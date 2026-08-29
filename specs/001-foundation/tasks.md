@@ -9,26 +9,70 @@ criteria.
 
 ## Phase A — Local LLM (User Story 1, P1)
 
-- [ ] T001 Confirm Ollama service configuration: set `OLLAMA_HOST=0.0.0.0:11434`
+- [x] T001 Confirm Ollama service configuration: set `OLLAMA_HOST=0.0.0.0:11434`
       and `OLLAMA_KEEP_ALIVE=-1` as persistent user/system environment
       variables; restart the Ollama service.
-      Verify: `netstat -ano | findstr :11434` shows listening on all interfaces.
+      Verified: `netstat -ano | findstr :11434` shows `0.0.0.0:11434` and
+      `[::]:11434` LISTENING.
 - [ ] T002 Add a Windows Firewall inbound rule scoping port 11434 to the
       Docker NAT subnet + loopback (not the whole internet).
-      Verify: `Get-NetFirewallRule` shows the rule; a request from outside
-      the LAN cannot reach 11434 (skip if machine has no public IP exposure
-      to test against — note as deferred).
-- [ ] T003 Pull `qwen3:4b`.
-      Verify: `ollama list` shows `qwen3:4b`.
-- [ ] T004 [P] Benchmark: send a streamed chat completion, measure tokens/second.
-      Verify: measured throughput ≥ 12 tok/s (SC-001); record the number.
-- [ ] T005 [P] Verify json_schema structured output: send a
+      **Deferred — needs elevated (admin) PowerShell, unavailable in the
+      automated session.** Exact command to run yourself, from an admin
+      PowerShell:
+      ```powershell
+      New-NetFirewallRule -DisplayName "Botvy-Ollama-DockerWSL" -Direction Inbound `
+        -Protocol TCP -LocalPort 11434 -Action Allow `
+        -RemoteAddress 172.16.0.0/12,127.0.0.1 -Profile Any
+      ```
+- [x] T003 Pull `qwen3:4b`.
+      Verified: `ollama list` / `/api/tags` shows `qwen3:4b` (Q4_K_M, 4.0B, 5.1GB).
+- [x] T004 [P] Benchmark: send a streamed chat completion, measure tokens/second.
+      **RESULT: FAILS SC-001.** GPU path crashes outright (see T005 note);
+      CPU-forced fallback (`OLLAMA_LLM_LIBRARY=cpu`) measured **≈4 tok/s**
+      (949 completion tokens in 238s, boosted by qwen3's default
+      chain-of-thought reasoning mode even for a one-word answer) — well
+      under the 12 tok/s gate. **Blocking finding, escalated to user — see
+      "Blocking issue" section below.**
+- [~] T005 [P] Verify json_schema structured output: send a
       `response_format: {"type":"json_schema", "json_schema": {...}, "strict": true}`
       request, confirm the response parses and matches the schema.
-- [ ] T006 Verify container reachability: run a throwaway container
+      First attempt (GPU path) crashed the whole ollama server —
+      `llama-server process has terminated: exit status 0xc0000409:
+      ... CUDA error: the provided PTX was compiled with an unsupported
+      toolchain.` Root cause: NVIDIA driver 556.12 (CUDA 12.5) is older
+      than what this Ollama build's CUDA PTX requires — **not** a
+      json_schema-specific bug; a plain non-schema chat request crashes
+      identically. Re-verifying schema correctness under the CPU-forced
+      fallback (functional-only, not a performance verification).
+- [x] T006 Verify container reachability: run a throwaway container
       (`docker run --rm curlimages/curl ...`) hitting
       `http://host.docker.internal:11434/v1/models` — confirm it succeeds
       (proves the Phase 1 gateway will be able to reach Ollama).
+      Verified: `docker run --rm curlimages/curl -s http://host.docker.internal:11434/api/tags`
+      → HTTP 200.
+
+### Blocking issue: GPU inference unusable on this machine as configured
+
+NVIDIA driver 556.12 (CUDA 12.5) cannot run this Ollama build's CUDA
+kernels (PTX toolchain mismatch) — every GPU-path request crashes
+`llama-server`, not just the json_schema one. CPU fallback works but
+measures ~4 tok/s, far under the plan's 12 tok/s gate that the whole chat
+SSE UX was designed around. This is an environment decision, not something
+resolvable by more retries. Options, for the user to choose from:
+
+1. **Update the NVIDIA driver** to a version supporting a newer CUDA
+   toolchain (likely 566.xx+). Requires admin rights + possibly a reboot;
+   highest chance of fully unblocking the original GTX 1050 GPU-tier plan.
+2. **Pin an older Ollama version** built against CUDA 12.5 or earlier,
+   compatible with the current driver, if one still supports qwen3-family
+   models and structured outputs.
+3. **Accept CPU-only for now**, treat SC-001 as deferred/failed, and
+   revisit the model-size/hardware-tier decision (a smaller quantization,
+   a different backend, or moving inference to different hardware) later.
+
+No action taken autonomously beyond diagnosis — this changes a core
+architectural assumption (GPU-tier hardware) from the approved plan and is
+exactly the kind of decision reserved for the user.
 
 ## Phase B — Postgres + n8n (User Story 2, P1)
 

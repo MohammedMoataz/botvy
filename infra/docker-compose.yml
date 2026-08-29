@@ -1,0 +1,84 @@
+name: botvy
+
+# Foundation-phase stack (feature 001-foundation): Postgres + n8n + a
+# placeholder standing in for the not-yet-built gateway, so the public
+# ingress boundary (constitution: Single Public Surface) exists before
+# there is a real gateway to protect. The gateway service itself replaces
+# "gateway-stub" starting in feature 002.
+#
+# Runs alongside the old reference stack (E:\Software\automation\botvy),
+# which keeps using host port 5678 for its own n8n — this stack uses 5679
+# to avoid collision (constitution: Development Workflow / parallel run).
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER not set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD not set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB not set}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init-postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:?N8N_VERSION not set}
+    restart: unless-stopped
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:?POSTGRES_USER not set}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD not set}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY not set}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5679/
+      GENERIC_TIMEZONE: ${TZ:?TZ not set}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "10000"
+    ports:
+      # host 5679, not 5678 — see file header
+      - "127.0.0.1:5679:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  gateway-stub:
+    # Temporary placeholder for feature 001-foundation only, proving the
+    # tunnel forwards to *a* service before the real gateway (feature 002+)
+    # exists. Deleted once apps/gateway has its own compose service.
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel run
+    environment:
+      # :- not :? — compose interpolates every service's env at parse time
+      # even when gated by a profile that isn't active, so a required var
+      # here would break `docker compose up -d` for the default profile.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - gateway-stub
+
+volumes:
+  pg_data:
+  n8n_data:

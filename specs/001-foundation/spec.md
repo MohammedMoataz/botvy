@@ -52,7 +52,10 @@ itself must be running for any workflow feature to build on.
 
 **Independent Test**: `docker compose up -d postgres n8n` brings both
 containers to a healthy state; connecting to `botvy` and `n8n` databases
-independently succeeds; the n8n editor loads at `http://localhost:5678`.
+independently succeeds; the n8n editor loads at `http://localhost:5679`
+(port 5679, not 5678 — the old reference botvy stack's n8n already
+occupies 127.0.0.1:5678 and keeps running in parallel per the constitution's
+Development Workflow section; this feature's n8n must not collide with it).
 
 **Acceptance Scenarios**:
 
@@ -89,7 +92,7 @@ external device, `n8n`'s editor port and Postgres's port are unreachable.
    receives a response (even if a temporary placeholder, since the gateway
    does not exist yet).
 2. **Given** the same external client, **When** it attempts to reach port
-   `5678` (n8n) or `5432` (Postgres) on the tunnel hostname or the host's
+   `5679` (n8n) or `5432` (Postgres) on the tunnel hostname or the host's
    public IP, **Then** the connection fails — those ports are bound to
    `127.0.0.1` only.
 

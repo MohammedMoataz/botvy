@@ -29,6 +29,7 @@ apps/admin/dist/
 
 # Agent credentials (spec-kit warning: may store auth tokens)
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # OS/editor
 .DS_Store
