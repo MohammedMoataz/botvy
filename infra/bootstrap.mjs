@@ -70,7 +70,32 @@ try {
 }
 
 // --- 2. n8n owner ---------------------------------------------------------
-const settings = await fetch(`${N8N_URL}/rest/settings`).then((r) => r.json());
+// On the fresh-machine path this script exists for, n8n is usually still
+// booting when we get here — it takes appreciably longer than Postgres.
+// Waiting is the normal case, not an error.
+async function waitForN8n(timeoutMs = 180_000) {
+  const deadline = Date.now() + timeoutMs;
+  process.stdout.write('› waiting for n8n');
+  for (;;) {
+    try {
+      const res = await fetch(`${N8N_URL}/rest/settings`);
+      if (res.ok) {
+        process.stdout.write(' ready\n');
+        return res.json();
+      }
+    } catch {
+      /* not accepting connections yet */
+    }
+    if (Date.now() > deadline) {
+      process.stdout.write('\n');
+      throw new Error(`n8n did not become ready at ${N8N_URL} within ${timeoutMs / 1000}s`);
+    }
+    process.stdout.write('.');
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
+const settings = await waitForN8n();
 if (settings.data?.userManagement?.showSetupOnFirstLoad) {
   console.log('› creating the n8n owner account');
   const res = await fetch(`${N8N_URL}/rest/owner/setup`, {

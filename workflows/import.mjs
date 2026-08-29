@@ -48,24 +48,52 @@ const files = (await readdir(HERE))
 const existing = await api('/workflows?limit=250');
 const byName = new Map((existing.data ?? []).map((w) => [w.name, w.id]));
 
+// n8n assigns its own id on import, so the `errorWorkflow: "BotvyErrorHandler"`
+// written in the JSON files never resolves — n8n then drops the setting
+// silently and logs `Could not find workflow "BotvyErrorHandler"` only when a
+// failure actually needs it. The handler is imported first (see the sort
+// above), so its real id is known by the time the others are written, and
+// each reference is rewritten to it here.
+const ERROR_HANDLER_NAME = 'Botvy Error Handler';
+const PLACEHOLDER_ERROR_ID = 'BotvyErrorHandler';
+let errorHandlerId = byName.get(ERROR_HANDLER_NAME) ?? null;
+
 for (const file of files) {
   const workflow = JSON.parse(await readFile(join(HERE, file), 'utf8'));
+
+  const settings = { ...(workflow.settings ?? {}) };
+  if (settings.errorWorkflow === PLACEHOLDER_ERROR_ID) {
+    if (!errorHandlerId) {
+      console.warn(
+        `  ! ${workflow.name}: error handler not imported yet, dropping its errorWorkflow reference`,
+      );
+      delete settings.errorWorkflow;
+    } else {
+      settings.errorWorkflow = errorHandlerId;
+    }
+  }
+
   // The API rejects unknown top-level keys; keep only what it accepts.
   const payload = {
     name: workflow.name,
     nodes: workflow.nodes,
     connections: workflow.connections,
-    settings: workflow.settings ?? {},
+    settings,
   };
 
   const existingId = byName.get(workflow.name);
+  let id;
   if (existingId) {
     await api(`/workflows/${existingId}`, { method: 'PUT', body: JSON.stringify(payload) });
-    console.log(`updated  ${workflow.name} (${existingId})`);
+    id = existingId;
+    console.log(`updated  ${workflow.name} (${id})`);
   } else {
     const created = await api('/workflows', { method: 'POST', body: JSON.stringify(payload) });
-    console.log(`created  ${workflow.name} (${created.id})`);
+    id = created.id;
+    console.log(`created  ${workflow.name} (${id})`);
   }
+
+  if (workflow.name === ERROR_HANDLER_NAME) errorHandlerId = id;
 }
 
 console.log('\nWorkflows are imported but NOT activated. Activate them in the n8n UI,');
