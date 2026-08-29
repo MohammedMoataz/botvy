@@ -1,0 +1,38 @@
+# Tool checkout — not part of this product's history
+/spec-kit/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Runtime data
+/data/
+*.sqlite
+*.sqlite-*
+
+# Build output
+dist/
+build/
+.next/
+apps/mobile/build/
+apps/mobile/.dart_tool/
+apps/admin/dist/
+
+# Flutter
+**/ios/Pods/
+**/android/.gradle/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+
+# Logs
+*.log
+npm-debug.log*
