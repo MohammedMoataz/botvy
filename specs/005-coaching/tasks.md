@@ -21,9 +21,10 @@
       training days, pending-check-in state), `CheckIn` (unique per user per
       local date), `WorkoutRecord` (unique per user per date, with a
       `source` distinguishing reported from planned).
-- [ ] T004 Generate and apply the migration. **Blocked: Docker is down
-      while its WSL storage is relocated**, so Postgres is unreachable.
-      The schema compiles and the client generates.
+- [x] T004 Generate and apply the migration.
+      Verified: migration `20260829224830_add_coaching` applied;
+      `psql -d botvy -c "\dt"` lists `coaching_profiles`, `checkins`,
+      `workout_records` alongside the earlier nine tables.
 
 ## Phase C — Services and API
 
@@ -61,12 +62,37 @@
       delivery.
       Deliberately one cycle, unlike the predecessor which sent tomorrow's
       program after the check-in reply *and* today's an hour later.
-- [ ] T012 Import and verify a real scheduled execution. **Blocked on Docker.**
+- [x] T012 Import into the running n8n.
+      Verified: `Botvy Nightly Coaching` created, and after the import fix
+      below its `errorWorkflow` resolves to the handler's real id.
+      **Bug found here**: the workflow JSON referenced the literal id
+      `BotvyErrorHandler`, but n8n assigns its own id on import, so every
+      workflow's error handling was silently unwired — n8n reported it only
+      in its log (`Could not find workflow "BotvyErrorHandler"`) and only
+      when a failure actually needed the handler. `import.mjs` now rewrites
+      the reference to the handler's real id.
 
-## Deferred / blocked
+## Live verification (against the running stack)
 
-- All database-touching verification (T004, T012) is blocked only on Docker
-  being down for its storage move — no design question is open.
-- Model-dependent quality (does the generated program read well, does
-  extraction populate the profile correctly) cannot be assessed while
-  inference is CPU-bound; that remains gated on the GPU driver.
+| Criterion | Result |
+|---|---|
+| SC-001 profile capture | `PATCH /coaching/profile` stored opt-in, timezone, allergies, training days; a follow-up `{"weightKg":77}` changed only weight — allergies and goal survived (FR-002) |
+| SC-002 one check-in per date | Replying "yeah trained legs and ate clean" recorded `adhered=t`; re-opening and replying "no I skipped today" left **exactly 1 row**, flipped to `adhered=f` |
+| Check-in tone | A miss answered with "one off day changes nothing long term" — recorded truthfully, answered encouragingly |
+| Streak | 0 → 1 after an adhered day, back to 0 when flipped to a miss |
+| SC-004 rest day | Program push on a Sunday (training days 1/3/5) returned `skippedRestDay:1`, `sent:0`, and stored **0** workout records |
+| Internal endpoint auth | Service token accepted; a valid **user JWT** rejected with 401 |
+| Timezone | Context reported `today` in the profile's `Africa/Cairo`, not the server's zone |
+
+Notable: the check-in reply path returns in under a second because it
+short-circuits **before** any model call — the classifier decides the common
+yes/no cases itself. That is what makes this feature usable at all while
+inference is CPU-bound.
+
+## Still gated on the GPU driver
+
+Program *generation* quality (does the plan read well, does the allergy gate
+actually catch a model that ignores the constraint) needs a model call per
+user and cannot be assessed at ~4 tokens/second. The deterministic rules
+around it — rest days, withholding, overwrite precedence — are unit-tested
+and, above, verified live.

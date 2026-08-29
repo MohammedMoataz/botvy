@@ -27,10 +27,22 @@
       is never conflated with an empty workflow list (FR-007). The
       executions call degrades to an empty list on its own, so a missing
       execution history does not fail the whole listing.
-- [ ] T006 Verify live against n8n: list shows a next-run for the 5-minute
-      sweep and none for the error handler; deactivate is reflected in n8n;
-      run-now produces an execution (SC-001, SC-002, SC-003).
-      **Blocked: Docker is down while its WSL storage is relocated.**
+- [x] T006 Verify live against n8n (SC-001, SC-003).
+      `GET /workflows` returned:
+      ```
+      Botvy Error Handler   | active=false | nextRun=—                        | canTrigger=false
+      Botvy Reminder Sweep  | active=true  | nextRun=2026-08-29T22:59:18.837Z | canTrigger=true
+      Botvy Nightly Coaching| active=false | nextRun=—                        | canTrigger=true
+      ```
+      Exactly as specified: a next-run for the scheduled sweep, none for the
+      error handler (no schedule), and `canTrigger` true only where a
+      companion webhook exists.
+      Run-now: `POST /workflows/eJ67.../run` →
+      `{"triggered":true,"status":200,"webhook":"botvy-sweep"}` (SC-003).
+      Role guard (SC-004): a `user`-role token → **403**; the admin → 200.
+      Investigated the sweep's `crashed` last-execution: n8n's own log says
+      *"Marked executions as crashed … due to … a restart of n8n"* — an
+      artifact of the Docker instability, not a node failure.
 
 ## Phase C — Admin SPA delivery
 
