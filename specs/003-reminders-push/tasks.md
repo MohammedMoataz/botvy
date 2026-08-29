@@ -53,8 +53,19 @@
 - [x] T013 `workflows/error_handler.json` — error trigger → `POST /internal/alerts`.
       Must be imported FIRST: n8n silently drops an `errorWorkflow` setting
       whose id does not resolve.
-- [ ] T014 Import both into the running n8n and verify a real scheduled
-      execution fires the sweep. **Not yet done.**
+- [x] T014 Import both into the running n8n.
+      Verified: `node workflows/import.mjs` →
+      `created Botvy Error Handler (CyhmDLuvjgTX7kHU)` /
+      `created Botvy Reminder Sweep (eJ67qs9hLJr96Ts0)`;
+      activation returns `active: true`.
+      Prerequisites handled along the way: n8n owner account created (its
+      REST API refuses everything until one exists), an API key minted and
+      stored in `.env`, and `INTERNAL_SERVICE_TOKEN` passed through to the
+      n8n container so the workflows' HTTP nodes can authenticate.
+- [ ] T015 Observe a real *scheduled* execution reaching the gateway.
+      Requires the gateway running as a container (the workflow calls
+      `http://gateway:8080`, which only resolves inside the compose
+      network). Pending the image rebuild that carries the Prisma ESM fix.
 
 ## Deferred / blocked
 

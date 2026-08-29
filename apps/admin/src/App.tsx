@@ -2,10 +2,11 @@ import { useSyncExternalStore } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { getAccessToken, logout, subscribeAuth } from './api/client';
-import { listDevices, listSettings, listUsers } from './api/admin';
 import Login from './pages/Login';
 import Overview from './pages/Overview';
-import Pending from './pages/Pending';
+import Users from './pages/Users';
+import Devices from './pages/Devices';
+import Config from './pages/Config';
 
 export function useIsAuthed(): boolean {
   return useSyncExternalStore(subscribeAuth, getAccessToken, () => null) !== null;
@@ -58,15 +59,9 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route element={<Shell />}>
         <Route index element={<Overview />} />
-        <Route path="users" element={<Pending title="Users" endpoint="/admin/users" query={listUsers} />} />
-        <Route
-          path="devices"
-          element={<Pending title="Devices" endpoint="/admin/devices" query={listDevices} />}
-        />
-        <Route
-          path="config"
-          element={<Pending title="Config" endpoint="/admin/settings" query={listSettings} />}
-        />
+        <Route path="users" element={<Users />} />
+        <Route path="devices" element={<Devices />} />
+        <Route path="config" element={<Config />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

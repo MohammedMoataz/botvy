@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { getHealth } from '../api/client';
-import { getStats, isNotImplemented, type AdminStats } from '../api/admin';
+import { getStats, type AdminStats } from '../api/admin';
 
 function Dot({ ok }: { ok: boolean | undefined }) {
   const state = ok === undefined ? 'unknown' : ok ? 'up' : 'down';
@@ -55,28 +55,24 @@ export default function Overview() {
       </section>
 
       <section>
-        <h2>
-          Usage <span className="badge">placeholder</span>
-        </h2>
-        {isNotImplemented(stats.error) && (
-          <p className="muted">
-            Waiting on <code>GET /admin/stats</code> from the gateway — no numbers are shown until
-            it exists.
-          </p>
-        )}
+        <h2>Usage</h2>
         <div className="grid">
           {STAT_CARDS.map(({ key, label }) => (
             <div className="card" key={key}>
               <div className="stat-label">{label}</div>
               <div className="stat-value">
-                {stats.data ? stats.data[key].toLocaleString() : <span className="muted">—</span>}
+                {stats.data ? (
+                  stats.data[key].toLocaleString()
+                ) : (
+                  <span className="muted">{stats.isPending ? '…' : '—'}</span>
+                )}
               </div>
             </div>
           ))}
         </div>
-        {stats.error && !isNotImplemented(stats.error) && (
+        {stats.error && (
           <p className="error" role="alert">
-            {stats.error.message}
+            GET /admin/stats failed: {stats.error.message}
           </p>
         )}
       </section>

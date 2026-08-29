@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/models.dart';
+import '../reminders/reminders_screen.dart';
 import '../settings/settings_screen.dart';
 import 'chat_controller.dart';
 
@@ -49,6 +50,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: const Text('Botvy'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.alarm),
+            tooltip: 'Reminders',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RemindersScreen()),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',

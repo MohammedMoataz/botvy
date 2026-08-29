@@ -49,3 +49,6 @@ apps/gateway/generated/
 
 # Volume backups from the decommissioned old stack (large, local-only)
 backups/
+
+# MCP browser-tool scratch output
+.playwright-mcp/

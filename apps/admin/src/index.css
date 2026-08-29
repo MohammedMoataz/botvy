@@ -139,14 +139,40 @@ pre {
   background: var(--down);
 }
 
-.badge {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  background: #fef3c7;
-  color: #92400e;
+.table-wrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.pill {
+  font-size: 12px;
+  border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 2px 6px;
-  vertical-align: middle;
+  padding: 2px 7px;
+}
+.pill-active {
+  color: var(--up);
+}
+.pill-banned {
+  color: var(--down);
 }
 
 .muted {

@@ -230,6 +230,40 @@ class ApiClient {
     }
   }
 
+  // -- reminders -----------------------------------------------------------
+
+  /// Every status. `?status=active|done|cancelled` exists but the screen shows
+  /// the lot, so there is nothing to filter with yet.
+  Future<List<Reminder>> reminders() async {
+    final res = await _guard(() => dio.get('/reminders'));
+    final rows = (res.data as List?) ?? const [];
+    return rows
+        .map((r) => Reminder.fromJson(Map<String, dynamic>.from(r as Map)))
+        .toList();
+  }
+
+  Future<Reminder> createReminder({
+    required String title,
+    required DateTime remindAt,
+  }) async {
+    final res = await _guard(() => dio.post('/reminders', data: {
+          'title': title,
+          'remindAt': remindAt.toUtc().toIso8601String(),
+          // Fixed defaults -- the UI has no lead-time editor. A lead time
+          // already in the past is dropped server-side, which is expected.
+          'leadTimes': const ['1h', '0m'],
+        }));
+    return Reminder.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  /// Cancelling also drops the reminder's unsent notifications, server-side.
+  /// Someone else's id answers 404, never 403 -- see [ApiException.statusCode].
+  Future<Reminder> cancelReminder(String id) async {
+    final res = await _guard(
+        () => dio.patch('/reminders/$id', data: {'status': 'cancelled'}));
+    return Reminder.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
   // -- health --------------------------------------------------------------
 
   Future<HealthStatus> health() async {
