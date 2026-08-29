@@ -1,0 +1,15 @@
+# Never send host node_modules into the build context: pnpm's Windows
+# symlink layout breaks the tar checksum step, and the image builds its
+# own dependencies anyway.
+**/node_modules
+**/dist
+**/build
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+spec-kit/
+specs/
+data/
+**/.dart_tool
+**/*.log

@@ -1,10 +1,8 @@
 name: botvy
 
-# Foundation-phase stack (feature 001-foundation): Postgres + n8n + a
-# placeholder standing in for the not-yet-built gateway, so the public
-# ingress boundary (constitution: Single Public Surface) exists before
-# there is a real gateway to protect. The gateway service itself replaces
-# "gateway-stub" starting in feature 002.
+# Botvy stack: Postgres (app data + n8n's own database), n8n, the NestJS
+# gateway (the ONLY service the tunnel exposes — constitution: Single
+# Public Surface), and cloudflared behind the optional "tunnel" profile.
 #
 # Runs alongside the old reference stack (E:\Software\automation\botvy),
 # which keeps using host port 5678 for its own n8n — this stack uses 5679
@@ -57,14 +55,32 @@ services:
       postgres:
         condition: service_healthy
 
-  gateway-stub:
-    # Temporary placeholder for feature 001-foundation only, proving the
-    # tunnel forwards to *a* service before the real gateway (feature 002+)
-    # exists. Deleted once apps/gateway has its own compose service.
-    image: nginx:alpine
+  gateway:
+    build:
+      context: ..
+      dockerfile: apps/gateway/Dockerfile
     restart: unless-stopped
+    environment:
+      # Inside the compose network Postgres is reachable by service name;
+      # Ollama runs natively on the host, so it needs host.docker.internal.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_CONTAINER:-http://host.docker.internal:11434/v1}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:?OLLAMA_CHAT_MODEL not set}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET not set}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET not set}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+      LLM_REQUEST_TIMEOUT_MS: ${LLM_REQUEST_TIMEOUT_MS:-120000}
+      CHAT_RATE_LIMIT_PER_MIN: ${CHAT_RATE_LIMIT_PER_MIN:-20}
+      CHAT_DAILY_QUOTA_TOKENS: ${CHAT_DAILY_QUOTA_TOKENS:-50000}
+      PORT: "8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -77,7 +93,7 @@ services:
       # here would break `docker compose up -d` for the default profile.
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     depends_on:
-      - gateway-stub
+      - gateway
 
 volumes:
   pg_data:

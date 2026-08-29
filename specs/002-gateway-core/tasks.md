@@ -4,11 +4,23 @@
 
 ## Phase A — Scaffold
 
-- [ ] T001 Scaffold `apps/gateway` (NestJS, TypeScript, pnpm) inside the workspace.
-- [ ] T002 Add Prisma; write `schema.prisma` for User, RefreshToken, Message, UsageLog per plan's Key Entities.
-- [ ] T003 Add a `gateway` service to `infra/docker-compose.yml` (build from `apps/gateway`, env from root `.env`, `depends_on: postgres`); point Cloudflare tunnel's public hostname at it instead of `gateway-stub` (compose file only — actual DNS/dashboard change is user's, per Feature 001's tunnel-setup.md).
-- [ ] T004 `prisma migrate dev` — generate + apply the initial migration against the `botvy` database from Feature 001.
-      Verify: migration file committed; `prisma studio` or `psql` shows the four tables.
+- [x] T001 Scaffold `apps/gateway` (NestJS, TypeScript, pnpm) inside the workspace.
+      Done: `@botvy/gateway` package, pnpm workspace at repo root.
+      Note: `pnpm` is invoked as `npx pnpm@latest` — a global corepack
+      install fails with EPERM against `C:\Program Files\nodejs`.
+- [x] T002 Add Prisma; write `schema.prisma` for User, RefreshToken, Message, UsageLog per plan's Key Entities.
+      Pinned Prisma 6.19.3 (not 7.x — 7 moves to a new config format;
+      no reason to absorb that churn at this scope).
+- [x] T003 Add a `gateway` service to `infra/docker-compose.yml` (build from `apps/gateway`, env from root `.env`, `depends_on: postgres`); point Cloudflare tunnel's public hostname at it instead of `gateway-stub`.
+      Done: `gateway-stub` placeholder deleted, real `gateway` service in
+      its place with `extra_hosts: host.docker.internal:host-gateway` so the
+      container can reach host-native Ollama; cloudflared now depends on
+      `gateway`. Container CMD runs `prisma migrate deploy` before boot so a
+      fresh machine converges its schema automatically.
+      Verified: `docker compose config --quiet` passes.
+- [x] T004 `prisma migrate dev` — generate + apply the initial migration against the `botvy` database from Feature 001.
+      Verified: migration `20260829175841_init` committed; `psql -d botvy -c "\dt"`
+      lists `users`, `refresh_tokens`, `messages`, `usage_log` (+ `_prisma_migrations`).
 
 ## Phase B — Auth (User Story 1, P1)
 
