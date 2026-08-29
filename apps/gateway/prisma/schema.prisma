@@ -30,8 +30,32 @@ model User {
   refreshTokens RefreshToken[]
   messages      Message[]
   usageLogs     UsageLog[]
+  devices       Device[]
 
   @@map("users")
+}
+
+model Device {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installId  String    @unique @map("install_id")
+  name       String?
+  platform   String
+  fcmToken   String?   @map("fcm_token")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime? @map("last_seen_at")
+
+  @@index([userId])
+  @@map("devices")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
 }
 
 model RefreshToken {

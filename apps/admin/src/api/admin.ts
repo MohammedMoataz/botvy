@@ -1,11 +1,6 @@
-// ── STUBS FOR THE MAIN SESSION ────────────────────────────────────────────────
-// None of these endpoints exist on the gateway yet. Each function below already
-// carries its intended URL and response type; the fetch call is written and
-// type-checked but short-circuited by ADMIN_API_LIVE.
-//
-// TO ACTIVATE: flip ADMIN_API_LIVE to true once /admin/* lands. Adjust a URL or
-// a type here only if the shipped contract differs from what is written below.
-// ─────────────────────────────────────────────────────────────────────────────
+// All four /admin/* endpoints are live on the gateway and verified against it.
+// The NotImplementedError machinery below is retained only so a future
+// endpoint added here can reuse the same pending() + empty-state path.
 
 import { api } from './client';
 
@@ -23,7 +18,7 @@ export class NotImplementedError extends Error {
 export const isNotImplemented = (e: unknown): e is NotImplementedError =>
   e instanceof NotImplementedError;
 
-const ADMIN_API_LIVE = false;
+const ADMIN_API_LIVE = true;
 
 function pending<T>(endpoint: string): () => Promise<T> {
   return () =>
@@ -45,7 +40,9 @@ export interface AdminUser {
   email: string;
   displayName: string | null;
   role: 'user' | 'admin';
+  status: 'active' | 'banned';
   createdAt: string;
+  lastLoginAt: string | null;
 }
 export const listUsers = pending<AdminUser[]>('/admin/users');
 
@@ -53,14 +50,18 @@ export const listUsers = pending<AdminUser[]>('/admin/users');
 export interface AdminDevice {
   id: string;
   userId: string;
+  name: string | null;
   platform: string;
   lastSeenAt: string | null;
+  createdAt: string;
 }
 export const listDevices = pending<AdminDevice[]>('/admin/devices');
 
 // ── Config / settings ─────────────────────────────────────────────────────────
 export interface AdminSetting {
   key: string;
-  value: string;
+  /** jsonb column — shape varies per setting key. */
+  value: unknown;
+  updatedAt: string;
 }
 export const listSettings = pending<AdminSetting[]>('/admin/settings');

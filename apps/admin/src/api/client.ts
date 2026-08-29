@@ -59,7 +59,7 @@ async function parse<T>(res: Response): Promise<T> {
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
-function send(path: string, init: RequestInit, token: string | null): Promise<Response> {
+function send(path: string, init: RequestInit, token: string | null = null): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (init.body) headers.set('Content-Type', 'application/json');

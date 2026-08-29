@@ -16,6 +16,15 @@ COPY apps/gateway ./apps/gateway
 WORKDIR /repo/apps/gateway
 RUN pnpm exec prisma generate && pnpm exec nest build
 
+# Flatten pnpm's symlinked store into a plain node_modules the runner can
+# resolve. A raw COPY of the workspace's symlink farm leaves the prisma CLI
+# as a dangling link, which breaks `migrate deploy` at container start.
+# node-linker=hoisted produces a real, self-contained directory tree.
+RUN pnpm --filter @botvy/gateway deploy --prod --config.node-linker=hoisted /deploy \
+  && cp -r /repo/apps/gateway/dist /deploy/dist \
+  && cp -r /repo/apps/gateway/prisma /deploy/prisma \
+  && cp -r /repo/apps/gateway/prompts /deploy/prompts
+
 FROM node:24-slim AS runner
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl \
@@ -24,15 +33,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl \
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY --from=builder /repo/node_modules /repo/node_modules
-COPY --from=builder /repo/apps/gateway/node_modules ./node_modules
-COPY --from=builder /repo/apps/gateway/dist ./dist
-COPY --from=builder /repo/apps/gateway/prisma ./prisma
-COPY --from=builder /repo/apps/gateway/prompts ./prompts
-COPY --from=builder /repo/apps/gateway/package.json ./package.json
+COPY --from=builder /deploy ./
 
 EXPOSE 8080
 # Migrations are applied at container start so a fresh deployment on any
 # machine converges the schema without a separate manual step
 # (constitution: transferability + forward-only migrations).
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main.js"]

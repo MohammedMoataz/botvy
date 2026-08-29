@@ -11,6 +11,7 @@ const envSchema = z.object({
   OLLAMA_BASE_URL: z.string().url(),
   OLLAMA_CHAT_MODEL: z.string().min(1),
   LLM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
+  CORS_ORIGINS: z.string().optional(),
   CHAT_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(20),
   CHAT_DAILY_QUOTA_TOKENS: z.coerce.number().int().positive().default(50000),
   PORT: z.coerce.number().int().positive().default(8080),

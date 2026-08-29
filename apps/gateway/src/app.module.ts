@@ -9,6 +9,7 @@ import { LlmModule } from './llm/llm.module.js';
 import { ChatModule } from './chat/chat.module.js';
 import { UsageModule } from './usage/usage.module.js';
 import { HealthModule } from './health/health.module.js';
+import { AdminModule } from './admin/admin.module.js';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { HealthModule } from './health/health.module.js';
     UsageModule,
     ChatModule,
     HealthModule,
+    AdminModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

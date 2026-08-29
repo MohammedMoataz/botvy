@@ -1,3 +1,8 @@
+# The old reference stack at E:\Software\automation\botvy also used the
+# compose project name "botvy", which made Compose treat its containers as
+# this stack's services and replace them. That stack is being decommissioned,
+# so this project reclaims the name — but never run `up` here while any
+# container from the old stack still exists.
 name: botvy
 
 # Botvy stack: Postgres (app data + n8n's own database), n8n, the NestJS

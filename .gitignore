@@ -43,3 +43,6 @@ npm-debug.log*
 
 # Prisma-generated client output
 apps/gateway/generated/
+
+# TS incremental build info
+*.tsbuildinfo
