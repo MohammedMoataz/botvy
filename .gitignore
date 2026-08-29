@@ -46,3 +46,6 @@ apps/gateway/generated/
 
 # TS incremental build info
 *.tsbuildinfo
+
+# Volume backups from the decommissioned old stack (large, local-only)
+backups/

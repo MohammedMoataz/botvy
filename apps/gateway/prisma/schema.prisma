@@ -31,6 +31,7 @@ model User {
   messages      Message[]
   usageLogs     UsageLog[]
   devices       Device[]
+  reminders     Reminder[]
 
   @@map("users")
 }
@@ -48,6 +49,43 @@ model Device {
 
   @@index([userId])
   @@map("devices")
+}
+
+enum ReminderStatus {
+  active
+  done
+  cancelled
+}
+
+model Reminder {
+  id        String         @id @default(uuid())
+  userId    String         @map("user_id")
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  remindAt  DateTime       @map("remind_at")
+  status    ReminderStatus @default(active)
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  notifications ReminderNotification[]
+
+  @@index([userId, remindAt])
+  @@map("reminders")
+}
+
+model ReminderNotification {
+  id         String    @id @default(uuid())
+  reminderId String    @map("reminder_id")
+  reminder   Reminder  @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  notifyAt   DateTime  @map("notify_at")
+  label      String
+  sentAt     DateTime? @map("sent_at")
+
+  // Partial index over unsent rows only: the sweep's hot query. Carried
+  // forward from the predecessor system, where it was the one index that
+  // mattered at 288 sweeps/day.
+  @@unique([reminderId, label])
+  @@index([notifyAt], map: "idx_notifications_due")
+  @@map("reminder_notifications")
 }
 
 model Setting {

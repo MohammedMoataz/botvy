@@ -1,0 +1,61 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsArray, IsDate, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+
+export class CreateReminderDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  title!: string;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  @Type(() => Date)
+  @IsDate()
+  remindAt!: Date;
+
+  @ApiProperty({ required: false, example: ['1h', '0m'], description: 'Lead times, e.g. "1h", "30m", "0m"' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  leadTimes?: string[];
+}
+
+export class UpdateReminderDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  title?: string;
+
+  @ApiProperty({ required: false, type: String, format: 'date-time' })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  remindAt?: Date;
+
+  @ApiProperty({ required: false, enum: ['active', 'done', 'cancelled'] })
+  @IsOptional()
+  @IsEnum(['active', 'done', 'cancelled'])
+  status?: 'active' | 'done' | 'cancelled';
+}
+
+export class RegisterDeviceDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  installId!: string;
+
+  @ApiProperty()
+  @IsString()
+  platform!: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiProperty({ required: false, description: 'FCM registration token' })
+  @IsOptional()
+  @IsString()
+  fcmToken?: string;
+}

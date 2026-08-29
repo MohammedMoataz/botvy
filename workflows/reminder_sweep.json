@@ -1,0 +1,76 @@
+{
+  "name": "Botvy Reminder Sweep",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "b1a10000-0000-4000-8000-000000000001",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-220, -80]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "botvy-sweep",
+        "options": {}
+      },
+      "id": "b1a10000-0000-4000-8000-000000000002",
+      "name": "Manual Run Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-220, 120],
+      "webhookId": "b1a10000-0000-4000-8000-000000000002",
+      "notes": "Companion trigger so the gateway's POST /workflows/:id/run can fire this sweep on demand - n8n's public API has no execute-now."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gateway:8080/internal/reminders/sweep",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "b1a10000-0000-4000-8000-000000000003",
+      "name": "Call Gateway Sweep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 20],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "The gateway owns all selection, delivery and marking - this workflow only triggers it (constitution: n8n never touches the database)."
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[{ "node": "Call Gateway Sweep", "type": "main", "index": 0 }]]
+    },
+    "Manual Run Webhook": {
+      "main": [[{ "node": "Call Gateway Sweep", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "BotvyErrorHandler"
+  },
+  "tags": [{ "name": "botvy" }]
+}
