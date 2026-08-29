@@ -1,0 +1,123 @@
+{
+  "name": "Botvy Nightly Coaching",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 21,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "c1a10000-0000-4000-8000-000000000001",
+      "name": "21:00 Check-in",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-240, -140]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 22,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "c1a10000-0000-4000-8000-000000000002",
+      "name": "22:00 Program",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-240, 140]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "botvy-coaching",
+        "options": {}
+      },
+      "id": "c1a10000-0000-4000-8000-000000000003",
+      "name": "Manual Run Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "webhookId": "c1a10000-0000-4000-8000-000000000003",
+      "notes": "Companion trigger so the gateway's POST /workflows/:id/run can fire the program push on demand - n8n's public API has no execute-now."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gateway:8080/internal/coaching/checkin",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": { "timeout": 120000 }
+      },
+      "id": "c1a10000-0000-4000-8000-000000000004",
+      "name": "Ask Check-ins",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, -140],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "The gateway selects opted-in users, marks them awaiting, and pushes. n8n holds no user data (constitution: n8n never touches the database)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gateway:8080/internal/coaching/program",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": { "timeout": 600000 }
+      },
+      "id": "c1a10000-0000-4000-8000-000000000005",
+      "name": "Push Programs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 80],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 10000,
+      "notes": "Long timeout: this generates one plan per opted-in user through the local model, which is slow on modest hardware."
+    }
+  ],
+  "connections": {
+    "21:00 Check-in": {
+      "main": [[{ "node": "Ask Check-ins", "type": "main", "index": 0 }]]
+    },
+    "22:00 Program": {
+      "main": [[{ "node": "Push Programs", "type": "main", "index": 0 }]]
+    },
+    "Manual Run Webhook": {
+      "main": [[{ "node": "Push Programs", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "BotvyErrorHandler"
+  },
+  "tags": [{ "name": "botvy" }]
+}

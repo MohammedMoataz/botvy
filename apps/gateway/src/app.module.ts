@@ -12,6 +12,7 @@ import { HealthModule } from './health/health.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { RemindersModule } from './reminders/reminders.module.js';
 import { WorkflowsModule } from './workflows/workflows.module.js';
+import { CoachingModule } from './coaching/coaching.module.js';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -69,6 +70,7 @@ const adminStatic = ADMIN_DIST
     AdminModule,
     RemindersModule,
     WorkflowsModule,
+    CoachingModule,
     ...adminStatic,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
