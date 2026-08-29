@@ -22,7 +22,14 @@ hardware: your data, your workflow engine, your language model.
 ```powershell
 cp infra/.env.example .env     # then fill in the values it documents
 docker compose --env-file .env -f infra/docker-compose.yml up -d
+node infra/bootstrap.mjs       # migrations, n8n owner + API key, workflow import
 ```
+
+`bootstrap.mjs` is idempotent and exists because those steps have a
+non-obvious required order: n8n rejects every API call until an owner
+account exists, an API key's raw value is returned exactly once, and the
+error-handler workflow must be imported before anything referencing it or
+n8n silently drops the reference.
 
 Then see `infra/docs/ollama-setup.md` for the host-level Ollama
 configuration (the `OLLAMA_HOST` binding and firewall rule that let
