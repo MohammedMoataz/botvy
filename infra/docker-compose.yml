@@ -91,6 +91,26 @@ services:
       postgres:
         condition: service_healthy
 
+  # Quick tunnel: a free public URL with no Cloudflare account and no domain.
+  # The hostname is random and CHANGES EVERY RESTART — that rotation is what
+  # forced the old stack to run a watchdog. Fine for testing from a phone;
+  # use the named tunnel below once a domain exists.
+  #
+  #   docker compose --profile quick up -d
+  #   node infra/tunnel-url.mjs      # prints the current hostname
+  #
+  # This makes the gateway reachable by anyone holding the URL. With open
+  # registration that means strangers could sign up and consume the model,
+  # so turn registration off in the admin portal, or only run this profile
+  # while you are actually testing.
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["quick"]
+    command: tunnel --no-autoupdate --url http://gateway:8080
+    depends_on:
+      - gateway
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
