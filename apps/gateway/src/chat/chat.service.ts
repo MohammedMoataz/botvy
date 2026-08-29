@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { LlmService, type ChatMessage } from '../llm/llm.service.js';
 import { UsageService } from '../usage/usage.service.js';
 import { RemindersService } from '../reminders/reminders.service.js';
+import { CoachingService } from '../coaching/coaching.service.js';
+import { classifyCheckin } from '../coaching/checkin-classifier.js';
 import { loadPrompt } from '../llm/prompts.js';
 
 const HISTORY_LIMIT = 20;
@@ -43,6 +45,7 @@ export class ChatService {
     private readonly llm: LlmService,
     private readonly usage: UsageService,
     private readonly reminders: RemindersService,
+    private readonly coaching: CoachingService,
   ) {}
 
   async history(userId: string, limit = 50) {
@@ -107,6 +110,29 @@ export class ChatService {
     return null;
   }
 
+  /**
+   * Records an answer to the nightly check-in and returns what to say back,
+   * or null when the reply is too ambiguous to record — in which case the
+   * caller treats it as ordinary conversation rather than guessing.
+   */
+  private async handleCheckinReply(userId: string, reply: string): Promise<string | null> {
+    const verdict = classifyCheckin(reply);
+    if (verdict === 'unclear') return null;
+
+    const adhered = verdict === 'adhered';
+    await this.coaching.recordCheckin(userId, adhered, reply);
+    const context = await this.coaching.context(userId);
+
+    if (adhered) {
+      return context.streak > 1
+        ? `Logged — that's ${context.streak} days in a row. Keep it going.`
+        : 'Logged. Nice work today.';
+    }
+    // Recorded truthfully, but the response is encouraging rather than
+    // punitive: a coach that scolds gets ignored.
+    return 'Logged — one off day changes nothing long term. Tomorrow is a fresh start.';
+  }
+
   streamReply(userId: string, userMessage: string): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
       const heartbeat = setInterval(() => {
@@ -115,6 +141,29 @@ export class ChatService {
 
       const run = async () => {
         try {
+          // A pending nightly check-in takes precedence over intent
+          // classification: while one is open, this message is an answer to
+          // it, not a new request. The window is bounded so a message the
+          // next morning is not filed as last night's answer.
+          if (await this.coaching.isAwaitingCheckin(userId)) {
+            const reply = await this.handleCheckinReply(userId, userMessage);
+            if (reply) {
+              await this.prisma.message.create({
+                data: { userId, role: 'user', content: userMessage },
+              });
+              subscriber.next({ type: 'intent', data: { intent: 'checkin_reply' } });
+              subscriber.next({ type: 'token', data: reply });
+              await this.prisma.message.create({
+                data: { userId, role: 'assistant', content: reply },
+              });
+              subscriber.next({ type: 'done', data: {} });
+              subscriber.complete();
+              return;
+            }
+            // Unclear reply: fall through to a normal conversational turn
+            // rather than recording a guess against the user's streak.
+          }
+
           const historyRows = await this.history(userId, HISTORY_LIMIT);
           const historyText = historyRows.map((m) => `${m.role}: ${m.content}`).join('\n');
 
