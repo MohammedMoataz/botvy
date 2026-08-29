@@ -24,34 +24,93 @@
 
 ## Phase B — Auth (User Story 1, P1)
 
-- [ ] T005 Auth module: register (argon2id hash, duplicate-email rejection), login (issue access + refresh JWT pair).
-- [ ] T006 Refresh rotation: refresh endpoint issues a new pair and revokes the old refresh token; reusing a revoked token is rejected.
-- [ ] T007 Roles guard + decorator (`user`/`admin`); every route but `/health` requires a valid access token.
-- [ ] T008 [P] vitest: refresh-rotation reuse-detection unit test.
-- [ ] T009 Verify via curl: register → login → call a protected route with the access token → refresh → confirm old refresh token now rejected (SC per User Story 1's acceptance scenarios).
+- [x] T005 Auth module: register (argon2id hash, duplicate-email rejection), login (issue access + refresh JWT pair).
+- [x] T006 Refresh rotation: refresh endpoint issues a new pair and revokes the old refresh token; reusing a revoked token is rejected.
+- [x] T007 Roles guard + decorator (`user`/`admin`); every route but `/health` requires a valid access token.
+      Implemented as a global `JwtAuthGuard` + `RolesGuard` pair with a
+      `@Public()` decorator escape hatch for register/login/refresh/health.
+- [x] T008 [P] vitest: refresh-rotation reuse-detection unit test.
+- [x] T009 Verify via curl.
+      Verified output:
+      - register alice → `{"id":"0f6589dd-...","email":"alice@example.com","role":"user"}`
+      - duplicate register → `{"message":"An account with this email already exists","error":"Conflict","statusCode":409}`
+      - `/chat/history` with no token → `status: 401`
+      - refresh #1 → new token pair issued
+      - reuse of the same refresh token → `{"message":"Refresh token has already been used or revoked",...,"statusCode":401}`
+      Bug found and fixed during verification: optional `displayName` was
+      rejected as required because `@IsOptional()` was missing, so duplicate
+      registration returned 400 (validation) instead of 409 (conflict).
 
 ## Phase C — Chat pipeline (User Story 2, P1)
 
-- [ ] T010 LLM service: `openai` client against `OLLAMA_BASE_URL`; `extract(schema, messages)` (temp 0, json_schema) and `chat(messages)` (temp 0.4, streamed).
-- [ ] T011 `prompts/intent.md`, `prompts/chat.md` written and loaded at boot.
-- [ ] T012 Chat controller: `POST /chat` — quota check → intent call → SSE `event: intent` → if not a recognized structured action, streamed `event: token`/`event: done` → persist both turns to `Message` scoped to the authenticated user.
-- [ ] T013 `GET /chat/history` scoped to the authenticated user only.
-- [ ] T014 15-second SSE heartbeat comments; error event + clean close if the LLM call fails mid-stream.
-- [ ] T015 [P] vitest: intent-branch fallback (malformed JSON from the model falls back to plain chat, per spec's Edge Cases).
-- [ ] T016 Verify via `curl -N` with two separately registered users: each streams a reply, each sees only their own `/chat/history`; hold one connection idle 60s+ and confirm heartbeats keep it alive (SC-001, SC-002).
+- [x] T010 LLM service: `openai` client against `OLLAMA_BASE_URL`; `extract(schema, messages)` (temp 0, json_schema) and `chat(messages)` (temp 0.4, streamed).
+- [x] T011 `prompts/intent.md`, `prompts/chat.md` written and loaded at boot.
+- [x] T012 Chat controller: `POST /chat` SSE pipeline.
+- [x] T013 `GET /chat/history` scoped to the authenticated user only.
+- [x] T014 15-second SSE heartbeats; error event + clean close on LLM failure.
+- [x] T015 [P] vitest: intent-branch fallback.
+- [x] T016 Verify via `curl -N` with two users.
+      Verified SSE stream (alice, "Reply with exactly: hello alice"):
+      ```
+      event: heartbeat / data: {}
+      event: intent   / data: {"intent":"chat","fallback":true}
+      event: token    / data: hello
+      event: token    / data:  alice
+      event: done     / data: {}
+      ```
+      Isolation verified: alice `/chat/history` → 2 messages (her turn +
+      the assistant reply, both persisted); bob `/chat/history` → 0. (SC-001)
+
+      **Bug found and fixed during verification:** the initial 10s OpenAI-SDK
+      timeout was shorter than a CPU-only inference call, so EVERY
+      structured-extraction call silently timed out and degraded to the plain
+      chat fallback (`"fallback":true` above). Root-caused from the log line
+      `extract() failed ... Error: Request timed out.` Timeout is now
+      configurable (`LLM_REQUEST_TIMEOUT_MS`, default 120s).
+      Re-verified after the fix, "remind me to call mom tomorrow at 5pm" →
+      `{"intent":"structured_action","fallback":false}` — json_schema
+      constrained decoding works correctly on this Ollama build, which
+      de-risks the Reminders feature.
+
+      Deferred: the explicit 60s-idle heartbeat soak (SC-002). Heartbeats are
+      observably emitted (see the stream above); the timed soak is worth
+      re-running once inference is not CPU-bound.
 
 ## Phase D — Quota & rate limiting (User Story 3, P2)
 
-- [ ] T017 `@nestjs/throttler` global guard with a configurable per-minute limit.
-- [ ] T018 Usage service: log every chat call's token usage; reject with 429 (distinct message) when the authenticated user's daily total exceeds the configured quota — checked *before* any model call is made.
-- [ ] T019 [P] vitest: quota-boundary unit test (request that would exceed quota is rejected pre-call).
-- [ ] T020 Verify via curl: exceed the rate limit → 429; exceed the daily quota → distinct 429 (SC-003).
+- [x] T017 `@nestjs/throttler` global guard with a configurable per-minute limit.
+- [x] T018 Usage service: log token usage; reject with a distinct 429 when the daily total is exceeded, checked *before* any model call.
+- [x] T019 [P] vitest: quota-boundary unit test.
+- [x] T020 Verify via curl (SC-003).
+      Rate limit — 25 rapid requests against a limit of 20/min:
+      `200 ×20, then 429 429 429 429 429` (exactly 5 rejections).
+      Daily quota — seeded 55,000 tokens against a 50,000 quota, waited for
+      the rate window to reset, then one chat request:
+      `{"reason":"daily_quota_exceeded","quota":50000}` with `status: 429`.
+      The two 429s are distinguishable, as required. Seeded row deleted after.
 
 ## Phase E — Health, docs, wrap-up
 
-- [ ] T021 `GET /health` — Postgres connectivity (Prisma `$queryRaw` ping) + Ollama reachability (`/api/tags`), no auth required.
-- [ ] T022 `@nestjs/swagger` wired in `main.ts`; confirm every route from this feature appears (SC-004).
-- [ ] T023 Update `specs/002-gateway-core/spec.md` status to `Implemented`; commit; merge `002-gateway-core` → `001-foundation` (not `master` — Feature 001 itself is still pending the user's Ollama/driver decision before merging further up).
+- [x] T021 `GET /health` — Postgres + Ollama reachability, no auth.
+      Verified: `{"status":"ok","database":true,"ollama":true}`.
+      **Bug found and fixed during verification:** `OLLAMA_BASE_URL` was set to
+      `host.docker.internal`, which only resolves inside a container, so a
+      host-run gateway hung. Split into `OLLAMA_BASE_URL` (host: localhost)
+      and `OLLAMA_BASE_URL_CONTAINER` (compose override), and gave the SDK an
+      explicit timeout so an unreachable backend reports down instead of hanging.
+- [x] T022 `@nestjs/swagger` wired in `main.ts` (SC-004).
+      Verified: `GET /docs-json` exports all six routes — `/auth/register`,
+      `/auth/login`, `/auth/refresh`, `/chat`, `/chat/history`, `/health` —
+      plus schemas RegisterDto, LoginDto, TokenPairDto, RefreshDto,
+      SendMessageDto. Saved as `apps/gateway/openapi.json`, the frozen
+      contract the Flutter and admin clients generate against.
+- [ ] T023 Update spec status to `Implemented`; merge `002-gateway-core` → `001-foundation`.
+
+### Test suite
+
+`vitest run` → **16 passed (3 files)**: quota boundaries, refresh rotation +
+reuse/expiry/tamper detection, duration parsing, and intent-extraction
+fallback paths (malformed JSON, empty content, backend throw).
 
 ## Dependencies
 

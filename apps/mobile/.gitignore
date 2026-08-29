@@ -1,0 +1,18 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# Generated platform folders are produced by `flutter create` (see report).
+android/.gradle/
+android/local.properties
+android/key.properties
+ios/Pods/
+ios/.symlinks/
+
+# Firebase config -- never commit, none exists yet.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
