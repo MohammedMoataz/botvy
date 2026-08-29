@@ -12,7 +12,13 @@ RUN corepack enable
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/gateway/package.json apps/gateway/
 COPY apps/admin/package.json apps/admin/
-RUN pnpm install --frozen-lockfile
+
+# Cache the pnpm store across builds. Without this every build re-downloads
+# the whole tree (~600 packages, firebase-admin's included), which on a
+# contended machine takes long enough to look like a hang.
+ENV PNPM_HOME=/pnpm
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && pnpm install --frozen-lockfile
 
 COPY apps/gateway ./apps/gateway
 COPY apps/admin ./apps/admin
