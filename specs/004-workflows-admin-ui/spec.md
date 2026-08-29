@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-30
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Workflow management and admin portal delivery: gateway endpoints proxying n8n REST to list, activate, deactivate and trigger workflows with computed next-run times, and the gateway serving the built admin SPA at /admin so it shares one origin and one public surface"
 

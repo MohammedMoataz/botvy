@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-29
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Gateway core: NestJS backend with Prisma/Postgres, JWT auth (register, login, refresh, roles), rate limiting and per-user daily quota, health check, chat SSE endpoint driving a two-call LLM pipeline (intent extraction then streamed chat) against the local Ollama server, OpenAPI docs"
 

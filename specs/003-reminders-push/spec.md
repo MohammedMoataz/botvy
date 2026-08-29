@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-29
 
-**Status**: Draft
+**Status**: Implemented
 
 **Input**: User description: "Reminders with push notifications: reminder CRUD scoped per user, natural-language reminder creation through the chat intent pipeline, device registration for FCM push tokens, notification fan-out with lead times, an n8n sweep workflow calling the gateway internal endpoint every 5 minutes, and an n8n error handler workflow pushing failures to admin devices"
 

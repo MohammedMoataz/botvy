@@ -63,12 +63,26 @@
       execution, with activate/deactivate and a run-now button that is
       disabled (with an explanatory title) for workflows having no webhook.
       Verified: `tsc --noEmit` → exit 0; `vite build` → 94 modules, built.
-- [ ] T011 Verify `/admin` and a deep link both load from the gateway, and
-      that the development CORS allowance is no longer needed (SC-005).
-      **Blocked on Docker** (the gateway needs Postgres to start).
+- [x] T011 Verify `/admin`, deep links, and same-origin operation (SC-005).
+      `GET /admin/` → 200 and real HTML; `GET /admin/users` (a client-side
+      route) → 200 via the SPA fallback rather than 404;
+      `GET /api/admin/stats` without a token → **401**, proving the static
+      handler does not shadow the API. The `/api/admin` move (T007) is what
+      makes that hold.
 
-## Deferred / blocked
+## Live browser verification (end to end, same-origin)
 
-Everything requiring a running stack (T006, T011) is blocked only on Docker
-being unavailable during the WSL storage move — not on any design question.
-The code builds and its pure logic is unit-tested.
+Driven through a real browser against the running stack:
+
+- **Login** succeeded from `/admin` with no CORS configuration — the SPA and
+  the API share an origin, which was the point of serving it here.
+- **Overview** rendered live data: health up, 2 users, 1 device, 11 messages
+  today, 1,755 tokens today.
+- **Workflows** rendered all three workflows from live n8n, with "Run now"
+  **disabled and explained** on the error handler ("no webhook trigger, so it
+  cannot be run on demand") and enabled on the two that carry one.
+- **SC-002**: clicking Deactivate turned the sweep off *in n8n itself*
+  (`active: false` via n8n's own API), the row updated to "inactive", and
+  clicking Activate turned it back on (`active: true`).
+
+Every acceptance scenario for this feature is now verified.
