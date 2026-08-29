@@ -1,5 +1,6 @@
-# Multi-stage build. The admin SPA (feature 004) will be built in its own
-# stage and copied into this image's static dir — not yet, per YAGNI.
+# Multi-stage build: the admin SPA is built in its own stage and copied in
+# beside dist/, so the gateway serves it at /admin and the whole system
+# keeps to one public surface (constitution V).
 FROM node:24-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends openssl python3 make g++ \
@@ -10,9 +11,17 @@ RUN corepack enable
 
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/gateway/package.json apps/gateway/
+COPY apps/admin/package.json apps/admin/
 RUN pnpm install --frozen-lockfile
 
 COPY apps/gateway ./apps/gateway
+COPY apps/admin ./apps/admin
+
+# The SPA is built with the API on the same origin, so it needs no base URL
+# and no CORS allowance in production.
+WORKDIR /repo/apps/admin
+RUN VITE_API_BASE_URL="" pnpm exec vite build
+
 WORKDIR /repo/apps/gateway
 RUN pnpm exec prisma generate && pnpm exec nest build
 
@@ -23,7 +32,8 @@ RUN pnpm exec prisma generate && pnpm exec nest build
 RUN pnpm --filter @botvy/gateway deploy --prod --config.node-linker=hoisted /deploy \
   && cp -r /repo/apps/gateway/dist /deploy/dist \
   && cp -r /repo/apps/gateway/prisma /deploy/prisma \
-  && cp -r /repo/apps/gateway/prompts /deploy/prompts
+  && cp -r /repo/apps/gateway/prompts /deploy/prompts \
+  && cp -r /repo/apps/admin/dist /deploy/admin
 
 FROM node:24-slim AS runner
 

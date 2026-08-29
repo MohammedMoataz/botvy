@@ -5,7 +5,7 @@ export default function Users() {
   return (
     <ListScreen
       title="Users"
-      endpoint="/admin/users"
+      endpoint="/api/admin/users"
       query={listUsers}
       empty="No users have registered yet."
       head={

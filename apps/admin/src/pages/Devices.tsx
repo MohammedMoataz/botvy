@@ -11,7 +11,7 @@ export default function Devices() {
   return (
     <ListScreen
       title="Devices"
-      endpoint="/admin/devices"
+      endpoint="/api/admin/devices"
       query={listDevices}
       empty="No devices are registered yet — none has paired with the gateway."
       head={

@@ -11,7 +11,7 @@ export default function Config() {
   return (
     <ListScreen
       title="Config"
-      endpoint="/admin/settings"
+      endpoint="/api/admin/settings"
       query={listSettings}
       empty="No settings are stored — the gateway is running on its defaults."
       head={

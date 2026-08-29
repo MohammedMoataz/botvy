@@ -13,6 +13,8 @@ const envSchema = z.object({
   LLM_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
   CORS_ORIGINS: z.string().optional(),
   INTERNAL_SERVICE_TOKEN: z.string().min(16),
+  N8N_URL: z.string().url().default('http://n8n:5678'),
+  N8N_API_KEY: z.string().optional(),
   FIREBASE_CREDENTIALS_FILE: z.string().optional(),
   CHAT_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(20),
   CHAT_DAILY_QUOTA_TOKENS: z.coerce.number().int().positive().default(50000),

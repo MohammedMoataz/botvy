@@ -7,6 +7,7 @@ import Overview from './pages/Overview';
 import Users from './pages/Users';
 import Devices from './pages/Devices';
 import Config from './pages/Config';
+import Workflows from './pages/Workflows';
 
 export function useIsAuthed(): boolean {
   return useSyncExternalStore(subscribeAuth, getAccessToken, () => null) !== null;
@@ -16,6 +17,7 @@ const NAV = [
   { to: '/', label: 'Overview', end: true },
   { to: '/users', label: 'Users', end: false },
   { to: '/devices', label: 'Devices', end: false },
+  { to: '/workflows', label: 'Workflows', end: false },
   { to: '/config', label: 'Config', end: false },
 ];
 
@@ -61,6 +63,7 @@ export default function App() {
         <Route index element={<Overview />} />
         <Route path="users" element={<Users />} />
         <Route path="devices" element={<Devices />} />
+        <Route path="workflows" element={<Workflows />} />
         <Route path="config" element={<Config />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

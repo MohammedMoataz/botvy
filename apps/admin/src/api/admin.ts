@@ -9,7 +9,7 @@ export interface AdminStats {
   messagesToday: number;
   tokensToday: number;
 }
-export const getStats = (): Promise<AdminStats> => api<AdminStats>('/admin/stats');
+export const getStats = (): Promise<AdminStats> => api<AdminStats>('/api/admin/stats');
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export interface AdminUser {
@@ -21,7 +21,7 @@ export interface AdminUser {
   createdAt: string;
   lastLoginAt: string | null;
 }
-export const listUsers = (): Promise<AdminUser[]> => api<AdminUser[]>('/admin/users');
+export const listUsers = (): Promise<AdminUser[]> => api<AdminUser[]>('/api/admin/users');
 
 // ── Devices ───────────────────────────────────────────────────────────────────
 export interface AdminDevice {
@@ -32,7 +32,7 @@ export interface AdminDevice {
   lastSeenAt: string | null;
   createdAt: string;
 }
-export const listDevices = (): Promise<AdminDevice[]> => api<AdminDevice[]>('/admin/devices');
+export const listDevices = (): Promise<AdminDevice[]> => api<AdminDevice[]>('/api/admin/devices');
 
 // ── Config / settings ─────────────────────────────────────────────────────────
 export interface AdminSetting {
@@ -41,4 +41,4 @@ export interface AdminSetting {
   value: unknown;
   updatedAt: string;
 }
-export const listSettings = (): Promise<AdminSetting[]> => api<AdminSetting[]>('/admin/settings');
+export const listSettings = (): Promise<AdminSetting[]> => api<AdminSetting[]>('/api/admin/settings');
