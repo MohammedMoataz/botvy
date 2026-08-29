@@ -51,6 +51,10 @@ services:
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       EXECUTIONS_DATA_MAX_AGE: "336"
       EXECUTIONS_DATA_PRUNE_MAX_COUNT: "10000"
+      # Read by the workflows' HTTP nodes as {{ $env.INTERNAL_SERVICE_TOKEN }}
+      # to authenticate against the gateway's /internal/* endpoints. This is
+      # the ONLY credential n8n holds.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN not set}
     ports:
       # host 5679, not 5678 — see file header
       - "127.0.0.1:5679:5678"
