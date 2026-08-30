@@ -55,3 +55,7 @@ backups/
 
 # Credential files - never commit
 secrets/
+
+# Flutter/IDE local files
+apps/mobile/.idea/
+apps/mobile/*.iml
