@@ -82,6 +82,20 @@ services:
       LLM_REQUEST_TIMEOUT_MS: ${LLM_REQUEST_TIMEOUT_MS:-120000}
       CHAT_RATE_LIMIT_PER_MIN: ${CHAT_RATE_LIMIT_PER_MIN:-20}
       CHAT_DAILY_QUOTA_TOKENS: ${CHAT_DAILY_QUOTA_TOKENS:-50000}
+      # Required by the gateway's config schema — without it the process
+      # exits at startup on a zod "Required" error. Same shared secret n8n
+      # presents on /internal/*; both sides must read the same value.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN not set}
+      # Minted by bootstrap.mjs. The admin portal's Workflows page is empty
+      # without it. N8N_URL is deliberately NOT passed: the container default
+      # (http://n8n:5678) is the in-network address, whereas .env holds the
+      # host-side one (localhost:5679) that bootstrap.mjs needs.
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Must be a path *inside* the container — add a read-only bind mount for
+      # the service-account JSON alongside it. Empty disables push and Google
+      # Sign-in, which the gateway degrades to rather than failing on.
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
       PORT: "8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -99,10 +113,14 @@ services:
   #   docker compose --profile quick up -d
   #   node infra/tunnel-url.mjs      # prints the current hostname
   #
-  # This makes the gateway reachable by anyone holding the URL. With open
-  # registration that means strangers could sign up and consume the model,
-  # so turn registration off in the admin portal, or only run this profile
-  # while you are actually testing.
+  # This makes the gateway reachable by anyone holding the URL, and anyone
+  # who has it can register: /auth/register is ungated, the admin API is
+  # read-only (no mutating routes), and nothing reads the Setting model, so
+  # there is currently NO way to turn registration off. Until there is, the
+  # only real control is to run this profile just while you are testing and
+  # bring it down afterwards:
+  #
+  #   docker compose --env-file .env -f infra/docker-compose.yml --profile quick down
   cloudflared-quick:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped

@@ -39,7 +39,12 @@ RUN pnpm --filter @botvy/gateway deploy --prod --config.node-linker=hoisted /dep
   && cp -r /repo/apps/gateway/dist /deploy/dist \
   && cp -r /repo/apps/gateway/prisma /deploy/prisma \
   && cp -r /repo/apps/gateway/prompts /deploy/prompts \
-  && cp -r /repo/apps/admin/dist /deploy/admin
+  && cp -r /repo/apps/admin/dist /deploy/admin \
+  # `deploy` rebuilds node_modules from the store, which does not carry the
+  # client generated above — that one lives in the workspace's own
+  # node_modules. Without regenerating here the runner starts, applies
+  # migrations, then dies on "@prisma/client did not initialize yet".
+  && (cd /deploy && ./node_modules/.bin/prisma generate --schema prisma/schema.prisma)
 
 FROM node:24-slim AS runner
 
