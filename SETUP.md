@@ -150,9 +150,16 @@ The Windows firewall rule has no direct equivalent. Binding to `0.0.0.0` puts
 Ollama on your LAN, so restrict it to the Docker bridge and loopback:
 
 ```bash
-sudo ufw allow from 172.16.0.0/12 to any port 11434 proto tcp
+# Use this stack's actual bridge subnet rather than a guess — Docker's pool is
+# configurable, and 172.16.0.0/12 is far wider than the one network involved.
+SUBNET=$(docker network inspect botvy_default \
+  -f '{{(index .IPAM.Config 0).Subnet}}')
+sudo ufw allow from "$SUBNET" to any port 11434 proto tcp
 sudo ufw deny 11434/tcp
 ```
+
+Re-check that subnet if you ever `docker compose down` the stack: removing and
+recreating the network can hand it a different one.
 
 **Reaching the host from a container.** `host.docker.internal` is not built in
 on Linux the way it is on Docker Desktop; it works here only because the
@@ -171,7 +178,7 @@ Then:
 
 ```bash
 export JAVA_HOME=~/opt/jdk17 ANDROID_HOME=~/opt/android-sdk
-export PATH=~/opt/flutter/bin:$ANDROID_HOME/platform-tools:$JAVA_HOME/bin:$PATH
+export PATH=~/opt/flutter/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$JAVA_HOME/bin:$PATH
 yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
 sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 flutter config --android-sdk ~/opt/android-sdk --jdk-dir ~/opt/jdk17
