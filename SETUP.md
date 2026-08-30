@@ -331,6 +331,30 @@ should be empty.
 packages with no cache; one sat at 373/605 for 15 minutes. A BuildKit cache
 mount on the pnpm store now fixes that, but the first build is still slow.
 
+**`npm error code ECOMPROMISED` / `Lock compromised` from npx.** An earlier
+`npx` run was killed while installing (a timeout, Ctrl-C, a closed
+terminal). npx takes a `concurrency.lock` in its cache before unpacking and
+only releases it on a clean exit, so a killed run leaves the lock behind
+forever and every later run of that same package fails.
+
+Confirm by looking for a zero-byte lock and a half-unpacked staging folder:
+
+```powershell
+Get-ChildItem "$(npm config get cache)\_npx" -Recurse -Filter concurrency.lock
+```
+
+A directory containing `concurrency.lock` but no `package.json` — often with
+a dot-prefixed folder like `.archiver-BKPZk49p` inside `node_modules` — is an
+interrupted install. Delete that one directory:
+
+```powershell
+Remove-Item "$(npm config get cache)\_npx\<hash>" -Recurse -Force
+```
+
+`npm cache clean --force` also works but throws away every cached package.
+The real prevention is simply not interrupting `npx` while it installs a
+large package; firebase-tools takes a while.
+
 ---
 
 ## The old Telegram assistant
