@@ -52,7 +52,7 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (!user || !(await argon2.verify(user.passwordHash, dto.password))) {
+    if (!user || !(await this.passwordMatches(user.passwordHash, dto.password))) {
       throw new UnauthorizedException('Invalid email or password');
     }
     await this.prisma.user.update({
@@ -93,6 +93,29 @@ export class AuthService {
     });
 
     return this.issueTokenPair(user.id, user.role);
+  }
+
+  /**
+   * argon2.verify THROWS on a value that is not a valid argon2 hash, rather
+   * than returning false. Google-only accounts deliberately store a
+   * non-argon2 placeholder, so an unguarded call would turn a wrong-password
+   * attempt into a 500 instead of a clean 401.
+   */
+  private async passwordMatches(hash: string, password: string): Promise<boolean> {
+    try {
+      return await argon2.verify(hash, password);
+    } catch {
+      return false;
+    }
+  }
+
+  /** Issues a token pair for an already-authenticated user (e.g. via Google). */
+  async issueForUser(userId: string, role: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { lastLoginAt: new Date() },
+    });
+    return this.issueTokenPair(userId, role);
   }
 
   private async issueTokenPair(userId: string, role: string) {

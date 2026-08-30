@@ -6,6 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
+import { GoogleAuthService } from './google-auth.service.js';
 import { JwtAuthGuard, RolesGuard } from './roles.guard.js';
 
 @Module({
@@ -22,6 +23,7 @@ import { JwtAuthGuard, RolesGuard } from './roles.guard.js';
   controllers: [AuthController],
   providers: [
     AuthService,
+    GoogleAuthService,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

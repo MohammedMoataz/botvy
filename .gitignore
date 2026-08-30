@@ -52,3 +52,6 @@ backups/
 
 # MCP browser-tool scratch output
 .playwright-mcp/
+
+# Credential files - never commit
+secrets/
