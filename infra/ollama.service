@@ -1,0 +1,40 @@
+# Ollama as a per-user systemd service (Linux hosts).
+#
+# The project runs Ollama natively rather than in Docker so it gets direct
+# GPU access. On Linux that means it needs a unit of its own; install it as a
+# *user* unit so no root is required:
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp infra/ollama.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now ollama
+#
+# For it to survive logout and start at boot, lingering must be enabled once
+# (this is the one step that needs root):
+#
+#   sudo loginctl enable-linger "$USER"
+#
+# Adjust ExecStart if Ollama is not unpacked at ~/opt/ollama.
+
+[Unit]
+Description=Ollama (native, GPU) for botvy
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/opt/ollama/bin/ollama serve
+Restart=always
+RestartSec=3
+
+# 0.0.0.0 is required, not a convenience: Ollama's default binds to loopback
+# only, which Docker containers cannot reach. That is the single most common
+# botvy setup failure. See the firewall note in SETUP.md — binding to all
+# interfaces also puts Ollama on the LAN until a rule restricts it.
+Environment=OLLAMA_HOST=0.0.0.0:11434
+
+# Keep the model resident, so the first request after an idle period does not
+# pay a cold load.
+Environment=OLLAMA_KEEP_ALIVE=-1
+
+[Install]
+WantedBy=default.target

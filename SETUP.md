@@ -115,6 +115,76 @@ Then open <http://localhost:8080/admin> and log in. Overview should show
 live counts; Workflows should list three workflows, imported but inactive.
 Turn them on when you want them firing.
 
+### On Linux instead of Windows
+
+The steps above are the same in substance; four of them differ in mechanics.
+Everything below was done on Ubuntu 24.04 without root, so it also covers the
+case where you cannot `sudo apt install`.
+
+**Secrets.** The PowerShell generator becomes:
+
+```bash
+tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40; echo
+```
+
+`bootstrap.mjs` parses `.env` literally — it does **not** expand `${...}` — so
+write the real password into `DATABASE_URL` rather than interpolating
+`POSTGRES_PASSWORD` into it.
+
+**Ollama.** There is no tray app. Recent releases ship a `.tar.zst`, not the
+`.tgz` the older docs assume, and it unpacks anywhere — no root needed:
+
+```bash
+curl -fL -o ollama.tar.zst \
+  https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst
+mkdir -p ~/opt/ollama && tar --use-compress-program=unzstd -xf ollama.tar.zst -C ~/opt/ollama
+ln -sf ~/opt/ollama/bin/ollama ~/.local/bin/ollama
+```
+
+`OLLAMA_HOST` and `OLLAMA_KEEP_ALIVE` belong in a service unit rather than a
+user environment variable — install `infra/ollama.service`, which documents
+both and the one-time `loginctl enable-linger` that makes it start at boot.
+Then `ollama pull qwen3:4b`.
+
+The Windows firewall rule has no direct equivalent. Binding to `0.0.0.0` puts
+Ollama on your LAN, so restrict it to the Docker bridge and loopback:
+
+```bash
+sudo ufw allow from 172.16.0.0/12 to any port 11434 proto tcp
+sudo ufw deny 11434/tcp
+```
+
+**Reaching the host from a container.** `host.docker.internal` is not built in
+on Linux the way it is on Docker Desktop; it works here only because the
+gateway service declares `extra_hosts: ["host.docker.internal:host-gateway"]`.
+Do not remove that line. Verify it end to end with:
+
+```bash
+docker exec botvy-gateway-1 node -e \
+  "fetch('http://host.docker.internal:11434/api/tags').then(r=>r.text()).then(console.log)"
+```
+
+**The Flutter toolchain**, if you have no root, is three tarballs into `~/opt`:
+the Flutter SDK, a JDK 17 (Temurin — the Gradle config pins Java 17), and the
+Android command-line tools unpacked to `~/opt/android-sdk/cmdline-tools/latest`.
+Then:
+
+```bash
+export JAVA_HOME=~/opt/jdk17 ANDROID_HOME=~/opt/android-sdk
+export PATH=~/opt/flutter/bin:$ANDROID_HOME/platform-tools:$JAVA_HOME/bin:$PATH
+yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
+sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+flutter config --android-sdk ~/opt/android-sdk --jdk-dir ~/opt/jdk17
+```
+
+`flutter doctor` will still fail the **Linux desktop** toolchain (clang, CMake,
+ninja, GTK). That is expected and irrelevant — this app targets Android.
+
+One wrinkle in the `flutter create` step: it writes a boilerplate
+`test/widget_test.dart` referencing a `MyApp` class this project does not have
+(the real one is `BotvyApp`), which then fails `flutter analyze`. Delete that
+one generated file; the project's own tests live beside it.
+
 ### Verifying a fresh install
 
 | Check | Expected |
