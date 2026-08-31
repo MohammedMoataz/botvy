@@ -82,6 +82,8 @@ services:
       LLM_REQUEST_TIMEOUT_MS: ${LLM_REQUEST_TIMEOUT_MS:-120000}
       CHAT_RATE_LIMIT_PER_MIN: ${CHAT_RATE_LIMIT_PER_MIN:-20}
       CHAT_DAILY_QUOTA_TOKENS: ${CHAT_DAILY_QUOTA_TOKENS:-50000}
+      # "false" closes self-registration on a publicly exposed instance.
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       # Required by the gateway's config schema — without it the process
       # exits at startup on a zod "Required" error. Same shared secret n8n
       # presents on /internal/*; both sides must read the same value.
@@ -113,12 +115,11 @@ services:
   #   docker compose --profile quick up -d
   #   node infra/tunnel-url.mjs      # prints the current hostname
   #
-  # This makes the gateway reachable by anyone holding the URL, and anyone
-  # who has it can register: /auth/register is ungated, the admin API is
-  # read-only (no mutating routes), and nothing reads the Setting model, so
-  # there is currently NO way to turn registration off. Until there is, the
-  # only real control is to run this profile just while you are testing and
-  # bring it down afterwards:
+  # This makes the gateway reachable by anyone holding the URL. Set
+  # ALLOW_REGISTRATION=false in .env before exposing it: that closes both
+  # /auth/register and first-time Google sign-ins (existing users are
+  # unaffected). The admin API is read-only (no mutating routes). You can
+  # also just run this profile while testing and bring it down afterwards:
   #
   #   docker compose --env-file .env -f infra/docker-compose.yml --profile quick down
   cloudflared-quick:

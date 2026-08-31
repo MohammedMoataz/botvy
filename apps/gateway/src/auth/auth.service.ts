@@ -9,6 +9,7 @@ import * as argon2 from 'argon2';
 import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { parseDurationToMs } from './duration.js';
+import { assertRegistrationOpen } from './registration-gate.js';
 import type { RegisterDto, LoginDto } from './dto.js';
 
 interface AccessTokenPayload {
@@ -35,6 +36,7 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    assertRegistrationOpen(this.config);
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException('An account with this email already exists');

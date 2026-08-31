@@ -73,6 +73,9 @@
   user must supply: a Firebase project + service-account key, and a
   Flutter SDK install so the mobile app can build. The degraded path is
   verified; the delivery path is not.
+- **Firebase service-account key rotation** — the key in use was exposed and
+  its rotation is deliberately deferred; triggers and steps in `SETUP.md`,
+  Part 2 § 2.
 - **Arabic reminder extraction (SC-001, second half)** — the chat intent
   pipeline currently classifies `structured_action` but does not yet
   extract `{title, remindAt}` and call `RemindersService`. Wiring that is

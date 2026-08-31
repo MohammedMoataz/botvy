@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { assertRegistrationOpen } from './registration-gate.js';
 
 export interface VerifiedGoogleUser {
   email: string;
@@ -110,6 +111,10 @@ export class GoogleAuthService {
       }
       return existing;
     }
+
+    // Below this line a NEW account would be created, so the registration
+    // gate applies. Above it, existing users keep signing in either way.
+    assertRegistrationOpen(this.config);
 
     return this.prisma.user.create({
       data: {
