@@ -53,6 +53,11 @@ export class LlmService {
     this.nativeBaseUrl = (config.get<string>('OLLAMA_BASE_URL') ?? '').replace(/\/v1\/?$/, '');
   }
 
+  /** The model every call here runs against — usage rows record it. */
+  get modelName(): string {
+    return this.model;
+  }
+
   /**
    * Runs a temperature-0, JSON-schema-constrained extraction call.
    * Returns null (never throws) if the model's output doesn't parse or
@@ -65,14 +70,17 @@ export class LlmService {
     schema: Record<string, unknown>;
   }): Promise<T | null> {
     try {
-      // Ollama's NATIVE endpoint, not the OpenAI shim this class uses for
-      // chat(). Two reasons, both measured:
+      // Ollama's NATIVE endpoint, not the OpenAI shim. Two reasons, both
+      // measured:
       //
-      //  - `think: false` only exists here. Left on, qwen3 emits an unbounded
-      //    reasoning phase before the JSON: one extraction measured 528s with
-      //    thinking on versus 5.18s with it off, same model, same hardware.
-      //    The shim offers no equivalent, and a `/no_think` prompt prefix did
-      //    not reliably suppress it under json_schema.
+      //  - `format` takes the JSON schema as a decoding grammar, which is
+      //    what actually stops qwen3 from reasoning here: every token it may
+      //    emit belongs to the JSON, so there is no room for a monologue.
+      //    That, not the `think` flag, is why an extraction that measured
+      //    528s now takes seconds. The flag is kept off for intent, but this
+      //    model's Ollama template opens a `<think>` block regardless of it —
+      //    see chat(), where the reasoning has to be handled rather than
+      //    wished away.
       //  - `num_predict` caps the response, so a model that starts rambling
       //    fails fast into the caller's chat fallback instead of burning the
       //    whole request timeout.
@@ -121,40 +129,129 @@ export class LlmService {
     });
 
     const model = this.model;
-    const client = this.client;
+    const nativeBaseUrl = this.nativeBaseUrl;
+    const timeoutMs = this.timeoutMs;
 
     async function* generate(): AsyncIterable<string> {
       let completionChars = 0;
       let reportedUsage: UsageTotals | null = null;
 
-      const streamResponse = await client.chat.completions.create({
-        model,
-        temperature: 0.4,
-        messages,
-        stream: true,
-        stream_options: { include_usage: true },
-      });
+      // The timeout is per-chunk, not per-request: `AbortSignal.timeout` would
+      // cut a healthy but slow reply off mid-sentence, and on CPU-only
+      // inference a long answer plus qwen3's reasoning phase can run for
+      // minutes. What actually means "Ollama died" is silence, so the clock
+      // restarts on every chunk that arrives.
+      const abort = new AbortController();
+      let idle = setTimeout(() => abort.abort(), timeoutMs);
+      const touch = () => {
+        clearTimeout(idle);
+        idle = setTimeout(() => abort.abort(), timeoutMs);
+      };
 
-      for await (const chunk of streamResponse) {
-        const delta = chunk.choices[0]?.delta?.content;
-        if (delta) {
-          completionChars += delta.length;
-          yield delta;
+      try {
+        // Native /api/chat rather than the /v1 shim, for `think`. The shim
+        // folds qwen3's reasoning into the reply, so the user reads the
+        // model's monologue before the answer.
+        //
+        // `think: true`, not false: qwen3:4b's Ollama template opens a
+        // `<think>` block for the final turn unconditionally, with no guard
+        // on the think flag, so the reasoning happens either way. The flag
+        // only decides who parses it. With it off, the raw monologue and a
+        // stray `</think>` arrive as `message.content`; with it on, Ollama
+        // splits the reasoning into `message.thinking`, which is dropped
+        // here, and `message.content` is the answer alone. A `/no_think`
+        // prompt marker does not suppress it either — measured, in both the
+        // system prompt and at the end of the user message.
+        const response = await fetch(`${nativeBaseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            messages,
+            think: true,
+            stream: true,
+            options: { temperature: 0.4 },
+          }),
+          signal: abort.signal,
+        });
+
+        if (!response.ok || !response.body) {
+          throw new Error(`Ollama returned ${response.status} for the chat stream`);
         }
-        if (chunk.usage) {
-          reportedUsage = {
-            promptTokens: chunk.usage.prompt_tokens,
-            completionTokens: chunk.usage.completion_tokens,
+
+        // Ollama streams NDJSON — one complete JSON object per line — not SSE.
+        // Chunks split anywhere, so hold a buffer and only parse whole lines.
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        const handleLine = (line: string): string | null => {
+          let chunk: {
+            message?: { content?: string };
+            done?: boolean;
+            prompt_eval_count?: number;
+            eval_count?: number;
           };
-        }
-      }
+          try {
+            chunk = JSON.parse(line);
+          } catch {
+            return null; // a malformed line is not worth killing the stream over
+          }
+          if (chunk.done && chunk.eval_count !== undefined) {
+            reportedUsage = {
+              promptTokens: chunk.prompt_eval_count ?? 0,
+              completionTokens: chunk.eval_count,
+            };
+          }
+          return chunk.message?.content || null;
+        };
 
-      resolveUsage(
-        reportedUsage ?? {
-          promptTokens: Math.ceil(messages.map((m) => m.content).join(' ').length / 4),
-          completionTokens: Math.ceil(completionChars / 4),
-        },
-      );
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          touch();
+          buffer += decoder.decode(value, { stream: true });
+
+          let newline: number;
+          while ((newline = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, newline).trim();
+            buffer = buffer.slice(newline + 1);
+            if (!line) continue;
+            const delta = handleLine(line);
+            if (delta) {
+              completionChars += delta.length;
+              yield delta;
+            }
+          }
+        }
+
+        // Ollama terminates every line with a newline, but a stream that ends
+        // without one would otherwise drop its last object — which is the one
+        // carrying the token counts.
+        const tail = buffer.trim();
+        if (tail) {
+          const delta = handleLine(tail);
+          if (delta) {
+            completionChars += delta.length;
+            yield delta;
+          }
+        }
+      } finally {
+        clearTimeout(idle);
+        // If the phone hung up, the consumer stops pulling from this generator
+        // and we land here mid-stream; aborting tells Ollama to stop, instead
+        // of leaving it generating tokens for a reply nobody will read. A
+        // no-op once the stream has finished normally.
+        abort.abort();
+        // Resolved even when the stream threw or the consumer walked away, so
+        // that anything awaiting usage cannot hang on a promise nobody settles.
+        resolveUsage(
+          reportedUsage ?? {
+            promptTokens: Math.ceil(messages.map((m) => m.content).join(' ').length / 4),
+            completionTokens: Math.ceil(completionChars / 4),
+          },
+        );
+      }
     }
 
     return { stream: generate(), usage };
