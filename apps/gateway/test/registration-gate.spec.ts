@@ -4,7 +4,7 @@ import { AuthService } from '../src/auth/auth.service.js';
 import { GoogleAuthService } from '../src/auth/google-auth.service.js';
 
 /** ConfigService stub: ALLOW_REGISTRATION plus the JWT values token issuing needs. */
-function makeConfig(allowRegistration: boolean | undefined) {
+function makeConfig(allowRegistration: boolean | string | undefined) {
   return {
     get: vi.fn((key: string) => {
       if (key === 'ALLOW_REGISTRATION') return allowRegistration;
@@ -25,7 +25,7 @@ function makePrisma(existingUser: Record<string, unknown> | null) {
   };
 }
 
-function makeAuth(allowRegistration: boolean | undefined, existingUser = null as Record<string, unknown> | null) {
+function makeAuth(allowRegistration: boolean | string | undefined, existingUser = null as Record<string, unknown> | null) {
   const prisma = makePrisma(existingUser);
   const jwt = { signAsync: vi.fn().mockResolvedValue('token'), verifyAsync: vi.fn() };
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -33,7 +33,7 @@ function makeAuth(allowRegistration: boolean | undefined, existingUser = null as
   return { service, prisma };
 }
 
-function makeGoogle(allowRegistration: boolean | undefined, existingUser: Record<string, unknown> | null) {
+function makeGoogle(allowRegistration: boolean | string | undefined, existingUser: Record<string, unknown> | null) {
   const prisma = makePrisma(existingUser);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const service = new GoogleAuthService(prisma as any, makeConfig(allowRegistration) as any);
@@ -91,5 +91,30 @@ describe('ALLOW_REGISTRATION — Google sign-in (which does create users)', () =
     const { service, prisma } = makeGoogle(false, { id: 'u1', email: 'new@example.com', status: 'active' });
     await expect(service.findOrCreateUser(googleIdentity)).resolves.toMatchObject({ id: 'u1' });
     expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+});
+
+// Regression: ConfigService.get() consults process.env before the validated,
+// zod-transformed config, so a var actually set in the environment arrives as
+// a STRING. Every case above passes a boolean, which is why the gate could
+// compare against boolean false only and still look fully covered — while a
+// real server running ALLOW_REGISTRATION=false accepted registrations.
+describe('ALLOW_REGISTRATION arriving as a string, as process.env delivers it', () => {
+  it('refuses email/password registration for the string "false"', async () => {
+    const { service, prisma } = makeAuth('false');
+    await expect(service.register(registerDto)).rejects.toThrow(ForbiddenException);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses a new Google account for the string "false"', async () => {
+    const { service, prisma } = makeGoogle('false', null);
+    await expect(service.findOrCreateUser(googleIdentity)).rejects.toThrow(ForbiddenException);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it('stays open for the string "true"', async () => {
+    const { service, prisma } = makeAuth('true');
+    await service.register(registerDto);
+    expect(prisma.user.create).toHaveBeenCalled();
   });
 });
