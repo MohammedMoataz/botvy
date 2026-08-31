@@ -12,7 +12,14 @@ import type { ConfigService } from '@nestjs/config';
  * permissive so existing deployments keep working.
  */
 export function assertRegistrationOpen(config: ConfigService): void {
-  if (config.get<boolean>('ALLOW_REGISTRATION') === false) {
+  // Both shapes have to be accepted. ConfigService.get() consults process.env
+  // BEFORE the validated config, so whenever the variable is actually set in
+  // the environment — precisely when closing registration matters — this
+  // arrives as the string "false" and never as the zod-transformed boolean.
+  // Comparing only against boolean false meant the gate never fired and
+  // registration stayed open on a server configured to refuse it.
+  const allowed = config.get<boolean | string>('ALLOW_REGISTRATION');
+  if (allowed === false || allowed === 'false') {
     throw new ForbiddenException('Registration is closed on this server');
   }
 }

@@ -101,6 +101,16 @@ services:
       PORT: "8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # The service-account JSON has to be visible INSIDE the container, so
+      # FIREBASE_CREDENTIALS_FILE alone is not enough. A directory is mounted
+      # rather than the file itself because a single-file bind needs a source
+      # that always exists, and push has to stay optional: the default points
+      # at a directory already in the repo, which is harmless because
+      # FIREBASE_CREDENTIALS_FILE is then empty and push simply stays off.
+      # Set FIREBASE_CREDENTIALS_DIR to the directory holding the key, and
+      # FIREBASE_CREDENTIALS_FILE to /run/secrets/<that file's name>.
+      - "${FIREBASE_CREDENTIALS_DIR:-./init-postgres}:/run/secrets:ro"
     ports:
       # Loopback by default. Set GATEWAY_BIND=0.0.0.0 to reach the gateway
       # from another device on your LAN — a phone running the app, say, which
