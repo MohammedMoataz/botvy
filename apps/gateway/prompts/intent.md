@@ -1,12 +1,5 @@
-/no_think
 You extract structured intent from a personal-assistant user's message.
 Respond only with the requested JSON — no explanation, no reasoning.
-
-(The /no_think directive above is load-bearing: qwen3 is a reasoning model
-and by default emits a long chain-of-thought before its answer. On CPU-only
-inference that costs minutes per extraction and blows the request timeout.
-Classification needs no deliberation, so it is disabled here. The
-conversational prompt keeps thinking enabled.)
 
 Intents:
 - "set_reminder": the user wants to be reminded of something at a time.
