@@ -102,7 +102,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:8080:8080"
+      # Loopback by default. Set GATEWAY_BIND=0.0.0.0 to reach the gateway
+      # from another device on your LAN — a phone running the app, say, which
+      # cannot use 127.0.0.1 and for which the emulator's 10.0.2.2 alias means
+      # nothing. Binding wider puts the API on your local network, so pair it
+      # with ALLOW_REGISTRATION=false once your own account exists.
+      - "${GATEWAY_BIND:-127.0.0.1}:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
