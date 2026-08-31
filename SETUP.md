@@ -18,7 +18,7 @@ Everything needed to run botvy on this machine or a new one.
 |---|---|---|
 | **Docker Desktop** | Runs Postgres, n8n, and the gateway | Put its disk image on a drive with room — it grows. Settings → Resources → Disk image location |
 | **Ollama**, installed natively | The local LLM. Native, not in Docker, because it needs direct GPU access | <https://ollama.com/download> |
-| **An NVIDIA GPU with a current driver** | CPU-only inference is too slow to use — see Part 2 | ~8 GB VRAM is comfortable; 4 GB is tight |
+| **An NVIDIA GPU** | Inference runs on it via CUDA, or via Vulkan on older drivers — see Part 2 | ~8 GB VRAM is comfortable; 4 GB works with a 4B model |
 | **Node.js 24 + pnpm** | Only for development and the bootstrap script | `npx pnpm@latest` works without a global install |
 | **Flutter SDK** | Only to build the mobile app | <https://docs.flutter.dev/get-started/install/windows> |
 | A domain on Cloudflare | Only for access away from home | Optional |
@@ -207,42 +207,60 @@ one generated file; the project's own tests live beside it.
 
 ## Part 2 — The four things only you can do
 
-### 1. Update the NVIDIA driver — the one that matters
+### 1. Ollama on an older NVIDIA driver — use Vulkan, not CUDA
 
-Without this botvy runs but is not usable as an assistant.
+> **This was misdiagnosed for a long time as "the driver is too old and
+> everything falls back to slow CPU".** Both halves were wrong, and the fix
+> needs no driver update and no admin rights. The measurements below are
+> from this machine (driver `556.12`, CUDA `12.5`, GTX 1050 4 GB).
 
-Ollama's CUDA build needs a newer driver than the one on this machine.
-Every GPU request crashes its inference process:
+**There is no CPU fallback.** On the default path Ollama's CUDA runner dies
+and the request returns **HTTP 500**:
 
 ```
-CUDA error: the provided PTX was compiled with an unsupported toolchain
+llama-server process has terminated: exit status 0xc0000409
+CUDA error: the provided PTX was compiled with an unsupported toolchain.
 ```
 
-It then falls back to CPU, which manages roughly **4 tokens/second**.
-Measured here:
+The runner *is* built for this card (`ARCHS` includes `610` = sm_61). It
+crashes inside `ggml_cuda_kernel_can_use_pdl` — Programmatic Dependent
+Launch, an sm_90+ feature. Merely querying those kernels makes the driver
+JIT their PTX, and a CUDA 12.5 driver cannot read PTX from the newer
+toolchain Ollama was built with. **A smaller model does not help** — 1.7b
+crashes identically.
 
-| Operation | On CPU |
-|---|---|
-| "remind me to call mom tomorrow at 5pm" | never finished (10 min) |
-| One user's daily coaching program | never finished (10 min) |
-| Nightly check-in reply | **under 1 second** — it deliberately avoids the model |
-
-This machine: driver `556.12`, CUDA `12.5`, GTX 1050 4 GB.
-
-Install a current driver from GeForce Experience or
-<https://www.nvidia.com/Download/index.aspx>. Needs admin rights and a
-reboot — which is why this one is yours and not mine. Then confirm the GPU
-is really being used:
+**The fix: make Ollama use its Vulkan backend instead.** It already ships
+one; CUDA simply claims the device first and then dies.
 
 ```powershell
-ollama run qwen3:4b "hi"
+[Environment]::SetEnvironmentVariable('CUDA_VISIBLE_DEVICES','-1','User')
+# restart Ollama from the tray, then confirm the GPU is really in use:
 curl http://localhost:11434/api/ps    # size_vram must be > 0
 ```
 
-If the driver update does not fix it, 4 GB may simply be too little. In
-order of preference: a smaller quantisation, a smaller model, or move
-inference to a machine with more VRAM — only `OLLAMA_BASE_URL` changes, no
-code does.
+With that set, the GTX 1050 runs under Vulkan with the model in VRAM
+(`size_vram` ≈ 2.6 GB for qwen3:4b).
+
+**The larger lesson: the GPU was never the main cost.** qwen3 is a reasoning
+model, and an unbounded thinking phase dominated every extraction:
+
+| Same extraction, same model, same GPU | Wall clock |
+|---|---|
+| thinking on (the old code path) | **528 s**, and the answer was wrong |
+| `think: false` | **5 s** |
+
+`extract()` therefore calls Ollama's **native** `/api/chat` rather than the
+`/v1` OpenAI shim, because `think` exists only there, and caps the reply with
+`num_predict`. End to end today, "remind me to call mom tomorrow at 5pm"
+resolves correctly in about **20 seconds**.
+
+Model choice, measured on that same prompt: `qwen3:1.7b` answers in ~7 s but
+puts the reminder on the wrong **day**; `qwen3:4b` takes ~20 s warm and gets
+it right. Correctness wins, so `OLLAMA_CHAT_MODEL=qwen3:4b`.
+
+A newer driver would still be worth installing — it would restore the CUDA
+path, which is faster than Vulkan — but it is an optimisation now, not a
+prerequisite.
 
 ### 2. Firebase — push notifications
 
