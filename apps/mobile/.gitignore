@@ -13,6 +13,12 @@ android/key.properties
 ios/Pods/
 ios/.symlinks/
 
-# Firebase config -- never commit, none exists yet.
+# Firebase client config. Holds no private key -- the API key inside it ships
+# in every APK anyway -- but this repo is public, and the file names a specific
+# Firebase project. Each deployment should fetch its OWN, per SETUP.md:
+#   firebase apps:sdkconfig ANDROID <APP_ID> --project <YOUR_PROJECT> --out \
+#     apps/mobile/android/app/google-services.json
+# CI does not need it: the Flutter job runs pub get / analyze / test, none of
+# which invoke the Google Services Gradle plugin. Only an APK build does.
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist

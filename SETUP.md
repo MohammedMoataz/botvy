@@ -4,6 +4,7 @@ Everything needed to run botvy on this machine or a new one.
 
 - [Part 1 — Running it on a fresh machine](#part-1--running-it-on-a-fresh-machine)
 - [Part 2 — The four things only you can do](#part-2--the-four-things-only-you-can-do)
+  - [Deferred: rotate the exposed Firebase key](#deferred-rotate-the-exposed-firebase-service-account-key)
 - [Part 3 — Operating it day to day](#part-3--operating-it-day-to-day)
 - [Part 4 — Troubleshooting things that have actually happened](#part-4--troubleshooting-things-that-have-actually-happened)
 
@@ -259,6 +260,40 @@ iOS additionally needs a paid Apple Developer account, for both APNs and
 device distribution.
 
 Needs an interactive Google sign-in, which is why it is yours.
+
+#### Deferred: rotate the exposed Firebase service-account key
+
+> **The key currently at `secrets/firebase-admin.json` is compromised and has
+> not been rotated.** This is a deliberate deferral, not an oversight — the
+> instance is demo/dev only and the first release was the priority. It stays
+> open until one of the triggers below fires.
+
+The key (key id ending **`c3a2a5`**) was pasted into a chat transcript. A
+Firebase service-account key grants full admin on the `bot-vy` project:
+every Firestore document, read and write, and the ability to mint auth
+tokens for any user. It was never committed — `secrets/` is gitignored, and
+`.env` references the file by path only (`FIREBASE_CREDENTIALS_FILE`) — so
+the exposure is the transcript, nothing in the repo.
+
+**Rotation is mandatory, not optional, before any of these:**
+
+| Trigger |
+|---|
+| Before the instance is reachable from the public internet |
+| Before any real user data exists |
+| Before the repository or project is shared with anyone else |
+
+Whichever comes first. Until then it is an accepted risk.
+
+**How to rotate** — five minutes, and nothing else in the project changes:
+
+1. Google Cloud Console → IAM & Admin → Service Accounts
+2. Open the `firebase-adminsdk-*` account → **Keys**
+3. Delete the key whose id ends `c3a2a5`
+4. **Add key → Create new key → JSON**
+5. Save it over `E:\Work\botvy\secrets\firebase-admin.json`
+
+No other change is needed — `.env` already points at that path.
 
 ### 3. Cloudflare tunnel — access away from home
 

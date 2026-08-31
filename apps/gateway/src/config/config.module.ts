@@ -16,6 +16,12 @@ const envSchema = z.object({
   N8N_URL: z.string().url().default('http://n8n:5678'),
   N8N_API_KEY: z.string().optional(),
   FIREBASE_CREDENTIALS_FILE: z.string().optional(),
+  // An env var is always a string, so z.boolean() would reject "true" and
+  // z.coerce.boolean() would read "false" as true. Default is permissive.
+  ALLOW_REGISTRATION: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   CHAT_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(20),
   CHAT_DAILY_QUOTA_TOKENS: z.coerce.number().int().positive().default(50000),
   PORT: z.coerce.number().int().positive().default(8080),
