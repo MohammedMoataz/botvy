@@ -303,7 +303,9 @@ class ApiClient {
         e.type == DioExceptionType.connectionTimeout) {
       return ApiException(
           'Cannot reach the gateway at ${dio.options.baseUrl}. '
-          'Check the server URL in Settings.',
+          'Tap the server icon in the top bar to change it. '
+          '10.0.2.2 only works on the Android emulator — a real phone needs '
+          "this machine's address on your network, or a tunnel URL.",
           statusCode: status);
     }
     return ApiException(e.message ?? 'Request failed.', statusCode: status);
