@@ -18,10 +18,20 @@ export interface StreamedChatResult {
   usage: Promise<UsageTotals>;
 }
 
+/**
+ * Ceiling on an extraction response. Every schema this is used with returns
+ * well under 200 tokens; anything longer means the model is rambling rather
+ * than answering, and failing fast is better than holding the request open.
+ */
+const EXTRACT_MAX_TOKENS = 512;
+
 @Injectable()
 export class LlmService {
   private readonly client: OpenAI;
   private readonly model: string;
+  /** Ollama's own API root — OLLAMA_BASE_URL points at its /v1 OpenAI shim. */
+  private readonly nativeBaseUrl: string;
+  private readonly timeoutMs: number;
   private readonly logger = new Logger(LlmService.name);
 
   constructor(config: ConfigService) {
@@ -39,6 +49,8 @@ export class LlmService {
       maxRetries: 1,
     });
     this.model = config.get<string>('OLLAMA_CHAT_MODEL')!;
+    this.timeoutMs = Number(config.get('LLM_REQUEST_TIMEOUT_MS') ?? 120_000);
+    this.nativeBaseUrl = (config.get<string>('OLLAMA_BASE_URL') ?? '').replace(/\/v1\/?$/, '');
   }
 
   /**
@@ -53,16 +65,40 @@ export class LlmService {
     schema: Record<string, unknown>;
   }): Promise<T | null> {
     try {
-      const completion = await this.client.chat.completions.create({
-        model: this.model,
-        temperature: 0,
-        messages: params.messages,
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: params.schemaName, strict: true, schema: params.schema },
-        },
+      // Ollama's NATIVE endpoint, not the OpenAI shim this class uses for
+      // chat(). Two reasons, both measured:
+      //
+      //  - `think: false` only exists here. Left on, qwen3 emits an unbounded
+      //    reasoning phase before the JSON: one extraction measured 528s with
+      //    thinking on versus 5.18s with it off, same model, same hardware.
+      //    The shim offers no equivalent, and a `/no_think` prompt prefix did
+      //    not reliably suppress it under json_schema.
+      //  - `num_predict` caps the response, so a model that starts rambling
+      //    fails fast into the caller's chat fallback instead of burning the
+      //    whole request timeout.
+      const response = await fetch(`${this.nativeBaseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages: params.messages,
+          format: params.schema,
+          think: false,
+          stream: false,
+          options: { temperature: 0, num_predict: EXTRACT_MAX_TOKENS },
+        }),
+        signal: AbortSignal.timeout(this.timeoutMs),
       });
-      const content = completion.choices[0]?.message?.content;
+
+      if (!response.ok) {
+        this.logger.warn(
+          `extract() got HTTP ${response.status} from Ollama, caller should fall back to chat`,
+        );
+        return null;
+      }
+
+      const body = (await response.json()) as { message?: { content?: string } };
+      const content = body.message?.content;
       if (!content) return null;
       return JSON.parse(content) as T;
     } catch (err) {
