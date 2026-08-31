@@ -24,6 +24,9 @@ export interface PlannedNotification {
   label: string;
 }
 
+/** Used when neither the reminder nor the caller specifies lead times. */
+export const DEFAULT_LEAD_TIMES = ['1h', '0m'];
+
 export function parseOffset(offset: string): number {
   const match = /^(\d+)(m|h|d)$/.exec(offset.trim());
   if (!match) throw new Error(`Invalid lead-time offset: ${offset}`);
@@ -49,7 +52,7 @@ export function offsetLabel(offset: string): string {
  */
 export function planNotifications(
   remindAt: Date,
-  offsets: string[] = ['1h', '0m'],
+  offsets: string[] = DEFAULT_LEAD_TIMES,
   notBefore: Date = new Date(),
 ): PlannedNotification[] {
   const seen = new Set<string>();

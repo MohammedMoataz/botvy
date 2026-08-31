@@ -94,9 +94,10 @@ services:
       # host-side one (localhost:5679) that bootstrap.mjs needs.
       N8N_API_KEY: ${N8N_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
-      # Must be a path *inside* the container — add a read-only bind mount for
-      # the service-account JSON alongside it. Empty disables push and Google
-      # Sign-in, which the gateway degrades to rather than failing on.
+      # Must be a path *inside* the container (/run/secrets/<file>.json — see
+      # the bind mount below), NOT a host path. Empty disables push and Google
+      # Sign-in, which the gateway degrades to. Set but unreadable is a boot
+      # failure: a host path here once disabled every notification silently.
       FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
       PORT: "8080"
     extra_hosts:

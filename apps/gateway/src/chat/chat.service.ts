@@ -7,10 +7,14 @@ import { RemindersService } from '../reminders/reminders.service.js';
 import { CoachingService } from '../coaching/coaching.service.js';
 import { classifyCheckin } from '../coaching/checkin-classifier.js';
 import { loadPrompt } from '../llm/prompts.js';
+import { formatInTz, localDate } from '../common/time.js';
+import { SettingsService } from '../settings/settings.service.js';
 
-const HISTORY_LIMIT = 20;
+// How many turns go into the prompt is a setting (chat.historyLimit): it is
+// the main lever on latency for CPU inference, so it gets tuned live.
 const INTENT_HISTORY_LIMIT = 4;
 const HEARTBEAT_INTERVAL_MS = 15_000;
+const UPCOMING_REMINDERS_IN_PROMPT = 5;
 
 const INTENT_SCHEMA = {
   type: 'object',
@@ -36,6 +40,27 @@ interface IntentResult {
   clarifyQuestion: string;
 }
 
+/** One message a phone composed while offline. */
+export interface QueuedMessage {
+  clientId: string;
+  text: string;
+  composedAt: Date;
+}
+
+export interface BatchAction {
+  clientId: string;
+  intent: string;
+  detail: string;
+}
+
+export interface BatchResult {
+  processed: number;
+  /** clientIds that had already been stored — the caller can clear them too. */
+  duplicates: string[];
+  actions: BatchAction[];
+  reply: string | null;
+}
+
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
@@ -46,6 +71,7 @@ export class ChatService {
     private readonly usage: UsageService,
     private readonly reminders: RemindersService,
     private readonly coaching: CoachingService,
+    private readonly settings: SettingsService,
   ) {}
 
   async history(userId: string, limit = 50) {
@@ -65,13 +91,12 @@ export class ChatService {
   private async handleReminderIntent(
     userId: string,
     result: IntentResult,
+    timezone: string,
   ): Promise<string | null> {
     if (result.intent === 'list_reminders') {
       const active = await this.reminders.list(userId, 'active');
       if (active.length === 0) return 'You have no active reminders.';
-      const lines = active.map(
-        (r) => `• ${r.title} — ${r.remindAt.toISOString().replace('T', ' ').slice(0, 16)} UTC`,
-      );
+      const lines = active.map((r) => `• ${r.title} — ${formatInTz(r.remindAt, timezone)}`);
       return `Your reminders:\n${lines.join('\n')}`;
     }
 
@@ -103,8 +128,9 @@ export class ChatService {
         title: result.title || 'Reminder',
         remindAt,
       });
-      const when = remindAt.toISOString().replace('T', ' ').slice(0, 16);
-      return `Reminder set: ${reminder.title} — ${when} UTC.`;
+      // Echoed in the user's own wall-clock time: a raw UTC timestamp reads
+      // as the wrong hour to everyone who is not on UTC.
+      return `Reminder set: ${reminder.title} — ${formatInTz(reminder.remindAt, timezone)}.`;
     }
 
     return null;
@@ -131,6 +157,160 @@ export class ChatService {
     // Recorded truthfully, but the response is encouraging rather than
     // punitive: a coach that scolds gets ignored.
     return 'Logged — one off day changes nothing long term. Tomorrow is a fresh start.';
+  }
+
+  /**
+   * Classifies one message. Shared by the live stream and the offline batch;
+   * `now` is the moment the user typed it, which for a queued message is not
+   * the moment it arrives — "in two hours" must mean two hours from typing.
+   */
+  private async extractIntent(
+    message: string,
+    history: string,
+    timezone: string,
+    now: Date,
+  ): Promise<IntentResult | null> {
+    const intentPrompt = loadPrompt('intent.md', {
+      history: history || '(none)',
+      message,
+      now: now.toISOString(),
+      timezone,
+      today: localDate(now, timezone),
+    });
+    return this.llm.extract<IntentResult>({
+      messages: [{ role: 'user', content: intentPrompt }],
+      schemaName: 'intent',
+      schema: INTENT_SCHEMA,
+    });
+  }
+
+  /** The few reminders worth knowing about, so "what's next?" needs no tool call. */
+  private async upcomingRemindersLine(userId: string, timezone: string): Promise<string> {
+    const active = await this.reminders.list(userId, 'active');
+    const upcoming = active.slice(0, UPCOMING_REMINDERS_IN_PROMPT);
+    if (upcoming.length === 0) return '(none)';
+    return upcoming.map((r) => `- ${r.title} — ${formatInTz(r.remindAt, timezone)}`).join('\n');
+  }
+
+  /**
+   * Coaching state, but only for users who opted in — building it is several
+   * queries, and it means nothing to everyone else.
+   */
+  private async coachingLine(userId: string): Promise<string> {
+    const profile = await this.coaching.getProfile(userId);
+    if (!profile?.optedIn) return '(not enrolled in coaching)';
+
+    const context = await this.coaching.context(userId);
+    const day = context.isRestDay ? 'a rest day' : 'a training day';
+    return `Enrolled. Today is ${day}. Current streak: ${context.streak} day(s); ${Math.round(
+      context.completionRatio * 100,
+    )}% of recent check-ins completed.`;
+  }
+
+  /**
+   * Delivers the messages a phone composed while offline.
+   *
+   * Each one is classified against the time it was *typed*, so a reminder
+   * asked for offline lands where the user meant it (already-past pings still
+   * produce the at-the-moment row, which the next sweep delivers — late beats
+   * lost). The conversation itself gets a single reply covering the whole
+   * batch rather than one per message: the user is reading it all at once, and
+   * on CPU inference N replies would be N times the wait.
+   *
+   * Re-sending a batch is safe: messages already stored under their clientId
+   * are skipped, so a flush interrupted halfway can simply be retried.
+   */
+  async batchReply(userId: string, queued: QueuedMessage[]): Promise<BatchResult> {
+    const known = await this.prisma.message.findMany({
+      // Scoped to this user: a client id belongs to one account, and another
+      // account's row must never be mistaken for a duplicate of theirs.
+      where: { userId, clientId: { in: queued.map((m) => m.clientId) } },
+      select: { clientId: true },
+    });
+    const duplicates = new Set(known.map((m) => m.clientId as string));
+    const fresh = queued
+      .filter((m) => !duplicates.has(m.clientId))
+      .sort((a, b) => a.composedAt.getTime() - b.composedAt.getTime());
+
+    if (fresh.length === 0) {
+      return { processed: 0, duplicates: [...duplicates], actions: [], reply: null };
+    }
+
+    const timezone = await this.coaching.userTimezone(userId);
+    const historyRows = await this.history(userId, await this.settings.get('chat.historyLimit'));
+    const intentHistory = historyRows
+      .slice(-INTENT_HISTORY_LIMIT)
+      .map((m) => `${m.role}: ${m.content}`)
+      .join('\n');
+
+    const actions: BatchAction[] = [];
+    for (const message of fresh) {
+      await this.prisma.message.create({
+        data: {
+          userId,
+          role: 'user',
+          content: message.text,
+          clientId: message.clientId,
+          composedAt: message.composedAt,
+        },
+      });
+
+      const intentResult = await this.extractIntent(
+        message.text,
+        intentHistory,
+        timezone,
+        message.composedAt,
+      );
+      if (!intentResult || intentResult.intent === 'chat') continue;
+
+      const detail = await this.handleReminderIntent(userId, intentResult, timezone);
+      if (detail) actions.push({ clientId: message.clientId, intent: intentResult.intent, detail });
+    }
+
+    const transcript = fresh
+      .map((m) => `[sent ${formatInTz(m.composedAt, timezone)}] ${m.text}`)
+      .join('\n');
+    const done =
+      actions.length > 0
+        ? `\n\nAlready handled for the user, do not repeat the work — just acknowledge briefly:\n${actions
+            .map((a) => `- ${a.detail}`)
+            .join('\n')}`
+        : '';
+
+    const systemPrompt = loadPrompt('chat.md', {
+      today: localDate(new Date(), timezone),
+      now: formatInTz(new Date(), timezone),
+      timezone,
+      reminders: await this.upcomingRemindersLine(userId, timezone),
+      coaching: await this.coachingLine(userId),
+    });
+    const chatMessages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      ...historyRows.map((m): ChatMessage => ({ role: m.role, content: m.content })),
+      {
+        role: 'user',
+        content:
+          `These messages were written while offline and are arriving together now. ` +
+          `Reply once, to all of them:\n${transcript}${done}`,
+      },
+    ];
+
+    const { stream, usage } = this.llm.chat(chatMessages);
+    let reply = '';
+    for await (const chunk of stream) reply += chunk;
+
+    await this.prisma.message.create({ data: { userId, role: 'assistant', content: reply } });
+
+    const tokenUsage = await usage;
+    await this.usage.record({
+      userId,
+      kind: 'chat',
+      model: this.llm.modelName,
+      promptTokens: tokenUsage.promptTokens,
+      completionTokens: tokenUsage.completionTokens,
+    });
+
+    return { processed: fresh.length, duplicates: [...duplicates], actions, reply };
   }
 
   streamReply(userId: string, userMessage: string): Observable<MessageEvent> {
@@ -164,9 +344,15 @@ export class ChatService {
             // rather than recording a guess against the user's streak.
           }
 
-          const historyRows = await this.history(userId, HISTORY_LIMIT);
+          const historyRows = await this.history(
+            userId,
+            await this.settings.get('chat.historyLimit'),
+          );
 
-          const timezone = process.env.TZ ?? 'UTC';
+          // The user's own zone, never the server's: "8pm" means 8pm where
+          // they are. Reading process.env.TZ here shifted every extracted
+          // reminder by the user's UTC offset.
+          const timezone = await this.coaching.userTimezone(userId);
           const nowDate = new Date();
           // Intent classification only needs enough context to resolve a
           // pronoun or a follow-up ("cancel that one") — not the full chat
@@ -177,18 +363,12 @@ export class ChatService {
             .slice(-INTENT_HISTORY_LIMIT)
             .map((m) => `${m.role}: ${m.content}`)
             .join('\n');
-          const intentPrompt = loadPrompt('intent.md', {
-            history: intentHistory || '(none)',
-            message: userMessage,
-            now: nowDate.toISOString(),
+          const intentResult = await this.extractIntent(
+            userMessage,
+            intentHistory,
             timezone,
-            today: nowDate.toISOString().slice(0, 10),
-          });
-          const intentResult = await this.llm.extract<IntentResult>({
-            messages: [{ role: 'user', content: intentPrompt }],
-            schemaName: 'intent',
-            schema: INTENT_SCHEMA,
-          });
+            nowDate,
+          );
           const intent = intentResult?.intent ?? 'chat';
           subscriber.next({
             type: 'intent',
@@ -204,7 +384,7 @@ export class ChatService {
           // just to phrase "Reminder set", which the predecessor system
           // wasted a call on for every single reminder.
           if (intentResult && intent !== 'chat') {
-            const reply = await this.handleReminderIntent(userId, intentResult);
+            const reply = await this.handleReminderIntent(userId, intentResult, timezone);
             if (reply) {
               subscriber.next({ type: 'token', data: reply });
               await this.prisma.message.create({
@@ -216,7 +396,13 @@ export class ChatService {
             }
           }
 
-          const systemPrompt = loadPrompt('chat.md');
+          const systemPrompt = loadPrompt('chat.md', {
+            today: localDate(nowDate, timezone),
+            now: formatInTz(nowDate, timezone),
+            timezone,
+            reminders: await this.upcomingRemindersLine(userId, timezone),
+            coaching: await this.coachingLine(userId),
+          });
           const chatMessages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
             ...historyRows.map((m): ChatMessage => ({ role: m.role, content: m.content })),

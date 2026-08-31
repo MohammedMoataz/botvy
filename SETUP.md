@@ -49,12 +49,17 @@ examples:
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Sign login tokens. Must differ from each other |
 | `INTERNAL_SERVICE_TOKEN` | The only credential n8n holds, for calling `/internal/*` |
 | `N8N_OWNER_EMAIL` / `N8N_OWNER_PASSWORD` | The n8n account bootstrap creates |
-| `TZ` | e.g. `Africa/Cairo`. Affects when nightly jobs run |
+| `TZ` | n8n's own clock. User-facing times come from each user's profile timezone, not this |
 | `DATABASE_URL` | Use the `POSTGRES_PASSWORD` you generated |
 
-Leave `TUNNEL_TOKEN`, `BOTVY_PUBLIC_HOSTNAME`, `FIREBASE_CREDENTIALS_FILE`,
-and `N8N_API_KEY` empty. The first three are optional; the last is minted by
-bootstrap.
+Leave `TUNNEL_TOKEN`, `BOTVY_PUBLIC_HOSTNAME`, `FIREBASE_CREDENTIALS_DIR`,
+`FIREBASE_CREDENTIALS_FILE`, and `N8N_API_KEY` empty. The first four are
+optional; the last is minted by bootstrap.
+
+Everything tunable at runtime — nightly check-in and program times, default
+reminder lead times, sweep batch size, notification wording — lives in the
+`settings` table and is editable from the admin portal's **Config** page. Only
+secrets and connection details are environment variables.
 
 **2. Set up Ollama** — see `infra/docs/ollama-setup.md` for detail. In short:
 
@@ -264,15 +269,27 @@ prerequisite.
 
 ### 2. Firebase — push notifications
 
-Reminders are recorded and marked correctly today but reach no phone. The
-gateway degrades on purpose: with no Firebase configured it logs what it
-would have sent and carries on, so the flow is demonstrable without it.
+Reminders fire from the phone itself, scheduled locally, so they work with no
+network and no Firebase at all. Push covers what the device cannot schedule
+for itself: the evening check-in, the nightly program, a reminder created on
+another device, and silent nudges telling the app to re-sync.
 
 1. Create a project at <https://console.firebase.google.com>
 2. Add an Android app using the package name from `apps/mobile`
 3. Download `google-services.json` → `apps/mobile/android/app/`
 4. Project settings → Service accounts → generate a private key
-5. `FIREBASE_CREDENTIALS_FILE=E:\path\to\service-account.json` in `.env`
+5. Save it into `secrets/` and set **both** halves in `.env`:
+
+```ini
+# The host directory holding the key; mounted read-only at /run/secrets
+FIREBASE_CREDENTIALS_DIR=./../secrets
+# The path INSIDE the container
+FIREBASE_CREDENTIALS_FILE=/run/secrets/firebase-admin.json
+```
+
+A host path (`E:\...`) in `FIREBASE_CREDENTIALS_FILE` does not exist inside
+the container. That mistake used to disable every notification silently; the
+gateway now refuses to boot instead. Leave both empty to run without push.
 
 iOS additionally needs a paid Apple Developer account, for both APNs and
 device distribution.
@@ -342,24 +359,37 @@ hostnames routing to them.
 
 ### 4. Build the mobile app
 
-`apps/mobile` was written without a Flutter SDK present, so treat the first
-build as a debugging session rather than a formality.
-
 ```powershell
 cd apps\mobile
-flutter create --project-name botvy --org org.botvy --platforms=android .
 flutter pub get
+dart run build_runner build   # drift's generated database code
 flutter analyze
 flutter test
 flutter build apk --release
 ```
 
-`flutter create` skips files that already exist, so it adds the Gradle and
-platform scaffolding without touching the written Dart.
+`build_runner` is only needed after changing `lib/src/db/database.dart`; the
+generated `database.g.dart` is otherwise stable.
+
+On first launch the app asks for notification permission and, on Android 12,
+for permission to schedule exact alarms. Both are needed for a reminder to
+land at the minute it was set for — without the second, Android may delay it
+by a few minutes, and Settings says so rather than leaving it a mystery.
 
 Server address: the Android emulator reaches the host at
 `http://10.0.2.2:8080`. A physical phone needs your machine's LAN IP, and
 the gateway reachable on it. Both are editable in the app's Settings screen.
+
+#### Checking that reminders really fire
+
+```powershell
+adb shell dumpsys alarm | Select-String botvy   # a pending RTC_WAKEUP per ping
+```
+
+The honest test is airplane mode: turn it on, create a reminder two minutes
+out, and wait. It should fire with no connection — the phone scheduled it
+itself. Turn the network back on and the reminder appears server-side, with
+no duplicate push.
 
 ---
 

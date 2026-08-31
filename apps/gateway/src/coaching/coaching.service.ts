@@ -10,6 +10,8 @@ import {
   mayOverwrite,
   muscleGroupsToAvoid,
 } from './adherence.js';
+import { DEFAULT_TIMEZONE } from '../common/time.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 export interface CoachingContext {
   streak: number;
@@ -23,10 +25,26 @@ export interface CoachingContext {
 export class CoachingService {
   private readonly logger = new Logger(CoachingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
 
   getProfile(userId: string) {
     return this.prisma.coachingProfile.findUnique({ where: { userId } });
+  }
+
+  /**
+   * The one timezone every user-facing time is resolved against — reminders
+   * included, not just coaching. A user who has never opened coaching still
+   * gets a profile row the first time the phone reports its zone.
+   */
+  async userTimezone(userId: string): Promise<string> {
+    const profile = await this.prisma.coachingProfile.findUnique({
+      where: { userId },
+      select: { timezone: true },
+    });
+    return profile?.timezone ?? DEFAULT_TIMEZONE;
   }
 
   /**
@@ -48,7 +66,7 @@ export class CoachingService {
   /** Streak, adherence and scheduling facts to inject into the coaching prompt. */
   async context(userId: string, now: Date = new Date()): Promise<CoachingContext> {
     const profile = await this.prisma.coachingProfile.findUnique({ where: { userId } });
-    const timezone = profile?.timezone ?? 'UTC';
+    const timezone = profile?.timezone ?? DEFAULT_TIMEZONE;
     const today = localDate(now, timezone);
 
     const [checkins, recentWorkouts] = await Promise.all([
@@ -77,7 +95,8 @@ export class CoachingService {
   async isAwaitingCheckin(userId: string, now: Date = new Date()): Promise<boolean> {
     const profile = await this.prisma.coachingProfile.findUnique({ where: { userId } });
     if (!profile?.awaitingCheckin) return false;
-    return checkinStillOpen(profile.awaitingSince, now);
+    const windowHours = await this.settings.get('coaching.checkinWindowHours');
+    return checkinStillOpen(profile.awaitingSince, now, windowHours * 3_600_000);
   }
 
   /** Records the day's outcome. Idempotent per user per local date. */
@@ -88,7 +107,7 @@ export class CoachingService {
     now: Date = new Date(),
   ) {
     const profile = await this.prisma.coachingProfile.findUnique({ where: { userId } });
-    const checkinDate = localDate(now, profile?.timezone ?? 'UTC');
+    const checkinDate = localDate(now, profile?.timezone ?? DEFAULT_TIMEZONE);
 
     const [record] = await this.prisma.$transaction([
       this.prisma.checkIn.upsert({
