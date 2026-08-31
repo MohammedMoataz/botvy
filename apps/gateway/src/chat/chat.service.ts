@@ -165,7 +165,6 @@ export class ChatService {
           }
 
           const historyRows = await this.history(userId, HISTORY_LIMIT);
-          const historyText = historyRows.map((m) => `${m.role}: ${m.content}`).join('\n');
 
           const timezone = process.env.TZ ?? 'UTC';
           const nowDate = new Date();
@@ -239,7 +238,7 @@ export class ChatService {
           await this.usage.record({
             userId,
             kind: 'chat',
-            model: 'qwen3:4b',
+            model: this.llm.modelName,
             promptTokens: tokenUsage.promptTokens,
             completionTokens: tokenUsage.completionTokens,
           });
