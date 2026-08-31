@@ -158,7 +158,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create an account')),
+      // Same server-settings action as the sign-in screen. Without it a user
+      // who lands here first is stuck: registering fails because the server
+      // URL is wrong, and the only way to change it was on the screen they
+      // navigated away from.
+      appBar: AppBar(
+        title: const Text('Create an account'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.dns_outlined),
+            tooltip: 'Server settings',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const SettingsScreen(),
+            )),
+          ),
+        ],
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
