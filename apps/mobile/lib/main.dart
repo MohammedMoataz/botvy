@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'src/api/api_client.dart';
+import 'src/app_providers.dart';
 import 'src/features/auth/auth_controller.dart';
 import 'src/features/auth/auth_screens.dart';
 import 'src/features/chat/chat_screen.dart';
-import 'src/push.dart';
+import 'src/features/reminders/reminders_screen.dart';
+
+/// Lets a tapped notification open a screen from outside the widget tree.
+final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,8 +21,6 @@ Future<void> main() async {
   final baseUrl = await store.readBaseUrl();
   final signedIn = (await store.readRefresh()) != null;
   final email = await store.readEmail();
-
-  await initPush(); // no-op unless built with --dart-define=BOTVY_PUSH=true
 
   runApp(ProviderScope(
     overrides: [
@@ -38,6 +40,7 @@ class BotvyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Botvy',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -53,13 +56,51 @@ class BotvyApp extends StatelessWidget {
   }
 }
 
-class _Root extends ConsumerWidget {
+class _Root extends ConsumerStatefulWidget {
   const _Root();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final signedIn =
-        ref.watch(authControllerProvider.select((s) => s.signedIn));
+  ConsumerState<_Root> createState() => _RootState();
+}
+
+class _RootState extends ConsumerState<_Root> {
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Notifications are set up regardless of sign-in state: a scheduled alarm
+    // must still be delivered and tappable on a cold start.
+    ref.read(notificationSchedulerProvider).init(onTap: _openFromNotification);
+  }
+
+  /// Push registration and syncing need a bearer token, so they begin only
+  /// once there is a session, and stop when it ends.
+  void _syncSession(bool signedIn) {
+    if (signedIn && !_started) {
+      _started = true;
+      final scheduler = ref.read(notificationSchedulerProvider);
+      scheduler.requestPermissions();
+      ref.read(pushServiceProvider).start();
+      ref.read(syncServiceProvider)
+        ..watchConnectivity()
+        ..kick();
+    } else if (!signedIn && _started) {
+      _started = false;
+    }
+  }
+
+  void _openFromNotification(String payload) {
+    if (!payload.contains('reminder')) return;
+    navigatorKey.currentState?.push(
+      MaterialPageRoute<void>(builder: (_) => const RemindersScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final signedIn = ref.watch(authControllerProvider.select((s) => s.signedIn));
+    _syncSession(signedIn);
     return signedIn ? const ChatScreen() : const LoginScreen();
   }
 }

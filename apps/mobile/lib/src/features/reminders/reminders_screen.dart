@@ -2,7 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/models.dart';
+import '../../app_providers.dart';
 import 'reminders_controller.dart';
+
+/// Offsets offered in the editor. The user's own default comes from the
+/// gateway; this is only the menu of what can be picked.
+const _leadChoices = <String, String>{
+  '1d': '1 day',
+  '3h': '3 hours',
+  '1h': '1 hour',
+  '30m': '30 min',
+  '10m': '10 min',
+  '0m': 'At time',
+};
 
 class RemindersScreen extends ConsumerWidget {
   const RemindersScreen({super.key});
@@ -15,7 +27,7 @@ class RemindersScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Reminders')),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: reminders.busy ? null : () => _create(context, ref),
+        onPressed: () => _edit(context, ref, null),
         icon: const Icon(Icons.add_alarm),
         label: const Text('New'),
       ),
@@ -31,19 +43,24 @@ class RemindersScreen extends ConsumerWidget {
                 ),
               ],
             ),
-          Expanded(child: _body(reminders, controller)),
+          Expanded(child: _body(context, ref, reminders, controller)),
         ],
       ),
     );
   }
 
-  Widget _body(RemindersState reminders, RemindersController controller) {
+  Widget _body(
+    BuildContext context,
+    WidgetRef ref,
+    RemindersState reminders,
+    RemindersController controller,
+  ) {
     if (reminders.loading) {
       return const Center(child: CircularProgressIndicator());
     }
     if (reminders.items.isEmpty) {
       return RefreshIndicator(
-        onRefresh: controller.load,
+        onRefresh: controller.refresh,
         // A ListView (not a bare Center) so pull-to-refresh still works when
         // there is nothing to scroll.
         child: ListView(
@@ -59,49 +76,100 @@ class RemindersScreen extends ConsumerWidget {
       );
     }
     return RefreshIndicator(
-      onRefresh: controller.load,
+      onRefresh: controller.refresh,
       child: ListView.separated(
         padding: const EdgeInsets.only(bottom: 88),
         itemCount: reminders.items.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, i) => _ReminderTile(
-          reminder: reminders.items[i],
-          onCancel: controller.cancel,
-        ),
+        itemBuilder: (context, i) {
+          final reminder = reminders.items[i];
+          return _ReminderTile(
+            reminder: reminder,
+            onDone: () => controller.markDone(reminder.id),
+            onCancel: () => controller.cancel(reminder.id),
+            onEdit: () => _edit(context, ref, reminder),
+            onDelete: () => _confirmDelete(context, controller, reminder),
+          );
+        },
       ),
     );
   }
 
-  Future<void> _create(BuildContext context, WidgetRef ref) async {
+  Future<void> _edit(BuildContext context, WidgetRef ref, Reminder? existing) async {
+    final db = ref.read(databaseProvider);
+    final leadDefaults = existing?.leadTimes ?? await defaultLeadTimes(db);
+    if (!context.mounted) return;
+
     final draft = await showModalBottomSheet<_Draft>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const _CreateSheet(),
+      builder: (_) => _EditSheet(existing: existing, leadTimes: leadDefaults),
     );
     if (draft == null) return;
-    final ok = await ref
-        .read(remindersControllerProvider.notifier)
-        .create(draft.title, draft.remindAt);
-    if (ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reminder set for '
-            '${formatRemindAt(draft.remindAt)}')),
+
+    final controller = ref.read(remindersControllerProvider.notifier);
+    if (existing == null) {
+      await controller.create(draft.title, draft.remindAt, leadTimes: draft.leadTimes);
+    } else {
+      await controller.edit(
+        existing.id,
+        title: draft.title,
+        remindAt: draft.remindAt,
+        leadTimes: draft.leadTimes,
       );
     }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Reminder set for ${formatRemindAt(draft.remindAt)}')),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    RemindersController controller,
+    Reminder reminder,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete reminder?'),
+        content: Text('"${reminder.title}" will be removed permanently.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.remove(reminder.id);
   }
 }
 
 class _ReminderTile extends StatelessWidget {
-  const _ReminderTile({required this.reminder, required this.onCancel});
+  const _ReminderTile({
+    required this.reminder,
+    required this.onDone,
+    required this.onCancel,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final Reminder reminder;
-  final Future<void> Function(String id) onCancel;
+  final VoidCallback onDone;
+  final VoidCallback onCancel;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final done = !reminder.isActive;
-    final labels = reminder.notifications.map((n) => n.label).join(' · ');
+    final finished = !reminder.isActive;
+    final labels = reminder.leadTimes.map((l) => _leadChoices[l] ?? l).join(' · ');
 
     final tile = ListTile(
       leading: Icon(
@@ -110,48 +178,70 @@ class _ReminderTile extends StatelessWidget {
           'cancelled' => Icons.cancel_outlined,
           _ => Icons.alarm,
         },
-        color: done ? scheme.outline : scheme.primary,
+        color: finished ? scheme.outline : scheme.primary,
       ),
       title: Text(
         reminder.title,
         style: TextStyle(
-          decoration: reminder.status == 'cancelled'
-              ? TextDecoration.lineThrough
-              : null,
-          color: done ? scheme.outline : null,
+          decoration: finished ? TextDecoration.lineThrough : null,
+          color: finished ? scheme.outline : null,
         ),
       ),
-      subtitle: Text([
-        formatRemindAt(reminder.remindAt),
-        if (done) reminder.status,
-        // An empty list is normal: lead times already in the past are dropped
-        // by the gateway.
-        if (labels.isNotEmpty) 'alerts: $labels',
-      ].join('  ·  ')),
-      trailing: reminder.isActive
+      subtitle: Row(
+        children: [
+          Expanded(
+            child: Text([
+              formatRemindAt(reminder.remindAt),
+              if (finished) reminder.status,
+              if (!finished && labels.isNotEmpty) 'alerts: $labels',
+            ].join('  ·  ')),
+          ),
+          if (reminder.pendingSync) ...[
+            const SizedBox(width: 6),
+            Icon(Icons.sync, size: 14, color: scheme.outline),
+          ],
+        ],
+      ),
+      // A finished reminder is not inert: deleting it is the only way it ever
+      // leaves the list, which is what the old screen made impossible.
+      trailing: finished
           ? IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete permanently',
+              onPressed: onDelete,
+            )
+          : IconButton(
               icon: const Icon(Icons.close),
               tooltip: 'Cancel reminder',
-              onPressed: () => onCancel(reminder.id),
-            )
-          : null,
+              onPressed: onCancel,
+            ),
+      onTap: finished ? null : onEdit,
     );
 
-    if (!reminder.isActive) return tile;
+    if (finished) return tile;
 
     return Dismissible(
       key: ValueKey(reminder.id),
-      direction: DismissDirection.endToStart,
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        color: scheme.primaryContainer,
+        child: Icon(Icons.check, color: scheme.onPrimaryContainer),
+      ),
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         color: scheme.errorContainer,
         child: Icon(Icons.cancel, color: scheme.onErrorContainer),
       ),
-      // Always false: a cancelled reminder stays in the list with a new
-      // status, so the row must not be removed from the tree.
-      confirmDismiss: (_) async {
-        await onCancel(reminder.id);
+      // Always false: the row stays in the list with a new status rather than
+      // vanishing, so it must not be removed from the tree here.
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          onDone();
+        } else {
+          onCancel();
+        }
         return false;
       },
       child: tile,
@@ -160,22 +250,31 @@ class _ReminderTile extends StatelessWidget {
 }
 
 class _Draft {
-  const _Draft(this.title, this.remindAt);
+  const _Draft(this.title, this.remindAt, this.leadTimes);
 
   final String title;
   final DateTime remindAt;
+  final List<String> leadTimes;
 }
 
-class _CreateSheet extends StatefulWidget {
-  const _CreateSheet();
+/// Serves both new and existing reminders — the fields are identical, and two
+/// copies of a date picker is two places for them to drift apart.
+class _EditSheet extends StatefulWidget {
+  const _EditSheet({required this.existing, required this.leadTimes});
+
+  final Reminder? existing;
+  final List<String> leadTimes;
 
   @override
-  State<_CreateSheet> createState() => _CreateSheetState();
+  State<_EditSheet> createState() => _EditSheetState();
 }
 
-class _CreateSheetState extends State<_CreateSheet> {
-  final _title = TextEditingController();
-  DateTime _when = DateTime.now().add(const Duration(hours: 1));
+class _EditSheetState extends State<_EditSheet> {
+  late final TextEditingController _title =
+      TextEditingController(text: widget.existing?.title ?? '');
+  late DateTime _when =
+      widget.existing?.remindAt ?? DateTime.now().add(const Duration(hours: 1));
+  late final Set<String> _leads = {...widget.leadTimes};
 
   @override
   void dispose() {
@@ -204,8 +303,8 @@ class _CreateSheetState extends State<_CreateSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final valid =
-        _title.text.trim().isNotEmpty && _when.isAfter(DateTime.now());
+    final editing = widget.existing != null;
+    final valid = _title.text.trim().isNotEmpty && _when.isAfter(DateTime.now());
 
     return Padding(
       // Lift the sheet above the keyboard.
@@ -215,45 +314,72 @@ class _CreateSheetState extends State<_CreateSheet> {
         top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 16,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('New reminder',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _title,
-            autofocus: true,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(
-              labelText: 'What should I remind you about?',
-              border: OutlineInputBorder(),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(editing ? 'Edit reminder' : 'New reminder',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _title,
+              autofocus: !editing,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'What should I remind you about?',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 8),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.schedule),
-            title: Text(formatRemindAt(_when)),
-            subtitle: _when.isAfter(DateTime.now())
-                ? null
-                : Text('Pick a time in the future',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.error)),
-            trailing: TextButton(onPressed: _pick, child: const Text('Change')),
-            onTap: _pick,
-          ),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: valid
-                ? () =>
-                    Navigator.of(context).pop(_Draft(_title.text.trim(), _when))
-                : null,
-            child: const Text('Create'),
-          ),
-        ],
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule),
+              title: Text(formatRemindAt(_when)),
+              subtitle: _when.isAfter(DateTime.now())
+                  ? null
+                  : Text('Pick a time in the future',
+                      style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              trailing: TextButton(onPressed: _pick, child: const Text('Change')),
+              onTap: _pick,
+            ),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8, bottom: 4),
+                child: Text('Alert me'),
+              ),
+            ),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final entry in _leadChoices.entries)
+                  FilterChip(
+                    label: Text(entry.value),
+                    selected: _leads.contains(entry.key),
+                    onSelected: (on) => setState(() {
+                      // At least one alert, or the reminder is silent.
+                      if (on) {
+                        _leads.add(entry.key);
+                      } else if (_leads.length > 1) {
+                        _leads.remove(entry.key);
+                      }
+                    }),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: valid
+                  ? () => Navigator.of(context).pop(
+                        _Draft(_title.text.trim(), _when, _leads.toList()),
+                      )
+                  : null,
+              child: Text(editing ? 'Save' : 'Create'),
+            ),
+          ],
+        ),
       ),
     );
   }

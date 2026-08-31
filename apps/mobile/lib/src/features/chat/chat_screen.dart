@@ -176,11 +176,34 @@ class _Bubble extends StatelessWidget {
                 width: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : SelectableText(
-                message.content,
-                style: TextStyle(
-                  color: isUser ? scheme.onPrimaryContainer : scheme.onSurface,
-                ),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SelectableText(
+                    message.content,
+                    style: TextStyle(
+                      color: isUser ? scheme.onPrimaryContainer : scheme.onSurface,
+                    ),
+                  ),
+                  // Sent while offline: it is safely stored and goes out on its
+                  // own, so the user is told rather than asked to retype it.
+                  if (message.isQueued)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.schedule, size: 12, color: scheme.outline),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Waiting for connection',
+                            style: TextStyle(fontSize: 11, color: scheme.outline),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
       ),
     );
