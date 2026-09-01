@@ -51,6 +51,12 @@ dependencies:
   # English-only formatter.
   intl: ^0.20.2
 
+  # The model already answers in markdown; without a renderer the user reads
+  # the asterisks and hashes. `_plus` is the maintained continuation of the
+  # discontinued flutter_markdown, and keeps the imageBuilder/onTapLink hooks.
+  flutter_markdown_plus: ^1.0.3
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
