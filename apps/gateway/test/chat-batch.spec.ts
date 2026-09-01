@@ -59,6 +59,9 @@ function makeService(opts: { stored?: string[]; intent?: unknown } = {}) {
     settings as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     search as any,
+    // Image proxying off: nothing here renders images.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    { get: vi.fn(() => undefined) } as any,
   );
   return { service, prisma, llm, reminders, search, created };
 }

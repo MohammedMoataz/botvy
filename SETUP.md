@@ -202,11 +202,37 @@ one generated file; the project's own tests live beside it.
 
 | Check | Expected |
 |---|---|
-| `curl http://localhost:8080/health` | `{"status":"ok","database":true,"ollama":true}` |
-| `curl http://localhost:11434/api/ps` | after one query, `size_vram` **> 0** — otherwise you are on CPU, see Part 2 |
-| `docker compose ps` | postgres healthy, n8n and gateway up |
-| `/admin` in a browser | login works; Overview shows live numbers |
+| `curl http://localhost:8080/health` | `status: ok`, `push: true`, and `sweepStale: false` within a few minutes of starting |
+| `curl http://localhost:11434/api/ps` | after one query, `size_vram` should equal `size` — anything less is running on the CPU, see Part 2 |
+| `docker compose ps` | postgres healthy; n8n, searxng and gateway up |
+| `/admin` in a browser | login works; Overview shows live numbers and a running reminder sweep |
 | n8n editor at `:5679` | reachable **only** from the machine itself |
+| `node test/intent-fixture.mjs` (in `apps/gateway`) | 23/23 — run it after changing the model or the intent prompt |
+
+`sweepStale: true` means the scheduled jobs are not reaching the gateway.
+Check that n8n actually has the shared secret — `docker exec botvy-n8n-1
+printenv INTERNAL_SERVICE_TOKEN` — and recreate the container if it is empty;
+one that predates the setting keeps its old environment forever.
+
+### The model
+
+`OLLAMA_CHAT_MODEL` must fit entirely in VRAM. Two settings go with it:
+`OLLAMA_THINKING` is true only for a reasoning model like qwen3 (qwen2.5
+rejects the field and every call fails), and `OLLAMA_NUM_CTX` pins the context
+window. Do not give the intent call and the chat call different windows —
+Ollama keys a loaded model by context size, so two values make it reload on
+every single turn. That cost 39 seconds to the first token; one value costs 3.
+
+### Web search
+
+Search runs through a local SearXNG that nothing but the gateway can reach.
+`infra/searxng/settings.yml` restricts it to a handful of engines: the default
+set waits for the slowest, and its image half is mostly icon libraries. Several
+general engines are listed on purpose — a single home IP collects a CAPTCHA
+from DuckDuckGo and a rate-limit from Brave soon enough, and one working engine
+is enough to answer. If every engine is throttled the assistant simply replies
+without searching, which is why an outage looks like an ordinary conversation
+rather than an error.
 
 ---
 

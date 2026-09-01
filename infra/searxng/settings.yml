@@ -8,7 +8,26 @@
 #   - the engine list is short and the timeout small, because a reply here
 #     blocks a user's chat turn — the default engine set waits for the slowest.
 
-use_default_settings: true
+# Only these engines run. The default set is large, and a search here blocks a
+# user's chat turn on the slowest of them — and its image half is full of icon
+# libraries (devicons, lucide) that answer "eiffel tower" with an SVG logo.
+use_default_settings:
+  engines:
+    keep_only:
+      # Several general engines on purpose: a single home IP gets a CAPTCHA
+      # from DuckDuckGo and a "too many requests" from Brave soon enough, and
+      # one throttled engine must not empty the whole result set.
+      - duckduckgo
+      - brave
+      - bing
+      - qwant
+      - mojeek
+      - startpage
+      - wikipedia
+      - duckduckgo images
+      - bing images
+      - unsplash
+      - wikicommons.images
 
 general:
   instance_name: "Botvy"
@@ -40,14 +59,22 @@ outgoing:
   pool_connections: 20
   pool_maxsize: 10
 
+# Per-engine tuning for the few that survive keep_only above. `disabled: false`
+# is what actually switches on an engine the defaults ship turned off —
+# keep_only only removes, it never enables.
 engines:
   - name: duckduckgo
-    disabled: false
+    timeout: 3.0
   - name: brave
+    timeout: 3.0
+  - name: bing
     disabled: false
+    timeout: 3.0
+  - name: qwant
+    disabled: false
+    timeout: 3.0
+  - name: mojeek
+    disabled: false
+    timeout: 3.0
   - name: wikipedia
-    disabled: false
-  - name: bing images
-    disabled: false
-  - name: duckduckgo images
-    disabled: false
+    timeout: 3.0
