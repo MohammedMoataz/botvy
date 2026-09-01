@@ -507,6 +507,24 @@ flutter build apk --release
 `build_runner` is only needed after changing `lib/src/db/database.dart`; the
 generated `database.g.dart` is otherwise stable.
 
+**For a release, build through the script instead of the last line**, so the
+APK carries the gateway you actually deployed:
+
+```powershell
+node infra\build-mobile.mjs                        # ask the running tunnel
+node infra\build-mobile.mjs https://botvy.example  # or name it
+node infra\build-mobile.mjs --check                # print it, build nothing
+```
+
+It validates the URL, runs the base-URL test with the same value the APK will
+carry, then builds with `--dart-define=BOTVY_BASE_URL=...`.
+
+This is only the **first-run default**: the app stores whatever the user sets in
+Settings, so a build with a stale URL is corrected on the device rather than
+needing a new APK. Which is just as well on a quick tunnel, whose hostname
+changes on every restart — bake one in only for a named tunnel, and the script
+warns when you do it anyway.
+
 On first launch the app asks for notification permission and, on Android 12,
 for permission to schedule exact alarms. Both are needed for a reminder to
 land at the minute it was set for — without the second, Android may delay it

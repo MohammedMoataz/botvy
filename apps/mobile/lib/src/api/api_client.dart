@@ -8,8 +8,23 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'models.dart';
 import 'sse.dart';
 
-/// Android emulator loopback to the host machine's gateway.
-const String kDefaultBaseUrl = 'http://10.0.2.2:8080';
+/// Where a fresh install looks for the gateway, before anyone opens Settings.
+///
+/// Injected at build time so a release can carry whatever hostname the tunnel
+/// is actually serving:
+///
+/// ```
+/// flutter build apk --release --dart-define=BOTVY_BASE_URL=https://your.host
+/// ```
+///
+/// It is only the *first* value: the URL lives in secure storage from the
+/// moment the user sets one, so a build with the wrong default is corrected on
+/// the device rather than needing a new APK. Falls back to the Android
+/// emulator's loopback to the host machine, which is what a developer wants.
+const String kDefaultBaseUrl = String.fromEnvironment(
+  'BOTVY_BASE_URL',
+  defaultValue: 'http://10.0.2.2:8080',
+);
 
 // ---------------------------------------------------------------------------
 // Storage
