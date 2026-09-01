@@ -73,6 +73,26 @@ describe('SearchService.search', () => {
     expect(result.content).not.toContain('![');
   });
 
+  it('strips a tag that was cut off before its closing bracket', async () => {
+    // A snippet truncated mid-tag has no `>` for a tag pattern to match, so
+    // the markup survived intact into the prompt.
+    const search = makeService(
+      ok({
+        results: [
+          {
+            title: 'Truncated',
+            url: 'https://example.com/x',
+            content: 'text <img src=x onerror=alert(1)//',
+          },
+        ],
+      }),
+    );
+    const [result] = await search.search('q');
+
+    expect(result.content).not.toContain('<');
+    expect(result.content).not.toContain('>');
+  });
+
   it('truncates a snippet so one page cannot crowd out the prompt', async () => {
     const search = makeService(
       ok({ results: [{ title: 't', url: 'https://e.com', content: 'x'.repeat(5000) }] }),

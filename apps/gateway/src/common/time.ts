@@ -77,11 +77,19 @@ export function wallClockToUtc(wallClock: string, timeZone: string): Date | null
   // Guess using the offset at the naive instant, then correct once: near a DST
   // change the offset before and after the guess differ, and the second pass is
   // what lands on the right side of it.
-  let guess = naiveUtcMs - (wallClockAsUtcMs(new Date(naiveUtcMs), timeZone) - naiveUtcMs);
-  const drift = wallClockAsUtcMs(new Date(guess), timeZone) - naiveUtcMs;
-  if (drift !== 0) guess -= drift;
+  const first = naiveUtcMs - (wallClockAsUtcMs(new Date(naiveUtcMs), timeZone) - naiveUtcMs);
+  const drift = wallClockAsUtcMs(new Date(first), timeZone) - naiveUtcMs;
+  if (drift === 0) return new Date(first);
 
-  return new Date(guess);
+  const corrected = first - drift;
+  if (wallClockAsUtcMs(new Date(corrected), timeZone) === naiveUtcMs) return new Date(corrected);
+
+  // Neither pass reads back as the time asked for, which means it never
+  // happens: the hour skipped by a spring-forward. Take the first instant
+  // after the gap rather than the hour before it — a reminder for 02:30 on
+  // that morning should fire once the clocks have moved, not read back as
+  // 01:30 to the user.
+  return new Date(first);
 }
 
 /** True for a string Intl accepts as an IANA zone — rejects "Cairo", "GMT+2". */
