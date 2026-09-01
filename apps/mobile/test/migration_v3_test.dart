@@ -150,7 +150,14 @@ void main() {
 
   test('reports the new schema version', () async {
     await db.allConversations(); // force the migration to run
-    expect(db.schemaVersion, 3);
+    expect(db.schemaVersion, 4);
+  });
+
+  test('an existing reminder is not mistaken for a deleted one', () async {
+    // The deleted column is new; every row that predates it was, by
+    // definition, not deleted — anything that had been was erased outright.
+    expect((await db.allReminders()).single.deletedAt, isNull);
+    expect((await db.watchReminders().first).map((r) => r.id), ['r1']);
   });
 
   test('the sweep clears only the cache, never the outbox', () async {

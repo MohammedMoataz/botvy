@@ -169,6 +169,23 @@ class Reminder {
 
   bool get isActive => status == 'active';
 
+  /// What the reminder is *now*, which is not the same as the status stored
+  /// against it: a reminder nobody finished becomes overdue by the clock
+  /// passing, and no row is written when that happens. Derived rather than
+  /// stored for exactly that reason — storing it would need a job to write it.
+  ReminderState state([DateTime? now]) {
+    switch (status) {
+      case 'done':
+        return ReminderState.completed;
+      case 'cancelled':
+        return ReminderState.cancelled;
+      default:
+        return remindAt.isBefore(now ?? DateTime.now())
+            ? ReminderState.overdue
+            : ReminderState.upcoming;
+    }
+  }
+
   factory Reminder.fromJson(Map<String, dynamic> json) => Reminder(
         id: json['id'] as String,
         title: (json['title'] as String?) ?? '',
@@ -186,6 +203,21 @@ class Reminder {
                 ReminderNotification.fromJson(Map<String, dynamic>.from(n as Map)))
             .toList(),
       );
+}
+
+/// Where a reminder stands, for the label on its tile.
+///
+/// `overdue` has no stored counterpart: it is `active` plus a moment that has
+/// passed. The other three map straight onto the status column.
+enum ReminderState { upcoming, overdue, completed, cancelled }
+
+extension ReminderStateLabel on ReminderState {
+  String get label => switch (this) {
+        ReminderState.upcoming => 'Upcoming',
+        ReminderState.overdue => 'Overdue',
+        ReminderState.completed => 'Completed',
+        ReminderState.cancelled => 'Cancelled',
+      };
 }
 
 /// A message typed while offline, waiting in the outbox.

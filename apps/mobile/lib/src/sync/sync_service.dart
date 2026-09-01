@@ -249,12 +249,11 @@ class SyncService {
       final seen = <String>{};
       for (final reminder in result.reminders) {
         seen.add(reminder.id);
-        if (reminder.deleted) {
-          await _db.deleteReminder(reminder.id);
-          continue;
-        }
         // A row edited again while the push was in flight keeps its local copy.
         if (stillPending.contains(reminder.id)) continue;
+        // A tombstone is stored, not erased: it is what the Deleted view lists
+        // and what Restore undoes. The row leaves for good only when the server
+        // purges it past the horizon, which a full snapshot then reflects.
         await _writeServerReminder(reminder);
       }
 
@@ -362,6 +361,9 @@ class SyncService {
             'leadTimes': _decodeLeadTimes(row.leadTimes),
             'status': row.status,
             if (row.pendingOp == ReminderOps.delete) 'deleted': true,
+            // An explicit false is the undo. Omitting it would send an
+            // ordinary edit, which the gateway refuses for a tombstoned row.
+            if (row.pendingOp == ReminderOps.restore) 'deleted': false,
             'updatedAt': (row.updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
             // The server's timestamp, not ours. When it still matches, the
             // gateway takes the edit without looking at this handset's clock.
@@ -472,6 +474,10 @@ class SyncService {
       remindAt: r.remindAt,
       status: Value(r.status),
       leadTimes: Value(jsonEncode(r.leadTimes)),
+      // The status the reminder had is preserved through a delete, so the
+      // Deleted view can say whether it was completed, cancelled or still
+      // waiting when it went.
+      deletedAt: Value(r.deletedAt),
       updatedAt: Value(r.updatedAt),
       baseUpdatedAt: Value(r.updatedAt),
       pendingOp: const Value(null),
