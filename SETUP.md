@@ -67,8 +67,11 @@ secrets and connection details are environment variables.
 [Environment]::SetEnvironmentVariable('OLLAMA_HOST','0.0.0.0:11434','User')
 [Environment]::SetEnvironmentVariable('OLLAMA_KEEP_ALIVE','-1','User')
 # restart Ollama from the tray, then:
-ollama pull qwen3:4b
+ollama pull qwen2.5:3b-instruct
 ```
+
+Pull whatever `OLLAMA_CHAT_MODEL` in your `.env` names — the two have to agree,
+and the gateway does not pull for you. See *The model* below for why this one.
 
 `OLLAMA_HOST=0.0.0.0` is **required** — Ollama's default binds to loopback
 only, which Docker containers cannot reach. That is the single most common
@@ -150,7 +153,7 @@ ln -sf ~/opt/ollama/bin/ollama ~/.local/bin/ollama
 `OLLAMA_HOST` and `OLLAMA_KEEP_ALIVE` belong in a service unit rather than a
 user environment variable — install `infra/ollama.service`, which documents
 both and the one-time `loginctl enable-linger` that makes it start at boot.
-Then `ollama pull qwen3:4b`.
+Then `ollama pull qwen2.5:3b-instruct`, or whatever `OLLAMA_CHAT_MODEL` names.
 
 The Windows firewall rule has no direct equivalent. Binding to `0.0.0.0` puts
 Ollama on your LAN, so restrict it to the Docker bridge and loopback:
@@ -203,11 +206,12 @@ one generated file; the project's own tests live beside it.
 | Check | Expected |
 |---|---|
 | `curl http://localhost:8080/health` | `status: ok`, `push: true`, and `sweepStale: false` within a few minutes of starting |
-| `curl http://localhost:11434/api/ps` | after one query, `size_vram` should equal `size` — anything less is running on the CPU, see Part 2 |
+| `curl http://localhost:11434/api/ps` | after one query, the loaded model is the one `OLLAMA_CHAT_MODEL` names, and `size_vram` equals `size` — anything less is running on the CPU, see Part 2 |
 | `docker compose ps` | postgres healthy; n8n, searxng and gateway up |
 | `/admin` in a browser | login works; Overview shows live numbers and a running reminder sweep |
 | n8n editor at `:5679` | reachable **only** from the machine itself |
-| `node test/intent-fixture.mjs` (in `apps/gateway`) | 23/23 — run it after changing the model or the intent prompt |
+| `node test/intent-fixture.mjs` (in `apps/gateway`) | 23/23, and the footer names the model it used — run it after changing the model or the intent prompt |
+| `vitest run` (in `apps/gateway`) and `flutter test` (in `apps/mobile`) | 248 and 129 as of v0.5.0 |
 | `POST /sync` with an empty body | `full: true` and a `now` cursor — the app's whole conversation with the gateway goes through this one route |
 
 `sweepStale: true` means the scheduled jobs are not reaching the gateway.
@@ -217,12 +221,23 @@ one that predates the setting keeps its old environment forever.
 
 ### The model
 
+**Currently `qwen2.5:3b-instruct`**, and it must be pulled by hand — the gateway
+never pulls. Confirm what is actually loaded with
+`curl http://localhost:11434/api/ps`: `size_vram` should equal `size`.
+
 `OLLAMA_CHAT_MODEL` must fit entirely in VRAM. Two settings go with it:
 `OLLAMA_THINKING` is true only for a reasoning model like qwen3 (qwen2.5
-rejects the field and every call fails), and `OLLAMA_NUM_CTX` pins the context
-window. Do not give the intent call and the chat call different windows —
-Ollama keys a loaded model by context size, so two values make it reload on
-every single turn. That cost 39 seconds to the first token; one value costs 3.
+rejects the field and every call fails, which is why it is `false` here), and
+`OLLAMA_NUM_CTX` pins the context window. Do not give the intent call and the
+chat call different windows — Ollama keys a loaded model by context size, so
+two values make it reload on every single turn. That cost 39 seconds to the
+first token; one value costs 3.
+
+The switch away from `qwen3:4b` is the subject of Part 2's measurements below
+and of `specs/007-search-and-rendering/`: on a 4 GB card qwen3:4b spilled about
+half of itself to the CPU, and a model that fits beats a cleverer one that does
+not. Those sections describe what was measured at the time and still name
+qwen3:4b for that reason; the value to install is the one above.
 
 ### Chats
 
@@ -333,7 +348,8 @@ curl http://localhost:11434/api/ps    # size_vram must be > 0
 ```
 
 With that set, the GTX 1050 runs under Vulkan with the model in VRAM
-(`size_vram` ≈ 2.6 GB for qwen3:4b).
+(`size_vram` ≈ 2.6 GB for qwen3:4b; ≈ 2.3 GB for the qwen2.5:3b-instruct in use
+now).
 
 **The larger lesson: the GPU was never the main cost.** qwen3 is a reasoning
 model, and an unbounded thinking phase dominated every extraction:
@@ -345,12 +361,20 @@ model, and an unbounded thinking phase dominated every extraction:
 
 `extract()` therefore calls Ollama's **native** `/api/chat` rather than the
 `/v1` OpenAI shim, because `think` exists only there, and caps the reply with
-`num_predict`. End to end today, "remind me to call mom tomorrow at 5pm"
-resolves correctly in about **20 seconds**.
+`num_predict`. With qwen3:4b that brought "remind me to call mom tomorrow at
+5pm" down to about **20 seconds** end to end.
 
-Model choice, measured on that same prompt: `qwen3:1.7b` answers in ~7 s but
-puts the reminder on the wrong **day**; `qwen3:4b` takes ~20 s warm and gets
-it right. Correctness wins, so `OLLAMA_CHAT_MODEL=qwen3:4b`.
+Model choice, measured on that same prompt: `qwen3:1.7b` answered in ~7 s but
+put the reminder on the wrong **day**; `qwen3:4b` took ~20 s warm and got it
+right.
+
+> **Superseded.** Everything above is the state before v0.2.0. The 4 GB card
+> could not hold qwen3:4b at a useful context — about half of it spilled to the
+> CPU — so the model is now `qwen2.5:3b-instruct`, fully resident, with
+> `OLLAMA_THINKING=false` because qwen2.5 rejects the field outright. First
+> token is ~2.8 s. The measurements are kept because the reasoning behind them
+> is still how to choose a model here: it has to fit. See
+> `specs/007-search-and-rendering/`.
 
 A newer driver would still be worth installing — it would restore the CUDA
 path, which is faster than Vulkan — but it is an optimisation now, not a
@@ -502,7 +526,7 @@ docker compose --env-file .env -f infra/docker-compose.yml logs -f gateway
 Two things matter, and neither is in Docker by accident:
 
 ```powershell
-# The database — users, reminders, coaching history, messages
+# The database — users, reminders, chats and their messages, coaching history
 docker exec botvy-postgres-1 pg_dump -U botvy botvy > backup-botvy.sql
 ```
 

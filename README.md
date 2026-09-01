@@ -3,19 +3,22 @@
 Self-hosted, multi-user AI assistant platform. Runs entirely on your own
 hardware: your data, your workflow engine, your language model.
 
-- **Gateway** (NestJS) — owns all data, auth, chat, reminders, admin API
+- **Gateway** (NestJS) — owns all data: auth, chat, reminders, coaching, the
+  admin API, and the one `/sync` route the app reconciles through
 - **Admin portal** (React + Vite) — users, devices, usage, configuration
 - **Mobile app** (Flutter) — named chats, reminders, coaching and history,
   holding the user's whole account in its own SQLite store so it all works
   offline
 - **n8n** — scheduler and workflow engine, calls the gateway's API only
-- **Ollama** — local LLM (`qwen3:4b`), OpenAI-compatible, no cloud provider
+- **Ollama** — local LLM (`qwen2.5:3b-instruct`), OpenAI-compatible, no cloud
+  provider
 
 ## Prerequisites
 
 - Docker Desktop
 - [Ollama](https://ollama.com/download) installed natively (native, not in
-  Docker — it needs direct GPU access), with `qwen3:4b` pulled
+  Docker — it needs direct GPU access), with `qwen2.5:3b-instruct` pulled —
+  or whatever `OLLAMA_CHAT_MODEL` names; the gateway never pulls for you
 - Optional: a Cloudflare domain + tunnel token for public access
 - Optional: a Firebase project for push notifications
 
@@ -58,5 +61,10 @@ forward-only; only the gateway is ever publicly reachable; and nothing is
 called done without running its check and showing the output.
 
 Features are developed with [spec-kit](https://github.com/github/spec-kit):
-each one gets a `specs/<nnn>-<name>/` directory with a spec, plan, and
-task list carrying its verification evidence.
+each one gets a `specs/<nnn>-<name>/` directory with a `spec.md` saying what
+was built and why, and a `tasks.md` carrying its verification evidence. (The
+first two also have a `plan.md`; the practice since then has been to fold the
+plan into the spec rather than keep a third file in step.)
+
+The newest spec describes the current shape of the system — start there rather
+than at 001.

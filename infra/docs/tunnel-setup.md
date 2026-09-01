@@ -7,6 +7,23 @@ no watchdog process needed.
 **Requires**: a domain managed in a Cloudflare account (free plan is
 enough).
 
+> **Which one is running.** The compose file ships both, behind profiles:
+> `cloudflared` (named, profile `tunnel`, needs the domain and token below) and
+> `cloudflared-quick` (profile `quick`, no account needed). **This machine
+> currently runs the quick one**, which means the hostname is a random
+> `*.trycloudflare.com` that **changes every time the container restarts** —
+> the app's saved server URL stops working when it does. Read the current one
+> with:
+>
+> ```powershell
+> node infra/tunnel-url.mjs
+> # or, if that reports a stale one, straight from the log:
+> docker compose --env-file ..\.env logs cloudflared-quick | Select-String trycloudflare.com
+> ```
+>
+> Set up the named tunnel below when you want a hostname that survives a
+> restart. Until then, expect to re-point the app after one.
+
 ## One-time setup (done by the user — needs Cloudflare account access)
 
 1. `cloudflared tunnel login` — opens a browser, authorizes against your
