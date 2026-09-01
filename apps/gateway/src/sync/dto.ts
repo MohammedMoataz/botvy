@@ -8,6 +8,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   MinLength,
   ValidateNested,
@@ -76,6 +77,64 @@ export class PushedReminderDto {
   baseUpdatedAt?: Date;
 }
 
+/**
+ * One conversation edit a phone made, possibly while offline.
+ *
+ * Deliberately the same shape as a pushed reminder, so `clientWins` resolves
+ * both with one rule. The difference: the phone mints the id and the gateway
+ * takes it, so there is no separate clientId and a create and an edit are the
+ * same write.
+ */
+export class PushedConversationDto {
+  @ApiProperty({ description: 'Minted by the phone. Created if unknown.' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  id!: string;
+
+  @ApiProperty({ required: false, description: 'Empty means unnamed; the client shows the first message.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  title?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  pinned?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  archived?: boolean;
+
+  @ApiProperty({ required: false, description: 'The device is asking for this to be removed.' })
+  @IsOptional()
+  @IsBoolean()
+  deleted?: boolean;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    description: "When the device made the edit, on its own clock. Clamped server-side.",
+  })
+  @Type(() => Date)
+  @IsDate()
+  updatedAt!: Date;
+
+  @ApiProperty({
+    required: false,
+    type: String,
+    format: 'date-time',
+    description:
+      'The last server updatedAt this device holds. When it still matches, the edit is uncontested and no clock is consulted.',
+  })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  baseUpdatedAt?: Date;
+}
+
 export class SyncPushDto {
   @ApiProperty({ type: [PushedReminderDto], required: false })
   @IsOptional()
@@ -84,6 +143,14 @@ export class SyncPushDto {
   @ValidateNested({ each: true })
   @Type(() => PushedReminderDto)
   reminders?: PushedReminderDto[];
+
+  @ApiProperty({ type: [PushedConversationDto], required: false })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => PushedConversationDto)
+  conversations?: PushedConversationDto[];
 
   /**
    * Reusing the coaching DTO is the allowlist: `whitelist: true` strips

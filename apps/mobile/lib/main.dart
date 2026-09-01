@@ -6,6 +6,7 @@ import 'src/app_providers.dart';
 import 'src/features/auth/auth_controller.dart';
 import 'src/features/auth/auth_screens.dart';
 import 'src/features/chat/chat_screen.dart';
+import 'src/features/chat/conversations_controller.dart';
 import 'src/features/reminders/reminders_screen.dart';
 
 /// Lets a tapped notification open a screen from outside the widget tree.
@@ -108,10 +109,23 @@ class _RootState extends ConsumerState<_Root> with WidgetsBindingObserver {
   }
 
   void _openFromNotification(String payload) {
+    // A check-in or a program: both are written into the coaching chat, so the
+    // tap should land on the message rather than on a reminder list.
+    if (payload.contains('checkin') || payload.contains('program')) {
+      _openCoachingChat();
+      return;
+    }
     if (!payload.contains('reminder')) return;
     navigatorKey.currentState?.push(
       MaterialPageRoute<void>(builder: (_) => const RemindersScreen()),
     );
+  }
+
+  Future<void> _openCoachingChat() async {
+    final chat = await ref.read(databaseProvider).coachingConversation();
+    if (chat == null) return; // not synced yet; the chat list will have it soon
+    ref.read(activeConversationProvider.notifier).select(chat.id);
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 
   @override

@@ -16,14 +16,21 @@ class _FakeApi extends ApiClient {
   _FakeApi() : super(TokenStore(kSecureStorage), baseUrl: 'http://example.invalid');
 
   SyncResult next = const SyncResult(now: 'cursor-1', lastMessageId: 0, full: true);
+
+  /// Responses handed out in order, for the paging loop. Falls back to [next].
+  List<SyncResult> queue = const [];
   Object? throwOnSync;
 
   Map<String, dynamic>? lastProfile;
   List<Map<String, dynamic>> lastReminders = const [];
+  List<Map<String, dynamic>> lastConversations = const [];
+  List<int?> requestedMessageIds = [];
+  List<String?> sinceValues = [];
   String? lastSince;
   int syncCalls = 0;
 
-  List<QueuedMessage> flushed = const [];
+  List<List<QueuedMessage>> flushes = [];
+  List<QueuedMessage> get flushed => flushes.isEmpty ? const [] : flushes.last;
   ChatBatchResult batchResult = const ChatBatchResult(processed: 0, duplicates: []);
 
   @override
@@ -32,19 +39,24 @@ class _FakeApi extends ApiClient {
     int? lastMessageId,
     String? installId,
     List<Map<String, dynamic>> reminders = const [],
+    List<Map<String, dynamic>> conversations = const [],
     Map<String, dynamic>? profile,
   }) async {
-    syncCalls++;
     lastSince = since;
+    sinceValues.add(since);
+    requestedMessageIds.add(lastMessageId);
     lastReminders = reminders;
+    lastConversations = conversations;
     lastProfile = profile;
     if (throwOnSync != null) throw throwOnSync!;
-    return next;
+    final result = syncCalls < queue.length ? queue[syncCalls] : next;
+    syncCalls++;
+    return result;
   }
 
   @override
   Future<ChatBatchResult> sendQueued(List<QueuedMessage> queued) async {
-    flushed = queued;
+    flushes.add(queued);
     return batchResult;
   }
 }
@@ -414,6 +426,300 @@ void main() {
 
       expect(h.api.syncCalls, 2);
     });
+  });
+
+  group('named chats', () {
+    Conversation chat({
+      String id = 'chat-1',
+      String title = '',
+      bool isCoaching = false,
+      DateTime? deletedAt,
+    }) =>
+        Conversation(
+          id: id,
+          title: title,
+          isCoaching: isCoaching,
+          updatedAt: DateTime.utc(2026, 9, 1, 8),
+          deletedAt: deletedAt,
+        );
+
+    test('stores a chat the server sent, with the server timestamp as the base', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      h.api.next = SyncResult(
+        now: 'cursor-1',
+        lastMessageId: 0,
+        full: true,
+        conversations: [chat(title: 'Cairo trip')],
+      );
+
+      await h.sync.sync();
+
+      final row = (await h.db.allConversations()).single;
+      expect(row.title, 'Cairo trip');
+      expect(row.baseUpdatedAt, DateTime.utc(2026, 9, 1, 8).toLocal());
+      expect(row.pendingOp, isNull);
+    });
+
+    test('a tombstone removes the chat and everything said in it', () async {
+      // Messages carry no tombstone of their own, so this cascade is the only
+      // way a deletion made elsewhere reaches this device.
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(id: 'chat-1'));
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        conversationId: const Value('chat-1'),
+        role: 'user',
+        content: 'still here?',
+        composedAt: DateTime(2026, 9, 1, 6),
+      ));
+      await h.db.setValue(SyncKeys.cursor, 'cursor-0');
+      h.api.next = SyncResult(
+        now: 'cursor-2',
+        lastMessageId: 0,
+        full: false,
+        conversations: [chat(deletedAt: DateTime.utc(2026, 9, 1, 9))],
+      );
+
+      await h.sync.sync();
+
+      expect(await h.db.allConversations(), isEmpty);
+      expect(await h.db.watchMessages().first, isEmpty);
+    });
+
+    test('a full snapshot spares a chat this device has not pushed yet', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(
+        id: 'local-only',
+        pendingOp: const Value(ConversationOps.upsert),
+      ));
+      await h.db.upsertConversation(ConversationsCompanion.insert(id: 'server-had-it'));
+
+      await h.sync.sync(); // full snapshot, no conversations
+
+      expect((await h.db.allConversations()).map((c) => c.id), ['local-only']);
+    });
+
+    test('pushes a rename with the server timestamp as its base', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(
+        id: 'chat-1',
+        title: const Value('Renamed'),
+        baseUpdatedAt: Value(DateTime.utc(2026, 9, 1, 8)),
+        updatedAt: Value(DateTime(2026, 9, 1, 11)),
+        pendingOp: const Value(ConversationOps.upsert),
+      ));
+
+      await h.sync.sync();
+
+      final sent = h.api.lastConversations.single;
+      expect(sent['id'], 'chat-1');
+      expect(sent['title'], 'Renamed');
+      expect(sent['baseUpdatedAt'], DateTime.utc(2026, 9, 1, 8).toIso8601String());
+    });
+
+    test('a rejected chat is not written through the reminder path', () async {
+      // The rejection shape is shared; without reading `entity` a refused chat
+      // would be stored as a reminder. Corruption, not a crash.
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(
+        id: 'chat-1',
+        title: const Value('Mine'),
+        updatedAt: Value(DateTime(2026, 9, 1, 11)),
+        pendingOp: const Value(ConversationOps.upsert),
+      ));
+      h.api.next = SyncResult(
+        now: 'cursor-2',
+        lastMessageId: 0,
+        full: false,
+        rejected: [
+          SyncRejection(
+            id: 'chat-1',
+            entity: 'conversation',
+            reason: 'stale',
+            serverConversation: chat(title: 'Server won'),
+          ),
+        ],
+      );
+      await h.db.setValue(SyncKeys.cursor, 'cursor-0');
+
+      await h.sync.sync();
+
+      expect(await h.db.allReminders(), isEmpty);
+      final row = await h.db.findConversation('chat-1');
+      expect(row!.title, 'Server won');
+      expect(row.pushAttempts, 1);
+    });
+  });
+
+  group('rebuilding the message cache after the upgrade', () {
+    test('asks for the whole history while pre-chat rows are still cached', () async {
+      // A synced message with no chat can only have come from before chats
+      // existed, and the gateway can never re-send it — messages are immutable
+      // and pulled by id. So the history has to be fetched again.
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        serverId: const Value(11),
+        role: 'user',
+        content: 'from before chats',
+        composedAt: DateTime(2026, 9, 1, 5),
+      ));
+      h.api.next = SyncResult(
+        now: 'cursor-1',
+        lastMessageId: 11,
+        full: true,
+        conversations: [
+          Conversation(id: 'chat-1', isCoaching: true, updatedAt: DateTime.utc(2026, 9, 1)),
+        ],
+        messages: [
+          ChatMessage(
+            id: 11,
+            conversationId: 'chat-1',
+            role: 'user',
+            content: 'from before chats',
+            createdAt: DateTime(2026, 9, 1, 5),
+          ),
+        ],
+      );
+
+      await h.sync.sync();
+
+      expect(h.api.requestedMessageIds.first, 0);
+      final rows = await h.db.watchMessages().first;
+      expect(rows.single.conversationId, 'chat-1');
+      // Nothing is left unfiled, so the next sync asks from the watermark again.
+      expect(await h.db.hasLegacyMessages(), isFalse);
+    });
+
+    test('keeps a message queued before the upgrade instead of sweeping it', () async {
+      // The sweep is for cache. An unsent message exists nowhere else.
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        clientId: const Value('c1'),
+        role: 'user',
+        content: 'typed on a plane',
+        composedAt: DateTime(2026, 9, 1, 6),
+        syncState: const Value(SyncStates.queued),
+      ));
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        serverId: const Value(11),
+        role: 'assistant',
+        content: 'cached',
+        composedAt: DateTime(2026, 9, 1, 5),
+      ));
+
+      await h.sync.sync();
+
+      final rows = await h.db.watchMessages().first;
+      expect(rows.map((m) => m.content), ['typed on a plane']);
+    });
+
+    test('keeps pulling while the page comes back full', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      h.api.queue = [
+        const SyncResult(now: 'cursor-1', lastMessageId: 200, full: true, moreMessages: true),
+        const SyncResult(now: 'cursor-2', lastMessageId: 250, full: false),
+      ];
+
+      await h.sync.sync();
+
+      expect(h.api.syncCalls, 2);
+    });
+
+    test('later pages stay deltas and push nothing', () async {
+      // A null `since` would make each page a full snapshot, and the delete
+      // sweep would then run once per page.
+      final h = harness();
+      addTearDown(h.db.close);
+      await addPending(h.db, 'r1');
+      h.api.queue = [
+        const SyncResult(now: 'cursor-1', lastMessageId: 200, full: true, moreMessages: true),
+        const SyncResult(now: 'cursor-2', lastMessageId: 250, full: false),
+      ];
+
+      await h.sync.sync();
+
+      expect(h.api.sinceValues.last, 'cursor-1');
+      expect(h.api.lastReminders, isEmpty);
+    });
+
+    test('does not file a message whose chat has not arrived', () async {
+      // Stopping leaves the watermark behind, so the next sync asks again and
+      // succeeds once the chat is there. Dropping it would lose it for good.
+      final h = harness();
+      addTearDown(h.db.close);
+      h.api.next = SyncResult(
+        now: 'cursor-1',
+        lastMessageId: 9,
+        full: true,
+        messages: [
+          ChatMessage(
+            id: 9,
+            conversationId: 'chat-nobody-sent',
+            role: 'user',
+            content: 'orphan',
+            createdAt: DateTime(2026, 9, 1, 6),
+          ),
+        ],
+      );
+
+      await h.sync.sync();
+
+      expect(await h.db.watchMessages().first, isEmpty);
+      expect(await h.db.highestMessageId(), 0);
+    });
+  });
+
+  test('an outbox larger than one batch flushes in chunks', () async {
+    // The endpoint refuses more than 20. Sending the whole outbox meant that
+    // past that point every flush 400'd, the error was swallowed as "offline",
+    // and nothing ever drained it again.
+    final h = harness();
+    addTearDown(h.db.close);
+    for (var i = 0; i < 25; i++) {
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        clientId: Value('c$i'),
+        role: 'user',
+        content: 'message $i',
+        composedAt: DateTime(2026, 9, 1, 6, i),
+        syncState: const Value(SyncStates.queued),
+      ));
+    }
+    h.api.batchResult = const ChatBatchResult(processed: 0, duplicates: []);
+
+    await h.sync.sync();
+
+    expect(h.api.flushes.map((f) => f.length), [20, 5]);
+  });
+
+  test('only the client ids the server named are cleared', () async {
+    final h = harness();
+    addTearDown(h.db.close);
+    for (final id in ['c1', 'c2']) {
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        clientId: Value(id),
+        role: 'user',
+        content: id,
+        composedAt: DateTime(2026, 9, 1, 6),
+        syncState: const Value(SyncStates.queued),
+      ));
+    }
+    h.api.batchResult = const ChatBatchResult(
+      processed: 1,
+      duplicates: [],
+      accepted: ['c1'],
+    );
+
+    await h.sync.sync();
+
+    final stillQueued = await h.db.outbox();
+    expect(stillQueued.map((m) => m.clientId), ['c2']);
   });
 
   test('re-arms the alarms even when the network step failed', () async {

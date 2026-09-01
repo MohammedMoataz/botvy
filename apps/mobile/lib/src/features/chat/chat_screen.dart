@@ -9,6 +9,8 @@ import '../reminders/reminders_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../api/api_client.dart';
 import 'chat_controller.dart';
+import 'conversation_drawer.dart';
+import 'conversations_controller.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -28,11 +30,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
-  void _send() {
+  void _send(String conversationId) {
     final text = _composer.text;
     if (text.trim().isEmpty) return;
     _composer.clear();
-    ref.read(chatControllerProvider.notifier).send(text);
+    ref.read(chatControllerProvider(conversationId).notifier).send(text);
   }
 
   void _scrollToBottom() {
@@ -45,14 +47,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chat = ref.watch(chatControllerProvider);
+    final conversationId = ref.watch(currentConversationIdProvider);
+    if (conversationId == null) {
+      // No chat yet — the first sync has not landed on a fresh install. Mint
+      // one so the composer works immediately, offline included.
+      return _EmptyChatScaffold(onStart: (id) {
+        ref.read(activeConversationProvider.notifier).select(id);
+      });
+    }
+
+    final chat = ref.watch(chatControllerProvider(conversationId));
 
     // Keep the growing reply in view as tokens land.
-    ref.listen(chatControllerProvider, (_, __) => _scrollToBottom());
+    ref.listen(chatControllerProvider(conversationId), (_, __) => _scrollToBottom());
 
     return Scaffold(
+      drawer: const ConversationDrawer(),
       appBar: AppBar(
-        title: const Text('Botvy'),
+        title: _Title(conversationId: conversationId),
         actions: [
           IconButton(
             icon: const Icon(Icons.alarm),
@@ -84,20 +96,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               content: Text(chat.error!),
               actions: [
                 TextButton(
-                  onPressed: ref.read(chatControllerProvider.notifier).clearError,
+                  onPressed:
+                      ref.read(chatControllerProvider(conversationId).notifier).clearError,
                   child: const Text('Dismiss'),
                 ),
               ],
             ),
-          Expanded(child: _body(chat)),
+          Expanded(child: _body(chat, conversationId)),
           const Divider(height: 1),
-          _composerBar(chat.streaming),
+          _composerBar(chat.streaming, conversationId),
         ],
       ),
     );
   }
 
-  Widget _body(ChatState chat) {
+  Widget _body(ChatState chat, String conversationId) {
     if (chat.loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -111,7 +124,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     }
     return RefreshIndicator(
-      onRefresh: ref.read(chatControllerProvider.notifier).loadHistory,
+      onRefresh: ref.read(chatControllerProvider(conversationId).notifier).loadHistory,
       // One selection region across the whole conversation. Markdown renders
       // as a tree of widgets, so per-bubble selection would only ever let the
       // user grab one paragraph at a time.
@@ -126,7 +139,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _composerBar(bool streaming) {
+  Widget _composerBar(bool streaming, String conversationId) {
     return SafeArea(
       top: false,
       child: Padding(
@@ -140,7 +153,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 minLines: 1,
                 maxLines: 5,
                 textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
+                onSubmitted: (_) => _send(conversationId),
                 enabled: !streaming,
                 decoration: InputDecoration(
                   hintText: streaming ? 'Waiting for the reply...' : 'Message',
@@ -151,7 +164,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
             const SizedBox(width: 8),
             IconButton.filled(
-              onPressed: streaming ? null : _send,
+              onPressed: streaming ? null : () => _send(conversationId),
               icon: const Icon(Icons.arrow_upward),
               tooltip: 'Send',
             ),
@@ -160,6 +173,60 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+}
+
+/// The chat's name, or the first thing said in it.
+///
+/// Derived rather than stored: a title written server-side would bump the row's
+/// `updatedAt`, and a rename a second later would be judged against a stale
+/// base and lose to the clock.
+class _Title extends ConsumerWidget {
+  const _Title({required this.conversationId});
+
+  final String conversationId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chats = ref.watch(conversationsControllerProvider).items;
+    final match = chats.where((c) => c.id == conversationId);
+    final chat = match.isEmpty ? null : match.first;
+    if (chat != null && (chat.title.trim().isNotEmpty || chat.isCoaching)) {
+      return Text(conversationLabel(chat, null), overflow: TextOverflow.ellipsis);
+    }
+
+    final messages = ref.watch(chatControllerProvider(conversationId)).messages;
+    final fromUser = messages.where((m) => m.isUser);
+    return Text(
+      conversationLabel(chat, fromUser.isEmpty ? null : fromUser.first.content),
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// A fresh install before the first sync: no chat exists yet, so one is minted
+/// on the spot rather than making the user wait for a connection.
+class _EmptyChatScaffold extends ConsumerStatefulWidget {
+  const _EmptyChatScaffold({required this.onStart});
+
+  final void Function(String id) onStart;
+
+  @override
+  ConsumerState<_EmptyChatScaffold> createState() => _EmptyChatScaffoldState();
+}
+
+class _EmptyChatScaffoldState extends ConsumerState<_EmptyChatScaffold> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onStart(ref.read(conversationsControllerProvider.notifier).startNew());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
 }
 
 class ChatBubble extends StatelessWidget {

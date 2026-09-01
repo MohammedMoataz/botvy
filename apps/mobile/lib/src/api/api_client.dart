@@ -206,12 +206,15 @@ class ApiClient {
 
   /// Streams `POST /chat`. Yields every SSE event; the caller decides which
   /// ones to render (heartbeats are noise and must be dropped).
-  Stream<SseEvent> sendMessage(String message) async* {
+  Stream<SseEvent> sendMessage(String message, {String? conversationId}) async* {
     final Response<dynamic> res;
     try {
       res = await dio.post<dynamic>(
         '/chat',
-        data: {'message': message},
+        // An id the gateway has never seen is created there, so a chat started
+        // offline can carry a message before the sync that would have created
+        // it has run.
+        data: {'message': message, if (conversationId != null) 'conversationId': conversationId},
         options: Options(
           responseType: ResponseType.stream,
           headers: {'Accept': 'text/event-stream'},
@@ -304,6 +307,7 @@ class ApiClient {
                 'clientId': m.clientId,
                 'text': m.text,
                 'composedAt': m.composedAt.toUtc().toIso8601String(),
+                if (m.conversationId != null) 'conversationId': m.conversationId,
               },
           ],
         }));
@@ -342,6 +346,7 @@ class ApiClient {
     int? lastMessageId,
     String? installId,
     List<Map<String, dynamic>> reminders = const [],
+    List<Map<String, dynamic>> conversations = const [],
     Map<String, dynamic>? profile,
   }) async {
     final res = await _guard(() => dio.post('/sync', data: {
@@ -350,6 +355,7 @@ class ApiClient {
           if (installId != null) 'installId': installId,
           'push': {
             if (reminders.isNotEmpty) 'reminders': reminders,
+            if (conversations.isNotEmpty) 'conversations': conversations,
             if (profile != null) 'profile': profile,
           },
         }));

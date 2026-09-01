@@ -3,7 +3,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { RemindersService } from '../reminders/reminders.service.js';
 import { CoachingService } from '../coaching/coaching.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import type { PushedReminderDto, SyncRequestDto } from './dto.js';
+import {
+  ConversationsService,
+  ProtectedConversationError,
+} from '../chat/conversations.service.js';
+import type { PushedConversationDto, PushedReminderDto, SyncRequestDto } from './dto.js';
 
 /**
  * The cursor handed back is deliberately behind real time.
@@ -21,10 +25,15 @@ const OVERLAP_MS = 5_000;
 const MESSAGE_PAGE = 200;
 
 export interface RejectedPush {
-  entity: 'reminder';
+  /**
+   * Which table the row belongs to. The device branches on this — without it a
+   * rejected conversation would be written back through the reminder path.
+   */
+  entity: 'reminder' | 'conversation';
   id: string;
   clientId?: string;
-  reason: 'stale' | 'gone';
+  /** `protected` is the coaching chat refusing to be deleted or archived. */
+  reason: 'stale' | 'gone' | 'protected';
   /** The authoritative row. The device overwrites its copy with this. */
   server: unknown;
 }
@@ -38,6 +47,7 @@ export class SyncService {
     private readonly reminders: RemindersService,
     private readonly coaching: CoachingService,
     private readonly settings: SettingsService,
+    private readonly conversations: ConversationsService,
   ) {}
 
   async sync(userId: string, request: SyncRequestDto) {
@@ -51,6 +61,13 @@ export class SyncService {
     const full = since === null;
 
     const rejected: RejectedPush[] = [];
+    // Conversations first: a reminder does not depend on one, but a device that
+    // created a chat and sent to it in the same pass reads more obviously in
+    // this order.
+    for (const push of request.push?.conversations ?? []) {
+      const outcome = await this.applyConversation(userId, push, realNow);
+      if (outcome) rejected.push(outcome);
+    }
     for (const push of request.push?.reminders ?? []) {
       const outcome = await this.applyReminder(userId, push, realNow);
       if (outcome) rejected.push(outcome);
@@ -71,6 +88,10 @@ export class SyncService {
       now: cursor.toISOString(),
       lastMessageId: pull.messages.at(-1)?.id ?? request.lastMessageId ?? 0,
       full,
+      // The device loops until this is false. Without it a history longer than
+      // one page arrives one page per sync, which was invisible while the phone
+      // already held every message and is not once it has to fetch them again.
+      moreMessages: pull.messages.length === MESSAGE_PAGE,
       pull,
       rejected,
     };
@@ -124,7 +145,20 @@ export class SyncService {
       }),
     ]);
 
-    return { reminders, profile, checkins, workouts, messages };
+    // Read after the messages, not alongside them. The foreign key guarantees a
+    // conversation exists before any message references it, so querying in this
+    // order means a message can never arrive naming a thread this response does
+    // not carry. The other direction — an empty thread arriving a sync early —
+    // costs nothing.
+    //
+    // Tombstones are included, same as reminders: a deletion reaches the device
+    // as a row carrying deletedAt, which is the only way a delta can express one.
+    const conversations = await this.prisma.conversation.findMany({
+      where: { userId, ...(changed ? { updatedAt: changed } : {}) },
+      orderBy: { updatedAt: 'asc' },
+    });
+
+    return { reminders, conversations, profile, checkins, workouts, messages };
   }
 
   /**
@@ -150,7 +184,13 @@ export class SyncService {
 
     const row = await this.prisma.reminder.findFirst({ where: { id: push.id, userId } });
     if (!row) {
-      return { entity: 'reminder', id: push.id, clientId: push.clientId, reason: 'gone', server: null };
+      return {
+        entity: 'reminder',
+        id: push.id,
+        clientId: push.clientId,
+        reason: 'gone',
+        server: null,
+      };
     }
 
     if (!this.clientWins(push, row.updatedAt, now)) {
@@ -172,6 +212,63 @@ export class SyncService {
   }
 
   /**
+   * Applies one pushed conversation. Same rules as a reminder, with two
+   * differences: the phone mints the id so an unknown one is a create rather
+   * than a rejection, and the coaching chat refuses to be deleted or archived.
+   */
+  private async applyConversation(
+    userId: string,
+    push: PushedConversationDto,
+    now: Date,
+  ): Promise<RejectedPush | null> {
+    const row = await this.prisma.conversation.findFirst({ where: { id: push.id, userId } });
+
+    if (!row || row.deletedAt) {
+      // Deleted: a device that had not heard about it must not resurrect it.
+      if (row?.deletedAt) {
+        return { entity: 'conversation', id: push.id, reason: 'gone', server: row };
+      }
+      // Never seen: created offline, and its first message may already be on
+      // the way. Rejecting it would lose the user's chat.
+      if (push.deleted) return null; // deleted before it ever reached us
+      try {
+        await this.conversations.upsert(userId, push.id, {
+          title: push.title,
+          pinned: push.pinned,
+          archived: push.archived,
+        });
+        return null;
+      } catch {
+        return { entity: 'conversation', id: push.id, reason: 'gone', server: null };
+      }
+    }
+
+    if (!this.clientWins(push, row.updatedAt, now)) {
+      return { entity: 'conversation', id: push.id, reason: 'stale', server: row };
+    }
+
+    try {
+      if (push.deleted) {
+        await this.conversations.remove(userId, push.id);
+        return null;
+      }
+      await this.conversations.upsert(userId, push.id, {
+        title: push.title,
+        pinned: push.pinned,
+        archived: push.archived,
+      });
+      return null;
+    } catch (err) {
+      if (err instanceof ProtectedConversationError) {
+        // Not 'stale': a stale rejection tells the phone to retry with a fresher
+        // timestamp, and it would then retry forever.
+        return { entity: 'conversation', id: push.id, reason: 'protected', server: row };
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Newest edit wins — but the device clock is only consulted when it has to be.
    *
    * When the row has not moved since this device last saw it, the edit is
@@ -184,7 +281,11 @@ export class SyncService {
    * cursor would push every honest edit made in the last OVERLAP_MS below a
    * row the server had just touched, and reject it.
    */
-  private clientWins(push: PushedReminderDto, serverUpdatedAt: Date, realNow: Date): boolean {
+  private clientWins(
+    push: { updatedAt: Date; baseUpdatedAt?: Date },
+    serverUpdatedAt: Date,
+    realNow: Date,
+  ): boolean {
     if (push.baseUpdatedAt && push.baseUpdatedAt.getTime() === serverUpdatedAt.getTime()) {
       return true;
     }

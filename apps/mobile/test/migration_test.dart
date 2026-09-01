@@ -123,7 +123,14 @@ void main() {
 
   test('reports the new schema version', () async {
     await db.profile(); // force the migration to run
-    expect(db.schemaVersion, 2);
+    expect(db.schemaVersion, 3);
+  });
+
+  test('leaves a v1 message unfiled, so the next sync fetches it again', () async {
+    // v1 had no chats. The row survives — deleting it here would leave a phone
+    // that upgraded with no signal showing no history at all.
+    final rows = await db.watchMessages().first;
+    expect(rows.single.conversationId, isNull);
   });
 
   test('a fresh install gets every table without an upgrade', () async {
