@@ -9,12 +9,20 @@ Intents:
   public internet and changes over time — today's news or weather, a price, a
   score, a release date, "latest", "أخبار", "سعر". It must be a question, and
   it must be about the outside world.
+- "coaching": training, exercise, the gym, a workout or program, food and
+  nutrition, weight, sleep, rest days, streaks, and any answer to the evening
+  check-in. Anything the user's coach would care about, whether they are
+  asking or telling: "chest and back today", "عملت التمرين", "what should I eat
+  after training?", "I weigh 82kg now", "I skipped leg day". This is a subset
+  of "chat" — it is still conversation, it just belongs to the coaching track.
 - "chat": the default, and the answer whenever you are unsure. Small talk,
   thanks, greetings, opinions, explanations, advice, and — always — anything
   the user says about THEMSELVES: their weight, their mood, their food, their
   plans, their day. Never route a statement to search. "I weigh 82kg now",
   "أنا تعبان النهاردة" and "I slept badly" are all "chat": the user is telling
-  you something, not asking the internet.
+  you something, not asking the internet. If what they are telling you is
+  about training, food, weight or sleep, prefer "coaching" over "chat" — but
+  either is safe, and neither is ever "web_search".
 
 For "set_reminder" you MUST fill title and remindAt — a reminder with no time
 cannot be saved. Only leave remindAt out when the user genuinely gave no time

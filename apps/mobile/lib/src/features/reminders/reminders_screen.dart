@@ -99,25 +99,222 @@ class RemindersScreen extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: controller.refresh,
-      child: ListView.separated(
-        padding: const EdgeInsets.only(bottom: 88),
-        itemCount: reminders.deleted.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (context, i) {
-          final reminder = reminders.deleted[i];
-          return _DeletedTile(
-            reminder: reminder,
-            onRestore: () async {
-              await controller.restore(reminder.id);
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('"${reminder.title}" restored')),
-              );
-            },
-          );
-        },
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: TextButton.icon(
+                onPressed: () => _confirmClearAll(context, controller, reminders.deleted.length),
+                icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                label: const Text('Clear all'),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.only(bottom: 88),
+              itemCount: reminders.deleted.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, i) {
+                final reminder = reminders.deleted[i];
+                return _DeletedTile(
+                  reminder: reminder,
+                  onRestore: () => _restore(context, controller, reminder),
+                  onHold: () => _deletedActions(context, controller, reminder),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _restore(
+    BuildContext context,
+    RemindersController controller,
+    Reminder reminder,
+  ) async {
+    await controller.restore(reminder.id);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('"${reminder.title}" restored as ${reminder.state().label.toLowerCase()}')),
+    );
+  }
+
+  /// Holding a deleted reminder: everything you can do with it, including the
+  /// two that are not "put it back exactly as it was".
+  Future<void> _deletedActions(
+    BuildContext context,
+    RemindersController controller,
+    Reminder reminder,
+  ) async {
+    final wasFinished = !reminder.isActive;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(reminder.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+              subtitle: Text('Deleted · was ${reminder.state().label.toLowerCase()}'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.restore),
+              title: const Text('Restore'),
+              subtitle: Text('Back as ${reminder.state().label.toLowerCase()}'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _restore(context, controller, reminder);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.alarm_add),
+              // The point of separating this from Restore: a completed or
+              // cancelled reminder comes back done, and "I want to do that
+              // again" needs it active.
+              title: const Text('Reactivate'),
+              subtitle: Text(wasFinished
+                  ? 'Back as upcoming, ready to ring again'
+                  : 'Back as upcoming'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _reactivate(context, controller, reminder);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Restore and edit'),
+              subtitle: const Text('Give it a new time or title'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _restoreAndEdit(context, controller, reminder);
+              },
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.delete_forever_outlined),
+              title: const Text('Delete permanently'),
+              subtitle: const Text('Cannot be undone'),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _confirmPurge(context, controller, reminder);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Reactivating one whose moment has passed asks for a new time first — a
+  /// ping planned for the past fires the instant it is written.
+  Future<void> _reactivate(
+    BuildContext context,
+    RemindersController controller,
+    Reminder reminder,
+  ) async {
+    if (reminder.remindAt.isAfter(DateTime.now())) {
+      await controller.reactivate(reminder.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"${reminder.title}" is active again')),
+      );
+      return;
+    }
+
+    final draft = await showModalBottomSheet<_Draft>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EditSheet(existing: reminder, leadTimes: reminder.leadTimes),
+    );
+    if (draft == null) return;
+    await controller.reactivate(reminder.id, remindAt: draft.remindAt);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('"${draft.title}" set for ${formatRemindAt(draft.remindAt)}')),
+    );
+  }
+
+  Future<void> _restoreAndEdit(
+    BuildContext context,
+    RemindersController controller,
+    Reminder reminder,
+  ) async {
+    await controller.restore(reminder.id);
+    if (!context.mounted) return;
+
+    final draft = await showModalBottomSheet<_Draft>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EditSheet(existing: reminder, leadTimes: reminder.leadTimes),
+    );
+    if (draft == null) return;
+    await controller.edit(
+      reminder.id,
+      title: draft.title,
+      remindAt: draft.remindAt,
+      leadTimes: draft.leadTimes,
+    );
+  }
+
+  Future<void> _confirmPurge(
+    BuildContext context,
+    RemindersController controller,
+    Reminder reminder,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete permanently?'),
+        content: Text('"${reminder.title}" will be gone for good. This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.purge(reminder.id);
+  }
+
+  Future<void> _confirmClearAll(
+    BuildContext context,
+    RemindersController controller,
+    int count,
+  ) async {
+    if (count == 0) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear deleted reminders?'),
+        content: Text(
+          '$count deleted reminder${count == 1 ? '' : 's'} will be gone for good. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Clear all'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.purgeAllDeleted();
   }
 
   Widget _body(
@@ -240,10 +437,15 @@ class RemindersScreen extends ConsumerWidget {
 
 /// One row in the undo list: what it was, when it went, and a way back.
 class _DeletedTile extends StatelessWidget {
-  const _DeletedTile({required this.reminder, required this.onRestore});
+  const _DeletedTile({
+    required this.reminder,
+    required this.onRestore,
+    required this.onHold,
+  });
 
   final Reminder reminder;
   final VoidCallback onRestore;
+  final VoidCallback onHold;
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +473,10 @@ class _DeletedTile extends StatelessWidget {
         icon: const Icon(Icons.restore, size: 18),
         label: const Text('Restore'),
       ),
+      // Restore is the common case and stays one tap. Holding offers the rest:
+      // reactivate, restore-and-edit, and erasing it for good.
+      onLongPress: onHold,
+      onTap: onHold,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import '../../api/models.dart';
 import '../../api/sse.dart';
 import '../../app_providers.dart';
 import '../../db/database.dart';
+import 'conversations_controller.dart';
 
 const _uuid = Uuid();
 
@@ -66,6 +68,10 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, String> {
   /// Held while a reply is arriving, so switching chats mid-answer and coming
   /// back finds it finished rather than lost.
   KeepAliveLink? _keepAlive;
+
+  /// Set when the gateway moves this turn out of the coaching chat into one of
+  /// its own. The switch happens at `done`, not here.
+  String? _movedTo;
 
   @override
   ChatState build(String arg) {
@@ -172,14 +178,25 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, String> {
           // timer instead.
           assistant.content += event.data;
           _update((s) => s.copyWith(messages: [...s.messages]));
+        } else if (event.event == 'moved') {
+          // The coaching chat is a track, not a general assistant: something
+          // unrelated typed there is answered in a chat of its own. Recorded
+          // now, acted on at `done` — switching mid-stream would show an empty
+          // new chat while the reply was still arriving here.
+          _movedTo = _conversationIdFrom(event.data);
         } else if (event.event == 'error') {
           _finish(error: 'The assistant is unavailable right now.');
         } else if (event.event == 'done') {
           // Both turns are already stored server-side; the sync pulls them
           // back with their ids. Caching copies here would give that pull
           // nothing to match and leave the history doubled.
+          final moved = _movedTo;
           _finish();
           ref.read(syncServiceProvider).kick();
+          if (moved != null) {
+            _movedTo = null;
+            ref.read(activeConversationProvider.notifier).select(moved);
+          }
         }
       },
       onError: (Object e) {
@@ -223,6 +240,20 @@ class ChatController extends AutoDisposeFamilyNotifier<ChatState, String> {
     _update((s) => s.copyWith(
           messages: [for (final m in s.messages) if (!identical(m, assistant)) m],
         ));
+  }
+
+  /// The `moved` event's payload is JSON on the wire; the parser hands it over
+  /// as a string when it is not an object it recognises.
+  String? _conversationIdFrom(String data) {
+    try {
+      final decoded = jsonDecode(data);
+      if (decoded is Map && decoded['conversationId'] is String) {
+        return decoded['conversationId'] as String;
+      }
+    } catch (_) {
+      // Not JSON. Nothing to move to, so the turn simply stays where it is.
+    }
+    return null;
   }
 
   ChatMessage _fromLocal(LocalMessage row) => ChatMessage(

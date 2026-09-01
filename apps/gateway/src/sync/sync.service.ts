@@ -193,6 +193,19 @@ export class SyncService {
       };
     }
 
+    // Erasing an already-deleted reminder, checked before the staleness rule:
+    // the row is a tombstone the user has already seen and chosen to be rid
+    // of, so an edit made elsewhere does not make that choice stale. It is
+    // still refused for a row that is not a tombstone, so purge can never be
+    // a way to skip the undo.
+    if (push.purged === true) {
+      if (!row.deletedAt) {
+        return { entity: 'reminder', id: push.id, clientId: push.clientId, reason: 'stale', server: row };
+      }
+      await this.reminders.purge(userId, push.id);
+      return null;
+    }
+
     if (!this.clientWins(push, row.updatedAt, now)) {
       return { entity: 'reminder', id: push.id, clientId: push.clientId, reason: 'stale', server: row };
     }
@@ -266,6 +279,11 @@ export class SyncService {
       if (push.deleted) {
         await this.conversations.remove(userId, push.id);
         return null;
+      }
+      // Before the edit, not after: clearing is bounded by the newest message
+      // at the time, and an edit in the same push must not move that boundary.
+      if (push.cleared) {
+        await this.conversations.clearMessages(userId, push.id);
       }
       await this.conversations.upsert(userId, push.id, {
         title: push.title,

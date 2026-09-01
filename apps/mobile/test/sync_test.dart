@@ -373,6 +373,52 @@ void main() {
       expect(h.api.lastReminders.single['deleted'], true);
     });
 
+    test('a purge is pushed, and the row goes once the server accepts it', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertReminder(RemindersCompanion.insert(
+        id: 'r1',
+        clientId: const Value('r1'),
+        title: 'Dentist',
+        remindAt: DateTime(2026, 9, 2, 20),
+        deletedAt: Value(DateTime(2026, 9, 1, 11)),
+        updatedAt: Value(DateTime(2026, 9, 1, 12)),
+        pendingOp: const Value(ReminderOps.purge),
+      ));
+
+      await h.sync.sync();
+
+      expect(h.api.lastReminders.single['purged'], true);
+      // A hard-deleted row appears in no delta, so acceptance is inferred from
+      // having been pushed and not rejected.
+      expect(await h.db.findReminder('r1'), isNull);
+    });
+
+    test('a refused purge keeps the row, so nothing is lost', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertReminder(RemindersCompanion.insert(
+        id: 'r1',
+        clientId: const Value('r1'),
+        title: 'Dentist',
+        remindAt: DateTime(2026, 9, 2, 20),
+        deletedAt: Value(DateTime(2026, 9, 1, 11)),
+        updatedAt: Value(DateTime(2026, 9, 1, 12)),
+        pendingOp: const Value(ReminderOps.purge),
+      ));
+      h.api.next = SyncResult(
+        now: 'cursor-2',
+        lastMessageId: 0,
+        full: false,
+        rejected: [SyncRejection(id: 'r1', reason: 'stale', server: serverReminder())],
+      );
+      await h.db.setValue(SyncKeys.cursor, 'cursor-0');
+
+      await h.sync.sync();
+
+      expect(await h.db.findReminder('r1'), isNotNull);
+    });
+
     test('an offline pass burns no attempt', () async {
       // A week in airplane mode must not exhaust the outbox.
       final h = harness();
@@ -572,6 +618,92 @@ void main() {
       expect(sent['id'], 'chat-1');
       expect(sent['title'], 'Renamed');
       expect(sent['baseUpdatedAt'], DateTime.utc(2026, 9, 1, 8).toIso8601String());
+    });
+
+    test('a chat cleared elsewhere is emptied here', () async {
+      // Messages carry no tombstone, so the watermark on the chat row is the
+      // only way this can travel.
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(id: 'chat-1'));
+      for (final id in [5, 9]) {
+        await h.db.insertMessage(ChatMessagesCompanion.insert(
+          serverId: Value(id),
+          conversationId: const Value('chat-1'),
+          role: 'user',
+          content: 'message $id',
+          composedAt: DateTime(2026, 9, 1, 6),
+        ));
+      }
+      await h.db.setValue(SyncKeys.cursor, 'cursor-0');
+      h.api.next = SyncResult(
+        now: 'cursor-2',
+        lastMessageId: 9,
+        full: false,
+        conversations: [
+          Conversation(
+            id: 'chat-1',
+            clearedUpToMessageId: 9,
+            updatedAt: DateTime.utc(2026, 9, 1, 9),
+          ),
+        ],
+      );
+
+      await h.sync.sync();
+
+      expect(await h.db.watchMessages().first, isEmpty);
+      expect(await h.db.findConversation('chat-1'), isNotNull);
+      expect((await h.db.findConversation('chat-1'))!.clearedUpToMessageId, 9);
+    });
+
+    test('a watermark that has not moved clears nothing', () async {
+      // Every later sync carries the same chat row; re-applying it must not
+      // delete messages sent since the clear.
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(
+        id: 'chat-1',
+        clearedUpToMessageId: const Value(9),
+      ));
+      await h.db.insertMessage(ChatMessagesCompanion.insert(
+        serverId: const Value(12),
+        conversationId: const Value('chat-1'),
+        role: 'user',
+        content: 'said after the clear',
+        composedAt: DateTime(2026, 9, 1, 8),
+      ));
+      await h.db.setValue(SyncKeys.cursor, 'cursor-0');
+      h.api.next = SyncResult(
+        now: 'cursor-2',
+        lastMessageId: 12,
+        full: false,
+        conversations: [
+          Conversation(
+            id: 'chat-1',
+            clearedUpToMessageId: 9,
+            updatedAt: DateTime.utc(2026, 9, 1, 10),
+          ),
+        ],
+      );
+
+      await h.sync.sync();
+
+      expect((await h.db.watchMessages().first).map((m) => m.content),
+          ['said after the clear']);
+    });
+
+    test('pushes a clear as its own flag', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertConversation(ConversationsCompanion.insert(
+        id: 'chat-1',
+        updatedAt: Value(DateTime(2026, 9, 1, 11)),
+        pendingOp: const Value(ConversationOps.clear),
+      ));
+
+      await h.sync.sync();
+
+      expect(h.api.lastConversations.single['cleared'], true);
     });
 
     test('a rejected chat is not written through the reminder path', () async {

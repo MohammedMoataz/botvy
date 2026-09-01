@@ -24,6 +24,7 @@ function makeService(opts: { own?: unknown; foreign?: unknown } = {}) {
     message: {
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
+      findFirst: vi.fn().mockResolvedValue(null),
     },
   };
   const settings = { get: vi.fn().mockResolvedValue({ en: 'Coaching', ar: 'التدريب' }) };
@@ -160,6 +161,77 @@ describe('upsert', () => {
     await service.upsert('u1', 'c1', { title: '', pinned: undefined });
 
     expect(prisma.conversation.update.mock.calls[0][0].data).toEqual({ title: '' });
+  });
+});
+
+describe('clearMessages', () => {
+  const own = { ...OWN };
+
+  function withMessages(newestId: number | null) {
+    const { service, prisma } = makeService({ own, foreign: own });
+    prisma.message.findFirst = vi
+      .fn()
+      .mockResolvedValue(newestId === null ? null : { id: newestId });
+    return { service, prisma };
+  }
+
+  it('deletes the messages and records how far it went', async () => {
+    // The watermark is the whole mechanism: a message carries no tombstone and
+    // the device pulls by id, so a hard delete alone is invisible to a phone
+    // that already has them.
+    const { service, prisma } = withMessages(42);
+    await service.clearMessages('u1', 'c1');
+
+    expect(prisma.message.deleteMany).toHaveBeenCalledWith({
+      where: { conversationId: 'c1', id: { lte: 42 } },
+    });
+    expect(prisma.conversation.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { clearedUpToMessageId: 42 },
+    });
+  });
+
+  it('is bounded, so a message arriving mid-clear survives', async () => {
+    // `lte: newest` rather than "everything in this chat" — otherwise a turn
+    // landing between the read and the delete is destroyed, and the devices
+    // are told to drop it too.
+    const { service, prisma } = withMessages(42);
+    await service.clearMessages('u1', 'c1');
+
+    expect(prisma.message.deleteMany.mock.calls[0][0].where.id).toEqual({ lte: 42 });
+  });
+
+  it('does nothing to an already-empty chat', async () => {
+    const { service, prisma } = withMessages(null);
+    await service.clearMessages('u1', 'c1');
+
+    expect(prisma.message.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.conversation.update).not.toHaveBeenCalled();
+  });
+
+  it('works on the coaching chat, which cannot be deleted', async () => {
+    // Clearing is the only way to empty it, so the protection must not extend
+    // here.
+    const coaching = { ...OWN, clientId: COACHING_CLIENT_ID };
+    const { service, prisma } = makeService({ own: coaching, foreign: coaching });
+    prisma.message.findFirst = vi.fn().mockResolvedValue({ id: 7 });
+
+    await service.clearMessages('u1', 'c1');
+    expect(prisma.message.deleteMany).toHaveBeenCalled();
+  });
+
+  it('refuses a chat belonging to someone else', async () => {
+    const { service } = makeService({ foreign: { ...OWN, userId: 'u2' } });
+    await expect(service.clearMessages('u1', 'c1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('createFor', () => {
+  it('mints an empty chat for a message moved out of coaching', async () => {
+    const { service, prisma } = makeService();
+    await service.createFor('u1');
+
+    expect(prisma.conversation.create).toHaveBeenCalledWith({ data: { userId: 'u1' } });
   });
 });
 

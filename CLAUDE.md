@@ -67,6 +67,17 @@ Setup, the environment contract and the verification steps live in `SETUP.md`.
   `pendingOp.isNull() | pendingOp.equals(x).not()`, or it hides every row that
   has no pending operation — which is nearly all of them. Bitten twice now.
 
+- **A column added to a table that a migration creates needs a version guard.**
+  `createTable` builds it from *today's* definition, so a later unconditional
+  `addColumn` for one of its columns fails with "duplicate column" on every
+  upgrade from before that table existed. Guard it: `if (from >= N && from < M)`.
+
+- **A green `nest build` can be incremental and prove nothing.** Before
+  deploying, build clean (`rm -rf dist`) — and then check the compiled code is
+  actually *in the container*, because `docker compose build` failing and
+  `up -d --force-recreate` restarting the previous image looks exactly like a
+  successful deploy.
+
 - **A rejection from `/sync` carries the table it came from.** Both entities
   share the rejection shape, so the device has to branch on `entity`; writing a
   refused chat through the reminder path corrupts rather than crashes.

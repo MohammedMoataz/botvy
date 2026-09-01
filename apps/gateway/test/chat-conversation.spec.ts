@@ -16,7 +16,9 @@ import { COACHING_CLIENT_ID } from '../src/chat/conversations.service.js';
 const COACHING = { id: 'conv-coaching', clientId: COACHING_CLIENT_ID };
 const OTHER = { id: 'conv-work', clientId: null };
 
-function makeService(opts: { awaiting?: boolean; history?: unknown[] } = {}) {
+function makeService(
+  opts: { awaiting?: boolean; history?: unknown[]; intent?: string } = {},
+) {
   const created: Record<string, unknown>[] = [];
   const prisma = {
     message: {
@@ -33,7 +35,7 @@ function makeService(opts: { awaiting?: boolean; history?: unknown[] } = {}) {
   }
   const llm = {
     modelName: 'test-model',
-    extract: vi.fn().mockResolvedValue(null),
+    extract: vi.fn().mockResolvedValue(opts.intent ? { intent: opts.intent } : null),
     chat: vi.fn().mockReturnValue({
       stream: tokens(),
       usage: Promise.resolve({ promptTokens: 1, completionTokens: 1 }),
@@ -54,6 +56,7 @@ function makeService(opts: { awaiting?: boolean; history?: unknown[] } = {}) {
     resolve: vi.fn().mockImplementation((_u: string, id?: string) =>
       Promise.resolve(id === OTHER.id ? OTHER : COACHING),
     ),
+    createFor: vi.fn().mockResolvedValue({ id: 'conv-new', clientId: null }),
   };
 
   const service = new ChatService(
@@ -167,6 +170,75 @@ describe('chats do not leak into each other', () => {
 
     expect(created).toHaveLength(2);
     for (const row of created) expect(row.conversationId).toBe(COACHING.id);
+  });
+});
+
+describe('the coaching chat is a track, not a general assistant', () => {
+  it('moves an unrelated message into a chat of its own', async () => {
+    const { service, conversations, created } = makeService({ intent: 'web_search' });
+
+    const events = await drain(
+      service.streamReply('u1', COACHING, 'who won the match last night?'),
+    );
+
+    expect(conversations.createFor).toHaveBeenCalledWith('u1');
+    // Moved before it is stored: storing first and moving after would leave
+    // the message behind in the coaching track.
+    for (const row of created) expect(row.conversationId).toBe('conv-new');
+    expect(events.find((e) => e.type === 'moved')?.data).toEqual({
+      conversationId: 'conv-new',
+      from: 'coaching',
+    });
+  });
+
+  it('keeps a message about training where it was typed', async () => {
+    const { service, conversations, created } = makeService({ intent: 'coaching' });
+
+    const events = await drain(service.streamReply('u1', COACHING, 'chest and back today'));
+
+    expect(conversations.createFor).not.toHaveBeenCalled();
+    for (const row of created) expect(row.conversationId).toBe(COACHING.id);
+    expect(events.map((e) => e.type)).not.toContain('moved');
+  });
+
+  it('answers a coaching turn as the coach, not the general assistant', async () => {
+    const { service, llm } = makeService({ intent: 'coaching' });
+    await drain(service.streamReply('u1', COACHING, 'what should I eat after training?'));
+
+    const system = llm.chat.mock.calls[0][0][0].content as string;
+    expect(system).toContain('coach');
+  });
+
+  it('never moves anything out of an ordinary chat', async () => {
+    const { service, conversations } = makeService({ intent: 'web_search' });
+    await drain(service.streamReply('u1', OTHER, 'who won the match last night?'));
+
+    expect(conversations.createFor).not.toHaveBeenCalled();
+  });
+
+  it('answers a moved message without the coaching history behind it', async () => {
+    // The history it was typed into is exactly what it is not about.
+    const { service, llm } = makeService({
+      intent: 'web_search',
+      history: [{ role: 'user', content: 'did legs yesterday' }],
+    });
+    await drain(service.streamReply('u1', COACHING, 'who won the match?'));
+
+    const sent = llm.chat.mock.calls[0][0] as { role: string; content: string }[];
+    expect(sent.some((m) => m.content.includes('did legs yesterday'))).toBe(false);
+  });
+
+  it('still records a check-in reply rather than moving it', async () => {
+    // The answer to tonight's question is coaching by definition, whatever the
+    // intent classifier would have made of the word "yes".
+    const { service, conversations, coaching } = makeService({
+      awaiting: true,
+      intent: 'web_search',
+    });
+    await drain(service.streamReply('u1', COACHING, 'yes'));
+
+    expect(coaching.recordCheckin).toHaveBeenCalled();
+    expect(conversations.createFor).not.toHaveBeenCalled();
   });
 });
 

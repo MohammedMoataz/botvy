@@ -220,6 +220,70 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
     await _armAndSync();
   }
 
+  /// Back, and active again whatever it was — for one the user wants to redo.
+  ///
+  /// [remindAt] gives it a new moment. Without one a reminder whose time has
+  /// passed returns active and overdue rather than ringing immediately.
+  Future<void> reactivate(String id, {DateTime? remindAt}) async {
+    final existing = await _db.findReminder(id);
+    if (existing == null) return;
+
+    final when = remindAt ?? existing.remindAt;
+    await _db.untombstoneReminder(id);
+    await _db.upsertReminder(RemindersCompanion.insert(
+      id: id,
+      clientId: Value(existing.clientId),
+      title: existing.title,
+      remindAt: when,
+      status: const Value('active'),
+      leadTimes: Value(existing.leadTimes),
+      deletedAt: const Value(null),
+      baseUpdatedAt: Value(existing.baseUpdatedAt),
+      updatedAt: Value(DateTime.now()),
+      pendingOp: const Value(ReminderOps.restore),
+    ));
+    if (when.isAfter(DateTime.now())) {
+      await _writePings(id, when, _decode(existing.leadTimes));
+    }
+    await _armAndSync();
+  }
+
+  /// Erases one deleted reminder for good, ahead of the server's own sweep.
+  ///
+  /// Marked rather than deleted: the gateway still holds the tombstone, so a
+  /// row removed here would come straight back on the next full snapshot. It
+  /// leaves for good once the push lands.
+  Future<void> purge(String id) async {
+    final existing = await _db.findReminder(id);
+    if (existing == null) return;
+
+    if (existing.baseUpdatedAt == null) {
+      // The gateway has never seen it, so there is nothing to tell it.
+      await _db.deleteReminder(id);
+    } else {
+      await _db.upsertReminder(RemindersCompanion.insert(
+        id: id,
+        clientId: Value(existing.clientId),
+        title: existing.title,
+        remindAt: existing.remindAt,
+        status: Value(existing.status),
+        leadTimes: Value(existing.leadTimes),
+        deletedAt: Value(existing.deletedAt),
+        baseUpdatedAt: Value(existing.baseUpdatedAt),
+        updatedAt: Value(DateTime.now()),
+        pendingOp: const Value(ReminderOps.purge),
+      ));
+    }
+    _sync.kick();
+  }
+
+  /// Empties the deleted list.
+  Future<void> purgeAllDeleted() async {
+    for (final reminder in state.deleted) {
+      await purge(reminder.id);
+    }
+  }
+
   void toggleDeletedView() {
     if (!_disposed) state = state.copyWith(showDeleted: !state.showDeleted);
   }

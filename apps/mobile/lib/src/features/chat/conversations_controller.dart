@@ -11,6 +11,11 @@ const _uuid = Uuid();
 /// How much of the first message stands in for a name the user never gave.
 const _derivedTitleLength = 40;
 
+/// Clearing locally is unbounded — the user asked for the chat to be empty, and
+/// every message in it is either already on the server or about to be sent.
+/// The gateway records its own, exact watermark when the push lands.
+const _clearEverythingLocal = 0x7FFFFFFF;
+
 class ConversationsState {
   const ConversationsState({
     this.items = const [],
@@ -132,6 +137,31 @@ class ConversationsController extends AutoDisposeNotifier<ConversationsState> {
         pendingOp: const Value(ConversationOps.delete),
       ));
     }
+    _sync.kick();
+  }
+
+  /// Empties a chat without deleting it — the only way to clear the coaching
+  /// one, which cannot be deleted.
+  ///
+  /// The local messages go now so the screen is empty immediately; the push
+  /// tells the gateway, which records how far the clearing went so every other
+  /// device does the same.
+  Future<void> clearMessages(String id) async {
+    final existing = await _db.findConversation(id);
+    if (existing == null) return;
+
+    await _db.clearConversationMessages(id, upToMessageId: _clearEverythingLocal);
+    await _db.upsertConversation(ConversationsCompanion.insert(
+      id: id,
+      title: Value(existing.title),
+      pinned: Value(existing.pinned),
+      archived: Value(existing.archived),
+      isCoaching: Value(existing.isCoaching),
+      clearedUpToMessageId: Value(existing.clearedUpToMessageId),
+      baseUpdatedAt: Value(existing.baseUpdatedAt),
+      updatedAt: Value(DateTime.now()),
+      pendingOp: const Value(ConversationOps.clear),
+    ));
     _sync.kick();
   }
 

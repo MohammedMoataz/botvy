@@ -83,6 +83,30 @@ void main() {
     });
   });
 
+  group('erasing for good', () {
+    test('one on its way out is already gone from the list', () async {
+      await add('going', deletedAt: DateTime(2026, 9, 1, 11), pendingOp: ReminderOps.purge);
+      await add('staying', deletedAt: DateTime(2026, 9, 1, 11));
+
+      final ids = (await db.watchDeletedReminders().first).map((r) => r.id);
+      expect(ids, ['staying']);
+    });
+
+    test('but the row survives until the gateway is told', () async {
+      // Deleting it locally first would let the next full snapshot, which
+      // still carries the server's tombstone, bring it straight back.
+      await add('going', deletedAt: DateTime(2026, 9, 1, 11), pendingOp: ReminderOps.purge);
+
+      expect(await db.findReminder('going'), isNotNull);
+      expect((await db.pendingReminders()).map((r) => r.id), ['going']);
+    });
+
+    test('and it is not in the active list either', () async {
+      await add('going', deletedAt: DateTime(2026, 9, 1, 11), pendingOp: ReminderOps.purge);
+      expect(await db.watchReminders().first, isEmpty);
+    });
+  });
+
   group('tombstoning', () {
     test('keeps the row and silences it', () async {
       await add('r1');
