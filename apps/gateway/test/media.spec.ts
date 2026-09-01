@@ -55,6 +55,14 @@ describe('isPrivateAddress', () => {
       'fd00::1',
       'fe80::1',
       '::ffff:127.0.0.1', // IPv4 wearing an IPv6 hat
+      // The canonical hex form of the same thing. The URL parser rewrites the
+      // dotted version into this, so a check that only knew the dotted form
+      // waved loopback and the metadata address straight through.
+      '::ffff:7f00:1',
+      '::ffff:a9fe:a9fe',
+      '::ffff:c0a8:1',
+      '0:0:0:0:0:ffff:7f00:0001',
+      '64:ff9b::7f00:1', // NAT64
     ]) {
       expect(isPrivateAddress(address), address).toBe(true);
     }
@@ -102,5 +110,34 @@ describe('checkUrlIsPublic', () => {
 
   it('allows a public address', async () => {
     expect(await checkUrlIsPublic('https://1.1.1.1/cat.jpg')).toMatchObject({ ok: true });
+    expect(await checkUrlIsPublic('https://[2606:4700::1111]/cat.jpg')).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('refuses a private address written as IPv4-mapped IPv6', async () => {
+    // `new URL()` normalises the bracketed dotted form into hex groups, so
+    // these are what the guard actually receives.
+    for (const url of [
+      'http://[::ffff:127.0.0.1]/',
+      'http://[::ffff:169.254.169.254]/latest/meta-data/',
+      'http://[::ffff:a9fe:a9fe]/',
+      'http://[::ffff:7f00:1]/',
+    ]) {
+      expect(await checkUrlIsPublic(url), url).toMatchObject({ ok: false });
+    }
+  });
+
+  it('refuses the address forms that look public until they are parsed', async () => {
+    // Decimal, octal and userinfo tricks. The URL parser canonicalises all of
+    // these to 127.0.0.1 before the guard sees them — asserted so a change of
+    // parser cannot quietly reopen them.
+    for (const url of [
+      'http://2130706433/',
+      'http://0177.0.0.1/',
+      'http://public.example.com@127.0.0.1/',
+    ]) {
+      expect(await checkUrlIsPublic(url), url).toMatchObject({ ok: false });
+    }
   });
 });

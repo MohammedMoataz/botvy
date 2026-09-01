@@ -146,6 +146,10 @@ function isHttpUrl(value: string): boolean {
 function sanitise(raw: string, limit: number): string {
   const flattened = raw
     .replace(/<[^>]*>/g, ' ')
+    // A snippet cut mid-tag has no closing bracket for the pattern above to
+    // find, so `<img src=x onerror=…` would survive untouched. Angle brackets
+    // have no business in a snippet either way.
+    .replace(/[<>]/g, ' ')
     .replace(/!\[/g, '[')
     .replace(/\s+/g, ' ')
     .trim();

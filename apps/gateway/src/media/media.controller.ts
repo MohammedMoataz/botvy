@@ -43,10 +43,15 @@ export class MediaController {
 
   @Get()
   async proxy(
-    @Query('url') target: string | undefined,
-    @Query('sig') signature: string | undefined,
+    @Query('url') targetParam: unknown,
+    @Query('sig') signatureParam: unknown,
     @Res() res: Response,
   ): Promise<void> {
+    // Repeating a query parameter hands Express an array, which is not a
+    // string and not falsy: it reached the HMAC and threw, turning the uniform
+    // 404 into a 500 that tells a prober their request was different.
+    const target = typeof targetParam === 'string' ? targetParam : '';
+    const signature = typeof signatureParam === 'string' ? signatureParam : '';
     if (!this.secret || !target || !signature) throw new NotFoundException();
     if (!verifyMediaUrl(target, signature, this.secret)) {
       this.logger.warn(`refused ${target}: signature does not match`);

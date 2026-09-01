@@ -51,6 +51,24 @@ describe('wallClockToUtc', () => {
     );
   });
 
+  it('lands after a spring-forward gap, not an hour before it', () => {
+    // 02:30 on 8 March 2026 never happens in New York — the clocks jump from
+    // 02:00 to 03:00. Reading it back as 01:30 would show the user an earlier
+    // time than they asked for; the first instant after the gap is 03:30.
+    const instant = wallClockToUtc('2026-03-08T02:30', 'America/New_York');
+
+    expect(instant?.toISOString()).toBe('2026-03-08T07:30:00.000Z');
+    expect(formatInTz(instant!, 'America/New_York')).toContain('03:30');
+  });
+
+  it('picks the first of the two occurrences in a fall-back hour', () => {
+    // 01:30 happens twice on 1 November 2026; the earlier one is EDT (UTC-4).
+    const instant = wallClockToUtc('2026-11-01T01:30', 'America/New_York');
+
+    expect(instant?.toISOString()).toBe('2026-11-01T05:30:00.000Z');
+    expect(formatInTz(instant!, 'America/New_York')).toContain('01:30');
+  });
+
   it('returns null for anything it cannot read, rather than a wrong time', () => {
     for (const bad of ['', 'tomorrow', '2026-09-02', 'not a date']) {
       expect(wallClockToUtc(bad, 'UTC')).toBeNull();

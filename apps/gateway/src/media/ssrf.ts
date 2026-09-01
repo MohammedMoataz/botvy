@@ -33,15 +33,66 @@ function isPrivateV4(address: string): boolean {
   return BLOCKED_V4.some(([first, last]) => value >= toInt(first) && value <= toInt(last));
 }
 
-function isPrivateV6(address: string): boolean {
+/** The eight 16-bit groups of an IPv6 address, `::` expanded. */
+function expandV6(address: string): number[] | null {
   const value = address.toLowerCase().split('%')[0];
-  if (value === '::' || value === '::1') return true;
-  // Unique local (fc00::/7) and link-local (fe80::/10).
-  if (/^f[cd][0-9a-f]{2}:/.test(value)) return true;
-  if (/^fe[89ab][0-9a-f]:/.test(value)) return true;
-  // IPv4 written inside IPv6, which would otherwise skip the v4 table.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(value);
-  if (mapped) return isPrivateV4(mapped[1]);
+  const halves = value.split('::');
+  if (halves.length > 2) return null;
+
+  const parse = (part: string): number[] | null => {
+    if (part === '') return [];
+    const groups: number[] = [];
+    for (const piece of part.split(':')) {
+      // A trailing dotted quad, as in ::ffff:127.0.0.1, is two groups.
+      if (piece.includes('.')) {
+        const octets = piece.split('.').map(Number);
+        if (octets.length !== 4 || octets.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) {
+          return null;
+        }
+        groups.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+        continue;
+      }
+      if (!/^[0-9a-f]{1,4}$/.test(piece)) return null;
+      groups.push(parseInt(piece, 16));
+    }
+    return groups;
+  };
+
+  const head = parse(halves[0]);
+  const tail = halves.length === 2 ? parse(halves[1]) : [];
+  if (head === null || tail === null) return null;
+
+  if (halves.length === 1) return head.length === 8 ? head : null;
+  const gap = 8 - head.length - tail.length;
+  if (gap < 0) return null;
+  return [...head, ...Array<number>(gap).fill(0), ...tail];
+}
+
+function isPrivateV6(address: string): boolean {
+  const groups = expandV6(address);
+  if (groups === null) return true; // unparseable: refuse rather than guess
+
+  // Unspecified (::) and loopback (::1).
+  if (groups.every((g, i) => (i === 7 ? g === 0 || g === 1 : g === 0))) return true;
+
+  // IPv4 inside IPv6. Checked on the expanded groups, not the text: the URL
+  // parser rewrites ::ffff:127.0.0.1 as ::ffff:7f00:1, and a regex looking for
+  // dotted quads never sees it — which let loopback and the cloud metadata
+  // address straight through.
+  const v4Mapped = groups.slice(0, 5).every((g) => g === 0) && groups[5] === 0xffff;
+  const v4Compatible = groups.slice(0, 6).every((g) => g === 0) && groups[6] !== 0;
+  if (v4Mapped || v4Compatible) {
+    const high = groups[6];
+    const low = groups[7];
+    return isPrivateV4(
+      [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.'),
+    );
+  }
+
+  const first = groups[0];
+  if ((first & 0xfe00) === 0xfc00) return true; // unique local, fc00::/7
+  if ((first & 0xffc0) === 0xfe80) return true; // link-local, fe80::/10
+  if (first === 0x0064 && groups[1] === 0xff9b) return true; // NAT64, 64:ff9b::/96
   return false;
 }
 
