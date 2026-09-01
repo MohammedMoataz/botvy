@@ -247,7 +247,7 @@ are written, and it is the only chat the gateway refuses to delete or archive �
 the nightly cycle has to have somewhere visible to speak. The database enforces
 one per user; there is no flag to keep in step.
 
-Two consequences worth knowing:
+Three consequences worth knowing:
 
 - **A reply only counts as the check-in inside that chat.** The classifier
   matches whole words, `rest` and `not` among them, so before this the sentence
@@ -255,6 +255,19 @@ Two consequences worth knowing:
   Answering in another chat now leaves the check-in open for the real answer.
 - **A message that names no chat goes to Coaching.** That covers a phone still
   on an older build and anything queued before the upgrade.
+- **It is a track, so anything unrelated is moved out of it.** A message there
+  is classified first; unless the intent is `coaching` — training, food, weight,
+  sleep, the programme, or an answer to the check-in — it is answered in a new
+  chat of its own, and the app opens that. The move happens *before* the message
+  is stored, so the track never holds it. A turn that stays gets
+  `prompts/coaching.md` rather than the general assistant's prompt.
+
+**Emptying a chat** is `cleared: true` on a pushed conversation. The messages
+are deleted for real and the conversation records `clearedUpToMessageId`, which
+is how the clearing reaches other devices — a message has no tombstone and is
+pulled by `id > lastMessageId`, so a hard delete alone is invisible to a phone
+that already has it. It works on the coaching chat, and it is the only way to
+empty the one chat that cannot be deleted.
 
 Deleting a chat deletes its messages immediately and leaves a tombstone, purged
 by the sweep on `reminders.tombstoneDays` like a reminder's. Chat titles are
@@ -270,13 +283,23 @@ nothing writes a row when the clock moves past it.
 
 Deleting is soft and **does not touch the status**, which is what lets the
 Deleted view say whether a reminder was completed, cancelled or never dealt with.
-`GET /reminders?deleted=true` lists them, `POST /reminders/:id/restore` brings
-one back, and over `/sync` an explicit `deleted: false` on a pushed reminder is
-the same undo. Restoring re-plans the pings only for a reminder that can still
-ring; a completed or long-past one comes back silent, because a ping for a
-moment in the past would fire at once.
+`GET /reminders?deleted=true` lists them, and there are three ways back out:
 
-They age out on `reminders.tombstoneDays` like any other tombstone, so the undo
+| Action | Route | What it does |
+|---|---|---|
+| Restore | `POST /reminders/:id/restore` | Back exactly as it was, re-armed only if it can still ring |
+| Reactivate | `POST /reminders/:id/reactivate` | Back as **active** whatever it was, with an optional new `remindAt` |
+| Purge | `DELETE /reminders/:id/purge` | Gone for good. Refused unless it is already a tombstone |
+
+`DELETE /reminders/deleted/all` empties the list. Over `/sync` the same three
+are `deleted: false`, `deleted: false` with a status, and `purged: true` — a
+purge has to go through the push, because a row deleted only on the phone comes
+straight back on the next full snapshot, which still carries the server's
+tombstone.
+
+Restoring re-plans pings only for a reminder that can still ring; a completed or
+long-past one comes back silent, because a ping for a moment in the past would
+fire at once. Untouched, they age out on `reminders.tombstoneDays`, so the undo
 list bounds itself and needs no setting of its own.
 
 ### What lives on the phone

@@ -19,6 +19,11 @@ class ReminderOps {
 
   /// Undo: the row is here, the server still thinks it is deleted.
   static const restore = 'restore';
+
+  /// Erase it for good. The row is kept only until the gateway is told —
+  /// deleting it locally first would let the next full snapshot, which still
+  /// carries the server's tombstone, bring it back.
+  static const purge = 'purge';
 }
 
 /// Where a chat message is in its journey to the gateway.
@@ -94,6 +99,10 @@ class ReminderPings extends Table {
 class ConversationOps {
   static const upsert = 'upsert';
   static const delete = 'delete';
+
+  /// Empty it, but keep it. The only way to empty the coaching chat, which
+  /// cannot be deleted.
+  static const clear = 'clear';
 }
 
 /// One named chat.
@@ -131,6 +140,11 @@ class Conversations extends Table {
   /// means the server has never sent this row, which is how a local delete
   /// knows there is nothing to tell the gateway about.
   DateTimeColumn get baseUpdatedAt => dateTime().nullable()();
+
+  /// Everything up to this server message id has been cleared. Rides the
+  /// conversation row so a chat emptied on one device empties on all of them —
+  /// messages carry no tombstone of their own.
+  IntColumn get clearedUpToMessageId => integer().withDefault(const Constant(0))();
 
   TextColumn get pendingOp => text().nullable()();
   IntColumn get pushAttempts => integer().withDefault(const Constant(0))();
@@ -246,7 +260,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   /// Without this, drift's default `onUpgrade` throws and every existing
   /// install fails to open the moment the version moves. v1 → v2 only adds, so
@@ -292,6 +306,16 @@ class AppDatabase extends _$AppDatabase {
             // is right: anything still here was not deleted.
             await m.addColumn(reminders, reminders.deletedAt);
           }
+          // Only for a database whose conversations table predates the column.
+          // `createTable` above builds it from *today's* definition, which
+          // already has it, so an unconditional addColumn here fails with
+          // "duplicate column" on every upgrade from before v3. Any table
+          // created inside a migration has this trap.
+          if (from >= 3 && from < 5) {
+            // Zero for every existing chat, which is right: none has been
+            // cleared, and server message ids start at 1.
+            await m.addColumn(conversations, conversations.clearedUpToMessageId);
+          }
         },
       );
 
@@ -319,7 +343,10 @@ class AppDatabase extends _$AppDatabase {
   /// edit.
   Stream<List<LocalReminder>> watchDeletedReminders() => (select(reminders)
         ..where((r) =>
-            r.deletedAt.isNotNull() | r.pendingOp.equals(ReminderOps.delete))
+            (r.deletedAt.isNotNull() | r.pendingOp.equals(ReminderOps.delete)) &
+            // One on its way out for good is already gone as far as the user
+            // is concerned; the row survives only until the gateway is told.
+            (r.pendingOp.isNull() | r.pendingOp.equals(ReminderOps.purge).not()))
         ..orderBy([(r) => OrderingTerm.desc(r.updatedAt)]))
       .watch();
 
@@ -467,6 +494,21 @@ class AppDatabase extends _$AppDatabase {
         if (keepTombstone) return;
         await (delete(conversations)..where((c) => c.id.equals(id))).go();
       });
+
+  /// Drops this chat's messages at or below [upToMessageId], and anything in
+  /// it the server has never seen.
+  ///
+  /// The second half matters: a message queued offline has no server id, so an
+  /// id-bounded delete would leave it behind in a chat the user has just
+  /// emptied. It is dropped here because clearing is a deliberate act, unlike
+  /// the sync's own housekeeping.
+  Future<void> clearConversationMessages(String id, {required int upToMessageId}) =>
+      (delete(chatMessages)
+            ..where((m) =>
+                m.conversationId.equals(id) &
+                (m.serverId.isNull() |
+                    m.serverId.isSmallerOrEqualValue(upToMessageId))))
+          .go();
 
   Future<void> bumpLastMessageAt(String id, DateTime when) =>
       (update(conversations)..where((c) => c.id.equals(id)))

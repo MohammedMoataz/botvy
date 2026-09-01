@@ -54,6 +54,20 @@ export class UpdateReminderDto {
   status?: 'active' | 'done' | 'cancelled';
 }
 
+export class ReactivateReminderDto {
+  @ApiProperty({
+    required: false,
+    type: String,
+    format: 'date-time',
+    description:
+      'A new moment for it. Without one the reminder comes back at its original time, which for a past one means active and overdue.',
+  })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  remindAt?: Date;
+}
+
 export class RegisterDeviceDto {
   @ApiProperty()
   @IsString()

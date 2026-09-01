@@ -1,10 +1,10 @@
-import 'package:botvy/src/db/database.dart';
+﻿import 'package:botvy/src/db/database.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// The v1 → v2 upgrade, run against a database shaped like the shipped one.
+/// The v1 â†’ v2 upgrade, run against a database shaped like the shipped one.
 ///
 /// This is the test that stands between a release and every existing install
 /// failing to open: drift's default `onUpgrade` throws, so the strategy has to
@@ -123,11 +123,11 @@ void main() {
 
   test('reports the new schema version', () async {
     await db.profile(); // force the migration to run
-    expect(db.schemaVersion, 4);
+    expect(db.schemaVersion, 5);
   });
 
   test('leaves a v1 message unfiled, so the next sync fetches it again', () async {
-    // v1 had no chats. The row survives — deleting it here would leave a phone
+    // v1 had no chats. The row survives â€” deleting it here would leave a phone
     // that upgraded with no signal showing no history at all.
     final rows = await db.watchMessages().first;
     expect(rows.single.conversationId, isNull);

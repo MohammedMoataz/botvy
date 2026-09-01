@@ -1,13 +1,13 @@
-import 'package:botvy/src/db/database.dart';
+﻿import 'package:botvy/src/db/database.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-/// The v2 → v3 upgrade, run against a database shaped like the shipped v0.3.0.
+/// The v2 â†’ v3 upgrade, run against a database shaped like the shipped v0.3.0.
 ///
 /// The rule this file exists to defend: **a message already on the phone is not
-/// deleted by the migration.** It is tempting — the rows are pure cache and
-/// they have to be fetched again to learn which chat they belong to — but doing
+/// deleted by the migration.** It is tempting â€” the rows are pure cache and
+/// they have to be fetched again to learn which chat they belong to â€” but doing
 /// it here would mean a phone that upgraded with no signal opens to an empty
 /// app, in an app whose whole point is working without one. They are swept
 /// later, inside the transaction that writes their replacements.
@@ -150,12 +150,12 @@ void main() {
 
   test('reports the new schema version', () async {
     await db.allConversations(); // force the migration to run
-    expect(db.schemaVersion, 4);
+    expect(db.schemaVersion, 5);
   });
 
   test('an existing reminder is not mistaken for a deleted one', () async {
     // The deleted column is new; every row that predates it was, by
-    // definition, not deleted — anything that had been was erased outright.
+    // definition, not deleted â€” anything that had been was erased outright.
     expect((await db.allReminders()).single.deletedAt, isNull);
     expect((await db.watchReminders().first).map((r) => r.id), ['r1']);
   });

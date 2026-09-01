@@ -225,6 +225,16 @@ class SyncService {
           continue;
         }
         if (stillPendingChats.contains(chat.id)) continue; // edited mid-flight
+        // A chat emptied anywhere is emptied here. Applied before the row is
+        // written so the watermark this compares against is the old one; after
+        // the write it would always equal itself and clear nothing.
+        final local = await _db.findConversation(chat.id);
+        if (chat.clearedUpToMessageId > (local?.clearedUpToMessageId ?? 0)) {
+          await _db.clearConversationMessages(
+            chat.id,
+            upToMessageId: chat.clearedUpToMessageId,
+          );
+        }
         await _writeServerConversation(chat);
       }
       if (result.full) {
@@ -240,6 +250,17 @@ class SyncService {
       // written, and deletes the whole legacy set rather than just this page,
       // which is what makes the re-pull terminate.
       if (sweepLegacy) await _db.deleteLegacyMessages();
+
+      // A purge the gateway accepted: the row is gone there, so it can finally
+      // go here. It cannot be recognised from the pull — a hard-deleted row
+      // appears in no delta — so it is recognised from having been pushed and
+      // not rejected.
+      final refused = {for (final r in result.rejected) r.id};
+      for (final row in await _db.pendingReminders()) {
+        if (row.pendingOp != ReminderOps.purge) continue;
+        if (!pushedIds.contains(row.id) || refused.contains(row.id)) continue;
+        await _db.deleteReminder(row.id);
+      }
 
       final stillPending = {
         for (final row in await _db.pendingReminders())
@@ -337,6 +358,7 @@ class SyncService {
             'pinned': row.pinned,
             'archived': row.archived,
             if (row.pendingOp == ConversationOps.delete) 'deleted': true,
+            if (row.pendingOp == ConversationOps.clear) 'cleared': true,
             'updatedAt': (row.updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
             // The server's timestamp, never a local edit time: when it still
             // matches, the gateway takes the edit without consulting a clock.
@@ -364,6 +386,7 @@ class SyncService {
             // An explicit false is the undo. Omitting it would send an
             // ordinary edit, which the gateway refuses for a tombstoned row.
             if (row.pendingOp == ReminderOps.restore) 'deleted': false,
+            if (row.pendingOp == ReminderOps.purge) 'purged': true,
             'updatedAt': (row.updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
             // The server's timestamp, not ours. When it still matches, the
             // gateway takes the edit without looking at this handset's clock.
@@ -457,6 +480,7 @@ class SyncService {
       pinned: Value(c.pinned),
       archived: Value(c.archived),
       isCoaching: Value(c.isCoaching),
+      clearedUpToMessageId: Value(c.clearedUpToMessageId),
       updatedAt: Value(c.updatedAt),
       // The server's own timestamp, kept apart from any local edit time: it is
       // what makes the next push uncontested and so clock-free.

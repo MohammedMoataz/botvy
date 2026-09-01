@@ -140,6 +140,48 @@ export class ConversationsService {
     return { id, deleted: true };
   }
 
+  /**
+   * A new, empty chat with a server-minted id.
+   *
+   * Used when a message typed in the coaching chat turns out not to belong to
+   * the coaching track: it gets a thread of its own rather than being refused.
+   */
+  createFor(userId: string) {
+    return this.prisma.conversation.create({ data: { userId } });
+  }
+
+  /**
+   * Empties a chat without deleting it.
+   *
+   * The messages are removed for real, and the watermark records how far the
+   * clearing went so every other device can do the same — a message carries no
+   * tombstone, and the device pulls by `id > lastMessageId`, so a hard delete
+   * alone would be invisible to a phone that already had them.
+   *
+   * This is the only way to empty the coaching chat, which cannot be deleted.
+   */
+  async clearMessages(userId: string, id: string) {
+    const conversation = await this.ownedOrThrow(userId, id);
+
+    const newest = await this.prisma.message.findFirst({
+      where: { conversationId: id },
+      orderBy: { id: 'desc' },
+      select: { id: true },
+    });
+    if (!newest) return conversation; // already empty; nothing to record
+
+    await this.prisma.message.deleteMany({
+      // Bounded by the id we just read rather than "everything in this chat":
+      // a message arriving mid-clear is newer than the watermark, so it
+      // survives here and is not dropped on the devices either.
+      where: { conversationId: id, id: { lte: newest.id } },
+    });
+    return this.prisma.conversation.update({
+      where: { id },
+      data: { clearedUpToMessageId: newest.id },
+    });
+  }
+
   /** Writes one of the nightly cycle's own messages into the coaching thread. */
   async speak(userId: string, content: string) {
     const conversation = await this.ensureCoaching(userId);
