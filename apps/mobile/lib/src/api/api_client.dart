@@ -67,10 +67,14 @@ class TokenStore {
 
 /// Thrown for anything the UI should show the user verbatim.
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode});
+  ApiException(this.message, {this.statusCode, this.isOffline = false});
 
   final String message;
   final int? statusCode;
+
+  /// The gateway could not be reached at all. Callers queue instead of failing:
+  /// no connection is a normal state for this app, not an error.
+  final bool isOffline;
 
   @override
   String toString() => message;
@@ -242,26 +246,108 @@ class ApiClient {
         .toList();
   }
 
+  /// [clientId] makes the call idempotent: a create whose response was lost
+  /// can be retried without producing a second reminder.
   Future<Reminder> createReminder({
     required String title,
     required DateTime remindAt,
+    List<String>? leadTimes,
+    String? clientId,
   }) async {
     final res = await _guard(() => dio.post('/reminders', data: {
           'title': title,
           'remindAt': remindAt.toUtc().toIso8601String(),
-          // Fixed defaults -- the UI has no lead-time editor. A lead time
-          // already in the past is dropped server-side, which is expected.
-          'leadTimes': const ['1h', '0m'],
+          // A lead time already in the past is dropped server-side, which is
+          // expected, not an error.
+          if (leadTimes != null) 'leadTimes': leadTimes,
+          if (clientId != null) 'clientId': clientId,
+        }));
+    return Reminder.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  /// Changing the time or the lead times re-plans the pings server-side.
+  Future<Reminder> updateReminder(
+    String id, {
+    String? title,
+    DateTime? remindAt,
+    List<String>? leadTimes,
+    String? status,
+  }) async {
+    final res = await _guard(() => dio.patch('/reminders/$id', data: {
+          if (title != null) 'title': title,
+          if (remindAt != null) 'remindAt': remindAt.toUtc().toIso8601String(),
+          if (leadTimes != null) 'leadTimes': leadTimes,
+          if (status != null) 'status': status,
         }));
     return Reminder.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
 
   /// Cancelling also drops the reminder's unsent notifications, server-side.
   /// Someone else's id answers 404, never 403 -- see [ApiException.statusCode].
-  Future<Reminder> cancelReminder(String id) async {
-    final res = await _guard(
-        () => dio.patch('/reminders/$id', data: {'status': 'cancelled'}));
-    return Reminder.fromJson(Map<String, dynamic>.from(res.data as Map));
+  Future<Reminder> cancelReminder(String id) =>
+      updateReminder(id, status: 'cancelled');
+
+  /// Permanent. Used only on reminders the user already finished or cancelled.
+  Future<void> deleteReminder(String id) async {
+    await _guard(() => dio.delete('/reminders/$id'));
+  }
+
+  // -- offline flush ---------------------------------------------------------
+
+  /// Delivers messages composed offline. Idempotent per `clientId`, so an
+  /// interrupted flush is retried whole rather than reconciled.
+  Future<ChatBatchResult> sendQueued(List<QueuedMessage> queued) async {
+    final res = await _guard(() => dio.post('/chat/batch', data: {
+          'messages': [
+            for (final m in queued)
+              {
+                'clientId': m.clientId,
+                'text': m.text,
+                'composedAt': m.composedAt.toUtc().toIso8601String(),
+              },
+          ],
+        }));
+    return ChatBatchResult.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  // -- devices ---------------------------------------------------------------
+
+  /// Registers this device for push and refreshes its last-seen time, which is
+  /// what tells the gateway this phone already holds the upcoming alarms.
+  Future<void> registerDevice({
+    required String installId,
+    required String platform,
+    String? fcmToken,
+  }) async {
+    await _guard(() => dio.post('/devices', data: {
+          'installId': installId,
+          'platform': platform,
+          if (fcmToken != null) 'fcmToken': fcmToken,
+        }));
+  }
+
+  Future<void> unregisterDevice(String installId) async {
+    await _guard(() => dio.delete('/devices/$installId'));
+  }
+
+  // -- settings & coaching ---------------------------------------------------
+
+  /// Server-side defaults, so the app stops carrying its own copies.
+  Future<ServerDefaults> defaults() async {
+    final res = await _guard(() => dio.get('/settings/defaults'));
+    return ServerDefaults.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
+  Future<CoachingProfile?> coachingProfile() async {
+    final res = await _guard(() => dio.get('/coaching/profile'));
+    final data = res.data;
+    if (data is! Map) return null;
+    return CoachingProfile.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  Future<CoachingProfile> updateCoachingProfile(Map<String, dynamic> patch) async {
+    final res = await _guard(() => dio.patch('/coaching/profile', data: patch));
+    return CoachingProfile.fromJson(Map<String, dynamic>.from(res.data as Map));
   }
 
   // -- health --------------------------------------------------------------
@@ -306,7 +392,8 @@ class ApiClient {
           'Tap the server icon in the top bar to change it. '
           '10.0.2.2 only works on the Android emulator — a real phone needs '
           "this machine's address on your network, or a tunnel URL.",
-          statusCode: status);
+          statusCode: status,
+          isOffline: true);
     }
     return ApiException(e.message ?? 'Request failed.', statusCode: status);
   }

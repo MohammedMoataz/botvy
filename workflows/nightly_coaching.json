@@ -6,38 +6,18 @@
         "rule": {
           "interval": [
             {
-              "field": "days",
-              "daysInterval": 1,
-              "triggerAtHour": 21,
-              "triggerAtMinute": 0
+              "field": "minutes",
+              "minutesInterval": 5
             }
           ]
         }
       },
       "id": "c1a10000-0000-4000-8000-000000000001",
-      "name": "21:00 Check-in",
+      "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [-240, -140]
-    },
-    {
-      "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "days",
-              "daysInterval": 1,
-              "triggerAtHour": 22,
-              "triggerAtMinute": 0
-            }
-          ]
-        }
-      },
-      "id": "c1a10000-0000-4000-8000-000000000002",
-      "name": "22:00 Program",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [-240, 140]
+      "position": [-240, 0],
+      "notes": "A dumb clock. The check-in and program times are per user and in the user's own timezone, so a fixed 21:00/22:00 trigger here could only ever be right for one of them - the gateway decides whose time has come."
     },
     {
       "parameters": {
@@ -49,14 +29,14 @@
       "name": "Manual Run Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-240, 0],
+      "position": [-240, 180],
       "webhookId": "c1a10000-0000-4000-8000-000000000003",
       "notes": "Companion trigger so the gateway's POST /workflows/:id/run can fire the program push on demand - n8n's public API has no execute-now."
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://gateway:8080/internal/coaching/checkin",
+        "url": "=http://gateway:8080/internal/coaching/tick",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -66,17 +46,17 @@
             }
           ]
         },
-        "options": { "timeout": 120000 }
+        "options": { "timeout": 600000 }
       },
-      "id": "c1a10000-0000-4000-8000-000000000004",
-      "name": "Ask Check-ins",
+      "id": "c1a10000-0000-4000-8000-000000000006",
+      "name": "Coaching Tick",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [40, -140],
+      "position": [40, 0],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 5000,
-      "notes": "The gateway selects opted-in users, marks them awaiting, and pushes. n8n holds no user data (constitution: n8n never touches the database)."
+      "maxTries": 2,
+      "waitBetweenTries": 10000,
+      "notes": "Idempotent: the gateway claims each user's local date before sending, so five-minute ticks ask once a day and a gateway that was down at the user's time still catches up. Long timeout because a firing tick generates plans through the local model."
     },
     {
       "parameters": {
@@ -97,19 +77,16 @@
       "name": "Push Programs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [40, 80],
+      "position": [40, 180],
       "retryOnFail": true,
       "maxTries": 2,
       "waitBetweenTries": 10000,
-      "notes": "Long timeout: this generates one plan per opted-in user through the local model, which is slow on modest hardware."
+      "notes": "On-demand path only, and deliberately unconditional: an operator running this by hand wants the programs sent now, not a time check."
     }
   ],
   "connections": {
-    "21:00 Check-in": {
-      "main": [[{ "node": "Ask Check-ins", "type": "main", "index": 0 }]]
-    },
-    "22:00 Program": {
-      "main": [[{ "node": "Push Programs", "type": "main", "index": 0 }]]
+    "Every 5 Minutes": {
+      "main": [[{ "node": "Coaching Tick", "type": "main", "index": 0 }]]
     },
     "Manual Run Webhook": {
       "main": [[{ "node": "Push Programs", "type": "main", "index": 0 }]]

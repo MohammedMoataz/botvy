@@ -1,6 +1,19 @@
 import { Body, Controller, Get, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsTimeZone,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
+
+const HH_MM = /^([01]\d|2[0-3]):[0-5]\d$/;
 import { CoachingService } from './coaching.service.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
@@ -11,9 +24,13 @@ export class UpdateCoachingProfileDto {
   @IsBoolean()
   optedIn?: boolean;
 
-  @ApiProperty({ required: false, example: 'Africa/Cairo' })
+  @ApiProperty({
+    required: false,
+    example: 'Africa/Cairo',
+    description: 'IANA zone. Drives reminders, confirmations and coaching times — not just coaching.',
+  })
   @IsOptional()
-  @IsString()
+  @IsTimeZone()
   timezone?: string;
 
   @ApiProperty({ required: false })
@@ -66,6 +83,39 @@ export class UpdateCoachingProfileDto {
   @IsOptional()
   @IsString()
   gymTime?: string;
+
+  @ApiProperty({
+    required: false,
+    example: '21:00',
+    description: 'Local time the evening check-in is asked. Omit to use the global default.',
+  })
+  @IsOptional()
+  @Matches(HH_MM, { message: 'checkinTime must be HH:mm' })
+  checkinTime?: string;
+
+  @ApiProperty({
+    required: false,
+    example: '22:00',
+    description: "Local time the day's program is pushed. Omit to use the global default.",
+  })
+  @IsOptional()
+  @Matches(HH_MM, { message: 'programTime must be HH:mm' })
+  programTime?: string;
+
+  @ApiProperty({
+    required: false,
+    example: ['1h', '0m'],
+    description: 'Lead times new reminders get for this user. Empty means the global default.',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  defaultLeadTimes?: string[];
+
+  @ApiProperty({ required: false, example: 'ar', description: 'Language for notification copy.' })
+  @IsOptional()
+  @IsString()
+  language?: string;
 }
 
 @ApiTags('coaching')

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getHealth } from '../api/client';
 import { getStats, type AdminStats } from '../api/admin';
+import { fmtDate } from './ListScreen';
 
 function Dot({ ok }: { ok: boolean | undefined }) {
   const state = ok === undefined ? 'unknown' : ok ? 'up' : 'down';
@@ -45,6 +46,23 @@ export default function Overview() {
               <Dot ok={health.data?.ollama} />
               {health.data ? (health.data.ollama ? 'up' : 'down') : '—'}
             </div>
+          </div>
+          <div className="card">
+            <div className="stat-label">Push (FCM)</div>
+            <div className="stat-value">
+              <Dot ok={health.data?.push} />
+              {health.data ? (health.data.push ? 'configured' : 'disabled') : '—'}
+            </div>
+          </div>
+          {/* The reminder sweep runs in n8n. Stale here means reminders are not
+              going out, which is otherwise invisible until a user complains. */}
+          <div className="card">
+            <div className="stat-label">Reminder sweep</div>
+            <div className="stat-value">
+              <Dot ok={health.data ? !health.data.sweepStale : undefined} />
+              {health.data ? (health.data.sweepStale ? 'stalled' : 'running') : '—'}
+            </div>
+            <div className="muted">{fmtDate(health.data?.lastSweepAt)}</div>
           </div>
         </div>
         {health.error && (

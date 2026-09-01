@@ -1,10 +1,16 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../api/api_client.dart';
 import '../../api/models.dart';
 import '../../api/sse.dart';
+import '../../app_providers.dart';
+import '../../db/database.dart';
+
+const _uuid = Uuid();
 
 class ChatState {
   const ChatState({
@@ -70,28 +76,52 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
     return true;
   }
 
+  AppDatabase get _db => ref.read(databaseProvider);
+
+  /// The cache first, so history is there with no connection, then the
+  /// network — which also flushes anything queued while offline.
   Future<void> loadHistory() async {
     if (!_update((s) => s.copyWith(loading: true, clearError: true))) return;
+
+    final cached = await _db.watchMessages().first;
+    _update((s) => s.copyWith(
+          messages: [for (final m in cached) _fromLocal(m)],
+          loading: false,
+        ));
+
     try {
       final messages = await _api.history();
-      _update((s) => s.copyWith(messages: messages, loading: false));
+      for (final m in messages) {
+        if (m.id == null) continue;
+        await _db.upsertServerMessage(
+          serverId: m.id!,
+          clientId: m.clientId,
+          role: m.role,
+          content: m.content,
+          composedAt: m.createdAt ?? DateTime.now(),
+        );
+      }
+      final merged = await _db.watchMessages().first;
+      _update((s) => s.copyWith(messages: [for (final m in merged) _fromLocal(m)]));
     } on ApiException catch (e) {
-      _update((s) => s.copyWith(loading: false, error: e.message));
+      // Offline with a cache is not an error worth a banner over the history.
+      if (cached.isEmpty) _update((s) => s.copyWith(error: e.message));
     }
+    ref.read(syncServiceProvider).kick();
   }
 
   void send(String text) {
     final trimmed = text.trim();
     if (_disposed || trimmed.isEmpty || state.streaming) return;
 
+    final clientId = _uuid.v4();
+    final composedAt = DateTime.now();
+    final userMessage =
+        ChatMessage(role: 'user', content: trimmed, clientId: clientId);
     final assistant =
         ChatMessage(role: 'assistant', content: '', streaming: true);
     _update((s) => s.copyWith(
-          messages: [
-            ...s.messages,
-            ChatMessage(role: 'user', content: trimmed),
-            assistant,
-          ],
+          messages: [...s.messages, userMessage, assistant],
           streaming: true,
           clearError: true,
         ));
@@ -110,11 +140,24 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
         } else if (event.event == 'error') {
           _finish(error: 'The assistant is unavailable right now.');
         } else if (event.event == 'done') {
+          // Both turns are already stored server-side; the sync pulls them
+          // back with their ids. Caching copies here would give that pull
+          // nothing to match and leave the history doubled.
           _finish();
+          ref.read(syncServiceProvider).kick();
         }
       },
-      onError: (Object e) => _finish(
-          error: e is ApiException ? e.message : 'The reply stream failed.'),
+      onError: (Object e) {
+        // Unreachable gateway is not a lost message: it goes to the outbox and
+        // is delivered, with its original timestamp, when the network returns.
+        if (e is ApiException && e.isOffline) {
+          _queue(userMessage, composedAt);
+          _dropStreamingBubble(assistant);
+          _finish();
+          return;
+        }
+        _finish(error: e is ApiException ? e.message : 'The reply stream failed.');
+      },
       onDone: () {
         // Server closed without a `done` event (crash, tunnel drop).
         if (!_disposed && state.streaming) {
@@ -124,6 +167,36 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
       cancelOnError: true,
     );
   }
+
+  /// Retries one queued message by handing the outbox back to the sync engine.
+  void retryQueued() => ref.read(syncServiceProvider).kick();
+
+  Future<void> _queue(ChatMessage message, DateTime composedAt) async {
+    message.syncState = SyncStates.queued;
+    await _db.insertMessage(ChatMessagesCompanion.insert(
+      clientId: Value(message.clientId),
+      role: 'user',
+      content: message.content,
+      composedAt: composedAt,
+      syncState: const Value(SyncStates.queued),
+    ));
+    _update((s) => s.copyWith(messages: [...s.messages]));
+  }
+
+  void _dropStreamingBubble(ChatMessage assistant) {
+    _update((s) => s.copyWith(
+          messages: [for (final m in s.messages) if (!identical(m, assistant)) m],
+        ));
+  }
+
+  ChatMessage _fromLocal(LocalMessage row) => ChatMessage(
+        id: row.serverId,
+        clientId: row.clientId,
+        role: row.role,
+        content: row.content,
+        createdAt: row.composedAt,
+        syncState: row.syncState,
+      );
 
   void _finish({String? error}) {
     _update((s) {

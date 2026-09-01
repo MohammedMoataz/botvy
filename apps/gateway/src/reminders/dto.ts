@@ -18,6 +18,15 @@ export class CreateReminderDto {
   @IsArray()
   @IsString({ each: true })
   leadTimes?: string[];
+
+  @ApiProperty({
+    required: false,
+    description: 'Client-generated id for a reminder composed offline; retries are deduplicated by it',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  clientId?: string;
 }
 
 export class UpdateReminderDto {
@@ -32,6 +41,12 @@ export class UpdateReminderDto {
   @Type(() => Date)
   @IsDate()
   remindAt?: Date;
+
+  @ApiProperty({ required: false, example: ['1h', '0m'], description: 'Replaces the reminder\'s lead times and re-plans its pings' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  leadTimes?: string[];
 
   @ApiProperty({ required: false, enum: ['active', 'done', 'cancelled'] })
   @IsOptional()

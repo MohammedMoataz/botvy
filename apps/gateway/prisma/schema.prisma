@@ -67,10 +67,20 @@ model Reminder {
   title     String
   remindAt  DateTime       @map("remind_at")
   status    ReminderStatus @default(active)
+  // The offsets this reminder's pings were planned from. Stored so a
+  // reschedule re-expands the user's own lead times instead of silently
+  // resetting them to the default.
+  leadTimes String[]       @default(["1h", "0m"]) @map("lead_times")
+  // Set by the phone for reminders composed offline: the retry after a
+  // dropped connection must not create a second row. Unique per user, not
+  // globally — one account's ids must never mask another's.
+  clientId  String?        @map("client_id")
   createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at")
 
   notifications ReminderNotification[]
 
+  @@unique([userId, clientId])
   @@index([userId, remindAt])
   @@map("reminders")
 }
@@ -82,6 +92,10 @@ model ReminderNotification {
   notifyAt   DateTime  @map("notify_at")
   label      String
   sentAt     DateTime? @map("sent_at")
+  // A device that has synced since this row was planned already holds a
+  // local alarm for it, so the sweep skips pushing to that device. Without
+  // the timestamp the two deliveries cannot be told apart.
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   // Partial index over unsent rows only: the sweep's hot query. Carried
   // forward from the predecessor system, where it was the one index that
@@ -112,6 +126,21 @@ model CoachingProfile {
   // ISO weekday numbers (1 = Monday). Days NOT listed are rest days.
   trainingDays Int[]   @default([]) @map("training_days")
   gymTime      String? @map("gym_time")
+
+  // Local wall-clock times ("HH:mm") this user is asked and pushed at. Null
+  // means the global default. A single server-wide cron could not honour
+  // these, so a 5-minute tick decides per user instead.
+  checkinTime String? @map("checkin_time")
+  programTime String? @map("program_time")
+  // Local dates the tick last acted on, so a user is asked once a day no
+  // matter how often the tick runs or how late it recovers.
+  lastCheckinSentDate String? @map("last_checkin_sent_date")
+  lastProgramSentDate String? @map("last_program_sent_date")
+
+  // Per-user preferences that outgrew "coaching" but have nowhere better to
+  // live: this row is the one place a user's settings already are.
+  defaultLeadTimes String[] @default([]) @map("default_lead_times")
+  language         String?
 
   // Nightly check-in state. `awaitingSince` bounds how long a reply is
   // interpreted as an answer, so an unrelated message the next day is not
@@ -191,8 +220,14 @@ model Message {
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   role      MessageRole
   content   String
+  // Set for messages the phone composed offline and flushed later: clientId
+  // makes a re-sent batch a no-op, composedAt is when the user actually typed
+  // it, which is what "remind me in 2 hours" has to be resolved against.
+  clientId   String?    @map("client_id")
+  composedAt DateTime?  @map("composed_at")
   createdAt DateTime    @default(now()) @map("created_at")
 
+  @@unique([userId, clientId])
   @@index([userId, id(sort: Desc)])
   @@map("messages")
 }

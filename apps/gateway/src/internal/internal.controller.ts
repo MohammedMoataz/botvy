@@ -42,4 +42,14 @@ export class InternalController {
   pushPrograms() {
     return this.nightly.pushPrograms((input) => this.programs.generate(input));
   }
+
+  /**
+   * The coaching clock. n8n calls this every few minutes and the gateway
+   * decides whose local check-in or program time has come — the only way to
+   * honour a per-user time from a single schedule.
+   */
+  @Post('coaching/tick')
+  tick() {
+    return this.nightly.tick((input) => this.programs.generate(input));
+  }
 }
