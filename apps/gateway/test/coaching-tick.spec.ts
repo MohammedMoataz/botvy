@@ -45,6 +45,8 @@ function makeService(profile: Record<string, unknown> = {}) {
   };
   const settings = { get: vi.fn().mockImplementation((k: string) => values[k]) };
 
+  const conversations = { speak: vi.fn().mockResolvedValue({ id: 'conv-coaching' }) };
+
   const service = new NightlyService(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prisma as any,
@@ -53,9 +55,11 @@ function makeService(profile: Record<string, unknown> = {}) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     coaching as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    conversations as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings as any,
   );
-  return { service, prisma, push, coaching };
+  return { service, prisma, push, coaching, conversations };
 }
 
 const program = async () => ({ text: 'Squats.', exercises: ['Squat'], muscleGroups: ['legs'] });
@@ -114,6 +118,27 @@ describe('NightlyService.tick', () => {
     const result = await service.tick(program, AFTER_CHECKIN); // 21:30 local
 
     expect(result.checkinsSent).toBe(0);
+  });
+
+  it('writes the question into the coaching chat, not only into a push', async () => {
+    // It used to exist solely as a notification: a user who opened the app
+    // instead of tapping it was expected to answer a question that was nowhere
+    // on screen, and their answer landed in a transcript with no question above
+    // it.
+    const { service, conversations } = makeService();
+    await service.tick(program, AFTER_CHECKIN);
+
+    expect(conversations.speak).toHaveBeenCalledWith('u1', expect.any(String));
+  });
+
+  it('tells the phone which chat the check-in belongs to', async () => {
+    const { service, push } = makeService();
+    await service.tick(program, AFTER_CHECKIN);
+
+    expect(push.send.mock.calls[0][1].data).toMatchObject({
+      type: 'checkin',
+      conversationId: 'conv-coaching',
+    });
   });
 
   it('records that it ran so a stalled clock is visible', async () => {

@@ -32,9 +32,17 @@ function containsWord(haystack: string, needle: string): boolean {
     const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`\\b${escaped}\\b`, 'i').test(haystack);
   }
-  // Arabic and other non-Latin scripts have no \b semantics in JS regex,
-  // so fall back to substring matching for them.
-  return haystack.includes(needle);
+  // JS `\b` is defined against [A-Za-z0-9_], so it is meaningless in Arabic.
+  // Substring matching was the old fallback and it was wrong in the worst
+  // direction: 'ما' sits inside 'تمام' — an *affirmative* — and negation wins,
+  // so a user answering "تمام" was logged as having missed their day. Split on
+  // everything that is not a letter and compare whole tokens instead.
+  return tokenise(haystack).includes(needle);
+}
+
+/** Words, for a script with no word-boundary escape. */
+function tokenise(text: string): string[] {
+  return text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 
 export function classifyCheckin(reply: string): CheckinVerdict {

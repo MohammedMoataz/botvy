@@ -6,9 +6,17 @@ import { UsageModule } from '../usage/usage.module.js';
 import { RemindersModule } from '../reminders/reminders.module.js';
 import { CoachingModule } from '../coaching/coaching.module.js';
 import { SearchModule } from '../search/search.module.js';
+import { ConversationsModule } from './conversations.module.js';
 
 @Module({
-  imports: [LlmModule, UsageModule, RemindersModule, CoachingModule, SearchModule],
+  imports: [
+    LlmModule,
+    UsageModule,
+    RemindersModule,
+    CoachingModule,
+    SearchModule,
+    ConversationsModule,
+  ],
   controllers: [ChatController],
   providers: [ChatService],
 })

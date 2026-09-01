@@ -79,11 +79,69 @@ class ReminderPings extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// What the phone did to a chat the server has not been told about.
+///
+/// Only two, unlike a reminder: the phone mints the id and the gateway takes it
+/// verbatim, so a create and an edit are the same write on the wire.
+class ConversationOps {
+  static const upsert = 'upsert';
+  static const delete = 'delete';
+}
+
+/// One named chat.
+///
+/// The user creates these and keeps a topic in its own thread. Two-way synced,
+/// so the columns mirror [Reminders]: an edit time, the server's own timestamp
+/// for the version last pulled, a pending operation and an attempt count.
+@DataClassName('LocalConversation')
+class Conversations extends Table {
+  /// Minted by whichever side creates it, and the gateway accepts the phone's
+  /// uuid as the row's own id. That is what lets a message name its chat the
+  /// instant the user opens one, with no network and no create round trip.
+  TextColumn get id => text()();
+
+  /// Empty until the user renames it. The list shows the first message instead,
+  /// so no auto-title is ever written and none can collide with a rename.
+  TextColumn get title => text().withDefault(const Constant(''))();
+
+  BoolColumn get pinned => boolean().withDefault(const Constant(false))();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+
+  /// True for the one chat the nightly check-in and program land in. It is also
+  /// where a message with no chat of its own is shown.
+  BoolColumn get isCoaching => boolean().withDefault(const Constant(false))();
+
+  /// Newest activity, which is what the list is ordered by. Kept apart from
+  /// [updatedAt]: that is an *edit* time and drives the outbox, so bumping it
+  /// on every message would make every send look like a pending push.
+  DateTimeColumn get lastMessageAt => dateTime().nullable()();
+
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  /// The server's own timestamp for the last version pulled, never written by a
+  /// local edit — the same contract as [Reminders.baseUpdatedAt]. Null also
+  /// means the server has never sent this row, which is how a local delete
+  /// knows there is nothing to tell the gateway about.
+  DateTimeColumn get baseUpdatedAt => dateTime().nullable()();
+
+  TextColumn get pendingOp => text().nullable()();
+  IntColumn get pushAttempts => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DataClassName('LocalMessage')
 class ChatMessages extends Table {
   IntColumn get localId => integer().autoIncrement()();
   IntColumn get serverId => integer().nullable().unique()();
   TextColumn get clientId => text().nullable().unique()();
+
+  /// Null means "not known yet": a row cached before this app had chats, or one
+  /// typed offline before its chat reached the gateway. A *synced* null is the
+  /// signal that the whole cache predates chats — see [AppDatabase.hasLegacyMessages].
+  TextColumn get conversationId => text().nullable()();
+
   TextColumn get role => text()();
   TextColumn get content => text()();
   DateTimeColumn get composedAt => dateTime()();
@@ -165,6 +223,7 @@ class KeyValues extends Table {
   tables: [
     Reminders,
     ReminderPings,
+    Conversations,
     ChatMessages,
     KeyValues,
     CoachingProfiles,
@@ -179,7 +238,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   /// Without this, drift's default `onUpgrade` throws and every existing
   /// install fails to open the moment the version moves. v1 → v2 only adds, so
@@ -203,6 +262,20 @@ class AppDatabase extends _$AppDatabase {
             // The blob these tables replace. It never had a reader, but it is
             // still one account's preferences sitting in a row nothing owns.
             await (delete(keyValues)..where((r) => r.k.equals('coachingProfile'))).go();
+          }
+          if (from < 3) {
+            await m.createTable(conversations);
+            // Nullable, and every existing row is left null on purpose.
+            // Messages are immutable and pulled by `id > lastMessageId`, so the
+            // chat the gateway backfills onto a row this device already holds
+            // can never reach it — the cache has to be fetched again. Deleting
+            // it here would leave a phone that upgraded on a plane with no
+            // history at all. Instead a null chat on a synced row marks the row
+            // as pre-chat, `hasLegacyMessages` makes the next pull start from
+            // zero, and those rows are swept in the same transaction that
+            // writes their replacements. Queued rows keep their null and are
+            // never swept: the user's unsent words are not a cache.
+            await m.addColumn(chatMessages, chatMessages.conversationId);
           }
         },
       );
@@ -272,10 +345,133 @@ class AppDatabase extends _$AppDatabase {
   Future<LocalReminder?> findReminder(String id) =>
       (select(reminders)..where((r) => r.id.equals(id))).getSingleOrNull();
 
+  // ── Conversations ──────────────────────────────────────────────────────────
+
+  /// The chat list: pinned first, then newest activity.
+  ///
+  /// A chat deleted locally is already gone from the user's point of view even
+  /// though its row survives until the gateway is told, so it is filtered out
+  /// here. Note the parentheses around the pendingOp clause — Dart binds `&`
+  /// tighter than `|`, and without them the archived test would apply to only
+  /// half of it.
+  ///
+  /// Do not write `pendingOp.isNotValue(delete)`: in SQL `pending_op !=
+  /// 'delete'` is NULL for a NULL column, which is falsy, so that expression
+  /// hides every clean chat and shows nothing else.
+  Stream<List<LocalConversation>> watchConversations({bool archived = false}) =>
+      (select(conversations)
+            ..where((c) =>
+                c.archived.equals(archived) &
+                (c.pendingOp.isNull() | c.pendingOp.equals(ConversationOps.upsert)))
+            ..orderBy([
+              (c) => OrderingTerm.desc(c.pinned),
+              (c) => OrderingTerm.desc(c.lastMessageAt),
+              (c) => OrderingTerm.desc(c.updatedAt),
+            ]))
+          .watch();
+
+  Future<List<LocalConversation>> allConversations() => select(conversations).get();
+
+  Future<LocalConversation?> findConversation(String id) =>
+      (select(conversations)..where((c) => c.id.equals(id))).getSingleOrNull();
+
+  Future<LocalConversation?> coachingConversation() =>
+      (select(conversations)..where((c) => c.isCoaching.equals(true))).getSingleOrNull();
+
+  Future<void> upsertConversation(ConversationsCompanion row) =>
+      into(conversations).insertOnConflictUpdate(row);
+
+  /// Chats the server has not accepted yet, oldest edit first. Same attempt
+  /// ceiling as reminders, so one refused row cannot block the rest.
+  Future<List<LocalConversation>> pendingConversations() => (select(conversations)
+        ..where((c) =>
+            c.pendingOp.isNotNull() & c.pushAttempts.isSmallerThanValue(maxPushAttempts))
+        ..orderBy([(c) => OrderingTerm(expression: c.updatedAt)]))
+      .get();
+
+  Future<void> bumpConversationAttempts(String id) => customUpdate(
+        'UPDATE conversations SET push_attempts = push_attempts + 1 WHERE id = ?',
+        variables: [Variable.withString(id)],
+        updates: {conversations},
+      );
+
+  Future<void> resetConversationAttempts(String id) =>
+      (update(conversations)..where((c) => c.id.equals(id)))
+          .write(const ConversationsCompanion(pushAttempts: Value(0)));
+
+  /// A chat and everything said in it.
+  ///
+  /// Deleting the messages is the point: the chat is gone, so its contents must
+  /// not stay in the cache. [keepTombstone] leaves the row behind carrying
+  /// `pendingOp = delete`, which is the only way the gateway learns about a
+  /// delete made offline.
+  Future<void> deleteConversation(String id, {bool keepTombstone = false}) =>
+      transaction(() async {
+        await (delete(chatMessages)..where((m) => m.conversationId.equals(id))).go();
+        if (keepTombstone) return;
+        await (delete(conversations)..where((c) => c.id.equals(id))).go();
+      });
+
+  Future<void> bumpLastMessageAt(String id, DateTime when) =>
+      (update(conversations)..where((c) => c.id.equals(id)))
+          .write(ConversationsCompanion(lastMessageAt: Value(when)));
+
   // ── Chat ───────────────────────────────────────────────────────────────────
 
   Stream<List<LocalMessage>> watchMessages() =>
       (select(chatMessages)..orderBy([(m) => OrderingTerm(expression: m.composedAt)])).watch();
+
+  /// One chat's messages, oldest first.
+  ///
+  /// [includeUnassigned] is set for the coaching chat and nowhere else. A
+  /// message cached before this app knew about chats, or typed offline before
+  /// its chat reached the gateway, has none — and the gateway files an
+  /// unattributed message under coaching, so that is where the user is shown
+  /// it. It is also what keeps a whole pre-upgrade history on screen until the
+  /// re-pull redistributes it.
+  Stream<List<LocalMessage>> watchConversationMessages(
+    String conversationId, {
+    bool includeUnassigned = false,
+  }) =>
+      (select(chatMessages)
+            ..where((m) => includeUnassigned
+                ? m.conversationId.equals(conversationId) | m.conversationId.isNull()
+                : m.conversationId.equals(conversationId))
+            ..orderBy([(m) => OrderingTerm(expression: m.composedAt)]))
+          .watch();
+
+  /// True while the cache still holds messages from before chats existed.
+  ///
+  /// Derived from the rows themselves rather than a flag, so there is no state
+  /// to clear and nothing that can fall out of step with the data.
+  Future<bool> hasLegacyMessages() async => (await (select(chatMessages)
+            ..where((m) =>
+                m.conversationId.isNull() & m.syncState.equals(SyncStates.synced))
+            ..limit(1))
+          .get())
+      .isNotEmpty;
+
+  /// Removes the pre-chat cache in one statement.
+  ///
+  /// Everything it deletes mirrors a server row that the same transaction is
+  /// replacing with a chat-tagged copy. Deleting the whole set rather than just
+  /// the page being applied is what makes the re-pull terminate: afterwards
+  /// [hasLegacyMessages] is false and the watermark advances normally again.
+  Future<int> deleteLegacyMessages() => (delete(chatMessages)
+        ..where((m) =>
+            m.conversationId.isNull() & m.syncState.equals(SyncStates.synced)))
+      .go();
+
+  /// The highest server id this device holds.
+  ///
+  /// An aggregate, not a table scan: the backfill walks the whole history 200
+  /// rows at a time, and loading every row to find one number would make that
+  /// quadratic.
+  Future<int> highestMessageId() async {
+    final max = chatMessages.serverId.max();
+    final row = await (selectOnly(chatMessages)..addColumns([max])).getSingle();
+    return row.read(max) ?? 0;
+  }
 
   /// Messages waiting to be delivered.
   ///
@@ -301,6 +497,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertServerMessage({
     required int serverId,
     String? clientId,
+    required String conversationId,
     required String role,
     required String content,
     required DateTime composedAt,
@@ -310,6 +507,10 @@ class AppDatabase extends _$AppDatabase {
             ..where((m) => m.clientId.equals(clientId)))
           .write(ChatMessagesCompanion(
         serverId: Value(serverId),
+        // The chat has to be written here too, not only on the insert below:
+        // this is the path every message this device composed offline takes,
+        // and without it they would all stay filed under no chat forever.
+        conversationId: Value(conversationId),
         content: Value(content),
         syncState: const Value(SyncStates.synced),
       ));
@@ -324,6 +525,7 @@ class AppDatabase extends _$AppDatabase {
     await into(chatMessages).insert(ChatMessagesCompanion.insert(
       serverId: Value(serverId),
       clientId: Value(clientId),
+      conversationId: Value(conversationId),
       role: role,
       content: content,
       composedAt: composedAt,
@@ -349,6 +551,9 @@ class AppDatabase extends _$AppDatabase {
         await delete(reminderPings).go();
         await delete(reminders).go();
         await delete(chatMessages).go();
+        // Including the chat names: a title is the most legible thing in this
+        // database, and it is written from the previous account's own words.
+        await delete(conversations).go();
         await delete(keyValues).go();
         // Including the history: signing out must not leave the previous
         // account's check-ins and programs readable on the device.

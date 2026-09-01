@@ -13,6 +13,9 @@ import '../notifications/local_notifications.dart';
 
 const _uuid = Uuid();
 
+/// What `POST /chat/batch` accepts in one call. Mirrors the DTO's ArrayMaxSize.
+const _batchLimit = 20;
+
 /// Keys in the local key/value table.
 class SyncKeys {
   /// Human-facing "last time we talked to the server", on the device clock.
@@ -117,33 +120,85 @@ class SyncService {
   Future<bool> _syncOnce() async {
     await _followDeviceTimezone();
     final cursor = await _db.getValue(SyncKeys.cursor);
-    final lastMessageId = await _highestMessageId();
+    // Messages are immutable and pulled by id, so the chat the gateway
+    // backfilled onto rows this device already holds can only arrive by asking
+    // for the history again. The predicate is the data: a synced message with
+    // no chat is, by construction, from before chats existed.
+    final legacy = await _db.hasLegacyMessages();
     final outbound = await _outboundReminders();
+    final chats = await _outboundConversations();
     final profilePatch = await _dirtyProfilePatch();
 
-    final result = await _api.sync(
+    var result = await _api.sync(
       since: cursor,
-      lastMessageId: lastMessageId,
+      lastMessageId: legacy ? 0 : await _db.highestMessageId(),
       installId: await stableInstallId(_db),
       reminders: outbound.payload,
+      conversations: chats.payload,
       profile: profilePatch,
     );
 
-    await _applyResult(result, pushedIds: outbound.ids, pushedProfile: profilePatch != null);
+    await _applyResult(
+      result,
+      pushedIds: outbound.ids,
+      pushedChatIds: chats.ids,
+      pushedProfile: profilePatch != null,
+      // Passed rather than recomputed, so an empty pull still clears the legacy
+      // rows: otherwise a server that had pruned its history would leave the
+      // predicate true and ask for lastMessageId 0 on every sync for ever.
+      sweepLegacy: legacy,
+    );
+
+    // The gateway pages messages. One pass used to stop after the first page
+    // and the rest arrived on some later sync — invisible while the device
+    // already held the history, and not once it has to fetch it again.
+    //
+    // Later pages push nothing (already sent) and carry `since`, so they stay
+    // deltas: passing null again would make each one a full snapshot and run
+    // the delete sweeps once per page.
+    //
+    // ponytail: 50 pages is about 10k messages a pass. Raise it if a real
+    // history ever hits the ceiling.
+    for (var page = 1; page < 50 && result.moreMessages; page++) {
+      result = await _api.sync(
+        since: result.now,
+        lastMessageId: await _db.highestMessageId(),
+        installId: await stableInstallId(_db),
+      );
+      await _applyResult(
+        result,
+        pushedIds: const {},
+        pushedChatIds: const {},
+        pushedProfile: false,
+        sweepLegacy: false,
+      );
+    }
     return true;
   }
 
   Future<void> _applyResult(
     SyncResult result, {
     required Set<String> pushedIds,
+    required Set<String> pushedChatIds,
     required bool pushedProfile,
+    required bool sweepLegacy,
   }) async {
     // One transaction ending in the cursor write, so the cursor can never
     // advance past rows that were not stored.
     await _db.transaction(() async {
-      final rejectedIds = <String>{};
       for (final rejection in result.rejected) {
-        rejectedIds.add(rejection.id);
+        // Branch on the table. Feeding a rejected chat through the reminder
+        // path would write a reminder row with a conversation's id in it —
+        // corruption rather than a crash, which is why this is not a cast.
+        if (rejection.isConversation) {
+          if (rejection.serverConversation != null) {
+            await _writeServerConversation(rejection.serverConversation!);
+          } else {
+            await _db.deleteConversation(rejection.id);
+          }
+          await _db.bumpConversationAttempts(rejection.id);
+          continue;
+        }
         if (rejection.server != null) {
           // The server's row won. Overwrite and stop trying to push ours —
           // the losing edit is visibly replaced rather than silently dropped.
@@ -153,6 +208,38 @@ class SyncService {
         }
         await _db.bumpPushAttempts(rejection.id);
       }
+
+      // Chats before messages, so the list never briefly holds a message
+      // pointing at a chat that is not there yet.
+      final stillPendingChats = {
+        for (final row in await _db.pendingConversations())
+          if (!pushedChatIds.contains(row.id)) row.id,
+      };
+      final seenChats = <String>{};
+      for (final chat in result.conversations) {
+        seenChats.add(chat.id);
+        if (chat.deleted) {
+          // The chat is gone, so what was said in it goes too. This is the only
+          // way a deletion reaches another device: messages carry no tombstone.
+          await _db.deleteConversation(chat.id);
+          continue;
+        }
+        if (stillPendingChats.contains(chat.id)) continue; // edited mid-flight
+        await _writeServerConversation(chat);
+      }
+      if (result.full) {
+        for (final local in await _db.allConversations()) {
+          if (seenChats.contains(local.id)) continue;
+          if (local.pendingOp != null) continue; // never pushed yet — keep it
+          await _db.deleteConversation(local.id);
+        }
+      }
+
+      // Everything this removes mirrors a server row that the lines below are
+      // replacing with a chat-tagged copy. It runs before the first page is
+      // written, and deletes the whole legacy set rather than just this page,
+      // which is what makes the re-pull terminate.
+      if (sweepLegacy) await _db.deleteLegacyMessages();
 
       final stillPending = {
         for (final row in await _db.pendingReminders())
@@ -207,13 +294,25 @@ class SyncService {
 
       for (final message in result.messages) {
         if (message.id == null) continue;
+        final chatId = message.conversationId;
+        // A message naming a chat this device has not been sent cannot be
+        // filed. Stopping here rather than dropping it leaves the watermark
+        // behind — it is derived from the rows actually stored — so the next
+        // sync asks for this message again and gets it once its chat arrives.
+        //
+        // ponytail: that self-healing is why the server's `lastMessageId` is
+        // never persisted. Storing it would advance the cursor past a message
+        // that was skipped, and the gap would be permanent.
+        if (chatId == null || await _db.findConversation(chatId) == null) break;
         await _db.upsertServerMessage(
           serverId: message.id!,
           clientId: message.clientId,
+          conversationId: chatId,
           role: message.role,
           content: message.content,
           composedAt: message.createdAt ?? DateTime.now(),
         );
+        await _db.bumpLastMessageAt(chatId, message.createdAt ?? DateTime.now());
       }
 
       await _db.setValue(SyncKeys.cursor, result.now);
@@ -221,6 +320,34 @@ class SyncService {
   }
 
   // ── outbound ───────────────────────────────────────────────────────────────
+
+  /// Chats the gateway has not accepted yet.
+  ///
+  /// The id always goes up: the phone minted it and the gateway takes it, so a
+  /// create and an edit are the same write and a retried create cannot make a
+  /// second chat.
+  Future<({List<Map<String, dynamic>> payload, Set<String> ids})>
+      _outboundConversations() async {
+    final rows = await _db.pendingConversations();
+    return (
+      payload: [
+        for (final row in rows)
+          {
+            'id': row.id,
+            'title': row.title,
+            'pinned': row.pinned,
+            'archived': row.archived,
+            if (row.pendingOp == ConversationOps.delete) 'deleted': true,
+            'updatedAt': (row.updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
+            // The server's timestamp, never a local edit time: when it still
+            // matches, the gateway takes the edit without consulting a clock.
+            if (row.baseUpdatedAt != null)
+              'baseUpdatedAt': row.baseUpdatedAt!.toUtc().toIso8601String(),
+          },
+      ],
+      ids: {for (final row in rows) row.id},
+    );
+  }
 
   Future<({List<Map<String, dynamic>> payload, Set<String> ids})> _outboundReminders() async {
     final rows = await _db.pendingReminders();
@@ -289,24 +416,53 @@ class SyncService {
     final queued = await _db.outbox();
     if (queued.isEmpty) return false;
 
-    final result = await _api.sendQueued([
-      for (final m in queued)
-        QueuedMessage(clientId: m.clientId!, text: m.content, composedAt: m.composedAt),
-    ]);
+    var processed = 0;
+    // The endpoint refuses more than [_batchLimit] at a time. Sending the whole
+    // outbox meant that once it passed that, every flush 400'd, the error was
+    // swallowed as "offline", and nothing ever drained it again — a permanent,
+    // silent stall.
+    for (var start = 0; start < queued.length; start += _batchLimit) {
+      final chunk = queued.sublist(
+        start,
+        start + _batchLimit > queued.length ? queued.length : start + _batchLimit,
+      );
+      final result = await _api.sendQueued([
+        for (final m in chunk)
+          QueuedMessage(
+            clientId: m.clientId!,
+            text: m.content,
+            composedAt: m.composedAt,
+            conversationId: m.conversationId,
+          ),
+      ]);
 
-    // Only what the server acknowledged. Marking the whole queue synced used to
-    // discard rows that were never sent at all.
-    final acknowledged = {
-      ...result.duplicates,
-      for (final m in queued) m.clientId!,
-    };
-    for (final clientId in acknowledged) {
-      await _db.markSynced(clientId);
+      // Only what the server actually named. Marking the whole chunk synced on
+      // any success discarded rows it had never seen.
+      for (final clientId in {...result.duplicates, ...result.accepted}) {
+        await _db.markSynced(clientId);
+      }
+      processed += result.processed;
     }
-    return result.processed > 0;
+    return processed > 0;
   }
 
   // ── writing what came back ─────────────────────────────────────────────────
+
+  Future<void> _writeServerConversation(Conversation c) async {
+    await _db.upsertConversation(ConversationsCompanion.insert(
+      id: c.id,
+      title: Value(c.title),
+      pinned: Value(c.pinned),
+      archived: Value(c.archived),
+      isCoaching: Value(c.isCoaching),
+      updatedAt: Value(c.updatedAt),
+      // The server's own timestamp, kept apart from any local edit time: it is
+      // what makes the next push uncontested and so clock-free.
+      baseUpdatedAt: Value(c.updatedAt),
+      pendingOp: const Value(null),
+      pushAttempts: const Value(0),
+    ));
+  }
 
   Future<void> _writeServerReminder(Reminder r) async {
     await _db.upsertReminder(RemindersCompanion.insert(
@@ -362,15 +518,6 @@ class SyncService {
     ));
   }
 
-  Future<int> _highestMessageId() async {
-    final rows = await _db.watchMessages().first;
-    var highest = 0;
-    for (final row in rows) {
-      final id = row.serverId;
-      if (id != null && id > highest) highest = id;
-    }
-    return highest;
-  }
 }
 
 List<String> _decodeLeadTimes(String encoded) {

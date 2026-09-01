@@ -37,6 +37,11 @@ function makeService(opts: {
   };
   const prisma = {};
   const settings = { get: vi.fn().mockResolvedValue({}) };
+  // The question and the program are written into the coaching chat now, not
+  // only pushed — so the transcript has the question the answer replies to.
+  const conversations = {
+    speak: vi.fn().mockResolvedValue({ id: 'conv-coaching' }),
+  };
   const service = new NightlyService(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prisma as any,
@@ -45,9 +50,11 @@ function makeService(opts: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     coaching as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    conversations as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings as any,
   );
-  return { service, push, coaching, recordWorkout };
+  return { service, push, coaching, conversations, recordWorkout };
 }
 
 const goodProgram = async () => ({

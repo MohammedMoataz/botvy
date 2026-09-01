@@ -192,6 +192,7 @@ void main() {
       await db.upsertServerMessage(
         serverId: 42,
         clientId: 'c1',
+        conversationId: 'chat-1',
         role: 'user',
         content: 'buy eggs',
         composedAt: DateTime(2026, 9, 1, 6),
@@ -201,6 +202,9 @@ void main() {
       expect(rows.length, 1);
       expect(rows.single.serverId, 42);
       expect(rows.single.syncState, SyncStates.synced);
+      // The chat has to be written on the match path too: this is how every
+      // message composed offline learns which chat it belongs to.
+      expect(rows.single.conversationId, 'chat-1');
       expect(await db.outbox(), isEmpty);
     });
 
@@ -208,6 +212,7 @@ void main() {
       for (var i = 0; i < 2; i++) {
         await db.upsertServerMessage(
           serverId: 7,
+          conversationId: 'chat-1',
           role: 'assistant',
           content: 'Got it.',
           composedAt: DateTime(2026, 9, 1, 7),

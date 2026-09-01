@@ -14,6 +14,7 @@ export interface SweepResult {
   expired: number;
   /** Deleted reminders whose tombstone is past the retention window. */
   purgedTombstones: number;
+  purgedConversations: number;
 }
 
 // Retry window and batch size are settings (reminders.expiryHours,
@@ -64,8 +65,17 @@ export class SweepService {
     // they are older than any offline stretch the sync will still honour, they
     // are just dead rows. A device that has been away longer than this is
     // given a full snapshot instead, so nothing is lost by purging.
+    const horizon = new Date(now.getTime() - tombstoneDays * 86_400_000);
     const purgedTombstones = await this.prisma.reminder.deleteMany({
-      where: { deletedAt: { lt: new Date(now.getTime() - tombstoneDays * 86_400_000) } },
+      where: { deletedAt: { lt: horizon } },
+    });
+
+    // Deleted chats age out on the same horizon, and their messages go with
+    // them through the foreign key. One horizon for both on purpose: the sync's
+    // full-snapshot fallback reads this same setting, so a shorter one here
+    // would purge a tombstone a device's cursor was still being trusted for.
+    const purgedConversations = await this.prisma.conversation.deleteMany({
+      where: { deletedAt: { lt: horizon } },
     });
 
     const due = await this.prisma.reminderNotification.findMany({
@@ -138,7 +148,8 @@ export class SweepService {
         `sweep: ${due.length} due, ${markedSent} claimed, ${pushed} delivered, ` +
           `${deliveredLocally} left to local alarms, ${skippedNoDevice} held (no device), ` +
           `${devicesRemoved} stale devices removed, ${expiredRows.count} expired, ` +
-          `${purgedTombstones.count} tombstones purged`,
+          `${purgedTombstones.count} tombstones purged, ` +
+          `${purgedConversations.count} chats purged`,
       );
     }
 
@@ -161,6 +172,7 @@ export class SweepService {
       deliveredLocally,
       expired: expiredRows.count,
       purgedTombstones: purgedTombstones.count,
+      purgedConversations: purgedConversations.count,
     };
   }
 

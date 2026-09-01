@@ -5,8 +5,9 @@ hardware: your data, your workflow engine, your language model.
 
 - **Gateway** (NestJS) — owns all data, auth, chat, reminders, admin API
 - **Admin portal** (React + Vite) — users, devices, usage, configuration
-- **Mobile app** (Flutter) — chat, reminders, coaching and history, holding the
-  user's whole account in its own SQLite store so it all works offline
+- **Mobile app** (Flutter) — named chats, reminders, coaching and history,
+  holding the user's whole account in its own SQLite store so it all works
+  offline
 - **n8n** — scheduler and workflow engine, calls the gateway's API only
 - **Ollama** — local LLM (`qwen3:4b`), OpenAI-compatible, no cloud provider
 
