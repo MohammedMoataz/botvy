@@ -63,12 +63,13 @@ class _Root extends ConsumerStatefulWidget {
   ConsumerState<_Root> createState() => _RootState();
 }
 
-class _RootState extends ConsumerState<_Root> {
+class _RootState extends ConsumerState<_Root> with WidgetsBindingObserver {
   bool _started = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Notifications are set up regardless of sign-in state: a scheduled alarm
     // must still be delivered and tappable on a cold start.
     ref.read(notificationSchedulerProvider).init(onTap: _openFromNotification);
@@ -76,6 +77,22 @@ class _RootState extends ConsumerState<_Root> {
 
   /// Push registration and syncing need a bearer token, so they begin only
   /// once there is a session, and stop when it ends.
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Coming back to the app is the moment a user would notice stale data, and
+  /// nothing else covers it — connectivity may never have changed and a push
+  /// nudge may never have arrived.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _started) {
+      ref.read(syncServiceProvider).kick();
+    }
+  }
+
   void _syncSession(bool signedIn) {
     if (signedIn && !_started) {
       _started = true;

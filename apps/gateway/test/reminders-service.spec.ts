@@ -14,6 +14,7 @@ function makeService(existing?: Record<string, unknown>) {
     remindAt: new Date('2026-09-02T17:00:00Z'),
     leadTimes: ['1d', '2h', '0m'],
     status: 'active',
+    deletedAt: null,
     ...existing,
   };
 
@@ -23,6 +24,7 @@ function makeService(existing?: Record<string, unknown>) {
       update: vi.fn().mockResolvedValue(reminder),
       delete: vi.fn().mockResolvedValue(reminder),
       findUnique: vi.fn().mockResolvedValue(reminder),
+      findMany: vi.fn().mockResolvedValue([reminder]),
     },
     reminderNotification: {
       deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
@@ -116,10 +118,44 @@ describe('RemindersService.create', () => {
 });
 
 describe('RemindersService.remove', () => {
-  it('hard-deletes an owned reminder', async () => {
+  it('tombstones an owned reminder rather than erasing it', async () => {
+    // A row that simply vanished could not appear in a sync delta, so an
+    // offline device would never learn the reminder is gone.
     const { service, prisma } = makeService();
     await service.remove('u1', 'r1');
-    expect(prisma.reminder.delete).toHaveBeenCalledWith({ where: { id: 'r1' } });
+
+    expect(prisma.reminder.delete).not.toHaveBeenCalled();
+    expect(prisma.reminder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'r1' },
+        data: expect.objectContaining({ status: 'cancelled', deletedAt: expect.any(Date) }),
+      }),
+    );
+  });
+
+  it('drops the pending pings so a removed reminder cannot ring', async () => {
+    const { service, prisma } = makeService();
+    await service.remove('u1', 'r1');
+
+    expect(prisma.reminderNotification.deleteMany).toHaveBeenCalledWith({
+      where: { reminderId: 'r1', sentAt: null },
+    });
+  });
+
+  it('refuses to touch a reminder that is already a tombstone', async () => {
+    const { service, prisma } = makeService({ deletedAt: new Date('2026-08-01T00:00:00Z') });
+    await expect(service.remove('u1', 'r1')).rejects.toThrow('not found');
+    expect(prisma.reminder.update).not.toHaveBeenCalled();
+  });
+
+  it('hides tombstones from the list every caller reads', async () => {
+    const { service, prisma } = makeService();
+    await service.list('u1');
+
+    expect(prisma.reminder.findMany.mock.calls[0][0].where).toMatchObject({
+      userId: 'u1',
+      deletedAt: null,
+    });
   });
 
   it('tells the user\'s phones to re-sync so their local alarms drop it', async () => {

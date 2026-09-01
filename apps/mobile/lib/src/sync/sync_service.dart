@@ -15,24 +15,26 @@ const _uuid = Uuid();
 
 /// Keys in the local key/value table.
 class SyncKeys {
+  /// Human-facing "last time we talked to the server", on the device clock.
   static const lastSyncAt = 'lastSyncAt';
+
+  /// The server's own cursor, stored verbatim. Deliberately NOT [lastSyncAt]:
+  /// that one is a device timestamp, and sending it as `since` would skip
+  /// whatever the clock skew covers.
+  static const cursor = 'syncCursor';
+
   static const defaults = 'serverDefaults';
-  static const profile = 'coachingProfile';
   static const installId = 'installId';
+  static const fcmToken = 'fcmToken';
 }
 
 /// Reconciles the device with the gateway.
 ///
-/// The rules are deliberately blunt, because a personal assistant used by one
-/// person on one phone does not need merge semantics:
-///   * local changes go up first, oldest first;
-///   * then the server's list replaces the local one, except for rows still
-///     waiting to be pushed;
-///   * then every upcoming alarm is re-scheduled from what the database now
-///     says.
-///
-/// The last step runs even when the network steps failed — that is what makes
-/// a reminder created in airplane mode still fire on time.
+/// The device holds the whole of this user's data and can edit it offline; the
+/// server is the shared merge point rather than the place the data lives. One
+/// round trip carries both directions — edits up, everything that changed since
+/// the cursor down — and the queued chat flush stays a separate call because it
+/// runs the model and can take minutes.
 class SyncService {
   SyncService(this._api, this._db, this._scheduler);
 
@@ -81,169 +83,230 @@ class SyncService {
   }
 
   Future<void> _run() async {
-    var online = true;
-    try {
-      await _pushReminders();
-      await _pushMessages();
-      await _pullReminders();
-      await _pullChat();
-      await _pullSettings();
-      await _touchDevice();
+    // Each step is isolated: a failure in one must not abort the others or
+    // lose the cursor. One rethrowing push used to block every later step on
+    // every trigger, forever.
+    final synced = await _step('sync', _syncOnce);
+    final flushed = await _step('chat', _flushChat);
+
+    // A flush creates rows the phone cannot predict — a reminder extracted from
+    // a queued message carries no client id, and the reply is written by the
+    // server — so the only way to learn them is to pull again.
+    if (flushed == true) await _step('resync', _syncOnce);
+
+    if (synced != null || flushed != null) {
       await _db.setValue(SyncKeys.lastSyncAt, DateTime.now().toIso8601String());
-    } catch (e) {
-      // Offline is the normal case here, not an error worth surfacing: the
-      // next trigger picks up where this left off.
-      online = false;
-      debugPrint('sync deferred: $e');
     }
 
     // Always, online or not — the alarms are the product.
     await _scheduler.rescheduleAll();
-    if (!online) return;
   }
 
-  // ── push ───────────────────────────────────────────────────────────────────
-
-  Future<void> _pushReminders() async {
-    for (final row in await _db.pendingReminders()) {
-      final leadTimes = _decodeLeadTimes(row.leadTimes);
-      switch (row.pendingOp) {
-        case ReminderOps.create:
-          final created = await _api.createReminder(
-            title: row.title,
-            remindAt: row.remindAt,
-            leadTimes: leadTimes,
-            clientId: row.clientId ?? row.id,
-          );
-          // The server's id replaces the local one, and its ping rows replace
-          // the ones computed on the device.
-          await _db.deleteReminder(row.id);
-          await _writeServerReminder(created);
-        case ReminderOps.update:
-          try {
-            final updated = await _api.updateReminder(
-              row.id,
-              title: row.title,
-              remindAt: row.remindAt,
-              leadTimes: leadTimes,
-              status: row.status,
-            );
-            await _writeServerReminder(updated);
-          } on ApiException catch (e) {
-            if (e.statusCode != 404) rethrow;
-            await _db.deleteReminder(row.id); // deleted elsewhere; drop it
-          }
-        case ReminderOps.delete:
-          try {
-            await _api.deleteReminder(row.id);
-          } on ApiException catch (e) {
-            if (e.statusCode != 404) rethrow; // already gone is success
-          }
-          await _db.deleteReminder(row.id);
-      }
+  Future<T?> _step<T>(String name, Future<T> Function() body) async {
+    try {
+      return await body();
+    } catch (e) {
+      // Offline is the normal case here, not an error worth surfacing.
+      debugPrint('sync step "$name" deferred: $e');
+      return null;
     }
   }
 
-  Future<void> _pushMessages() async {
+  // ── the one round trip ─────────────────────────────────────────────────────
+
+  Future<bool> _syncOnce() async {
+    await _followDeviceTimezone();
+    final cursor = await _db.getValue(SyncKeys.cursor);
+    final lastMessageId = await _highestMessageId();
+    final outbound = await _outboundReminders();
+    final profilePatch = await _dirtyProfilePatch();
+
+    final result = await _api.sync(
+      since: cursor,
+      lastMessageId: lastMessageId,
+      installId: await stableInstallId(_db),
+      reminders: outbound.payload,
+      profile: profilePatch,
+    );
+
+    await _applyResult(result, pushedIds: outbound.ids, pushedProfile: profilePatch != null);
+    return true;
+  }
+
+  Future<void> _applyResult(
+    SyncResult result, {
+    required Set<String> pushedIds,
+    required bool pushedProfile,
+  }) async {
+    // One transaction ending in the cursor write, so the cursor can never
+    // advance past rows that were not stored.
+    await _db.transaction(() async {
+      final rejectedIds = <String>{};
+      for (final rejection in result.rejected) {
+        rejectedIds.add(rejection.id);
+        if (rejection.server != null) {
+          // The server's row won. Overwrite and stop trying to push ours —
+          // the losing edit is visibly replaced rather than silently dropped.
+          await _writeServerReminder(rejection.server!);
+        } else {
+          await _db.deleteReminder(rejection.id); // gone server-side
+        }
+        await _db.bumpPushAttempts(rejection.id);
+      }
+
+      final stillPending = {
+        for (final row in await _db.pendingReminders())
+          if (!pushedIds.contains(row.id)) row.id,
+      };
+
+      final seen = <String>{};
+      for (final reminder in result.reminders) {
+        seen.add(reminder.id);
+        if (reminder.deleted) {
+          await _db.deleteReminder(reminder.id);
+          continue;
+        }
+        // A row edited again while the push was in flight keeps its local copy.
+        if (stillPending.contains(reminder.id)) continue;
+        await _writeServerReminder(reminder);
+      }
+
+      // Only a full snapshot is authoritative about what exists. Running this
+      // over a delta would delete every reminder that simply had not changed.
+      if (result.full) {
+        for (final local in await _db.allReminders()) {
+          if (seen.contains(local.id)) continue;
+          if (local.pendingOp != null) continue; // never pushed yet — keep it
+          await _db.deleteReminder(local.id);
+        }
+      }
+
+      if (result.profile != null) {
+        await _writeServerProfile(result.profile!, clearDirty: pushedProfile);
+      }
+
+      for (final entry in result.checkins) {
+        await _db.upsertCheckin(CheckinsCompanion.insert(
+          checkinDate: entry.checkinDate,
+          adhered: entry.adhered,
+          rawReply: Value(entry.rawReply),
+          createdAt: entry.createdAt,
+        ));
+      }
+
+      for (final entry in result.workouts) {
+        await _db.upsertWorkout(WorkoutRecordsCompanion.insert(
+          workoutDate: entry.workoutDate,
+          source: entry.source,
+          exercises: Value(jsonEncode(entry.exercises)),
+          muscleGroups: Value(jsonEncode(entry.muscleGroups)),
+          notes: Value(entry.notes),
+          createdAt: entry.createdAt,
+        ));
+      }
+
+      for (final message in result.messages) {
+        if (message.id == null) continue;
+        await _db.upsertServerMessage(
+          serverId: message.id!,
+          clientId: message.clientId,
+          role: message.role,
+          content: message.content,
+          composedAt: message.createdAt ?? DateTime.now(),
+        );
+      }
+
+      await _db.setValue(SyncKeys.cursor, result.now);
+    });
+  }
+
+  // ── outbound ───────────────────────────────────────────────────────────────
+
+  Future<({List<Map<String, dynamic>> payload, Set<String> ids})> _outboundReminders() async {
+    final rows = await _db.pendingReminders();
+    return (
+      payload: [
+        for (final row in rows)
+          {
+            if (row.pendingOp != ReminderOps.create) 'id': row.id,
+            'clientId': row.clientId ?? row.id,
+            'title': row.title,
+            'remindAt': row.remindAt.toUtc().toIso8601String(),
+            'leadTimes': _decodeLeadTimes(row.leadTimes),
+            'status': row.status,
+            if (row.pendingOp == ReminderOps.delete) 'deleted': true,
+            'updatedAt': (row.updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
+            // The server's timestamp, not ours. When it still matches, the
+            // gateway takes the edit without looking at this handset's clock.
+            if (row.baseUpdatedAt != null)
+              'baseUpdatedAt': row.baseUpdatedAt!.toUtc().toIso8601String(),
+          },
+      ],
+      ids: {for (final row in rows) row.id},
+    );
+  }
+
+  /// Records the handset's zone as an ordinary local edit.
+  ///
+  /// The gateway resolves "8pm" against the profile timezone, so a phone that
+  /// has travelled must say so. Doing it as a dirty local write rather than a
+  /// direct PATCH means a zone change noticed offline is remembered instead of
+  /// lost — that call was the one thing on the settings screen that still
+  /// required a connection.
+  Future<void> _followDeviceTimezone() async {
+    final device = await deviceTimezone();
+    final local = await _db.profile();
+    if (local != null && local.timezone == device) return;
+
+    await _db.writeProfile(CoachingProfilesCompanion(
+      timezone: Value(device),
+      dirty: const Value(true),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  /// The profile fields this device may write, and only those.
+  ///
+  /// Built as an explicit map rather than from the row: a `toJson` would leak a
+  /// server-owned column the first time someone adds one, and the server would
+  /// then be told its own scheduling state by a phone.
+  Future<Map<String, dynamic>?> _dirtyProfilePatch() async {
+    final row = await _db.profile();
+    if (row == null || !row.dirty) return null;
+    return {
+      'optedIn': row.optedIn,
+      'timezone': row.timezone,
+      'trainingDays': _decodeList(row.trainingDays).map((e) => int.tryParse('$e') ?? e).toList(),
+      'allergies': _decodeList(row.allergies).map((e) => '$e').toList(),
+      'gymTime': row.gymTime,
+      'checkinTime': row.checkinTime,
+      'programTime': row.programTime,
+      'language': row.language,
+    };
+  }
+
+  Future<bool> _flushChat() async {
     final queued = await _db.outbox();
-    if (queued.isEmpty) return;
+    if (queued.isEmpty) return false;
 
     final result = await _api.sendQueued([
-      for (final m in queued.where((m) => m.role == 'user' && m.clientId != null))
+      for (final m in queued)
         QueuedMessage(clientId: m.clientId!, text: m.content, composedAt: m.composedAt),
     ]);
 
-    for (final m in queued) {
-      if (m.clientId != null) await _db.markSynced(m.clientId!);
+    // Only what the server acknowledged. Marking the whole queue synced used to
+    // discard rows that were never sent at all.
+    final acknowledged = {
+      ...result.duplicates,
+      for (final m in queued) m.clientId!,
+    };
+    for (final clientId in acknowledged) {
+      await _db.markSynced(clientId);
     }
-    // The reply is not inserted here: the history pull that follows brings it
-    // back with its server id. Writing it now would leave a copy with no id
-    // for that pull to duplicate.
-    if (result.processed > 0) debugPrint('flushed ${result.processed} queued message(s)');
+    return result.processed > 0;
   }
 
-  // ── pull ───────────────────────────────────────────────────────────────────
-
-  /// Full snapshot rather than a delta cursor: a person owns tens of
-  /// reminders, and replacing the list makes a deletion propagate for free.
-  Future<void> _pullReminders() async {
-    final server = await _api.reminders();
-    final pending = {for (final r in await _db.pendingReminders()) r.id};
-    final seen = <String>{};
-
-    for (final r in server) {
-      seen.add(r.id);
-      if (pending.contains(r.id)) continue; // local edit wins until it is pushed
-      await _writeServerReminder(r);
-    }
-
-    for (final local in await _db.allReminders()) {
-      if (seen.contains(local.id)) continue;
-      if (local.pendingOp != null) continue; // never pushed yet — keep it
-      await _db.deleteReminder(local.id);
-    }
-  }
-
-  Future<void> _pullChat() async {
-    final history = await _api.history();
-    for (final m in history) {
-      if (m.id == null) continue;
-      await _db.upsertServerMessage(
-        serverId: m.id!,
-        clientId: m.clientId,
-        role: m.role,
-        content: m.content,
-        composedAt: m.createdAt ?? DateTime.now(),
-      );
-    }
-  }
-
-  Future<void> _pullSettings() async {
-    final defaults = await _api.defaults();
-    await _db.setValue(
-      SyncKeys.defaults,
-      jsonEncode({
-        'timezone': defaults.timezone,
-        'leadTimes': defaults.leadTimes,
-        'checkinTime': defaults.checkinTime,
-        'programTime': defaults.programTime,
-      }),
-    );
-
-    // The gateway resolves "8pm" against the profile timezone, so a phone that
-    // has travelled must say so or every reminder lands in the old zone.
-    final profile = await _api.coachingProfile();
-    final device = await deviceTimezone();
-    if (profile == null || profile.timezone != device) {
-      await _api.updateCoachingProfile({'timezone': device});
-    }
-    await _db.setValue(
-      SyncKeys.profile,
-      jsonEncode({
-        'optedIn': profile?.optedIn ?? false,
-        'timezone': device,
-        'trainingDays': profile?.trainingDays ?? const [],
-        'allergies': profile?.allergies ?? const [],
-        'gymTime': profile?.gymTime,
-        'checkinTime': profile?.checkinTime,
-        'programTime': profile?.programTime,
-        'language': profile?.language,
-      }),
-    );
-  }
-
-  /// Re-registering refreshes `lastSeenAt`, which is how the gateway knows this
-  /// phone already holds the upcoming alarms and can skip pushing them.
-  Future<void> _touchDevice() async {
-    final installId = await stableInstallId(_db);
-    await _api.registerDevice(
-      installId: installId,
-      platform: defaultTargetPlatform.name,
-      fcmToken: await _db.getValue('fcmToken'),
-    );
-  }
-
-  // ── helpers ────────────────────────────────────────────────────────────────
+  // ── writing what came back ─────────────────────────────────────────────────
 
   Future<void> _writeServerReminder(Reminder r) async {
     await _db.upsertReminder(RemindersCompanion.insert(
@@ -254,7 +317,9 @@ class SyncService {
       status: Value(r.status),
       leadTimes: Value(jsonEncode(r.leadTimes)),
       updatedAt: Value(r.updatedAt),
+      baseUpdatedAt: Value(r.updatedAt),
       pendingOp: const Value(null),
+      pushAttempts: const Value(0),
     ));
     await _db.replacePings(r.id, [
       for (final n in r.notifications)
@@ -267,6 +332,45 @@ class SyncService {
         ),
     ]);
   }
+
+  Future<void> _writeServerProfile(CoachingProfile p, {required bool clearDirty}) async {
+    final local = await _db.profile();
+    // An edit made while the push was in flight stays dirty and wins locally
+    // until the next pass carries it up.
+    final keepLocalEdit = (local?.dirty ?? false) && !clearDirty;
+    if (keepLocalEdit) {
+      await _db.writeProfile(CoachingProfilesCompanion(
+        awaitingCheckin: Value(p.awaitingCheckin),
+        awaitingSince: Value(p.awaitingSince),
+      ));
+      return;
+    }
+
+    await _db.writeProfile(CoachingProfilesCompanion(
+      optedIn: Value(p.optedIn),
+      timezone: Value(p.timezone),
+      trainingDays: Value(jsonEncode(p.trainingDays)),
+      allergies: Value(jsonEncode(p.allergies)),
+      gymTime: Value(p.gymTime),
+      checkinTime: Value(p.checkinTime),
+      programTime: Value(p.programTime),
+      language: Value(p.language),
+      awaitingCheckin: Value(p.awaitingCheckin),
+      awaitingSince: Value(p.awaitingSince),
+      dirty: const Value(false),
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
+
+  Future<int> _highestMessageId() async {
+    final rows = await _db.watchMessages().first;
+    var highest = 0;
+    for (final row in rows) {
+      final id = row.serverId;
+      if (id != null && id > highest) highest = id;
+    }
+    return highest;
+  }
 }
 
 List<String> _decodeLeadTimes(String encoded) {
@@ -274,6 +378,14 @@ List<String> _decodeLeadTimes(String encoded) {
     return (jsonDecode(encoded) as List).map((e) => e.toString()).toList();
   } catch (_) {
     return const ['1h', '0m'];
+  }
+}
+
+List<Object?> _decodeList(String encoded) {
+  try {
+    return jsonDecode(encoded) as List;
+  } catch (_) {
+    return const [];
   }
 }
 

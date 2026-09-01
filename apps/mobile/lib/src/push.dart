@@ -16,11 +16,12 @@ import 'sync/sync_service.dart';
 /// call is wrapped, because an unconfigured Firebase must degrade to "no push"
 /// rather than stop the app from starting.
 class PushService {
-  PushService(this._api, this._db, this._scheduler);
+  PushService(this._api, this._db, this._scheduler, this._sync);
 
   final ApiClient _api;
   final AppDatabase _db;
   final NotificationScheduler _scheduler;
+  final SyncService _sync;
 
   bool _started = false;
 
@@ -43,7 +44,7 @@ class PushService {
       // the app draws it, on the same channel as its own alarms.
       FirebaseMessaging.onMessage.listen(_onMessage);
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        if (message.data['type'] == 'sync') _scheduler.rescheduleAll();
+        if (message.data['type'] == 'sync') _sync.kick();
       });
     } catch (e) {
       debugPrint('Push unavailable (Firebase not configured?): $e');
@@ -52,9 +53,10 @@ class PushService {
 
   Future<void> _onMessage(RemoteMessage message) async {
     // A data-only message is a nudge: something changed elsewhere, so pull and
-    // re-arm the local alarms. The user should see nothing.
+    // re-arm the local alarms. The user should see nothing. This used to write
+    // a flag that nothing read, which made the nudge do nothing at all.
     if (message.notification == null && message.data['type'] == 'sync') {
-      await _db.setValue('pendingSync', DateTime.now().toIso8601String());
+      _sync.kick();
       return;
     }
 

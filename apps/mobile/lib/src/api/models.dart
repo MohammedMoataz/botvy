@@ -124,6 +124,8 @@ class Reminder {
     this.updatedAt,
     this.notifications = const [],
     this.pendingSync = false,
+    this.syncFailed = false,
+    this.deletedAt,
   });
 
   final String id;
@@ -150,6 +152,16 @@ class Reminder {
   /// True while this device holds a change the gateway has not accepted yet.
   final bool pendingSync;
 
+  /// The server has refused this edit enough times that the device stopped
+  /// re-sending it. The edit is still here; the tile offers a retry.
+  final bool syncFailed;
+
+  /// Set when the server has removed it. A delta carries the row marked rather
+  /// than omitting it, which is the only way a deletion can reach the device.
+  final DateTime? deletedAt;
+
+  bool get deleted => deletedAt != null;
+
   bool get isActive => status == 'active';
 
   factory Reminder.fromJson(Map<String, dynamic> json) => Reminder(
@@ -163,6 +175,7 @@ class Reminder {
         clientId: json['clientId'] as String?,
         createdAt: _localTime(json['createdAt']),
         updatedAt: _localTime(json['updatedAt']),
+        deletedAt: _localTime(json['deletedAt']),
         notifications: ((json['notifications'] as List?) ?? const [])
             .map((n) =>
                 ReminderNotification.fromJson(Map<String, dynamic>.from(n as Map)))
@@ -235,6 +248,134 @@ class ServerDefaults {
       );
 }
 
+/// One evening's answer, as the server recorded it.
+class CheckinEntry {
+  const CheckinEntry({
+    required this.checkinDate,
+    required this.adhered,
+    this.rawReply,
+    required this.createdAt,
+  });
+
+  /// Local calendar date, YYYY-MM-DD — the server's own key for the day.
+  final String checkinDate;
+  final bool adhered;
+  final String? rawReply;
+  final DateTime createdAt;
+
+  factory CheckinEntry.fromJson(Map<String, dynamic> json) => CheckinEntry(
+        checkinDate: (json['checkinDate'] as String?) ?? '',
+        adhered: (json['adhered'] as bool?) ?? false,
+        rawReply: json['rawReply'] as String?,
+        createdAt: _localTime(json['createdAt']) ?? DateTime.now(),
+      );
+}
+
+/// A day's training, either reported by the user or generated as a plan.
+class WorkoutEntry {
+  const WorkoutEntry({
+    required this.workoutDate,
+    required this.source,
+    this.exercises = const [],
+    this.muscleGroups = const [],
+    this.notes,
+    required this.createdAt,
+  });
+
+  final String workoutDate;
+  final String source; // 'reported' | 'planned'
+  final List<String> exercises;
+  final List<String> muscleGroups;
+  final String? notes;
+  final DateTime createdAt;
+
+  bool get isPlanned => source == 'planned';
+
+  factory WorkoutEntry.fromJson(Map<String, dynamic> json) => WorkoutEntry(
+        workoutDate: (json['workoutDate'] as String?) ?? '',
+        source: (json['source'] as String?) ?? 'planned',
+        exercises:
+            ((json['exercises'] as List?) ?? const []).map((e) => e.toString()).toList(),
+        muscleGroups:
+            ((json['muscleGroups'] as List?) ?? const []).map((e) => e.toString()).toList(),
+        notes: json['notes'] as String?,
+        createdAt: _localTime(json['createdAt']) ?? DateTime.now(),
+      );
+}
+
+/// A push the server refused, with the row that won attached.
+class SyncRejection {
+  const SyncRejection({required this.id, required this.reason, this.server});
+
+  final String id;
+  final String reason; // 'stale' | 'gone'
+
+  /// The authoritative row, or null when the server no longer has one.
+  final Reminder? server;
+
+  factory SyncRejection.fromJson(Map<String, dynamic> json) => SyncRejection(
+        id: (json['id'] as String?) ?? '',
+        reason: (json['reason'] as String?) ?? 'stale',
+        server: json['server'] is Map
+            ? Reminder.fromJson(Map<String, dynamic>.from(json['server'] as Map))
+            : null,
+      );
+}
+
+/// Everything that changed since the device's cursor, plus the new cursor.
+class SyncResult {
+  const SyncResult({
+    required this.now,
+    required this.lastMessageId,
+    required this.full,
+    this.reminders = const [],
+    this.profile,
+    this.checkins = const [],
+    this.workouts = const [],
+    this.messages = const [],
+    this.rejected = const [],
+  });
+
+  /// The server's own timestamp, stored verbatim and sent back next time. It is
+  /// never parsed or compared against the device clock.
+  final String now;
+  final int lastMessageId;
+
+  /// True when this response replaces the local copy rather than amending it.
+  final bool full;
+
+  final List<Reminder> reminders;
+  final CoachingProfile? profile;
+  final List<CheckinEntry> checkins;
+  final List<WorkoutEntry> workouts;
+  final List<ChatMessage> messages;
+  final List<SyncRejection> rejected;
+
+  factory SyncResult.fromJson(Map<String, dynamic> json) {
+    final pull = Map<String, dynamic>.from((json['pull'] as Map?) ?? const {});
+    List<T> list<T>(String key, T Function(Map<String, dynamic>) parse) =>
+        ((pull[key] as List?) ?? const [])
+            .map((e) => parse(Map<String, dynamic>.from(e as Map)))
+            .toList();
+
+    return SyncResult(
+      now: (json['now'] as String?) ?? '',
+      lastMessageId: (json['lastMessageId'] as num?)?.toInt() ?? 0,
+      full: (json['full'] as bool?) ?? false,
+      reminders: list('reminders', Reminder.fromJson),
+      profile: pull['profile'] is Map
+          ? CoachingProfile.fromJson(Map<String, dynamic>.from(pull['profile'] as Map))
+          : null,
+      checkins: list('checkins', CheckinEntry.fromJson),
+      workouts: list('workouts', WorkoutEntry.fromJson),
+      messages: list('messages', ChatMessage.fromJson),
+      rejected: ((json['rejected'] as List?) ?? const [])
+          .map((e) => SyncRejection.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
+    );
+  }
+}
+
 /// GET/PATCH /coaching/profile. Also carries the user's timezone, which drives
 /// reminders too — not only coaching.
 class CoachingProfile {
@@ -247,6 +388,9 @@ class CoachingProfile {
     this.checkinTime,
     this.programTime,
     this.language,
+    this.awaitingCheckin = false,
+    this.awaitingSince,
+    this.pendingSync = false,
   });
 
   final bool optedIn;
@@ -258,8 +402,18 @@ class CoachingProfile {
   final String? programTime;
   final String? language;
 
+  /// Server-owned: Botvy has asked today's question and is waiting on a reply.
+  /// Displayed, never sent back.
+  final bool awaitingCheckin;
+  final DateTime? awaitingSince;
+
+  /// True while this device holds an edit the server has not accepted yet.
+  final bool pendingSync;
+
   factory CoachingProfile.fromJson(Map<String, dynamic> json) => CoachingProfile(
         optedIn: (json['optedIn'] as bool?) ?? false,
+        awaitingCheckin: (json['awaitingCheckin'] as bool?) ?? false,
+        awaitingSince: _localTime(json['awaitingSince']),
         timezone: (json['timezone'] as String?) ?? 'UTC',
         trainingDays: ((json['trainingDays'] as List?) ?? const [])
             .map((e) => (e as num).toInt())
