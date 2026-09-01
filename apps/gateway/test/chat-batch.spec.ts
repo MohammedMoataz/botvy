@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ChatService } from '../src/chat/chat.service.js';
+import { formatInTz } from '../src/common/time.js';
 
 /**
  * The offline flush. What matters here is that re-sending a batch cannot
@@ -39,6 +40,9 @@ function makeService(opts: { stored?: string[]; intent?: unknown } = {}) {
     getProfile: vi.fn().mockResolvedValue({ optedIn: false }),
   };
   const settings = { get: vi.fn().mockResolvedValue(20) };
+  // A queued message is answered from the conversation, never from the web:
+  // the batch path does not search.
+  const search = { search: vi.fn().mockResolvedValue([]) };
 
   const service = new ChatService(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,8 +57,10 @@ function makeService(opts: { stored?: string[]; intent?: unknown } = {}) {
     coaching as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    search as any,
   );
-  return { service, prisma, llm, reminders, created };
+  return { service, prisma, llm, reminders, search, created };
 }
 
 const COMPOSED = new Date('2026-09-01T06:00:00Z');
@@ -101,8 +107,11 @@ describe('ChatService.batchReply', () => {
     const { service, llm } = makeService();
     await service.batchReply('u1', [batch[0]]);
 
+    // The reference handed to the model is the composing moment on the user's
+    // own clock — 06:00 UTC is 09:00 in Cairo — not the moment of the flush.
     const prompt = llm.extract.mock.calls[0][0].messages[0].content as string;
-    expect(prompt).toContain(COMPOSED.toISOString());
+    expect(prompt).toContain('09:00');
+    expect(prompt).toContain(formatInTz(COMPOSED, 'Africa/Cairo'));
   });
 
   it('creates the reminder a queued message asked for and tells the model it is done', async () => {
