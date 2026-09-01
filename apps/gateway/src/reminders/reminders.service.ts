@@ -71,6 +71,15 @@ export class RemindersService {
     return created;
   }
 
+  /** Recently deleted, newest first — the undo list. */
+  listDeleted(userId: string) {
+    return this.prisma.reminder.findMany({
+      where: { userId, deletedAt: { not: null } },
+      orderBy: { deletedAt: 'desc' },
+      include: { notifications: true },
+    });
+  }
+
   list(userId: string, status?: 'active' | 'done' | 'cancelled') {
     return this.prisma.reminder.findMany({
       // Tombstones are excluded here rather than at each call site: this is the
@@ -164,11 +173,46 @@ export class RemindersService {
     await this.prisma.reminderNotification.deleteMany({
       where: { reminderId: id, sentAt: null },
     });
+    // The status is left exactly as it was. Overwriting it with 'cancelled'
+    // threw away the one thing the deleted list has to show — whether the
+    // reminder had been completed, cancelled, or was still waiting when it
+    // went — and made restoring it a lie.
     await this.prisma.reminder.update({
       where: { id },
-      data: { deletedAt: new Date(), status: 'cancelled' },
+      data: { deletedAt: new Date() },
     });
     await this.nudgeDevices(userId);
     return { id, deleted: true };
+  }
+
+  /**
+   * Brings a deleted reminder back, with the status it had when it went.
+   *
+   * Its pending pings were deleted on the way out, so one that is still active
+   * and still in the future has to be planned again or it would come back
+   * silent — visible in the list and incapable of ringing.
+   */
+  async restore(userId: string, id: string) {
+    const reminder = await this.prisma.reminder.findUnique({ where: { id } });
+    if (!reminder || reminder.userId !== userId) {
+      throw new NotFoundException('Reminder not found');
+    }
+    if (!reminder.deletedAt) return reminder; // already here; nothing to undo
+
+    if (reminder.status === 'active' && reminder.remindAt > new Date()) {
+      const planned = planNotifications(reminder.remindAt, reminder.leadTimes);
+      await this.prisma.reminderNotification.createMany({
+        data: planned.map((p) => ({ reminderId: id, notifyAt: p.notifyAt, label: p.label })),
+        skipDuplicates: true,
+      });
+    }
+
+    const restored = await this.prisma.reminder.update({
+      where: { id },
+      data: { deletedAt: null },
+      include: { notifications: true },
+    });
+    await this.nudgeDevices(userId);
+    return restored;
   }
 }

@@ -16,6 +16,9 @@ class ReminderOps {
   static const create = 'create';
   static const update = 'update';
   static const delete = 'delete';
+
+  /// Undo: the row is here, the server still thinks it is deleted.
+  static const restore = 'restore';
 }
 
 /// Where a chat message is in its journey to the gateway.
@@ -52,6 +55,11 @@ class Reminders extends Table {
   /// would fall through to a clock comparison and a handset running slow
   /// would lose all of them.
   DateTimeColumn get baseUpdatedAt => dateTime().nullable()();
+
+  /// Set when the reminder has been deleted. The row stays: it is what the
+  /// Deleted view lists and what Restore undoes. Cleared on the server's
+  /// horizon, when a full snapshot stops carrying it.
+  DateTimeColumn get deletedAt => dateTime().nullable()();
 
   /// Null once the server agrees with this row.
   TextColumn get pendingOp => text().nullable()();
@@ -238,7 +246,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   /// Without this, drift's default `onUpgrade` throws and every existing
   /// install fails to open the moment the version moves. v1 → v2 only adds, so
@@ -277,13 +285,43 @@ class AppDatabase extends _$AppDatabase {
             // never swept: the user's unsent words are not a cache.
             await m.addColumn(chatMessages, chatMessages.conversationId);
           }
+          if (from < 4) {
+            // Deleted reminders used to be removed from this table outright,
+            // so there was nothing to undo. They stay now, hidden from the
+            // list and shown in the Deleted view. Null for every existing row
+            // is right: anything still here was not deleted.
+            await m.addColumn(reminders, reminders.deletedAt);
+          }
         },
       );
 
   // ── Reminders ──────────────────────────────────────────────────────────────
 
-  Stream<List<LocalReminder>> watchReminders() =>
-      (select(reminders)..orderBy([(r) => OrderingTerm(expression: r.remindAt)])).watch();
+  /// The reminders the user still has.
+  ///
+  /// Excludes tombstones, and also excludes one deleted offline whose delete
+  /// has not been pushed yet — before this it stayed in the list until the sync
+  /// landed, so deleting with no connection looked like it had failed.
+  /// Note the shape of the pendingOp test: `pending_op != 'delete'` is NULL in
+  /// SQL for a NULL column, which is falsy, so writing it that way would hide
+  /// every reminder that has no pending operation at all — i.e. all of them.
+  Stream<List<LocalReminder>> watchReminders() => (select(reminders)
+        ..where((r) =>
+            r.deletedAt.isNull() &
+            (r.pendingOp.isNull() | r.pendingOp.equals(ReminderOps.delete).not()))
+        ..orderBy([(r) => OrderingTerm(expression: r.remindAt)]))
+      .watch();
+
+  /// Recently deleted, newest first. What the undo view lists.
+  ///
+  /// A row deleted offline is here the moment the user taps delete, before the
+  /// gateway has been told — the tombstone is local first, like every other
+  /// edit.
+  Stream<List<LocalReminder>> watchDeletedReminders() => (select(reminders)
+        ..where((r) =>
+            r.deletedAt.isNotNull() | r.pendingOp.equals(ReminderOps.delete))
+        ..orderBy([(r) => OrderingTerm.desc(r.updatedAt)]))
+      .watch();
 
   Future<List<LocalReminder>> allReminders() => select(reminders).get();
 
@@ -315,10 +353,28 @@ class AppDatabase extends _$AppDatabase {
   Future<void> upsertReminder(RemindersCompanion row) =>
       into(reminders).insertOnConflictUpdate(row);
 
+  /// Erases a reminder outright. For a row the gateway has purged or never
+  /// had — an ordinary delete leaves a tombstone instead, so there is
+  /// something to undo.
   Future<void> deleteReminder(String id) => transaction(() async {
         await (delete(reminderPings)..where((p) => p.reminderId.equals(id))).go();
         await (delete(reminders)..where((r) => r.id.equals(id))).go();
       });
+
+  /// Marks a reminder deleted and silences it, keeping the row for the undo
+  /// view. The pings go now: a deleted reminder must not ring while it waits
+  /// to be either restored or purged.
+  Future<void> tombstoneReminder(String id, DateTime at) => transaction(() async {
+        await (delete(reminderPings)..where((p) => p.reminderId.equals(id))).go();
+        await (update(reminders)..where((r) => r.id.equals(id)))
+            .write(RemindersCompanion(deletedAt: Value(at)));
+      });
+
+  /// Lifts a local tombstone. The pings are re-planned by the caller, which
+  /// knows whether the reminder can still ring.
+  Future<void> untombstoneReminder(String id) =>
+      (update(reminders)..where((r) => r.id.equals(id)))
+          .write(const RemindersCompanion(deletedAt: Value(null)));
 
   /// Replaces a reminder's pings wholesale — the only safe way to re-plan,
   /// since a changed time invalidates every row derived from the old one.

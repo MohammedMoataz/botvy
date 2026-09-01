@@ -128,9 +128,19 @@ describe('RemindersService.remove', () => {
     expect(prisma.reminder.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'r1' },
-        data: expect.objectContaining({ status: 'cancelled', deletedAt: expect.any(Date) }),
+        data: { deletedAt: expect.any(Date) },
       }),
     );
+  });
+
+  it('keeps the status it had, so the deleted list can say which it was', async () => {
+    // Deleting used to stamp 'cancelled' over the real status, which threw
+    // away the only thing that distinguishes a completed reminder from an
+    // abandoned one — and made restoring it a lie.
+    const { service, prisma } = makeService({ status: 'done' });
+    await service.remove('u1', 'r1');
+
+    expect(prisma.reminder.update.mock.calls[0][0].data).not.toHaveProperty('status');
   });
 
   it('drops the pending pings so a removed reminder cannot ring', async () => {
@@ -168,5 +178,70 @@ describe('RemindersService.remove', () => {
     const { service, prisma } = makeService({ userId: 'someone-else' });
     await expect(service.remove('u1', 'r1')).rejects.toThrow('not found');
     expect(prisma.reminder.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('RemindersService.restore', () => {
+  const deleted = (over: Record<string, unknown> = {}) => ({
+    deletedAt: new Date('2026-08-01T00:00:00Z'),
+    ...over,
+  });
+
+  it('lifts the tombstone without touching the status', async () => {
+    const { service, prisma } = makeService(deleted({ status: 'done' }));
+    await service.restore('u1', 'r1');
+
+    expect(prisma.reminder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'r1' }, data: { deletedAt: null } }),
+    );
+  });
+
+  it('plans pings again for one that can still ring', async () => {
+    // Deleting dropped them, so without this it comes back visible and silent.
+    const { service, prisma } = makeService(
+      deleted({ status: 'active', remindAt: new Date(Date.now() + 86_400_000) }),
+    );
+    await service.restore('u1', 'r1');
+
+    expect(prisma.reminderNotification.createMany).toHaveBeenCalled();
+  });
+
+  it('plans nothing for one whose moment has passed', async () => {
+    const { service, prisma } = makeService(
+      deleted({ status: 'active', remindAt: new Date(Date.now() - 86_400_000) }),
+    );
+    await service.restore('u1', 'r1');
+
+    expect(prisma.reminderNotification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('plans nothing for one that was already finished', async () => {
+    const { service, prisma } = makeService(
+      deleted({ status: 'done', remindAt: new Date(Date.now() + 86_400_000) }),
+    );
+    await service.restore('u1', 'r1');
+
+    expect(prisma.reminderNotification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op for one that was never deleted', async () => {
+    const { service, prisma } = makeService();
+    await service.restore('u1', 'r1');
+
+    expect(prisma.reminder.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to restore another user\'s reminder', async () => {
+    const { service } = makeService(deleted({ userId: 'someone-else' }));
+    await expect(service.restore('u1', 'r1')).rejects.toThrow('not found');
+  });
+
+  it('lists the deleted ones newest first, for the undo view', async () => {
+    const { service, prisma } = makeService();
+    await service.listDeleted('u1');
+
+    const call = prisma.reminder.findMany.mock.calls[0][0];
+    expect(call.where).toEqual({ userId: 'u1', deletedAt: { not: null } });
+    expect(call.orderBy).toEqual({ deletedAt: 'desc' });
   });
 });

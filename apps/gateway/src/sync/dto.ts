@@ -108,7 +108,11 @@ export class PushedConversationDto {
   @IsBoolean()
   archived?: boolean;
 
-  @ApiProperty({ required: false, description: 'The device is asking for this to be removed.' })
+  @ApiProperty({
+    required: false,
+    description:
+      'True asks for removal. An explicit false is an undo — it restores a tombstoned reminder with the status it had. Omitted means neither.',
+  })
   @IsOptional()
   @IsBoolean()
   deleted?: boolean;
