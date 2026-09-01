@@ -37,10 +37,29 @@ class Reminders extends Table {
 
   /// JSON array of offsets, e.g. ["1h","0m"].
   TextColumn get leadTimes => text().withDefault(const Constant('["1h","0m"]'))();
+
+  /// When this device last changed the row. Drives outbox ordering and the
+  /// newest-wins comparison.
   DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  /// The server's own `updatedAt` for the last version this device pulled —
+  /// deliberately *not* the same thing as [updatedAt], and never written by a
+  /// local edit.
+  ///
+  /// The gateway accepts a push outright when this still matches its row,
+  /// which is the ordinary case and consults no clock at all. Sending the
+  /// local edit time here instead would never match, so every offline edit
+  /// would fall through to a clock comparison and a handset running slow
+  /// would lose all of them.
+  DateTimeColumn get baseUpdatedAt => dateTime().nullable()();
 
   /// Null once the server agrees with this row.
   TextColumn get pendingOp => text().nullable()();
+
+  /// How many times the server has refused this row. A rejected edit keeps its
+  /// `pendingOp` forever rather than being discarded, but stops being re-sent
+  /// after a few tries so one poisoned row cannot block the whole outbox.
+  IntColumn get pushAttempts => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -71,7 +90,68 @@ class ChatMessages extends Table {
   TextColumn get syncState => text().withDefault(const Constant(SyncStates.synced))();
 }
 
-/// Small key/value bag: sync cursor, server defaults, timezone override.
+/// The user's coaching settings, as one row with id 0.
+///
+/// A table rather than a JSON blob in [KeyValues] because these fields are
+/// edited offline: they need a dirty flag and an edit time, and the settings
+/// screen reads them directly. The previous cached blob had no reader at all.
+@DataClassName('LocalProfile')
+class CoachingProfiles extends Table {
+  IntColumn get id => integer().withDefault(const Constant(0))();
+
+  // ── the fields the phone may change ──
+  BoolColumn get optedIn => boolean().withDefault(const Constant(false))();
+  TextColumn get timezone => text().withDefault(const Constant('UTC'))();
+
+  /// JSON arrays, matching how [Reminders.leadTimes] already stores a list.
+  TextColumn get trainingDays => text().withDefault(const Constant('[]'))();
+  TextColumn get allergies => text().withDefault(const Constant('[]'))();
+  TextColumn get gymTime => text().nullable()();
+  TextColumn get checkinTime => text().nullable()();
+  TextColumn get programTime => text().nullable()();
+  TextColumn get language => text().nullable()();
+
+  // ── the server's, pulled and displayed but never pushed ──
+  BoolColumn get awaitingCheckin => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get awaitingSince => dateTime().nullable()();
+
+  /// True while this device holds an edit the server has not accepted yet.
+  BoolColumn get dirty => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// One evening's answer. Pull-only: check-ins are recorded server-side when the
+/// reply is classified, so the phone never authors one.
+@DataClassName('LocalCheckin')
+class Checkins extends Table {
+  /// The server's own unique key, so an upsert is idempotent without an id.
+  TextColumn get checkinDate => text()();
+  BoolColumn get adhered => boolean()();
+  TextColumn get rawReply => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {checkinDate};
+}
+
+/// A day's training, either reported by the user or generated as a plan.
+@DataClassName('LocalWorkout')
+class WorkoutRecords extends Table {
+  TextColumn get workoutDate => text()();
+  TextColumn get source => text()(); // 'reported' | 'planned'
+  TextColumn get exercises => text().withDefault(const Constant('[]'))();
+  TextColumn get muscleGroups => text().withDefault(const Constant('[]'))();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {workoutDate};
+}
+
+/// Small key/value bag: sync cursor, server defaults, install id.
 /// A whole preferences package for four strings would be more moving parts.
 class KeyValues extends Table {
   TextColumn get k => text()();
@@ -81,7 +161,17 @@ class KeyValues extends Table {
   Set<Column> get primaryKey => {k};
 }
 
-@DriftDatabase(tables: [Reminders, ReminderPings, ChatMessages, KeyValues])
+@DriftDatabase(
+  tables: [
+    Reminders,
+    ReminderPings,
+    ChatMessages,
+    KeyValues,
+    CoachingProfiles,
+    Checkins,
+    WorkoutRecords,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'botvy'));
 
@@ -89,7 +179,33 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  /// Without this, drift's default `onUpgrade` throws and every existing
+  /// install fails to open the moment the version moves. v1 → v2 only adds, so
+  /// nothing is rebuilt and no row is at risk: the reminders, their pending
+  /// operations and the queued messages all survive untouched, and the first
+  /// sync afterwards has no cursor and so fills the new tables from a full
+  /// snapshot.
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(coachingProfiles);
+            await m.createTable(checkins);
+            await m.createTable(workoutRecords);
+            await m.addColumn(reminders, reminders.pushAttempts);
+            // Null on an existing row: it has never been reconciled against a
+            // server timestamp, so the first push falls back to the clock
+            // comparison and the first pull fills it in.
+            await m.addColumn(reminders, reminders.baseUpdatedAt);
+            // The blob these tables replace. It never had a reader, but it is
+            // still one account's preferences sitting in a row nothing owns.
+            await (delete(keyValues)..where((r) => r.k.equals('coachingProfile'))).go();
+          }
+        },
+      );
 
   // ── Reminders ──────────────────────────────────────────────────────────────
 
@@ -98,8 +214,30 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<LocalReminder>> allReminders() => select(reminders).get();
 
-  Future<List<LocalReminder>> pendingReminders() =>
-      (select(reminders)..where((r) => r.pendingOp.isNotNull())).get();
+  /// The outbox: rows the server has not accepted yet.
+  ///
+  /// Oldest edit first, so a create is pushed before the update that follows
+  /// it. A row the server keeps refusing drops out after [maxPushAttempts] and
+  /// stops blocking the queue, but keeps its `pendingOp` — the user's edit is
+  /// never silently thrown away, and the tile offers a retry.
+  Future<List<LocalReminder>> pendingReminders() => (select(reminders)
+        ..where((r) =>
+            r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(maxPushAttempts))
+        ..orderBy([(r) => OrderingTerm(expression: r.updatedAt)]))
+      .get();
+
+  static const maxPushAttempts = 5;
+
+  Future<void> bumpPushAttempts(String id) =>
+      customUpdate(
+        'UPDATE reminders SET push_attempts = push_attempts + 1 WHERE id = ?',
+        variables: [Variable.withString(id)],
+        updates: {reminders},
+      );
+
+  Future<void> resetPushAttempts(String id) =>
+      (update(reminders)..where((r) => r.id.equals(id)))
+          .write(const RemindersCompanion(pushAttempts: Value(0)));
 
   Future<void> upsertReminder(RemindersCompanion row) =>
       into(reminders).insertOnConflictUpdate(row);
@@ -139,8 +277,16 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<LocalMessage>> watchMessages() =>
       (select(chatMessages)..orderBy([(m) => OrderingTerm(expression: m.composedAt)])).watch();
 
+  /// Messages waiting to be delivered.
+  ///
+  /// Only rows the batch endpoint can actually accept: it takes the user's own
+  /// turns, keyed by client id. A queued assistant row or one with no id could
+  /// never be sent, and used to sit here forever rebuilding the same payload.
   Future<List<LocalMessage>> outbox() => (select(chatMessages)
-        ..where((m) => m.syncState.isNotValue(SyncStates.synced))
+        ..where((m) =>
+            m.syncState.isNotValue(SyncStates.synced) &
+            m.role.equals('user') &
+            m.clientId.isNotNull())
         ..orderBy([(m) => OrderingTerm(expression: m.composedAt)]))
       .get();
 
@@ -204,5 +350,39 @@ class AppDatabase extends _$AppDatabase {
         await delete(reminders).go();
         await delete(chatMessages).go();
         await delete(keyValues).go();
+        // Including the history: signing out must not leave the previous
+        // account's check-ins and programs readable on the device.
+        await delete(coachingProfiles).go();
+        await delete(checkins).go();
+        await delete(workoutRecords).go();
       });
+
+  // ── Coaching profile ───────────────────────────────────────────────────────
+
+  Stream<LocalProfile?> watchProfile() =>
+      (select(coachingProfiles)..where((p) => p.id.equals(0))).watchSingleOrNull();
+
+  Future<LocalProfile?> profile() =>
+      (select(coachingProfiles)..where((p) => p.id.equals(0))).getSingleOrNull();
+
+  Future<void> writeProfile(CoachingProfilesCompanion row) =>
+      into(coachingProfiles).insertOnConflictUpdate(row.copyWith(id: const Value(0)));
+
+  // ── History (pull-only) ────────────────────────────────────────────────────
+
+  Future<void> upsertCheckin(CheckinsCompanion row) =>
+      into(checkins).insertOnConflictUpdate(row);
+
+  Future<List<LocalCheckin>> recentCheckins({int limit = 60}) => (select(checkins)
+        ..orderBy([(c) => OrderingTerm.desc(c.checkinDate)])
+        ..limit(limit))
+      .get();
+
+  Future<void> upsertWorkout(WorkoutRecordsCompanion row) =>
+      into(workoutRecords).insertOnConflictUpdate(row);
+
+  Future<List<LocalWorkout>> recentWorkouts({int limit = 30}) => (select(workoutRecords)
+        ..orderBy([(w) => OrderingTerm.desc(w.workoutDate)])
+        ..limit(limit))
+      .get();
 }

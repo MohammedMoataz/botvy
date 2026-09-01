@@ -330,6 +330,32 @@ class ApiClient {
     await _guard(() => dio.delete('/devices/$installId'));
   }
 
+  // -- sync ------------------------------------------------------------------
+
+  /// One round trip in both directions.
+  ///
+  /// [since] is whatever the last response called `now` — a server timestamp,
+  /// passed back verbatim and never parsed, so a wrong device clock cannot
+  /// corrupt the cursor. Omitting it asks for a full snapshot.
+  Future<SyncResult> sync({
+    String? since,
+    int? lastMessageId,
+    String? installId,
+    List<Map<String, dynamic>> reminders = const [],
+    Map<String, dynamic>? profile,
+  }) async {
+    final res = await _guard(() => dio.post('/sync', data: {
+          if (since != null) 'since': since,
+          if (lastMessageId != null) 'lastMessageId': lastMessageId,
+          if (installId != null) 'installId': installId,
+          'push': {
+            if (reminders.isNotEmpty) 'reminders': reminders,
+            if (profile != null) 'profile': profile,
+          },
+        }));
+    return SyncResult.fromJson(Map<String, dynamic>.from(res.data as Map));
+  }
+
   // -- settings & coaching ---------------------------------------------------
 
   /// Server-side defaults, so the app stops carrying its own copies.

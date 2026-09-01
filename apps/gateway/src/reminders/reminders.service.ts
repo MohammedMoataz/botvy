@@ -73,7 +73,10 @@ export class RemindersService {
 
   list(userId: string, status?: 'active' | 'done' | 'cancelled') {
     return this.prisma.reminder.findMany({
-      where: { userId, ...(status ? { status } : {}) },
+      // Tombstones are excluded here rather than at each call site: this is the
+      // only way chat reaches reminders (listing, cancelling, the prompt's
+      // upcoming lines), so one condition covers every caller.
+      where: { userId, deletedAt: null, ...(status ? { status } : {}) },
       orderBy: { remindAt: 'asc' },
       include: { notifications: true },
     });
@@ -86,7 +89,9 @@ export class RemindersService {
    */
   private async ownedOrThrow(userId: string, id: string) {
     const reminder = await this.prisma.reminder.findUnique({ where: { id } });
-    if (!reminder || reminder.userId !== userId) {
+    // A tombstone is not-found too, so a late PATCH from a device that had not
+    // yet heard about the delete cannot resurrect it.
+    if (!reminder || reminder.userId !== userId || reminder.deletedAt) {
       throw new NotFoundException('Reminder not found');
     }
     return reminder;
@@ -147,12 +152,22 @@ export class RemindersService {
   }
 
   /**
-   * Hard delete — the only way to get a finished reminder out of the list.
-   * Owner-scoped, and the notification rows cascade with it.
+   * Removes a reminder from the user's world.
+   *
+   * A tombstone, not a delete: an offline device learns about a deletion by
+   * seeing the row come back marked, and a row that vanished would simply
+   * never appear in its delta. The sweep purges tombstones once they are older
+   * than any plausible offline stretch.
    */
   async remove(userId: string, id: string) {
     await this.ownedOrThrow(userId, id);
-    await this.prisma.reminder.delete({ where: { id } });
+    await this.prisma.reminderNotification.deleteMany({
+      where: { reminderId: id, sentAt: null },
+    });
+    await this.prisma.reminder.update({
+      where: { id },
+      data: { deletedAt: new Date(), status: 'cancelled' },
+    });
     await this.nudgeDevices(userId);
     return { id, deleted: true };
   }
