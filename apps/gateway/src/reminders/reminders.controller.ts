@@ -15,7 +15,12 @@ export class RemindersController {
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Query('status') status?: 'active' | 'done' | 'cancelled',
+    @Query('deleted') deleted?: string,
   ) {
+    // Deleted reminders are a separate list, not a status: one can be deleted
+    // while it was done, cancelled or still waiting, and which it was is what
+    // the undo list has to show.
+    if (deleted === 'true') return this.reminders.listDeleted(user.userId);
     return this.reminders.list(user.userId, status);
   }
 
@@ -33,9 +38,15 @@ export class RemindersController {
     return this.reminders.update(user.userId, id, dto);
   }
 
-  /** Permanent removal — how a finished reminder leaves the list for good. */
+  /** Soft removal: it leaves the list but stays undoable until the sweep. */
   @Delete(':id')
   remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.reminders.remove(user.userId, id);
+  }
+
+  /** Undo. Comes back with the status it had, and rings again if it still can. */
+  @Post(':id/restore')
+  restore(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.reminders.restore(user.userId, id);
   }
 }

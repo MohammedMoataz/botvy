@@ -246,6 +246,24 @@ by the sweep on `reminders.tombstoneDays` like a reminder's. Chat titles are
 never written by the gateway: an empty title means unnamed and the app shows the
 first message instead, which is what keeps a rename from racing an auto-title.
 
+### Reminder states, and undo
+
+A reminder is one of four things, and only three of them are stored. `active`,
+`done` and `cancelled` are the status column; **overdue** is derived — an active
+reminder whose moment has passed — and is deliberately not a status, because
+nothing writes a row when the clock moves past it.
+
+Deleting is soft and **does not touch the status**, which is what lets the
+Deleted view say whether a reminder was completed, cancelled or never dealt with.
+`GET /reminders?deleted=true` lists them, `POST /reminders/:id/restore` brings
+one back, and over `/sync` an explicit `deleted: false` on a pushed reminder is
+the same undo. Restoring re-plans the pings only for a reminder that can still
+ring; a completed or long-past one comes back silent, because a ping for a
+moment in the past would fire at once.
+
+They age out on `reminders.tombstoneDays` like any other tombstone, so the undo
+list bounds itself and needs no setting of its own.
+
 ### What lives on the phone
 
 The app keeps the user's whole account in its own SQLite database — reminders,

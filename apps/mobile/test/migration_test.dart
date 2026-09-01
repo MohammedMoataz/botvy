@@ -123,7 +123,7 @@ void main() {
 
   test('reports the new schema version', () async {
     await db.profile(); // force the migration to run
-    expect(db.schemaVersion, 3);
+    expect(db.schemaVersion, 4);
   });
 
   test('leaves a v1 message unfiled, so the next sync fetches it again', () async {

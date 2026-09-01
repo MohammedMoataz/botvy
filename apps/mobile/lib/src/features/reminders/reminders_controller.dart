@@ -14,22 +14,34 @@ const _uuid = Uuid();
 class RemindersState {
   const RemindersState({
     this.items = const [],
+    this.deleted = const [],
+    this.showDeleted = false,
     this.loading = false,
     this.error,
   });
 
   final List<Reminder> items;
+
+  /// Recently deleted, newest first. Kept until the gateway purges them on its
+  /// tombstone horizon, which is what bounds this list without a setting.
+  final List<Reminder> deleted;
+
+  final bool showDeleted;
   final bool loading;
   final String? error;
 
   RemindersState copyWith({
     List<Reminder>? items,
+    List<Reminder>? deleted,
+    bool? showDeleted,
     bool? loading,
     String? error,
     bool clearError = false,
   }) =>
       RemindersState(
         items: items ?? this.items,
+        deleted: deleted ?? this.deleted,
+        showDeleted: showDeleted ?? this.showDeleted,
         loading: loading ?? this.loading,
         error: clearError ? null : (error ?? this.error),
       );
@@ -50,6 +62,8 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
     final db = ref.read(databaseProvider);
     final subscription = db.watchReminders().listen(_onRows);
     ref.onDispose(subscription.cancel);
+    final deletedSub = db.watchDeletedReminders().listen(_onDeletedRows);
+    ref.onDispose(deletedSub.cancel);
 
     ref.read(syncServiceProvider).kick();
     return const RemindersState(loading: true);
@@ -64,6 +78,11 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
       items: sortReminders(rows.map(_toReminder).toList()),
       loading: false,
     );
+  }
+
+  void _onDeletedRows(List<LocalReminder> rows) {
+    if (_disposed) return;
+    state = state.copyWith(deleted: rows.map(_toReminder).toList());
   }
 
   /// Writes the reminder and its pings locally, then arms the alarms. The
@@ -142,13 +161,18 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
 
   Future<void> cancel(String id) => setStatus(id, 'cancelled');
 
-  /// Permanent removal — how a finished reminder finally leaves the list.
+  /// Removes a reminder from the list, keeping it undoable.
+  ///
+  /// The status is deliberately untouched: whether it was completed, cancelled
+  /// or still waiting is exactly what the Deleted view has to show, and what
+  /// Restore has to bring back.
   Future<void> remove(String id) async {
     final existing = await _db.findReminder(id);
     if (existing == null) return;
 
     if (existing.pendingOp == ReminderOps.create) {
-      // Never reached the gateway, so there is nothing to delete there.
+      // Never reached the gateway, so there is nothing to delete there — and
+      // nothing for the gateway to restore either, so it goes for good.
       await _db.deleteReminder(id);
     } else {
       await _db.upsertReminder(RemindersCompanion.insert(
@@ -158,12 +182,46 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
         remindAt: existing.remindAt,
         status: Value(existing.status),
         leadTimes: Value(existing.leadTimes),
+        baseUpdatedAt: Value(existing.baseUpdatedAt),
         updatedAt: Value(DateTime.now()),
         pendingOp: const Value(ReminderOps.delete),
       ));
+      // Silenced immediately, restored or purged later. A deleted reminder
+      // must not ring while it sits in the undo list.
       await _db.replacePings(id, const []);
     }
     await _armAndSync();
+  }
+
+  /// Undo. Comes back with the status it had, and rings again if it still can.
+  Future<void> restore(String id) async {
+    final existing = await _db.findReminder(id);
+    if (existing == null) return;
+
+    await _db.untombstoneReminder(id);
+    await _db.upsertReminder(RemindersCompanion.insert(
+      id: id,
+      clientId: Value(existing.clientId),
+      title: existing.title,
+      remindAt: existing.remindAt,
+      status: Value(existing.status),
+      leadTimes: Value(existing.leadTimes),
+      deletedAt: const Value(null),
+      baseUpdatedAt: Value(existing.baseUpdatedAt),
+      updatedAt: Value(DateTime.now()),
+      pendingOp: const Value(ReminderOps.restore),
+    ));
+
+    // Only one that can still ring gets its alarms back. A completed or
+    // long-past reminder returns to the list silent, which is correct.
+    if (existing.status == 'active' && existing.remindAt.isAfter(DateTime.now())) {
+      await _writePings(id, existing.remindAt, _decode(existing.leadTimes));
+    }
+    await _armAndSync();
+  }
+
+  void toggleDeletedView() {
+    if (!_disposed) state = state.copyWith(showDeleted: !state.showDeleted);
   }
 
   Future<void> refresh() => _sync.sync();
@@ -213,6 +271,10 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
         leadTimes: _decode(row.leadTimes),
         clientId: row.clientId,
         updatedAt: row.updatedAt,
+        // A delete made offline reads as deleted straight away, before the
+        // gateway has been told — the same as every other local edit.
+        deletedAt: row.deletedAt ??
+            (row.pendingOp == ReminderOps.delete ? row.updatedAt : null),
         pendingSync: row.pendingOp != null,
         syncFailed: row.pushAttempts >= AppDatabase.maxPushAttempts,
       );
