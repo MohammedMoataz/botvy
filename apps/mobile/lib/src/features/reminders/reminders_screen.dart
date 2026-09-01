@@ -89,6 +89,7 @@ class RemindersScreen extends ConsumerWidget {
             onCancel: () => controller.cancel(reminder.id),
             onEdit: () => _edit(context, ref, reminder),
             onDelete: () => _confirmDelete(context, controller, reminder),
+            onRetry: () => controller.retry(reminder.id),
           );
         },
       ),
@@ -157,6 +158,7 @@ class _ReminderTile extends StatelessWidget {
     required this.onCancel,
     required this.onEdit,
     required this.onDelete,
+    required this.onRetry,
   });
 
   final Reminder reminder;
@@ -164,6 +166,7 @@ class _ReminderTile extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +199,15 @@ class _ReminderTile extends StatelessWidget {
               if (!finished && labels.isNotEmpty) 'alerts: $labels',
             ].join('  ·  ')),
           ),
-          if (reminder.pendingSync) ...[
+          if (reminder.syncFailed) ...[
+            const SizedBox(width: 6),
+            // The edit is still here — the server refused it enough times that
+            // we stopped re-sending. Tapping asks again.
+            InkWell(
+              onTap: onRetry,
+              child: Icon(Icons.sync_problem, size: 16, color: scheme.error),
+            ),
+          ] else if (reminder.pendingSync) ...[
             const SizedBox(width: 6),
             Icon(Icons.sync, size: 14, color: scheme.outline),
           ],

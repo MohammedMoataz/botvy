@@ -80,6 +80,7 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
       title: trimmed,
       remindAt: remindAt,
       leadTimes: Value(jsonEncode(offsets)),
+      updatedAt: Value(DateTime.now()),
       pendingOp: const Value(ReminderOps.create),
     ));
     await _writePings(id, remindAt, offsets);
@@ -105,6 +106,7 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
       remindAt: newTime,
       status: Value(existing.status),
       leadTimes: Value(jsonEncode(offsets)),
+      updatedAt: Value(DateTime.now()),
       // A row still waiting to be created must stay a create, or the update
       // would be sent for an id the gateway has never seen.
       pendingOp: Value(
@@ -126,6 +128,7 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
       remindAt: existing.remindAt,
       status: Value(status),
       leadTimes: Value(existing.leadTimes),
+      updatedAt: Value(DateTime.now()),
       pendingOp: Value(
         existing.pendingOp == ReminderOps.create ? ReminderOps.create : ReminderOps.update,
       ),
@@ -155,6 +158,7 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
         remindAt: existing.remindAt,
         status: Value(existing.status),
         leadTimes: Value(existing.leadTimes),
+        updatedAt: Value(DateTime.now()),
         pendingOp: const Value(ReminderOps.delete),
       ));
       await _db.replacePings(id, const []);
@@ -163,6 +167,12 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
   }
 
   Future<void> refresh() => _sync.sync();
+
+  /// Clears the strike count so a rejected edit is attempted again.
+  Future<void> retry(String id) async {
+    await _db.resetPushAttempts(id);
+    _sync.kick();
+  }
 
   void clearError() {
     if (!_disposed) state = state.copyWith(clearError: true);
@@ -204,6 +214,7 @@ class RemindersController extends AutoDisposeNotifier<RemindersState> {
         clientId: row.clientId,
         updatedAt: row.updatedAt,
         pendingSync: row.pendingOp != null,
+        syncFailed: row.pushAttempts >= AppDatabase.maxPushAttempts,
       );
 }
 

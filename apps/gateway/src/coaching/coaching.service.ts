@@ -48,13 +48,14 @@ export class CoachingService {
   }
 
   /**
-   * Merges extracted fields into the profile. Only keys actually present
-   * are written, so a partial extraction never clears fields the model
-   * simply did not mention.
+   * Merges fields into the profile. A key that is absent is left alone, so a
+   * partial patch never clears what it did not mention — but an explicit
+   * `null` DOES clear the field. Filtering nulls too meant a gym time, once
+   * set, could never be removed.
    */
   async upsertProfile(userId: string, patch: Record<string, unknown>) {
     const clean = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined && v !== null),
+      Object.entries(patch).filter(([, v]) => v !== undefined),
     );
     return this.prisma.coachingProfile.upsert({
       where: { userId },

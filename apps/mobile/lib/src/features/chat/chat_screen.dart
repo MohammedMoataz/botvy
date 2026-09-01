@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/models.dart';
+import '../history/history_screen.dart';
 import '../reminders/reminders_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../api/api_client.dart';
@@ -58,6 +59,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             tooltip: 'Reminders',
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const RemindersScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'History',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const HistoryScreen()),
             ),
           ),
           IconButton(
