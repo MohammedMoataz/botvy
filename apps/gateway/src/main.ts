@@ -29,7 +29,7 @@ async function bootstrap() {
   const openapi = new DocumentBuilder()
     .setTitle('Botvy Gateway')
     .setDescription('Botvy platform API — auth, chat, reminders, workflows, admin')
-    .setVersion('0.2.0')
+    .setVersion('0.3.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, openapi);
