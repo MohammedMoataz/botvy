@@ -1,6 +1,8 @@
 /// Types mirroring apps/gateway/openapi.json. Hand-written rather than
-/// generated -- six endpoints do not justify a codegen toolchain.
+/// generated -- a handful of endpoints do not justify a codegen toolchain.
 library;
+
+import 'package:intl/intl.dart';
 
 /// `TokenPairDto` -- returned by POST /auth/login and POST /auth/refresh.
 class TokenPair {
@@ -36,13 +38,19 @@ class Account {
 class ChatMessage {
   ChatMessage({
     this.id,
+    this.clientId,
     required this.role,
     required this.content,
     this.createdAt,
     this.streaming = false,
+    this.syncState = 'synced',
   });
 
   final int? id;
+
+  /// Set for messages this device composed; the key the outbox dedupes on.
+  final String? clientId;
+
   final String role; // 'user' | 'assistant'
   String content; // mutable: the assistant bubble grows token by token
   final DateTime? createdAt;
@@ -50,10 +58,18 @@ class ChatMessage {
   /// True while tokens are still arriving for this message.
   bool streaming;
 
+  /// 'synced' | 'queued' | 'failed' — queued means written offline and waiting.
+  String syncState;
+
   bool get isUser => role == 'user';
+
+  bool get isQueued => syncState == 'queued';
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
         id: json['id'] as int?,
+        // Present for messages this device composed offline: it is how a
+        // pulled row is matched to the local one instead of duplicating it.
+        clientId: json['clientId'] as String?,
         role: json['role'] as String,
         content: (json['content'] as String?) ?? '',
         createdAt: json['createdAt'] == null
@@ -102,8 +118,12 @@ class Reminder {
     required this.title,
     required this.remindAt,
     required this.status,
+    this.leadTimes = const ['1h', '0m'],
+    this.clientId,
     this.createdAt,
+    this.updatedAt,
     this.notifications = const [],
+    this.pendingSync = false,
   });
 
   final String id;
@@ -113,11 +133,22 @@ class Reminder {
   final DateTime remindAt;
 
   final String status; // 'active' | 'done' | 'cancelled'
+
+  /// The offsets this reminder's pings were planned from.
+  final List<String> leadTimes;
+
+  /// Set for reminders this device created offline.
+  final String? clientId;
+
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   /// May legitimately be shorter than the lead times requested: the gateway
   /// drops any whose moment has already passed. Not an error.
   final List<ReminderNotification> notifications;
+
+  /// True while this device holds a change the gateway has not accepted yet.
+  final bool pendingSync;
 
   bool get isActive => status == 'active';
 
@@ -126,11 +157,120 @@ class Reminder {
         title: (json['title'] as String?) ?? '',
         remindAt: _localTime(json['remindAt']) ?? DateTime.now(),
         status: (json['status'] as String?) ?? 'active',
+        leadTimes: ((json['leadTimes'] as List?) ?? const ['1h', '0m'])
+            .map((e) => e.toString())
+            .toList(),
+        clientId: json['clientId'] as String?,
         createdAt: _localTime(json['createdAt']),
+        updatedAt: _localTime(json['updatedAt']),
         notifications: ((json['notifications'] as List?) ?? const [])
             .map((n) =>
                 ReminderNotification.fromJson(Map<String, dynamic>.from(n as Map)))
             .toList(),
+      );
+}
+
+/// A message typed while offline, waiting in the outbox.
+class QueuedMessage {
+  const QueuedMessage({
+    required this.clientId,
+    required this.text,
+    required this.composedAt,
+  });
+
+  final String clientId;
+  final String text;
+
+  /// When the user actually typed it. The gateway resolves "in two hours"
+  /// against this, not against the moment the flush lands.
+  final DateTime composedAt;
+}
+
+/// POST /chat/batch.
+class ChatBatchResult {
+  const ChatBatchResult({
+    required this.processed,
+    required this.duplicates,
+    this.reply,
+  });
+
+  final int processed;
+
+  /// clientIds the gateway had already stored — safe to mark synced too.
+  final List<String> duplicates;
+
+  /// One reply covering the whole batch. Null when everything was a duplicate.
+  final String? reply;
+
+  factory ChatBatchResult.fromJson(Map<String, dynamic> json) => ChatBatchResult(
+        processed: (json['processed'] as num?)?.toInt() ?? 0,
+        duplicates: ((json['duplicates'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        reply: json['reply'] as String?,
+      );
+}
+
+/// GET /settings/defaults — values the app used to hardcode.
+class ServerDefaults {
+  const ServerDefaults({
+    required this.timezone,
+    required this.leadTimes,
+    required this.checkinTime,
+    required this.programTime,
+  });
+
+  final String timezone;
+  final List<String> leadTimes;
+  final String checkinTime;
+  final String programTime;
+
+  factory ServerDefaults.fromJson(Map<String, dynamic> json) => ServerDefaults(
+        timezone: (json['timezone'] as String?) ?? 'UTC',
+        leadTimes: ((json['leadTimes'] as List?) ?? const ['1h', '0m'])
+            .map((e) => e.toString())
+            .toList(),
+        checkinTime: (json['checkinTime'] as String?) ?? '21:00',
+        programTime: (json['programTime'] as String?) ?? '22:00',
+      );
+}
+
+/// GET/PATCH /coaching/profile. Also carries the user's timezone, which drives
+/// reminders too — not only coaching.
+class CoachingProfile {
+  const CoachingProfile({
+    required this.optedIn,
+    required this.timezone,
+    this.trainingDays = const [],
+    this.allergies = const [],
+    this.gymTime,
+    this.checkinTime,
+    this.programTime,
+    this.language,
+  });
+
+  final bool optedIn;
+  final String timezone;
+  final List<int> trainingDays; // ISO weekdays, 1 = Monday
+  final List<String> allergies;
+  final String? gymTime;
+  final String? checkinTime;
+  final String? programTime;
+  final String? language;
+
+  factory CoachingProfile.fromJson(Map<String, dynamic> json) => CoachingProfile(
+        optedIn: (json['optedIn'] as bool?) ?? false,
+        timezone: (json['timezone'] as String?) ?? 'UTC',
+        trainingDays: ((json['trainingDays'] as List?) ?? const [])
+            .map((e) => (e as num).toInt())
+            .toList(),
+        allergies: ((json['allergies'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList(),
+        gymTime: json['gymTime'] as String?,
+        checkinTime: json['checkinTime'] as String?,
+        programTime: json['programTime'] as String?,
+        language: json['language'] as String?,
       );
 }
 
@@ -139,18 +279,10 @@ DateTime? _localTime(Object? raw) {
   return DateTime.tryParse(raw)?.toLocal();
 }
 
-const _kWeekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const _kMonths = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
 /// 'Today 14:30' / 'Tomorrow 09:00' / 'Fri 3 Oct, 09:00' (+ year if not this
-/// one). [now] is injectable so this is testable without a clock.
-///
-/// ponytail: hand-rolled instead of pulling in `intl` for one format string.
-/// Swap for DateFormat the day the app needs real localisation.
-String formatRemindAt(DateTime when, {DateTime? now}) {
+/// one). [now] is injectable so this is testable without a clock, and
+/// [locale] so an Arabic user reads Arabic month names.
+String formatRemindAt(DateTime when, {DateTime? now, String? locale}) {
   final local = when.toLocal();
   final ref = (now ?? DateTime.now()).toLocal();
   // UTC anchors: a local DateTime difference across a DST boundary is 23h or
@@ -158,16 +290,12 @@ String formatRemindAt(DateTime when, {DateTime? now}) {
   final days = DateTime.utc(local.year, local.month, local.day)
       .difference(DateTime.utc(ref.year, ref.month, ref.day))
       .inDays;
-  final time = '${local.hour.toString().padLeft(2, '0')}:'
-      '${local.minute.toString().padLeft(2, '0')}';
+  final time = DateFormat.Hm(locale).format(local);
   if (days == 0) return 'Today $time';
   if (days == 1) return 'Tomorrow $time';
   if (days == -1) return 'Yesterday $time';
-  final date = '${_kWeekdays[local.weekday - 1]} ${local.day} '
-      '${_kMonths[local.month - 1]}';
-  return local.year == ref.year
-      ? '$date, $time'
-      : '$date ${local.year}, $time';
+  final pattern = local.year == ref.year ? 'EEE d MMM' : 'EEE d MMM y';
+  return '${DateFormat(pattern, locale).format(local)}, $time';
 }
 
 /// Soonest pending reminder first; everything already fired, done or cancelled

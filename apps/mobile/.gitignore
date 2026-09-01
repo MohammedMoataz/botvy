@@ -22,3 +22,6 @@ ios/.symlinks/
 # which invoke the Google Services Gradle plugin. Only an APK build does.
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# Kotlin build-tools scratch directory, created by the Gradle build.
+android/.kotlin/

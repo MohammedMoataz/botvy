@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { opsStatus } from '../ops/ops-status.js';
 
 @Injectable()
 export class AdminService {
@@ -9,7 +10,7 @@ export class AdminService {
     const startOfDay = new Date();
     startOfDay.setUTCHours(0, 0, 0, 0);
 
-    const [totalUsers, totalDevices, messagesToday, usageToday] = await Promise.all([
+    const [totalUsers, totalDevices, messagesToday, usageToday, ops] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.device.count(),
       this.prisma.message.count({ where: { createdAt: { gte: startOfDay } } }),
@@ -17,6 +18,7 @@ export class AdminService {
         where: { createdAt: { gte: startOfDay } },
         _sum: { promptTokens: true, completionTokens: true },
       }),
+      opsStatus(this.prisma),
     ]);
 
     return {
@@ -25,6 +27,7 @@ export class AdminService {
       messagesToday,
       tokensToday:
         (usageToday._sum.promptTokens ?? 0) + (usageToday._sum.completionTokens ?? 0),
+      ...ops,
     };
   }
 

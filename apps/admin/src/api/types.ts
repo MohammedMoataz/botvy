@@ -42,4 +42,11 @@ export interface HealthResponse {
   status: 'ok' | 'degraded';
   database: boolean;
   ollama: boolean;
+  /** False when FIREBASE_CREDENTIALS_FILE is unset: no push is delivered. */
+  push: boolean;
+  lastSweepAt: string | null;
+  /** True when no reminder sweep has landed recently — the n8n path is broken. */
+  sweepStale: boolean;
+  lastCoachingTickAt: string | null;
+  coachingTickStale: boolean;
 }

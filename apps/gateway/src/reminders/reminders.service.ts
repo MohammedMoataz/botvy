@@ -1,31 +1,74 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { planNotifications } from './lead-times.js';
+import { PushService } from '../push/push.service.js';
+import { DEFAULT_LEAD_TIMES, planNotifications } from './lead-times.js';
 
 export interface CreateReminderInput {
   title: string;
   remindAt: Date;
   leadTimes?: string[];
+  /** Client-generated id for a reminder composed offline; makes retries safe. */
+  clientId?: string;
 }
 
 @Injectable()
 export class RemindersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(RemindersService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
+
+  /**
+   * Tells the user's phones to re-sync, so the local alarms they schedule
+   * themselves match a reminder that changed elsewhere (from chat, or another
+   * device). Silent and best-effort: the phone also pulls a full snapshot
+   * whenever it opens, which is what actually guarantees convergence.
+   */
+  private async nudgeDevices(userId: string): Promise<void> {
+    try {
+      const devices = await this.prisma.device.findMany({
+        where: { userId, fcmToken: { not: null } },
+        select: { fcmToken: true },
+      });
+      const tokens = devices.map((d) => d.fcmToken as string);
+      if (tokens.length === 0) return;
+      await this.push.send(tokens, { data: { type: 'sync' } });
+    } catch (err) {
+      this.logger.warn(`sync nudge failed for ${userId}: ${String(err)}`);
+    }
+  }
 
   async create(userId: string, input: CreateReminderInput) {
-    const planned = planNotifications(input.remindAt, input.leadTimes ?? ['1h', '0m']);
+    // A phone that loses the response to its create still holds the row in
+    // its outbox and retries; without this the retry makes a second reminder.
+    if (input.clientId) {
+      const existing = await this.prisma.reminder.findUnique({
+        where: { userId_clientId: { userId, clientId: input.clientId } },
+        include: { notifications: true },
+      });
+      if (existing) return existing;
+    }
 
-    return this.prisma.reminder.create({
+    const leadTimes = input.leadTimes ?? DEFAULT_LEAD_TIMES;
+    const planned = planNotifications(input.remindAt, leadTimes);
+
+    const created = await this.prisma.reminder.create({
       data: {
         userId,
         title: input.title,
         remindAt: input.remindAt,
+        leadTimes,
+        clientId: input.clientId,
         notifications: {
           create: planned.map((p) => ({ notifyAt: p.notifyAt, label: p.label })),
         },
       },
       include: { notifications: true },
     });
+    await this.nudgeDevices(userId);
+    return created;
   }
 
   list(userId: string, status?: 'active' | 'done' | 'cancelled') {
@@ -52,41 +95,65 @@ export class RemindersService {
   async update(
     userId: string,
     id: string,
-    patch: { title?: string; remindAt?: Date; status?: 'active' | 'done' | 'cancelled' },
+    patch: {
+      title?: string;
+      remindAt?: Date;
+      leadTimes?: string[];
+      status?: 'active' | 'done' | 'cancelled';
+    },
   ) {
-    await this.ownedOrThrow(userId, id);
+    const reminder = await this.ownedOrThrow(userId, id);
+    const closing = patch.status === 'done' || patch.status === 'cancelled';
+    // Finishing a reminder deleted its pending pings, so bringing one back to
+    // life has to plan them again or it would sit in the list saying nothing.
+    const reopening = patch.status === 'active' && reminder.status !== 'active';
 
-    // Rescheduling replaces the notification plan: the old unsent rows
-    // point at times derived from the previous remindAt.
-    if (patch.remindAt) {
+    // A reminder that is finished must stop notifying, whichever status
+    // finished it — the sweep filtering on status is one safeguard, deleting
+    // the rows is the one that cannot be forgotten.
+    if (closing) {
       await this.prisma.reminderNotification.deleteMany({
         where: { reminderId: id, sentAt: null },
       });
-      const planned = planNotifications(patch.remindAt);
+    } else if (patch.remindAt || patch.leadTimes || reopening) {
+      // Rescheduling replaces the notification plan: the old unsent rows
+      // point at times derived from the previous remindAt. The lead times
+      // come from the reminder itself unless the caller changed them —
+      // passing none here used to silently reset a custom set to the default.
+      await this.prisma.reminderNotification.deleteMany({
+        where: { reminderId: id, sentAt: null },
+      });
+      const planned = planNotifications(
+        patch.remindAt ?? reminder.remindAt,
+        patch.leadTimes ?? reminder.leadTimes,
+      );
       await this.prisma.reminderNotification.createMany({
         data: planned.map((p) => ({ reminderId: id, notifyAt: p.notifyAt, label: p.label })),
         skipDuplicates: true,
       });
     }
 
-    return this.prisma.reminder.update({
+    const updated = await this.prisma.reminder.update({
       where: { id },
       data: patch,
       include: { notifications: true },
     });
+    await this.nudgeDevices(userId);
+    return updated;
   }
 
   async cancel(userId: string, id: string) {
+    return this.update(userId, id, { status: 'cancelled' });
+  }
+
+  /**
+   * Hard delete — the only way to get a finished reminder out of the list.
+   * Owner-scoped, and the notification rows cascade with it.
+   */
+  async remove(userId: string, id: string) {
     await this.ownedOrThrow(userId, id);
-    // Cancelling deletes unsent notifications outright rather than relying
-    // on the sweep to filter by status — one fewer way to fire a push for
-    // a cancelled reminder.
-    await this.prisma.reminderNotification.deleteMany({
-      where: { reminderId: id, sentAt: null },
-    });
-    return this.prisma.reminder.update({
-      where: { id },
-      data: { status: 'cancelled' },
-    });
+    await this.prisma.reminder.delete({ where: { id } });
+    await this.nudgeDevices(userId);
+    return { id, deleted: true };
   }
 }

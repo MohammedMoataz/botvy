@@ -39,6 +39,29 @@ export interface AdminSetting {
   key: string;
   /** jsonb column — shape varies per setting key. */
   value: unknown;
+  /** False when the gateway is running on the coded default for this key. */
+  overridden: boolean;
+  default: unknown;
+  description: string;
+}
+
+/** Written by the gateway itself (last sweep, last coaching tick). Read-only. */
+export interface OpsRecord {
+  key: string;
+  value: unknown;
   updatedAt: string;
 }
-export const listSettings = (): Promise<AdminSetting[]> => api<AdminSetting[]>('/api/admin/settings');
+
+export interface AdminSettings {
+  settings: AdminSetting[];
+  ops: OpsRecord[];
+}
+
+export const listSettings = (): Promise<AdminSettings> => api<AdminSettings>('/api/admin/settings');
+
+/** Values are validated per key by the gateway and take effect without a restart. */
+export const updateSetting = (key: string, value: unknown): Promise<AdminSetting> =>
+  api<AdminSetting>(`/api/admin/settings/${encodeURIComponent(key)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ value }),
+  });

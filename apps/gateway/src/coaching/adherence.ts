@@ -13,16 +13,9 @@ export interface CheckInRecord {
   adhered: boolean;
 }
 
-/** Calendar date in a given IANA timezone, as YYYY-MM-DD. */
-export function localDate(at: Date, timezone: string): string {
-  // en-CA formats as YYYY-MM-DD, which is exactly the storage format.
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(at);
-}
+// Timezone maths moved to common/ once reminders needed it too; re-exported
+// here because coaching is where callers already look for it.
+export { localDate } from '../common/time.js';
 
 function previousDate(date: string): string {
   const d = new Date(`${date}T00:00:00Z`);
@@ -118,7 +111,11 @@ export function allergyViolations(planText: string, allergies: string[]): string
 /** A pending check-in older than this is stale and must not capture a reply. */
 export const CHECKIN_WINDOW_MS = 12 * 60 * 60 * 1000;
 
-export function checkinStillOpen(awaitingSince: Date | null, now: Date = new Date()): boolean {
+export function checkinStillOpen(
+  awaitingSince: Date | null,
+  now: Date = new Date(),
+  windowMs: number = CHECKIN_WINDOW_MS,
+): boolean {
   if (!awaitingSince) return false;
-  return now.getTime() - awaitingSince.getTime() < CHECKIN_WINDOW_MS;
+  return now.getTime() - awaitingSince.getTime() < windowMs;
 }

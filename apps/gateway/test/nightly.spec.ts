@@ -36,8 +36,17 @@ function makeService(opts: {
     markAwaitingCheckin: vi.fn().mockResolvedValue({}),
   };
   const prisma = {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const service = new NightlyService(prisma as any, push as any, coaching as any);
+  const settings = { get: vi.fn().mockResolvedValue({}) };
+  const service = new NightlyService(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    prisma as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    push as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    coaching as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    settings as any,
+  );
   return { service, push, coaching, recordWorkout };
 }
 

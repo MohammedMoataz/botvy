@@ -55,6 +55,9 @@ backups/
 
 # Credential files - never commit
 secrets/
+# The Android client config carries an API key. The copy Gradle reads lives at
+# apps/mobile/android/app/ (ignored there too); a stray copy here is a leak.
+/google-services.json
 
 # Flutter/IDE local files
 apps/mobile/.idea/

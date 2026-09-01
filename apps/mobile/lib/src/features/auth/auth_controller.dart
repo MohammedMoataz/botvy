@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/api_client.dart';
+import '../../app_providers.dart';
 
 class AuthState {
   const AuthState({
@@ -73,6 +74,12 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // The cache holds this account's reminders and conversation, and the
+    // scheduled alarms would keep firing for them. Both must go before the
+    // next person signs in on this device.
+    await ref.read(pushServiceProvider).unregister();
+    await ref.read(notificationSchedulerProvider).cancelAll();
+    await ref.read(databaseProvider).wipe();
     await _api.logout();
     state = const AuthState(signedIn: false);
   }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RemindersService } from './reminders.service.js';
 import { CreateReminderDto, UpdateReminderDto } from './dto.js';
@@ -30,9 +30,12 @@ export class RemindersController {
     @Param('id') id: string,
     @Body() dto: UpdateReminderDto,
   ) {
-    if (dto.status === 'cancelled') {
-      return this.reminders.cancel(user.userId, id);
-    }
     return this.reminders.update(user.userId, id, dto);
+  }
+
+  /** Permanent removal — how a finished reminder leaves the list for good. */
+  @Delete(':id')
+  remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.reminders.remove(user.userId, id);
   }
 }

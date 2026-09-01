@@ -1,0 +1,34 @@
+{
+  "note": "Utterances the classifier must get right, in both languages the assistant is used in. Run against a live Ollama with `node test/intent-fixture.mjs` after changing the model or the intent prompt — a model swap is a behaviour change, not a config change.",
+  "timezone": "Africa/Cairo",
+  "now": "2026-09-01T15:00:00Z",
+  "cases": [
+    { "message": "hello, how are you?", "intent": "chat" },
+    { "message": "thanks, that helped", "intent": "chat" },
+    { "message": "I weigh 82kg now", "intent": "chat" },
+    { "message": "أنا تعبان النهاردة", "intent": "chat" },
+
+    { "message": "remind me to call mum tomorrow at 6pm", "intent": "set_reminder", "remindAt": "2026-09-02T18:00" },
+    { "message": "remind me to take the medicine at 9pm", "intent": "set_reminder", "remindAt": "2026-09-01T21:00" },
+    { "message": "remind me in 2 hours to check the oven", "intent": "set_reminder", "remindAt": "2026-09-01T20:00" },
+    { "message": "set a reminder for the dentist on 5 October at 10am", "intent": "set_reminder", "remindAt": "2026-10-05T10:00" },
+    { "message": "فكرني أروح الجيم بكرة الساعة ٦ مساءً", "intent": "set_reminder", "remindAt": "2026-09-02T18:00" },
+    { "message": "عندي اجتماع بكرة الساعة ٨ الصبح", "intent": "set_reminder", "remindAt": "2026-09-02T08:00" },
+    { "message": "فكرني أدفع الإيجار يوم ٥ الساعة ١٠", "intent": "set_reminder" },
+    { "message": "remind me to buy milk", "intent": "set_reminder", "needsClarification": true },
+
+    { "message": "what reminders do I have?", "intent": "list_reminders" },
+    { "message": "show me my reminders", "intent": "list_reminders" },
+    { "message": "ايه التذكيرات اللي عندي؟", "intent": "list_reminders" },
+
+    { "message": "cancel the dentist reminder", "intent": "cancel_reminder" },
+    { "message": "delete the reminder about the gym", "intent": "cancel_reminder" },
+    { "message": "الغي تذكير الاجتماع", "intent": "cancel_reminder" },
+
+    { "message": "what is the price of bitcoin today?", "intent": "web_search" },
+    { "message": "what's the weather in Cairo tomorrow?", "intent": "web_search" },
+    { "message": "who won the match last night?", "intent": "web_search" },
+    { "message": "latest news about the euro exchange rate", "intent": "web_search" },
+    { "message": "كام سعر الدولار النهاردة؟", "intent": "web_search" }
+  ]
+}

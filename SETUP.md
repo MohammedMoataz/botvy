@@ -49,12 +49,17 @@ examples:
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Sign login tokens. Must differ from each other |
 | `INTERNAL_SERVICE_TOKEN` | The only credential n8n holds, for calling `/internal/*` |
 | `N8N_OWNER_EMAIL` / `N8N_OWNER_PASSWORD` | The n8n account bootstrap creates |
-| `TZ` | e.g. `Africa/Cairo`. Affects when nightly jobs run |
+| `TZ` | n8n's own clock. User-facing times come from each user's profile timezone, not this |
 | `DATABASE_URL` | Use the `POSTGRES_PASSWORD` you generated |
 
-Leave `TUNNEL_TOKEN`, `BOTVY_PUBLIC_HOSTNAME`, `FIREBASE_CREDENTIALS_FILE`,
-and `N8N_API_KEY` empty. The first three are optional; the last is minted by
-bootstrap.
+Leave `TUNNEL_TOKEN`, `BOTVY_PUBLIC_HOSTNAME`, `FIREBASE_CREDENTIALS_DIR`,
+`FIREBASE_CREDENTIALS_FILE`, and `N8N_API_KEY` empty. The first four are
+optional; the last is minted by bootstrap.
+
+Everything tunable at runtime — nightly check-in and program times, default
+reminder lead times, sweep batch size, notification wording — lives in the
+`settings` table and is editable from the admin portal's **Config** page. Only
+secrets and connection details are environment variables.
 
 **2. Set up Ollama** — see `infra/docs/ollama-setup.md` for detail. In short:
 
@@ -197,11 +202,37 @@ one generated file; the project's own tests live beside it.
 
 | Check | Expected |
 |---|---|
-| `curl http://localhost:8080/health` | `{"status":"ok","database":true,"ollama":true}` |
-| `curl http://localhost:11434/api/ps` | after one query, `size_vram` **> 0** — otherwise you are on CPU, see Part 2 |
-| `docker compose ps` | postgres healthy, n8n and gateway up |
-| `/admin` in a browser | login works; Overview shows live numbers |
+| `curl http://localhost:8080/health` | `status: ok`, `push: true`, and `sweepStale: false` within a few minutes of starting |
+| `curl http://localhost:11434/api/ps` | after one query, `size_vram` should equal `size` — anything less is running on the CPU, see Part 2 |
+| `docker compose ps` | postgres healthy; n8n, searxng and gateway up |
+| `/admin` in a browser | login works; Overview shows live numbers and a running reminder sweep |
 | n8n editor at `:5679` | reachable **only** from the machine itself |
+| `node test/intent-fixture.mjs` (in `apps/gateway`) | 23/23 — run it after changing the model or the intent prompt |
+
+`sweepStale: true` means the scheduled jobs are not reaching the gateway.
+Check that n8n actually has the shared secret — `docker exec botvy-n8n-1
+printenv INTERNAL_SERVICE_TOKEN` — and recreate the container if it is empty;
+one that predates the setting keeps its old environment forever.
+
+### The model
+
+`OLLAMA_CHAT_MODEL` must fit entirely in VRAM. Two settings go with it:
+`OLLAMA_THINKING` is true only for a reasoning model like qwen3 (qwen2.5
+rejects the field and every call fails), and `OLLAMA_NUM_CTX` pins the context
+window. Do not give the intent call and the chat call different windows —
+Ollama keys a loaded model by context size, so two values make it reload on
+every single turn. That cost 39 seconds to the first token; one value costs 3.
+
+### Web search
+
+Search runs through a local SearXNG that nothing but the gateway can reach.
+`infra/searxng/settings.yml` restricts it to a handful of engines: the default
+set waits for the slowest, and its image half is mostly icon libraries. Several
+general engines are listed on purpose — a single home IP collects a CAPTCHA
+from DuckDuckGo and a rate-limit from Brave soon enough, and one working engine
+is enough to answer. If every engine is throttled the assistant simply replies
+without searching, which is why an outage looks like an ordinary conversation
+rather than an error.
 
 ---
 
@@ -264,15 +295,27 @@ prerequisite.
 
 ### 2. Firebase — push notifications
 
-Reminders are recorded and marked correctly today but reach no phone. The
-gateway degrades on purpose: with no Firebase configured it logs what it
-would have sent and carries on, so the flow is demonstrable without it.
+Reminders fire from the phone itself, scheduled locally, so they work with no
+network and no Firebase at all. Push covers what the device cannot schedule
+for itself: the evening check-in, the nightly program, a reminder created on
+another device, and silent nudges telling the app to re-sync.
 
 1. Create a project at <https://console.firebase.google.com>
 2. Add an Android app using the package name from `apps/mobile`
 3. Download `google-services.json` → `apps/mobile/android/app/`
 4. Project settings → Service accounts → generate a private key
-5. `FIREBASE_CREDENTIALS_FILE=E:\path\to\service-account.json` in `.env`
+5. Save it into `secrets/` and set **both** halves in `.env`:
+
+```ini
+# The host directory holding the key; mounted read-only at /run/secrets
+FIREBASE_CREDENTIALS_DIR=./../secrets
+# The path INSIDE the container
+FIREBASE_CREDENTIALS_FILE=/run/secrets/firebase-admin.json
+```
+
+A host path (`E:\...`) in `FIREBASE_CREDENTIALS_FILE` does not exist inside
+the container. That mistake used to disable every notification silently; the
+gateway now refuses to boot instead. Leave both empty to run without push.
 
 iOS additionally needs a paid Apple Developer account, for both APNs and
 device distribution.
@@ -342,24 +385,37 @@ hostnames routing to them.
 
 ### 4. Build the mobile app
 
-`apps/mobile` was written without a Flutter SDK present, so treat the first
-build as a debugging session rather than a formality.
-
 ```powershell
 cd apps\mobile
-flutter create --project-name botvy --org org.botvy --platforms=android .
 flutter pub get
+dart run build_runner build   # drift's generated database code
 flutter analyze
 flutter test
 flutter build apk --release
 ```
 
-`flutter create` skips files that already exist, so it adds the Gradle and
-platform scaffolding without touching the written Dart.
+`build_runner` is only needed after changing `lib/src/db/database.dart`; the
+generated `database.g.dart` is otherwise stable.
+
+On first launch the app asks for notification permission and, on Android 12,
+for permission to schedule exact alarms. Both are needed for a reminder to
+land at the minute it was set for — without the second, Android may delay it
+by a few minutes, and Settings says so rather than leaving it a mystery.
 
 Server address: the Android emulator reaches the host at
 `http://10.0.2.2:8080`. A physical phone needs your machine's LAN IP, and
 the gateway reachable on it. Both are editable in the app's Settings screen.
+
+#### Checking that reminders really fire
+
+```powershell
+adb shell dumpsys alarm | Select-String botvy   # a pending RTC_WAKEUP per ping
+```
+
+The honest test is airplane mode: turn it on, create a reminder two minutes
+out, and wait. It should fire with no connection — the phone scheduled it
+itself. Turn the network back on and the reminder appears server-side, with
+no duplicate push.
 
 ---
 

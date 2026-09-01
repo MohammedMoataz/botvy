@@ -1,8 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required: the app talks to the gateway over HTTP/SSE. -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Required for firebase_messaging on Android 13+. Harmless while push is off. -->
+    <!-- Required for any notification on Android 13+, and requested at runtime
+         after sign-in. Declaring it alone shows nothing. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- A reminder is an alarm: it has to fire at the minute the user asked
+         for, not whenever the system next batches work. USE_EXACT_ALARM is the
+         reminder-app grant (auto-granted on 13+); SCHEDULE_EXACT_ALARM covers
+         Android 12, where the user can revoke it and we fall back to inexact. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <!-- Pending alarms are dropped by the OS on reboot; the receiver below
+         restores them. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <!-- ponytail: cleartext is on so the default http://10.0.2.2:8080 emulator
          target works. Once the gateway is behind the Cloudflare tunnel (https),
@@ -34,6 +46,28 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- Server pushes land on the same channel as the device's own alarms,
+             so the user has one notification switch rather than two. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="botvy_reminders" />
+
+        <!-- flutter_local_notifications: delivers scheduled alarms, and
+             re-registers the pending ones after a reboot or an app update. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
     </application>
 
     <queries>

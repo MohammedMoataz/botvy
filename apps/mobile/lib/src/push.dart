@@ -2,39 +2,93 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
-/// ===========================================================================
-/// PUSH IS OFF. No Firebase project exists for Botvy yet.
+import 'api/api_client.dart';
+import 'db/database.dart';
+import 'notifications/local_notifications.dart';
+import 'sync/sync_service.dart';
+
+/// Server-initiated messages: the evening check-in, the daily program, a
+/// reminder the device could not have scheduled itself, and silent nudges that
+/// tell the app its local copy is stale.
 ///
-/// `initPush()` is a no-op unless the app is built with
-/// `--dart-define=BOTVY_PUSH=true`, and even then every call is wrapped so a
-/// missing google-services.json degrades to "no push" instead of a crash on
-/// launch. Nothing here is wired to the gateway: there is no endpoint to
-/// register a device token against yet, so the token is only logged.
-///
-/// To turn it on later:
-///   1. Create the Firebase project, run `flutterfire configure`.
-///   2. Drop android/app/google-services.json in place and add the
-///      google-services Gradle plugin.
-///   3. Add a token-registration endpoint to the gateway and POST `token`
-///      to it where marked below.
-///   4. Build with --dart-define=BOTVY_PUSH=true.
-/// ===========================================================================
-const bool kPushEnabled = bool.fromEnvironment('BOTVY_PUSH');
+/// Reminder pings themselves are scheduled on the device (see
+/// [NotificationScheduler]); push is the fallback, not the mechanism. Every
+/// call is wrapped, because an unconfigured Firebase must degrade to "no push"
+/// rather than stop the app from starting.
+class PushService {
+  PushService(this._api, this._db, this._scheduler);
 
-Future<void> initPush() async {
-  if (!kPushEnabled) return;
+  final ApiClient _api;
+  final AppDatabase _db;
+  final NotificationScheduler _scheduler;
 
-  try {
-    await Firebase.initializeApp();
-    final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission();
+  bool _started = false;
 
-    final token = await messaging.getToken();
-    // TODO(botvy): POST `token` to the gateway once a device-registration
-    // endpoint exists. The frozen contract has no such endpoint today.
-    debugPrint('FCM token: $token');
-  } catch (e) {
-    // Unconfigured Firebase must never block the app from starting.
-    debugPrint('Push disabled (Firebase not configured): $e');
+  /// Call once the user is signed in: registration needs a bearer token, and
+  /// an unauthenticated device row has nobody to notify.
+  Future<void> start() async {
+    if (_started) return;
+    _started = true;
+
+    try {
+      await Firebase.initializeApp();
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission();
+
+      final token = await messaging.getToken();
+      if (token != null) await _register(token);
+      messaging.onTokenRefresh.listen((t) => _register(t));
+
+      // Android does not draw an FCM banner while the app is foregrounded, so
+      // the app draws it, on the same channel as its own alarms.
+      FirebaseMessaging.onMessage.listen(_onMessage);
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        if (message.data['type'] == 'sync') _scheduler.rescheduleAll();
+      });
+    } catch (e) {
+      debugPrint('Push unavailable (Firebase not configured?): $e');
+    }
+  }
+
+  Future<void> _onMessage(RemoteMessage message) async {
+    // A data-only message is a nudge: something changed elsewhere, so pull and
+    // re-arm the local alarms. The user should see nothing.
+    if (message.notification == null && message.data['type'] == 'sync') {
+      await _db.setValue('pendingSync', DateTime.now().toIso8601String());
+      return;
+    }
+
+    final notification = message.notification;
+    if (notification == null) return;
+    await _scheduler.show(
+      notification.title ?? 'Botvy',
+      notification.body ?? '',
+      payload: message.data['type'] as String?,
+    );
+  }
+
+  Future<void> _register(String token) async {
+    try {
+      await _db.setValue('fcmToken', token);
+      await _api.registerDevice(
+        installId: await stableInstallId(_db),
+        platform: defaultTargetPlatform.name,
+        fcmToken: token,
+      );
+    } catch (e) {
+      // Nothing is lost: every sync re-registers, so a failure here is
+      // corrected on the next pass.
+      debugPrint('Device registration deferred: $e');
+    }
+  }
+
+  /// Sign-out: this device should stop receiving another account's pushes.
+  Future<void> unregister() async {
+    _started = false;
+    try {
+      await _api.unregisterDevice(await stableInstallId(_db));
+    } catch (e) {
+      debugPrint('Device unregistration failed: $e');
+    }
   }
 }
