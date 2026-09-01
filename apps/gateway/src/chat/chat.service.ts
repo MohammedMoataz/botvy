@@ -32,7 +32,14 @@ const INTENT_SCHEMA = {
   properties: {
     intent: {
       type: 'string',
-      enum: ['chat', 'set_reminder', 'list_reminders', 'cancel_reminder', 'web_search'],
+      enum: [
+        'chat',
+        'coaching',
+        'set_reminder',
+        'list_reminders',
+        'cancel_reminder',
+        'web_search',
+      ],
     },
     title: { type: 'string' },
     remindAt: { type: 'string' },
@@ -68,7 +75,14 @@ const REMINDER_SCHEMA = {
 } as const;
 
 interface IntentResult {
-  intent: 'chat' | 'set_reminder' | 'list_reminders' | 'cancel_reminder' | 'web_search';
+  intent:
+    | 'chat'
+    /** Training, food, weight, sleep, the programme — the coaching track. */
+    | 'coaching'
+    | 'set_reminder'
+    | 'list_reminders'
+    | 'cancel_reminder'
+    | 'web_search';
   title?: string;
   /** The user's own wall clock, no zone: "2026-09-02T18:00". */
   remindAt?: string;
@@ -511,7 +525,11 @@ export class ChatService {
     conversation: ConversationRef,
     userMessage: string,
   ): Observable<MessageEvent> {
-    const conversationId = conversation.id;
+    // Reassigned when a message that does not belong to the coaching track is
+    // moved out of it — everything written afterwards has to land in the new
+    // chat, not the one the user typed into.
+    let conversationId = conversation.id;
+    const startedInCoaching = conversation.clientId === COACHING_CLIENT_ID;
     return new Observable<MessageEvent>((subscriber) => {
       const heartbeat = setInterval(() => {
         subscriber.next({ type: 'heartbeat', data: {} });
@@ -584,6 +602,21 @@ export class ChatService {
             data: { intent, fallback: intentResult === null },
           });
 
+          // The coaching chat is a track, not a general assistant: it holds the
+          // nightly follow-ups and the user's answers to them, and stays
+          // readable as a record of their training. Anything else typed here is
+          // answered — in a new chat of its own, which the client then opens.
+          // Moving it before the message is stored is what keeps the track
+          // clean; storing first and moving after would leave it behind.
+          if (startedInCoaching && intent !== 'coaching') {
+            const moved = await this.conversations.createFor(userId);
+            conversationId = moved.id;
+            subscriber.next({
+              type: 'moved',
+              data: { conversationId: moved.id, from: 'coaching' },
+            });
+          }
+
           await this.prisma.message.create({
             data: { userId, conversationId, role: 'user', content: userMessage },
           });
@@ -629,6 +662,9 @@ export class ChatService {
           // conversation rather than being added to it. An empty search falls
           // through to an ordinary reply, so a search outage is invisible.
           const searching = searchResults.length > 0;
+          // Staying in the coaching chat means this is coaching talk, so it
+          // gets the coach's prompt rather than the general assistant's.
+          const coachingTurn = startedInCoaching && conversationId === conversation.id;
           const systemPrompt = searching
             ? loadPrompt('search.md', {
                 today: localDate(nowDate, timezone),
@@ -636,16 +672,29 @@ export class ChatService {
                 question: userMessage,
                 results: formatSearchResults(searchResults),
               })
-            : loadPrompt('chat.md', {
-                today: localDate(nowDate, timezone),
-                now: formatInTz(nowDate, timezone),
-                timezone,
-                reminders: await this.upcomingRemindersLine(userId, timezone),
-                coaching: await this.coachingLine(userId),
-              });
-          const history = searching
-            ? historyRows.slice(-SEARCH_HISTORY_LIMIT)
-            : historyRows;
+            : coachingTurn
+              ? loadPrompt('coaching.md', {
+                  today: localDate(nowDate, timezone),
+                  now: formatInTz(nowDate, timezone),
+                  timezone,
+                  coaching: await this.coachingLine(userId),
+                })
+              : loadPrompt('chat.md', {
+                  today: localDate(nowDate, timezone),
+                  now: formatInTz(nowDate, timezone),
+                  timezone,
+                  reminders: await this.upcomingRemindersLine(userId, timezone),
+                  coaching: await this.coachingLine(userId),
+                });
+          // A moved message starts a chat of its own, so it carries none of the
+          // coaching history it was typed into — that history is exactly what
+          // it is not about.
+          const moved = conversationId !== conversation.id;
+          const history = moved
+              ? []
+              : searching
+                ? historyRows.slice(-SEARCH_HISTORY_LIMIT)
+                : historyRows;
           const chatMessages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
             ...history.map((m): ChatMessage => ({ role: m.role, content: m.content })),

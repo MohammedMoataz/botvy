@@ -151,8 +151,20 @@ class _ChatTile extends ConsumerWidget {
                 controller.setPinned(chat.id, !chat.pinned);
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.cleaning_services_outlined),
+              title: const Text('Clear messages'),
+              subtitle: chat.isCoaching
+                  ? const Text('Keeps the chat — the check-in still lands here')
+                  : null,
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _confirmClear(context, controller, label);
+              },
+            ),
             // The coaching chat has to stay visible and has to exist: the
-            // nightly check-in and program land in it.
+            // nightly check-in and program land in it. Clearing is how it is
+            // emptied instead.
             if (!chat.isCoaching) ...[
               ListTile(
                 leading: Icon(chat.archived ? Icons.unarchive_outlined : Icons.archive_outlined),
@@ -210,6 +222,34 @@ class _ChatTile extends ConsumerWidget {
     if (name != null && name.trim().isNotEmpty) {
       await controller.rename(chat.id, name);
     }
+  }
+
+  Future<void> _confirmClear(
+    BuildContext context,
+    ConversationsController controller,
+    String label,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear messages?'),
+        content: Text(
+          'Everything said in "$label" will be removed, on this phone and '
+          'everywhere else. The chat itself stays. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await controller.clearMessages(chat.id);
   }
 
   Future<void> _confirmDelete(

@@ -50,10 +50,23 @@ export class PushedReminderDto {
   @IsString()
   status?: 'active' | 'done' | 'cancelled';
 
-  @ApiProperty({ required: false, description: 'The device is asking for this to be removed.' })
+  @ApiProperty({
+    required: false,
+    description:
+      'True asks for removal. An explicit false is an undo — it restores a tombstoned reminder with the status it had. Omitted means neither.',
+  })
   @IsOptional()
   @IsBoolean()
   deleted?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Erase an already-deleted reminder for good, ahead of the sweep. Refused for one that is not a tombstone, so it cannot skip the undo.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  purged?: boolean;
 
   @ApiProperty({
     type: String,
@@ -108,14 +121,19 @@ export class PushedConversationDto {
   @IsBoolean()
   archived?: boolean;
 
-  @ApiProperty({
-    required: false,
-    description:
-      'True asks for removal. An explicit false is an undo — it restores a tombstoned reminder with the status it had. Omitted means neither.',
-  })
+  @ApiProperty({ required: false, description: 'The device is asking for this chat to be removed.' })
   @IsOptional()
   @IsBoolean()
   deleted?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Empty this chat: its messages are deleted and a watermark recorded, so every other device drops its copies too. The chat itself stays, which is the only way to empty the coaching one.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  cleared?: boolean;
 
   @ApiProperty({
     type: String,

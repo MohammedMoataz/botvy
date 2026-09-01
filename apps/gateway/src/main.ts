@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+﻿import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -16,7 +16,7 @@ async function bootstrap() {
   // In production the admin SPA is served by this same gateway, so it is
   // same-origin and needs no CORS. In development it runs on Vite's own
   // port, so allow exactly the origins listed in CORS_ORIGINS (comma
-  // separated) — never a wildcard, since requests carry bearer tokens.
+  // separated) â€” never a wildcard, since requests carry bearer tokens.
   const corsOrigins = config
     .get<string>('CORS_ORIGINS')
     ?.split(',')
@@ -28,8 +28,8 @@ async function bootstrap() {
 
   const openapi = new DocumentBuilder()
     .setTitle('Botvy Gateway')
-    .setDescription('Botvy platform API — auth, chat, reminders, workflows, admin')
-    .setVersion('0.5.0')
+    .setDescription('Botvy platform API â€” auth, chat, reminders, workflows, admin')
+    .setVersion('0.6.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, openapi);

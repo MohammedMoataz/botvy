@@ -405,6 +405,7 @@ class Conversation {
     this.pinned = false,
     this.archived = false,
     this.isCoaching = false,
+    this.clearedUpToMessageId = 0,
     this.updatedAt,
     this.deletedAt,
   });
@@ -416,6 +417,10 @@ class Conversation {
 
   /// The one chat the nightly check-in and program land in.
   final bool isCoaching;
+
+  /// Everything up to this server message id has been cleared. Messages carry
+  /// no tombstone, so this is how an emptied chat empties everywhere.
+  final int clearedUpToMessageId;
 
   final DateTime? updatedAt;
 
@@ -433,6 +438,7 @@ class Conversation {
         archived: (json['archived'] as bool?) ?? false,
         // The gateway marks it with a reserved client id rather than a column.
         isCoaching: json['clientId'] == 'coaching',
+        clearedUpToMessageId: (json['clearedUpToMessageId'] as num?)?.toInt() ?? 0,
         updatedAt: _date(json['updatedAt']),
         deletedAt: _date(json['deletedAt']),
       );

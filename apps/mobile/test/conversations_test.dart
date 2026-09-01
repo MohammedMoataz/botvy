@@ -136,6 +136,59 @@ void main() {
     });
   });
 
+  group('clearing a chat', () {
+    setUp(() async {
+      await add('chat-1');
+      for (final id in [10, 20, 30]) {
+        await db.insertMessage(ChatMessagesCompanion.insert(
+          serverId: Value(id),
+          conversationId: const Value('chat-1'),
+          role: 'user',
+          content: 'message $id',
+          composedAt: DateTime(2026, 9, 1, 6),
+        ));
+      }
+      await db.insertMessage(ChatMessagesCompanion.insert(
+        conversationId: const Value('chat-2'),
+        serverId: const Value(11),
+        role: 'user',
+        content: 'another chat',
+        composedAt: DateTime(2026, 9, 1, 6),
+      ));
+    });
+
+    test('drops only this chat, only up to the watermark', () async {
+      await db.clearConversationMessages('chat-1', upToMessageId: 20);
+
+      final left = await db.watchMessages().first;
+      expect(left.map((m) => m.content), ['message 30', 'another chat']);
+    });
+
+    test('takes anything queued in it, which has no server id to compare', () async {
+      // An id-bounded delete alone would leave an unsent message sitting in a
+      // chat the user has just emptied.
+      await db.insertMessage(ChatMessagesCompanion.insert(
+        clientId: const Value('c1'),
+        conversationId: const Value('chat-1'),
+        role: 'user',
+        content: 'never sent',
+        composedAt: DateTime(2026, 9, 1, 7),
+        syncState: const Value(SyncStates.queued),
+      ));
+
+      await db.clearConversationMessages('chat-1', upToMessageId: 30);
+
+      final left = await db.watchMessages().first;
+      expect(left.map((m) => m.content), ['another chat']);
+    });
+
+    test('leaves the chat itself alone', () async {
+      await db.clearConversationMessages('chat-1', upToMessageId: 30);
+
+      expect(await db.findConversation('chat-1'), isNotNull);
+    });
+  });
+
   group('highestMessageId', () {
     test('is zero on an empty table', () async {
       expect(await db.highestMessageId(), 0);
@@ -167,6 +220,7 @@ void main() {
           pinned: false,
           archived: false,
           isCoaching: isCoaching,
+          clearedUpToMessageId: 0,
           pushAttempts: 0,
         );
 

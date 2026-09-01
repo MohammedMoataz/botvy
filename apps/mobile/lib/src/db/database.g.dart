@@ -957,6 +957,14 @@ class $ConversationsTable extends Conversations
   late final GeneratedColumn<DateTime> baseUpdatedAt =
       GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
           type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _clearedUpToMessageIdMeta =
+      const VerificationMeta('clearedUpToMessageId');
+  @override
+  late final GeneratedColumn<int> clearedUpToMessageId = GeneratedColumn<int>(
+      'cleared_up_to_message_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _pendingOpMeta =
       const VerificationMeta('pendingOp');
   @override
@@ -981,6 +989,7 @@ class $ConversationsTable extends Conversations
         lastMessageAt,
         updatedAt,
         baseUpdatedAt,
+        clearedUpToMessageId,
         pendingOp,
         pushAttempts
       ];
@@ -1033,6 +1042,12 @@ class $ConversationsTable extends Conversations
           baseUpdatedAt.isAcceptableOrUnknown(
               data['base_updated_at']!, _baseUpdatedAtMeta));
     }
+    if (data.containsKey('cleared_up_to_message_id')) {
+      context.handle(
+          _clearedUpToMessageIdMeta,
+          clearedUpToMessageId.isAcceptableOrUnknown(
+              data['cleared_up_to_message_id']!, _clearedUpToMessageIdMeta));
+    }
     if (data.containsKey('pending_op')) {
       context.handle(_pendingOpMeta,
           pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
@@ -1068,6 +1083,8 @@ class $ConversationsTable extends Conversations
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
       baseUpdatedAt: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      clearedUpToMessageId: attachedDatabase.typeMapping.read(DriftSqlType.int,
+          data['${effectivePrefix}cleared_up_to_message_id'])!,
       pendingOp: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
       pushAttempts: attachedDatabase.typeMapping
@@ -1109,6 +1126,11 @@ class LocalConversation extends DataClass
   /// means the server has never sent this row, which is how a local delete
   /// knows there is nothing to tell the gateway about.
   final DateTime? baseUpdatedAt;
+
+  /// Everything up to this server message id has been cleared. Rides the
+  /// conversation row so a chat emptied on one device empties on all of them —
+  /// messages carry no tombstone of their own.
+  final int clearedUpToMessageId;
   final String? pendingOp;
   final int pushAttempts;
   const LocalConversation(
@@ -1120,6 +1142,7 @@ class LocalConversation extends DataClass
       this.lastMessageAt,
       this.updatedAt,
       this.baseUpdatedAt,
+      required this.clearedUpToMessageId,
       this.pendingOp,
       required this.pushAttempts});
   @override
@@ -1139,6 +1162,7 @@ class LocalConversation extends DataClass
     if (!nullToAbsent || baseUpdatedAt != null) {
       map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
     }
+    map['cleared_up_to_message_id'] = Variable<int>(clearedUpToMessageId);
     if (!nullToAbsent || pendingOp != null) {
       map['pending_op'] = Variable<String>(pendingOp);
     }
@@ -1162,6 +1186,7 @@ class LocalConversation extends DataClass
       baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(baseUpdatedAt),
+      clearedUpToMessageId: Value(clearedUpToMessageId),
       pendingOp: pendingOp == null && nullToAbsent
           ? const Value.absent()
           : Value(pendingOp),
@@ -1181,6 +1206,8 @@ class LocalConversation extends DataClass
       lastMessageAt: serializer.fromJson<DateTime?>(json['lastMessageAt']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      clearedUpToMessageId:
+          serializer.fromJson<int>(json['clearedUpToMessageId']),
       pendingOp: serializer.fromJson<String?>(json['pendingOp']),
       pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
     );
@@ -1197,6 +1224,7 @@ class LocalConversation extends DataClass
       'lastMessageAt': serializer.toJson<DateTime?>(lastMessageAt),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'clearedUpToMessageId': serializer.toJson<int>(clearedUpToMessageId),
       'pendingOp': serializer.toJson<String?>(pendingOp),
       'pushAttempts': serializer.toJson<int>(pushAttempts),
     };
@@ -1211,6 +1239,7 @@ class LocalConversation extends DataClass
           Value<DateTime?> lastMessageAt = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          int? clearedUpToMessageId,
           Value<String?> pendingOp = const Value.absent(),
           int? pushAttempts}) =>
       LocalConversation(
@@ -1224,6 +1253,7 @@ class LocalConversation extends DataClass
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         baseUpdatedAt:
             baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        clearedUpToMessageId: clearedUpToMessageId ?? this.clearedUpToMessageId,
         pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
         pushAttempts: pushAttempts ?? this.pushAttempts,
       );
@@ -1242,6 +1272,9 @@ class LocalConversation extends DataClass
       baseUpdatedAt: data.baseUpdatedAt.present
           ? data.baseUpdatedAt.value
           : this.baseUpdatedAt,
+      clearedUpToMessageId: data.clearedUpToMessageId.present
+          ? data.clearedUpToMessageId.value
+          : this.clearedUpToMessageId,
       pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
       pushAttempts: data.pushAttempts.present
           ? data.pushAttempts.value
@@ -1260,6 +1293,7 @@ class LocalConversation extends DataClass
           ..write('lastMessageAt: $lastMessageAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('clearedUpToMessageId: $clearedUpToMessageId, ')
           ..write('pendingOp: $pendingOp, ')
           ..write('pushAttempts: $pushAttempts')
           ..write(')'))
@@ -1267,8 +1301,18 @@ class LocalConversation extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, title, pinned, archived, isCoaching,
-      lastMessageAt, updatedAt, baseUpdatedAt, pendingOp, pushAttempts);
+  int get hashCode => Object.hash(
+      id,
+      title,
+      pinned,
+      archived,
+      isCoaching,
+      lastMessageAt,
+      updatedAt,
+      baseUpdatedAt,
+      clearedUpToMessageId,
+      pendingOp,
+      pushAttempts);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1281,6 +1325,7 @@ class LocalConversation extends DataClass
           other.lastMessageAt == this.lastMessageAt &&
           other.updatedAt == this.updatedAt &&
           other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.clearedUpToMessageId == this.clearedUpToMessageId &&
           other.pendingOp == this.pendingOp &&
           other.pushAttempts == this.pushAttempts);
 }
@@ -1294,6 +1339,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
   final Value<DateTime?> lastMessageAt;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> baseUpdatedAt;
+  final Value<int> clearedUpToMessageId;
   final Value<String?> pendingOp;
   final Value<int> pushAttempts;
   final Value<int> rowid;
@@ -1306,6 +1352,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
     this.lastMessageAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.baseUpdatedAt = const Value.absent(),
+    this.clearedUpToMessageId = const Value.absent(),
     this.pendingOp = const Value.absent(),
     this.pushAttempts = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1319,6 +1366,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
     this.lastMessageAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.baseUpdatedAt = const Value.absent(),
+    this.clearedUpToMessageId = const Value.absent(),
     this.pendingOp = const Value.absent(),
     this.pushAttempts = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1332,6 +1380,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
     Expression<DateTime>? lastMessageAt,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? baseUpdatedAt,
+    Expression<int>? clearedUpToMessageId,
     Expression<String>? pendingOp,
     Expression<int>? pushAttempts,
     Expression<int>? rowid,
@@ -1345,6 +1394,8 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
       if (lastMessageAt != null) 'last_message_at': lastMessageAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (clearedUpToMessageId != null)
+        'cleared_up_to_message_id': clearedUpToMessageId,
       if (pendingOp != null) 'pending_op': pendingOp,
       if (pushAttempts != null) 'push_attempts': pushAttempts,
       if (rowid != null) 'rowid': rowid,
@@ -1360,6 +1411,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
       Value<DateTime?>? lastMessageAt,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? baseUpdatedAt,
+      Value<int>? clearedUpToMessageId,
       Value<String?>? pendingOp,
       Value<int>? pushAttempts,
       Value<int>? rowid}) {
@@ -1372,6 +1424,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
       updatedAt: updatedAt ?? this.updatedAt,
       baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      clearedUpToMessageId: clearedUpToMessageId ?? this.clearedUpToMessageId,
       pendingOp: pendingOp ?? this.pendingOp,
       pushAttempts: pushAttempts ?? this.pushAttempts,
       rowid: rowid ?? this.rowid,
@@ -1405,6 +1458,10 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
     if (baseUpdatedAt.present) {
       map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
     }
+    if (clearedUpToMessageId.present) {
+      map['cleared_up_to_message_id'] =
+          Variable<int>(clearedUpToMessageId.value);
+    }
     if (pendingOp.present) {
       map['pending_op'] = Variable<String>(pendingOp.value);
     }
@@ -1428,6 +1485,7 @@ class ConversationsCompanion extends UpdateCompanion<LocalConversation> {
           ..write('lastMessageAt: $lastMessageAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('clearedUpToMessageId: $clearedUpToMessageId, ')
           ..write('pendingOp: $pendingOp, ')
           ..write('pushAttempts: $pushAttempts, ')
           ..write('rowid: $rowid')
@@ -3810,6 +3868,7 @@ typedef $$ConversationsTableCreateCompanionBuilder = ConversationsCompanion
   Value<DateTime?> lastMessageAt,
   Value<DateTime?> updatedAt,
   Value<DateTime?> baseUpdatedAt,
+  Value<int> clearedUpToMessageId,
   Value<String?> pendingOp,
   Value<int> pushAttempts,
   Value<int> rowid,
@@ -3824,6 +3883,7 @@ typedef $$ConversationsTableUpdateCompanionBuilder = ConversationsCompanion
   Value<DateTime?> lastMessageAt,
   Value<DateTime?> updatedAt,
   Value<DateTime?> baseUpdatedAt,
+  Value<int> clearedUpToMessageId,
   Value<String?> pendingOp,
   Value<int> pushAttempts,
   Value<int> rowid,
@@ -3861,6 +3921,10 @@ class $$ConversationsTableFilterComposer
 
   ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
       column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get clearedUpToMessageId => $composableBuilder(
+      column: $table.clearedUpToMessageId,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get pendingOp => $composableBuilder(
       column: $table.pendingOp, builder: (column) => ColumnFilters(column));
@@ -3904,6 +3968,10 @@ class $$ConversationsTableOrderingComposer
       column: $table.baseUpdatedAt,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get clearedUpToMessageId => $composableBuilder(
+      column: $table.clearedUpToMessageId,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get pendingOp => $composableBuilder(
       column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
 
@@ -3944,6 +4012,9 @@ class $$ConversationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
       column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get clearedUpToMessageId => $composableBuilder(
+      column: $table.clearedUpToMessageId, builder: (column) => column);
 
   GeneratedColumn<String> get pendingOp =>
       $composableBuilder(column: $table.pendingOp, builder: (column) => column);
@@ -3986,6 +4057,7 @@ class $$ConversationsTableTableManager extends RootTableManager<
             Value<DateTime?> lastMessageAt = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<int> clearedUpToMessageId = const Value.absent(),
             Value<String?> pendingOp = const Value.absent(),
             Value<int> pushAttempts = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -3999,6 +4071,7 @@ class $$ConversationsTableTableManager extends RootTableManager<
             lastMessageAt: lastMessageAt,
             updatedAt: updatedAt,
             baseUpdatedAt: baseUpdatedAt,
+            clearedUpToMessageId: clearedUpToMessageId,
             pendingOp: pendingOp,
             pushAttempts: pushAttempts,
             rowid: rowid,
@@ -4012,6 +4085,7 @@ class $$ConversationsTableTableManager extends RootTableManager<
             Value<DateTime?> lastMessageAt = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<int> clearedUpToMessageId = const Value.absent(),
             Value<String?> pendingOp = const Value.absent(),
             Value<int> pushAttempts = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -4025,6 +4099,7 @@ class $$ConversationsTableTableManager extends RootTableManager<
             lastMessageAt: lastMessageAt,
             updatedAt: updatedAt,
             baseUpdatedAt: baseUpdatedAt,
+            clearedUpToMessageId: clearedUpToMessageId,
             pendingOp: pendingOp,
             pushAttempts: pushAttempts,
             rowid: rowid,
