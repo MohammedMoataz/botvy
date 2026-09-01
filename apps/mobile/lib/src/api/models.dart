@@ -39,6 +39,7 @@ class ChatMessage {
   ChatMessage({
     this.id,
     this.clientId,
+    this.conversationId,
     required this.role,
     required this.content,
     this.createdAt,
@@ -50,6 +51,9 @@ class ChatMessage {
 
   /// Set for messages this device composed; the key the outbox dedupes on.
   final String? clientId;
+
+  /// Which chat it belongs to. Null only on a row cached before chats existed.
+  final String? conversationId;
 
   final String role; // 'user' | 'assistant'
   String content; // mutable: the assistant bubble grows token by token
@@ -70,6 +74,7 @@ class ChatMessage {
         // Present for messages this device composed offline: it is how a
         // pulled row is matched to the local one instead of duplicating it.
         clientId: json['clientId'] as String?,
+        conversationId: json['conversationId'] as String?,
         role: json['role'] as String,
         content: (json['content'] as String?) ?? '',
         createdAt: json['createdAt'] == null
@@ -189,10 +194,15 @@ class QueuedMessage {
     required this.clientId,
     required this.text,
     required this.composedAt,
+    this.conversationId,
   });
 
   final String clientId;
   final String text;
+
+  /// Absent for a message typed before this app had chats; the gateway files
+  /// those in the coaching one, which is where the device already shows them.
+  final String? conversationId;
 
   /// When the user actually typed it. The gateway resolves "in two hours"
   /// against this, not against the moment the flush lands.
@@ -204,6 +214,7 @@ class ChatBatchResult {
   const ChatBatchResult({
     required this.processed,
     required this.duplicates,
+    this.accepted = const [],
     this.reply,
   });
 
@@ -212,7 +223,12 @@ class ChatBatchResult {
   /// clientIds the gateway had already stored — safe to mark synced too.
   final List<String> duplicates;
 
-  /// One reply covering the whole batch. Null when everything was a duplicate.
+  /// clientIds this call actually stored. The device clears exactly these and
+  /// the duplicates: marking the whole outbox synced on any success discarded
+  /// rows the server had never seen.
+  final List<String> accepted;
+
+  /// One reply per chat in the batch, joined. Null when all were duplicates.
   final String? reply;
 
   factory ChatBatchResult.fromJson(Map<String, dynamic> json) => ChatBatchResult(
@@ -220,6 +236,8 @@ class ChatBatchResult {
         duplicates: ((json['duplicates'] as List?) ?? const [])
             .map((e) => e.toString())
             .toList(),
+        accepted:
+            ((json['accepted'] as List?) ?? const []).map((e) => e.toString()).toList(),
         reply: json['reply'] as String?,
       );
 }
@@ -305,22 +323,91 @@ class WorkoutEntry {
 
 /// A push the server refused, with the row that won attached.
 class SyncRejection {
-  const SyncRejection({required this.id, required this.reason, this.server});
+  const SyncRejection({
+    required this.id,
+    required this.reason,
+    this.entity = 'reminder',
+    this.server,
+    this.serverConversation,
+  });
 
   final String id;
-  final String reason; // 'stale' | 'gone'
 
-  /// The authoritative row, or null when the server no longer has one.
+  /// Which table the row belongs to. Defaulting to 'reminder' keeps a response
+  /// from a gateway that predates chats readable — but the field has to be
+  /// read, or a rejected chat is written back through the reminder path and
+  /// quietly corrupts the local store.
+  final String entity;
+
+  final String reason; // 'stale' | 'gone' | 'protected'
+
+  /// The authoritative reminder, or null when the server no longer has one.
   final Reminder? server;
 
-  factory SyncRejection.fromJson(Map<String, dynamic> json) => SyncRejection(
-        id: (json['id'] as String?) ?? '',
-        reason: (json['reason'] as String?) ?? 'stale',
-        server: json['server'] is Map
-            ? Reminder.fromJson(Map<String, dynamic>.from(json['server'] as Map))
-            : null,
+  /// The authoritative chat, for a rejection whose entity is 'conversation'.
+  final Conversation? serverConversation;
+
+  bool get isConversation => entity == 'conversation';
+
+  factory SyncRejection.fromJson(Map<String, dynamic> json) {
+    final entity = (json['entity'] as String?) ?? 'reminder';
+    final server = json['server'] is Map
+        ? Map<String, dynamic>.from(json['server'] as Map)
+        : null;
+    return SyncRejection(
+      id: (json['id'] as String?) ?? '',
+      entity: entity,
+      reason: (json['reason'] as String?) ?? 'stale',
+      server: entity == 'reminder' && server != null ? Reminder.fromJson(server) : null,
+      serverConversation:
+          entity == 'conversation' && server != null ? Conversation.fromJson(server) : null,
+    );
+  }
+}
+
+/// One named chat, as the gateway holds it.
+class Conversation {
+  const Conversation({
+    required this.id,
+    this.title = '',
+    this.pinned = false,
+    this.archived = false,
+    this.isCoaching = false,
+    this.updatedAt,
+    this.deletedAt,
+  });
+
+  final String id;
+  final String title;
+  final bool pinned;
+  final bool archived;
+
+  /// The one chat the nightly check-in and program land in.
+  final bool isCoaching;
+
+  final DateTime? updatedAt;
+
+  /// Set when the server has removed it. The device drops the chat and every
+  /// message in it — the only way a deletion can reach another phone, since
+  /// messages carry no tombstone of their own.
+  final DateTime? deletedAt;
+
+  bool get deleted => deletedAt != null;
+
+  factory Conversation.fromJson(Map<String, dynamic> json) => Conversation(
+        id: json['id'] as String,
+        title: (json['title'] as String?) ?? '',
+        pinned: (json['pinned'] as bool?) ?? false,
+        archived: (json['archived'] as bool?) ?? false,
+        // The gateway marks it with a reserved client id rather than a column.
+        isCoaching: json['clientId'] == 'coaching',
+        updatedAt: _date(json['updatedAt']),
+        deletedAt: _date(json['deletedAt']),
       );
 }
+
+DateTime? _date(Object? value) =>
+    value is String ? DateTime.tryParse(value)?.toLocal() : null;
 
 /// Everything that changed since the device's cursor, plus the new cursor.
 class SyncResult {
@@ -328,7 +415,9 @@ class SyncResult {
     required this.now,
     required this.lastMessageId,
     required this.full,
+    this.moreMessages = false,
     this.reminders = const [],
+    this.conversations = const [],
     this.profile,
     this.checkins = const [],
     this.workouts = const [],
@@ -344,7 +433,12 @@ class SyncResult {
   /// True when this response replaces the local copy rather than amending it.
   final bool full;
 
+  /// The message page came back full, so there is more history to fetch. The
+  /// device loops on this rather than hardcoding the server's page size.
+  final bool moreMessages;
+
   final List<Reminder> reminders;
+  final List<Conversation> conversations;
   final CoachingProfile? profile;
   final List<CheckinEntry> checkins;
   final List<WorkoutEntry> workouts;
@@ -362,7 +456,9 @@ class SyncResult {
       now: (json['now'] as String?) ?? '',
       lastMessageId: (json['lastMessageId'] as num?)?.toInt() ?? 0,
       full: (json['full'] as bool?) ?? false,
+      moreMessages: (json['moreMessages'] as bool?) ?? false,
       reminders: list('reminders', Reminder.fromJson),
+      conversations: list('conversations', Conversation.fromJson),
       profile: pull['profile'] is Map
           ? CoachingProfile.fromJson(Map<String, dynamic>.from(pull['profile'] as Map))
           : null,

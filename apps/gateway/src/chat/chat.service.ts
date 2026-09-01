@@ -17,6 +17,7 @@ import {
 } from '../search/search.service.js';
 import { mediaPath } from '../media/media.signing.js';
 import { preferSoonestDay, resolveRelativePhrase } from './relative-time.js';
+import { COACHING_CLIENT_ID, ConversationsService } from './conversations.service.js';
 
 // How many turns go into the prompt is a setting (chat.historyLimit): it is
 // the main lever on latency for CPU inference, so it gets tuned live.
@@ -120,6 +121,14 @@ export interface QueuedMessage {
   clientId: string;
   text: string;
   composedAt: Date;
+  /** Absent from a client older than named chats; those land in coaching. */
+  conversationId?: string;
+}
+
+/** The parts of a conversation a turn needs. */
+export interface ConversationRef {
+  id: string;
+  clientId: string | null;
 }
 
 export interface BatchAction {
@@ -132,6 +141,8 @@ export interface BatchResult {
   processed: number;
   /** clientIds that had already been stored — the caller can clear them too. */
   duplicates: string[];
+  /** clientIds stored by this call. The device clears exactly these. */
+  accepted: string[];
   actions: BatchAction[];
   reply: string | null;
 }
@@ -148,6 +159,7 @@ export class ChatService {
     private readonly coaching: CoachingService,
     private readonly settings: SettingsService,
     private readonly search: SearchService,
+    private readonly conversations: ConversationsService,
     config: ConfigService,
   ) {
     this.mediaSecret = config.get<string>('MEDIA_SIGNING_SECRET');
@@ -156,9 +168,18 @@ export class ChatService {
   /** Absent when image proxying is switched off; images then stay plain links. */
   private readonly mediaSecret?: string;
 
-  async history(userId: string, limit = 50) {
+  /**
+   * The tail of one conversation, oldest first.
+   *
+   * [conversationId] is what keeps chats apart: without it a question asked in
+   * a new thread is answered from the tail of an unrelated one, and the intent
+   * classifier resolves "cancel that one" against a reminder discussed
+   * somewhere else. Omitting it reads across all of the user's threads, which
+   * only `GET /chat/history` with no conversation does.
+   */
+  async history(userId: string, limit = 50, conversationId?: string) {
     const rows = await this.prisma.message.findMany({
-      where: { userId },
+      where: { userId, ...(conversationId ? { conversationId } : {}) },
       orderBy: { id: 'desc' },
       take: limit,
     });
@@ -342,7 +363,9 @@ export class ChatService {
   async batchReply(userId: string, queued: QueuedMessage[]): Promise<BatchResult> {
     const known = await this.prisma.message.findMany({
       // Scoped to this user: a client id belongs to one account, and another
-      // account's row must never be mistaken for a duplicate of theirs.
+      // account's row must never be mistaken for a duplicate of theirs. Not
+      // scoped to a conversation — a clientId is unique per user, so a message
+      // that landed in another thread is still correctly a duplicate.
       where: { userId, clientId: { in: queued.map((m) => m.clientId) } },
       select: { clientId: true },
     });
@@ -352,21 +375,67 @@ export class ChatService {
       .sort((a, b) => a.composedAt.getTime() - b.composedAt.getTime());
 
     if (fresh.length === 0) {
-      return { processed: 0, duplicates: [...duplicates], actions: [], reply: null };
+      return { processed: 0, duplicates: [...duplicates], actions: [], accepted: [], reply: null };
+    }
+
+    // One reply per conversation, not one per batch. A flush spanning three
+    // chats used to get a single answer, which necessarily landed in the wrong
+    // thread for two of them — exactly the failure named chats exist to stop.
+    const groups = new Map<string | undefined, QueuedMessage[]>();
+    for (const message of fresh) {
+      const key = message.conversationId;
+      const group = groups.get(key);
+      if (group) group.push(message);
+      else groups.set(key, [message]);
     }
 
     const timezone = await this.coaching.userTimezone(userId);
-    const historyRows = await this.history(userId, await this.settings.get('chat.historyLimit'));
+    const historyLimit = await this.settings.get('chat.historyLimit');
+    const actions: BatchAction[] = [];
+    const accepted: string[] = [];
+    const replies: string[] = [];
+
+    for (const [conversationKey, messages] of groups) {
+      const conversation = await this.conversations.resolve(userId, conversationKey);
+      const reply = await this.replyToGroup(userId, conversation.id, messages, {
+        timezone,
+        historyLimit,
+        actions,
+      });
+      for (const message of messages) accepted.push(message.clientId);
+      if (reply) replies.push(reply);
+    }
+
+    return {
+      processed: fresh.length,
+      duplicates: [...duplicates],
+      actions,
+      // Which clientIds actually landed. The device used to mark its whole
+      // outbox synced on any success, discarding rows the server never saw.
+      accepted,
+      reply: replies.length > 0 ? replies.join('\n\n') : null,
+    };
+  }
+
+  /** One conversation's worth of a flush: store, classify, then answer once. */
+  private async replyToGroup(
+    userId: string,
+    conversationId: string,
+    messages: QueuedMessage[],
+    ctx: { timezone: string; historyLimit: number; actions: BatchAction[] },
+  ): Promise<string | null> {
+    const { timezone } = ctx;
+    const historyRows = await this.history(userId, ctx.historyLimit, conversationId);
     const intentHistory = historyRows
       .slice(-INTENT_HISTORY_LIMIT)
       .map((m) => `${m.role}: ${m.content}`)
       .join('\n');
 
-    const actions: BatchAction[] = [];
-    for (const message of fresh) {
+    for (const message of messages) {
       await this.prisma.message.create({
         data: {
           userId,
+          conversationId,
           role: 'user',
           content: message.text,
           clientId: message.clientId,
@@ -383,15 +452,18 @@ export class ChatService {
       if (!intentResult || intentResult.intent === 'chat') continue;
 
       const detail = await this.handleReminderIntent(userId, intentResult, timezone);
-      if (detail) actions.push({ clientId: message.clientId, intent: intentResult.intent, detail });
+      if (detail) {
+        ctx.actions.push({ clientId: message.clientId, intent: intentResult.intent, detail });
+      }
     }
 
-    const transcript = fresh
+    const transcript = messages
       .map((m) => `[sent ${formatInTz(m.composedAt, timezone)}] ${m.text}`)
       .join('\n');
+    const handled = ctx.actions.filter((a) => messages.some((m) => m.clientId === a.clientId));
     const done =
-      actions.length > 0
-        ? `\n\nAlready handled for the user, do not repeat the work — just acknowledge briefly:\n${actions
+      handled.length > 0
+        ? `\n\nAlready handled for the user, do not repeat the work — just acknowledge briefly:\n${handled
             .map((a) => `- ${a.detail}`)
             .join('\n')}`
         : '';
@@ -418,7 +490,9 @@ export class ChatService {
     let reply = '';
     for await (const chunk of stream) reply += chunk;
 
-    await this.prisma.message.create({ data: { userId, role: 'assistant', content: reply } });
+    await this.prisma.message.create({
+      data: { userId, conversationId, role: 'assistant', content: reply },
+    });
 
     const tokenUsage = await usage;
     await this.usage.record({
@@ -429,10 +503,15 @@ export class ChatService {
       completionTokens: tokenUsage.completionTokens,
     });
 
-    return { processed: fresh.length, duplicates: [...duplicates], actions, reply };
+    return reply;
   }
 
-  streamReply(userId: string, userMessage: string): Observable<MessageEvent> {
+  streamReply(
+    userId: string,
+    conversation: ConversationRef,
+    userMessage: string,
+  ): Observable<MessageEvent> {
+    const conversationId = conversation.id;
     return new Observable<MessageEvent>((subscriber) => {
       const heartbeat = setInterval(() => {
         subscriber.next({ type: 'heartbeat', data: {} });
@@ -444,16 +523,26 @@ export class ChatService {
           // classification: while one is open, this message is an answer to
           // it, not a new request. The window is bounded so a message the
           // next morning is not filed as last night's answer.
-          if (await this.coaching.isAwaitingCheckin(userId)) {
+          //
+          // Only in the coaching thread, though. The classifier matches whole
+          // words including "rest", "not" and "did", so without this condition
+          // "does this need rest time?" typed in a recipe chat at 22:00 would
+          // zero the user's streak and answer with "Logged — one off day
+          // changes nothing long term." An answer typed in the wrong chat is
+          // now simply not recorded, and the window stays open for the real one.
+          if (
+            conversation.clientId === COACHING_CLIENT_ID &&
+            (await this.coaching.isAwaitingCheckin(userId))
+          ) {
             const reply = await this.handleCheckinReply(userId, userMessage);
             if (reply) {
               await this.prisma.message.create({
-                data: { userId, role: 'user', content: userMessage },
+                data: { userId, conversationId, role: 'user', content: userMessage },
               });
               subscriber.next({ type: 'intent', data: { intent: 'checkin_reply' } });
               subscriber.next({ type: 'token', data: reply });
               await this.prisma.message.create({
-                data: { userId, role: 'assistant', content: reply },
+                data: { userId, conversationId, role: 'assistant', content: reply },
               });
               subscriber.next({ type: 'done', data: {} });
               subscriber.complete();
@@ -466,6 +555,7 @@ export class ChatService {
           const historyRows = await this.history(
             userId,
             await this.settings.get('chat.historyLimit'),
+            conversationId,
           );
 
           // The user's own zone, never the server's: "8pm" means 8pm where
@@ -495,7 +585,7 @@ export class ChatService {
           });
 
           await this.prisma.message.create({
-            data: { userId, role: 'user', content: userMessage },
+            data: { userId, conversationId, role: 'user', content: userMessage },
           });
 
           // A question that needs the live web. Classification happens before
@@ -526,7 +616,7 @@ export class ChatService {
             if (reply) {
               subscriber.next({ type: 'token', data: reply });
               await this.prisma.message.create({
-                data: { userId, role: 'assistant', content: reply },
+                data: { userId, conversationId, role: 'assistant', content: reply },
               });
               subscriber.next({ type: 'done', data: {} });
               subscriber.complete();
@@ -581,7 +671,7 @@ export class ChatService {
           }
 
           await this.prisma.message.create({
-            data: { userId, role: 'assistant', content: fullReply },
+            data: { userId, conversationId, role: 'assistant', content: fullReply },
           });
 
           const tokenUsage = await usage;

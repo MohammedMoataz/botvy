@@ -49,7 +49,7 @@ export const SETTINGS = {
     schema: z.number().int().positive().max(365),
     default: 30,
     description:
-      'How long a deleted reminder is remembered so an offline phone can learn it is gone. A device away longer gets a full snapshot instead.',
+      'How long a deleted reminder or chat is remembered so an offline phone can learn it is gone. A device away longer gets a full snapshot instead. One horizon for both on purpose: the cursor fallback reads this key, so a shorter one elsewhere would purge a tombstone that was still being honoured.',
   },
   'coaching.checkinTime': {
     schema: timeOfDay,
@@ -69,7 +69,13 @@ export const SETTINGS = {
   'chat.historyLimit': {
     schema: z.number().int().positive().max(200),
     default: 20,
-    description: 'Conversation turns included in the prompt.',
+    description: 'Turns from *this* conversation included in the prompt.',
+  },
+  'coaching.conversationTitle': {
+    schema: z.record(z.string(), z.string()),
+    default: { en: 'Coaching', ar: 'التدريب' },
+    description:
+      'Name given to the fixed chat the evening check-in and the daily program land in, per language. Only the initial value — the user can rename it.',
   },
   'push.copy': {
     schema: pushCopy,

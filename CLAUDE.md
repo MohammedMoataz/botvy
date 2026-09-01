@@ -45,3 +45,18 @@ Setup, the environment contract and the verification steps live in `SETUP.md`.
 - **The sync delete-sweep runs only against a full snapshot.** A delta lists
   what changed; treating it as the complete set deletes every reminder that
   simply did not change. Deletions arrive as tombstones instead.
+
+- **Messages are immutable, and that is load-bearing.** They are pulled by
+  `id > lastMessageId` with no `updatedAt` and no tombstone, which is why the
+  cursor is cheap — and why a column backfilled onto existing rows can never
+  reach a device that already has them. The v3 drift migration works around it
+  by marking the cache and re-pulling, not by editing rows in place.
+
+- **The check-in only listens in the coaching chat.** `awaitingCheckin` is one
+  flag per user, and the classifier matches whole words including `rest` and
+  `not`. Without the conversation condition, an ordinary sentence in an
+  unrelated chat records a missed day and zeroes the streak.
+
+- **A rejection from `/sync` carries the table it came from.** Both entities
+  share the rejection shape, so the device has to branch on `entity`; writing a
+  refused chat through the reminder path corrupts rather than crashes.

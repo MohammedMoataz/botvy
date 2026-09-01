@@ -34,6 +34,17 @@ describe('classifyCheckin', () => {
     expect(classifyCheckin('لا فاتني النهاردة')).toBe('missed');
   });
 
+  it('does not let an Arabic negative hiding inside another word win', () => {
+    // JS \b is defined against [A-Za-z0-9_], so Arabic used to fall back to a
+    // bare substring test — and 'ما' sits inside 'تمام', which is itself an
+    // affirmative. Negation wins, so a user answering "fine, done" was logged
+    // as having missed the day.
+    expect(classifyCheckin('تمام')).toBe('adhered');
+    expect(classifyCheckin('ماشي خلصت')).toBe('adhered');
+    // A real standalone negative still reads as one.
+    expect(classifyCheckin('ما عملتش حاجة')).toBe('missed');
+  });
+
   it('reports unclear rather than guessing, so the caller can ask the model', () => {
     for (const reply of ['', '   ', 'what was the plan again?', 'hmm']) {
       expect(classifyCheckin(reply), JSON.stringify(reply)).toBe('unclear');

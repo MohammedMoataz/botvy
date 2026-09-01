@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SyncService } from '../src/sync/sync.service.js';
+import { ProtectedConversationError } from '../src/chat/conversations.service.js';
 
 /**
  * The sync contract, with Prisma and the two delegated services stubbed.
@@ -8,7 +9,15 @@ import { SyncService } from '../src/sync/sync.service.js';
  * cursor that skips a row forever, a slow device clock that discards a user's
  * offline edits, and a server-owned column reachable from a client.
  */
-function makeService(opts: { tombstoneDays?: number; serverUpdatedAt?: Date } = {}) {
+function makeService(
+  opts: {
+    tombstoneDays?: number;
+    serverUpdatedAt?: Date;
+    /** The conversation row the server holds, if the test needs one. */
+    chatRow?: unknown;
+    messages?: unknown[];
+  } = {},
+) {
   const serverRow = {
     id: 'r1',
     userId: 'u1',
@@ -22,10 +31,15 @@ function makeService(opts: { tombstoneDays?: number; serverUpdatedAt?: Date } = 
       findFirst: vi.fn().mockResolvedValue(serverRow),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    conversation: {
+      findFirst: vi.fn().mockResolvedValue(opts.chatRow ?? null),
+      findUnique: vi.fn().mockResolvedValue(opts.chatRow ?? null),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     coachingProfile: { findFirst: vi.fn().mockResolvedValue(null) },
     checkIn: { findMany: vi.fn().mockResolvedValue([]) },
     workoutRecord: { findMany: vi.fn().mockResolvedValue([]) },
-    message: { findMany: vi.fn().mockResolvedValue([]) },
+    message: { findMany: vi.fn().mockResolvedValue(opts.messages ?? []) },
     device: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   const reminders = {
@@ -37,6 +51,10 @@ function makeService(opts: { tombstoneDays?: number; serverUpdatedAt?: Date } = 
   const settings = {
     get: vi.fn().mockResolvedValue(opts.tombstoneDays ?? 30),
   };
+  const conversations = {
+    upsert: vi.fn().mockResolvedValue({ id: 'c1' }),
+    remove: vi.fn().mockResolvedValue({ id: 'c1', deleted: true }),
+  };
 
   const service = new SyncService(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,8 +65,10 @@ function makeService(opts: { tombstoneDays?: number; serverUpdatedAt?: Date } = 
     coaching as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     settings as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    conversations as any,
   );
-  return { service, prisma, reminders, coaching, serverRow };
+  return { service, prisma, reminders, coaching, conversations, serverRow };
 }
 
 /**
@@ -82,6 +102,7 @@ describe('SyncService — pulling', () => {
 
     for (const call of [
       prisma.reminder.findMany,
+      prisma.conversation.findMany,
       prisma.checkIn.findMany,
       prisma.workoutRecord.findMany,
       prisma.coachingProfile.findFirst,
@@ -131,6 +152,7 @@ describe('SyncService — pulling', () => {
 
     for (const call of [
       prisma.reminder.findMany,
+      prisma.conversation.findMany,
       prisma.checkIn.findMany,
       prisma.workoutRecord.findMany,
       prisma.message.findMany,
@@ -138,6 +160,43 @@ describe('SyncService — pulling', () => {
     ]) {
       expect(call.mock.calls[0][0].where).toMatchObject({ userId: 'u1' });
     }
+  });
+
+  it('reads conversations after messages, never alongside them', async () => {
+    // The foreign key guarantees a conversation exists before any message
+    // references it, so this order is what stops a message arriving in a
+    // response that does not carry its chat. Reversed, or run in the same
+    // Promise.all, a chat created between the two queries produces a message
+    // the device has to drop.
+    const { service, prisma } = makeService();
+    await service.sync('u1', {});
+
+    expect(prisma.conversation.findMany.mock.invocationCallOrder[0]).toBeGreaterThan(
+      prisma.message.findMany.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('includes tombstoned conversations, because a delta cannot express a gone row', async () => {
+    const { service, prisma } = makeService();
+    await service.sync('u1', { since: new Date('2026-09-01T10:00:00Z') });
+
+    expect(prisma.conversation.findMany.mock.calls[0][0].where).not.toHaveProperty('deletedAt');
+  });
+
+  it('says there is more when the page came back full', async () => {
+    // The device loops on this. Hardcoding the page size client-side would put
+    // the same constant in two repositories.
+    const full = Array.from({ length: 200 }, (_, i) => ({ id: i + 1 }));
+    const { service } = makeService({ messages: full });
+
+    const result = await service.sync('u1', {});
+    expect(result.moreMessages).toBe(true);
+    expect(result.lastMessageId).toBe(200);
+  });
+
+  it('says there is no more on a short page', async () => {
+    const { service } = makeService({ messages: [{ id: 7 }] });
+    await expect(service.sync('u1', {})).resolves.toMatchObject({ moreMessages: false });
   });
 });
 
@@ -268,6 +327,126 @@ describe('SyncService — pushing the profile', () => {
     await service.sync('u1', { push: { profile: { optedIn: true } as never } });
 
     expect(coaching.upsertProfile).toHaveBeenCalled();
+  });
+});
+
+describe('SyncService — pushing conversations', () => {
+  const chat = (over: Record<string, unknown> = {}) => ({
+    id: 'c1',
+    title: 'Trip planning',
+    updatedAt: ago(10_000),
+    ...over,
+  });
+  const serverChat = (over: Record<string, unknown> = {}) => ({
+    id: 'c1',
+    userId: 'u1',
+    title: 'Old name',
+    clientId: null,
+    deletedAt: null,
+    updatedAt: ago(60_000),
+    ...over,
+  });
+
+  it('creates a chat the server has never seen rather than refusing it', async () => {
+    // Started offline, and its first message may already be on the way.
+    const { service, conversations } = makeService();
+    const result = await service.sync('u1', { push: { conversations: [chat()] } });
+
+    expect(conversations.upsert).toHaveBeenCalledWith('u1', 'c1', {
+      title: 'Trip planning',
+      pinned: undefined,
+      archived: undefined,
+    });
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('does not resurrect one that was deleted', async () => {
+    const row = serverChat({ deletedAt: new Date() });
+    const { service, conversations } = makeService({ chatRow: row });
+    const result = await service.sync('u1', { push: { conversations: [chat()] } });
+
+    expect(conversations.upsert).not.toHaveBeenCalled();
+    expect(result.rejected[0]).toMatchObject({ entity: 'conversation', reason: 'gone' });
+  });
+
+  it('accepts a rename whose base still matches, with no clock involved', async () => {
+    const base = ago(60_000);
+    const { service, conversations } = makeService({ chatRow: serverChat({ updatedAt: base }) });
+    await service.sync('u1', {
+      push: { conversations: [chat({ updatedAt: ago(3_600_000), baseUpdatedAt: base })] },
+    });
+
+    expect(conversations.upsert).toHaveBeenCalled();
+  });
+
+  it('rejects a stale rename and hands back the row that won', async () => {
+    const row = serverChat({ updatedAt: ago(10_000) });
+    const { service, conversations } = makeService({ chatRow: row });
+    const result = await service.sync('u1', {
+      push: { conversations: [chat({ updatedAt: ago(120_000), baseUpdatedAt: ago(180_000) })] },
+    });
+
+    expect(conversations.upsert).not.toHaveBeenCalled();
+    expect(result.rejected[0]).toMatchObject({
+      entity: 'conversation',
+      reason: 'stale',
+      server: row,
+    });
+  });
+
+  it('labels every rejection with its table', async () => {
+    // Without this the device writes a rejected conversation back through the
+    // reminder path — corruption, not a crash.
+    const { service } = makeService({ chatRow: serverChat({ deletedAt: new Date() }) });
+    const result = await service.sync('u1', { push: { conversations: [chat()] } });
+
+    expect(result.rejected.every((r) => r.entity === 'conversation')).toBe(true);
+  });
+
+  it('refuses to delete the coaching chat, and says so distinctly', async () => {
+    // Not 'stale': that would tell the phone to retry with a fresher timestamp,
+    // and it would then retry for ever.
+    const base = ago(60_000);
+    const { service, conversations } = makeService({
+      chatRow: serverChat({ clientId: 'coaching', updatedAt: base }),
+    });
+    conversations.remove.mockRejectedValueOnce(new ProtectedConversationError());
+
+    const result = await service.sync('u1', {
+      push: { conversations: [chat({ deleted: true, baseUpdatedAt: base })] },
+    });
+
+    expect(result.rejected[0]).toMatchObject({ entity: 'conversation', reason: 'protected' });
+  });
+
+  it('routes a delete through the tombstone path', async () => {
+    const base = ago(60_000);
+    const { service, conversations } = makeService({ chatRow: serverChat({ updatedAt: base }) });
+    await service.sync('u1', {
+      push: { conversations: [chat({ deleted: true, baseUpdatedAt: base })] },
+    });
+
+    expect(conversations.remove).toHaveBeenCalledWith('u1', 'c1');
+  });
+
+  it('ignores a delete for a chat the server never had', async () => {
+    // Created and deleted entirely offline. Creating it just to tombstone it
+    // would be two writes to reach the state of having done nothing.
+    const { service, conversations } = makeService();
+    const result = await service.sync('u1', {
+      push: { conversations: [chat({ deleted: true })] },
+    });
+
+    expect(conversations.upsert).not.toHaveBeenCalled();
+    expect(conversations.remove).not.toHaveBeenCalled();
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('scopes the lookup to the caller', async () => {
+    const { service, prisma } = makeService();
+    await service.sync('u1', { push: { conversations: [chat()] } });
+
+    expect(prisma.conversation.findFirst.mock.calls[0][0].where).toMatchObject({ userId: 'u1' });
   });
 });
 
