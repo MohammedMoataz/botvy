@@ -236,6 +236,72 @@ describe('RemindersService.restore', () => {
     await expect(service.restore('u1', 'r1')).rejects.toThrow('not found');
   });
 
+  it('reactivating makes it active again, whatever it was', async () => {
+    // Restore returns a completed reminder as completed. This is the other
+    // thing a user wants from the deleted list: do that again.
+    const { service, prisma } = makeService(
+      deleted({ status: 'done', remindAt: new Date(Date.now() + 86_400_000) }),
+    );
+    await service.reactivate('u1', 'r1');
+
+    expect(prisma.reminder.update.mock.calls[0][0].data).toMatchObject({
+      deletedAt: null,
+      status: 'active',
+    });
+    expect(prisma.reminderNotification.createMany).toHaveBeenCalled();
+  });
+
+  it('reactivating with a new time moves it and arms that', async () => {
+    const when = new Date(Date.now() + 172_800_000);
+    const { service, prisma } = makeService(
+      deleted({ status: 'cancelled', remindAt: new Date(Date.now() - 86_400_000) }),
+    );
+    await service.reactivate('u1', 'r1', when);
+
+    expect(prisma.reminder.update.mock.calls[0][0].data.remindAt).toBe(when);
+    expect(prisma.reminderNotification.createMany).toHaveBeenCalled();
+  });
+
+  it('reactivating a past one with no new time arms nothing', async () => {
+    // A ping planned for the past fires the instant it is written. It comes
+    // back active and overdue instead, which is at least honest.
+    const { service, prisma } = makeService(
+      deleted({ status: 'done', remindAt: new Date(Date.now() - 86_400_000) }),
+    );
+    await service.reactivate('u1', 'r1');
+
+    expect(prisma.reminderNotification.createMany).not.toHaveBeenCalled();
+    expect(prisma.reminder.update.mock.calls[0][0].data.status).toBe('active');
+  });
+
+  it('purge erases a deleted reminder for good', async () => {
+    const { service, prisma } = makeService(deleted());
+    await service.purge('u1', 'r1');
+
+    expect(prisma.reminder.delete).toHaveBeenCalledWith({ where: { id: 'r1' } });
+  });
+
+  it('purge refuses one that is not deleted, so it cannot skip the undo', async () => {
+    const { service, prisma } = makeService();
+    await expect(service.purge('u1', 'r1')).rejects.toThrow('not found');
+    expect(prisma.reminder.delete).not.toHaveBeenCalled();
+  });
+
+  it('purge refuses another user\'s reminder', async () => {
+    const { service } = makeService(deleted({ userId: 'someone-else' }));
+    await expect(service.purge('u1', 'r1')).rejects.toThrow('not found');
+  });
+
+  it('emptying the list touches only this user\'s tombstones', async () => {
+    const { service, prisma } = makeService();
+    prisma.reminder.deleteMany = vi.fn().mockResolvedValue({ count: 4 });
+
+    await expect(service.purgeAllDeleted('u1')).resolves.toEqual({ purged: 4 });
+    expect(prisma.reminder.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', deletedAt: { not: null } },
+    });
+  });
+
   it('lists the deleted ones newest first, for the undo view', async () => {
     const { service, prisma } = makeService();
     await service.listDeleted('u1');

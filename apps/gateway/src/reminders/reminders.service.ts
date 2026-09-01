@@ -71,6 +71,68 @@ export class RemindersService {
     return created;
   }
 
+  /**
+   * Brings a deleted reminder back *and* makes it active again, whatever it
+   * was before. Restore returns a completed reminder as completed; this is for
+   * "I want to do that again".
+   *
+   * A moment that has already passed cannot be re-armed — a ping planned for
+   * the past fires the instant it is written — so the caller supplies a new
+   * time for those. Without one the reminder comes back active and overdue,
+   * which is at least honest about needing attention.
+   */
+  async reactivate(userId: string, id: string, remindAt?: Date) {
+    const reminder = await this.prisma.reminder.findUnique({ where: { id } });
+    if (!reminder || reminder.userId !== userId) {
+      throw new NotFoundException('Reminder not found');
+    }
+
+    const when = remindAt ?? reminder.remindAt;
+    await this.prisma.reminderNotification.deleteMany({
+      where: { reminderId: id, sentAt: null },
+    });
+    if (when > new Date()) {
+      const planned = planNotifications(when, reminder.leadTimes);
+      await this.prisma.reminderNotification.createMany({
+        data: planned.map((p) => ({ reminderId: id, notifyAt: p.notifyAt, label: p.label })),
+        skipDuplicates: true,
+      });
+    }
+
+    const updated = await this.prisma.reminder.update({
+      where: { id },
+      data: { deletedAt: null, status: 'active', remindAt: when },
+      include: { notifications: true },
+    });
+    await this.nudgeDevices(userId);
+    return updated;
+  }
+
+  /**
+   * Erases a deleted reminder for good, ahead of the sweep's horizon.
+   *
+   * Only one that is already a tombstone: this is the second step of a
+   * deletion the user has already made, not a way to skip the undo.
+   */
+  async purge(userId: string, id: string) {
+    const reminder = await this.prisma.reminder.findUnique({ where: { id } });
+    if (!reminder || reminder.userId !== userId || !reminder.deletedAt) {
+      throw new NotFoundException('Deleted reminder not found');
+    }
+    await this.prisma.reminder.delete({ where: { id } });
+    await this.nudgeDevices(userId);
+    return { id, purged: true };
+  }
+
+  /** Empties the undo list. Same rule: tombstones only. */
+  async purgeAllDeleted(userId: string) {
+    const removed = await this.prisma.reminder.deleteMany({
+      where: { userId, deletedAt: { not: null } },
+    });
+    await this.nudgeDevices(userId);
+    return { purged: removed.count };
+  }
+
   /** Recently deleted, newest first — the undo list. */
   listDeleted(userId: string) {
     return this.prisma.reminder.findMany({

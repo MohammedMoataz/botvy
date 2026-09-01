@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RemindersService } from './reminders.service.js';
-import { CreateReminderDto, UpdateReminderDto } from './dto.js';
+import { CreateReminderDto, ReactivateReminderDto, UpdateReminderDto } from './dto.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 
@@ -48,5 +48,30 @@ export class RemindersController {
   @Post(':id/restore')
   restore(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.reminders.restore(user.userId, id);
+  }
+
+  /**
+   * Back, and active again whatever it was — for a reminder the user wants to
+   * do over. `remindAt` gives it a new moment; without one it returns overdue.
+   */
+  @Post(':id/reactivate')
+  reactivate(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReactivateReminderDto,
+  ) {
+    return this.reminders.reactivate(user.userId, id, dto.remindAt);
+  }
+
+  /** Erases one deleted reminder for good, ahead of the sweep. */
+  @Delete(':id/purge')
+  purge(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.reminders.purge(user.userId, id);
+  }
+
+  /** Empties the undo list. */
+  @Delete('deleted/all')
+  purgeAll(@CurrentUser() user: AuthenticatedUser) {
+    return this.reminders.purgeAllDeleted(user.userId);
   }
 }

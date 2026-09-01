@@ -1,10 +1,10 @@
-name: botvy
+﻿name: botvy
 description: Botvy mobile client for the self-hosted assistant gateway.
 publish_to: 'none'
 # versionName+versionCode. Bump the build number on EVERY release build:
 # Android compares versionCode, so two APKs sharing it can silently fail to
 # replace each other and leave an old build installed.
-version: 0.5.0+8
+version: 0.6.0+9
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

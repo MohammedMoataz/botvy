@@ -250,6 +250,15 @@ model Conversation {
   /// what makes it exactly one per user — no enum, no partial index.
   clientId String? @map("client_id")
 
+  /// Everything up to and including this message id has been cleared.
+  ///
+  /// Messages carry no tombstone, and the device pulls them by `id >
+  /// lastMessageId`, so a hard delete is invisible to a phone that already has
+  /// them. This watermark is how clearing travels: it rides the conversation's
+  /// own updatedAt cursor, and the device drops its local rows at or below it.
+  /// An id rather than a timestamp, so no clock is involved.
+  clearedUpToMessageId Int @default(0) @map("cleared_up_to_message_id")
+
   /// A tombstone, like Reminder's: a hard delete cannot appear in a sync delta,
   /// so an offline device would never learn the chat is gone. Purged by the
   /// sweep past `reminders.tombstoneDays`, which cascades the messages — which
