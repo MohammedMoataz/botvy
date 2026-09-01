@@ -3,7 +3,7 @@
 # Run from the repo root (or anywhere with curl + docker on PATH).
 set -euo pipefail
 
-MODEL="${1:-qwen3:4b}"
+MODEL="${1:-qwen2.5:3b-instruct}"
 HOST_URL="http://localhost:11434"
 
 echo "== T006: container -> host.docker.internal reachability =="

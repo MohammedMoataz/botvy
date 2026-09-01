@@ -36,10 +36,11 @@ reaches it via `host.docker.internal:11434`.
    vEthernet subnets Docker Desktop uses on this machine — verify with
    `docker network inspect bridge` and `Get-NetIPAddress` if the subnet
    ever changes, e.g. after a Docker Desktop or WSL update.)
-4. Pull the model:
+4. Pull the model named by `OLLAMA_CHAT_MODEL`:
    ```powershell
-   ollama pull qwen3:4b
+   ollama pull qwen2.5:3b-instruct
    ```
+   The gateway never pulls: a model it cannot find fails every request.
 
 ## Verification
 
@@ -54,13 +55,16 @@ docker run --rm curlimages/curl -s http://host.docker.internal:11434/api/tags
 # see infra/docs/benchmark-ollama.ps1
 ```
 
-Gate: streamed throughput must be **≥ 12 tokens/second** for `qwen3:4b` on
-this machine's GTX 1050 (4GB VRAM) — this is the number the chat SSE
-pipeline's UX (Feature 002+) is designed around.
+Gate: streamed throughput must be **≥ 12 tokens/second** on this machine's
+GTX 1050 (4GB VRAM) — the number the chat SSE pipeline's UX (Feature 002+) is
+designed around. The stricter gate now is residency: `/api/ps` must show
+`size_vram` equal to `size`, because a model that spills to the CPU misses this
+by an order of magnitude. That is why the chat model is a 3B and not qwen3:4b,
+which did not fit — see `specs/007-search-and-rendering/`.
 
 ## Model role map (referenced by the gateway from Feature 002 onward)
 
 | Role | Model | Notes |
 |---|---|---|
-| Chat / intent extraction | `qwen3:4b` | resident (`OLLAMA_KEEP_ALIVE=-1`), used for every interactive request |
+| Chat / intent extraction | `qwen2.5:3b-instruct` | resident (`OLLAMA_KEEP_ALIVE=-1`), used for every interactive request. `OLLAMA_THINKING=false` — qwen2.5 rejects the field and every call fails with it on |
 | Nightly program generation (v2 feature) | a larger 7-8B Q4 model | not pulled in this feature — scheduled-only workload can tolerate the load-time cost of swapping models |
