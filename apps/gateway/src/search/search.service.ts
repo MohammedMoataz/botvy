@@ -66,7 +66,9 @@ export class SearchService {
   async searchImages(query: string): Promise<ImageResult[]> {
     const rows = await this.query(query, 'images');
     return rows
-      .filter((r) => typeof r.img_src === 'string' && isHttpUrl(r.img_src))
+      .filter(
+        (r) => typeof r.img_src === 'string' && isHttpUrl(r.img_src) && isRasterImage(r.img_src),
+      )
       .slice(0, MAX_IMAGES)
       .map((r) => ({
         title: sanitise(asText(r.title), 120),
@@ -103,6 +105,22 @@ export class SearchService {
       this.logger.warn(`search unavailable, answering without it: ${String(err)}`);
       return [];
     }
+  }
+}
+
+/**
+ * Only the formats the media proxy will actually serve.
+ *
+ * The image engines return plenty that is not a photograph — icon sets in SVG
+ * turn up for almost any query — and the proxy refuses SVG because it can
+ * carry script. Filtering here means the reply does not carry a link that was
+ * never going to render.
+ */
+function isRasterImage(url: string): boolean {
+  try {
+    return /\.(jpe?g|png|webp|avif|gif)$/i.test(new URL(url).pathname);
+  } catch {
+    return false;
   }
 }
 

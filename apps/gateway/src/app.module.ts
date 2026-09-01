@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule as AppConfigModule } from './config/config.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { MediaModule } from './media/media.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { LlmModule } from './llm/llm.module.js';
 import { ChatModule } from './chat/chat.module.js';
@@ -73,6 +74,7 @@ const adminStatic = ADMIN_DIST
     RemindersModule,
     WorkflowsModule,
     CoachingModule,
+    MediaModule,
     ...adminStatic,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

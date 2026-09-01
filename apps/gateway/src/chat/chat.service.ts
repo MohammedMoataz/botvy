@@ -1,4 +1,5 @@
 import { Injectable, Logger, type MessageEvent } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Observable } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LlmService, type ChatMessage } from '../llm/llm.service.js';
@@ -9,7 +10,12 @@ import { classifyCheckin } from '../coaching/checkin-classifier.js';
 import { loadPrompt } from '../llm/prompts.js';
 import { formatInTz, localDate, wallClockToUtc } from '../common/time.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { SearchService, type SearchResult } from '../search/search.service.js';
+import {
+  SearchService,
+  type ImageResult,
+  type SearchResult,
+} from '../search/search.service.js';
+import { mediaPath } from '../media/media.signing.js';
 import { preferSoonestDay, resolveRelativePhrase } from './relative-time.js';
 
 // How many turns go into the prompt is a setting (chat.historyLimit): it is
@@ -83,6 +89,32 @@ function formatSources(results: SearchResult[]): string {
   return `\n\n## Sources\n${lines.join('\n')}\n`;
 }
 
+/**
+ * Image markdown, written by the gateway rather than the model.
+ *
+ * The model never sees an image URL and never emits one: these come from the
+ * image search directly, and every src is a signed /media path so the phone
+ * fetches from us instead of handing its address to whatever host a search
+ * result names.
+ */
+function formatImages(images: ImageResult[], secret: string | undefined): string {
+  const rendered = images
+    .map((image) => {
+      const src = mediaPath(image.imageUrl, secret);
+      return src ? `![${image.title}](${src})` : null;
+    })
+    .filter((line): line is string => line !== null);
+
+  return rendered.length > 0 ? `\n\n${rendered.join('\n')}\n` : '';
+}
+
+/** Whether the user asked to be shown something, rather than told. */
+function wantsImages(message: string): boolean {
+  return /\b(image|images|picture|pictures|photo|photos|show me|what does .* look like)\b|صورة|صور|شكل/iu.test(
+    message,
+  );
+}
+
 /** One message a phone composed while offline. */
 export interface QueuedMessage {
   clientId: string;
@@ -116,7 +148,13 @@ export class ChatService {
     private readonly coaching: CoachingService,
     private readonly settings: SettingsService,
     private readonly search: SearchService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.mediaSecret = config.get<string>('MEDIA_SIGNING_SECRET');
+  }
+
+  /** Absent when image proxying is switched off; images then stay plain links. */
+  private readonly mediaSecret?: string;
 
   async history(userId: string, limit = 50) {
     const rows = await this.prisma.message.findMany({
@@ -465,8 +503,18 @@ export class ChatService {
           // an action — by the time results are in, the only thing left to do
           // is answer.
           let searchResults: SearchResult[] = [];
+          let searchImages: ImageResult[] = [];
           if (intentResult && intent === 'web_search') {
-            searchResults = await this.search.search(intentResult.query || userMessage);
+            const query = intentResult.query || userMessage;
+            // Images only when the user asked to see something; a price or a
+            // score does not need a picture, and the extra call is a second
+            // round trip on every search otherwise.
+            const [results, images] = await Promise.all([
+              this.search.search(query),
+              wantsImages(userMessage) ? this.search.searchImages(query) : Promise.resolve([]),
+            ]);
+            searchResults = results;
+            searchImages = images;
           }
 
           // Reminder intents are executed deterministically in code and
@@ -526,9 +574,10 @@ export class ChatService {
           // and echoing an attacker-supplied one back as a tappable link is
           // the whole injection payoff.
           if (searching) {
-            const sources = formatSources(searchResults);
-            fullReply += sources;
-            subscriber.next({ type: 'token', data: sources });
+            const tail =
+              formatImages(searchImages, this.mediaSecret) + formatSources(searchResults);
+            fullReply += tail;
+            subscriber.next({ type: 'token', data: tail });
           }
 
           await this.prisma.message.create({

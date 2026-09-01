@@ -140,4 +140,20 @@ describe('SearchService.searchImages', () => {
 
     expect(await search.searchImages('q')).toEqual([]);
   });
+
+  it('skips SVG, which the proxy refuses and which can carry script', async () => {
+    // Icon sets come back for almost any query; a link that cannot render is
+    // worse than no image at all.
+    const search = makeService(
+      ok({
+        results: [
+          { title: 'icon', url: 'https://e.com/p', img_src: 'https://cdn.example/icon.svg' },
+          { title: 'photo', url: 'https://e.com/p2', img_src: 'https://cdn.example/photo.jpg' },
+        ],
+      }),
+    );
+
+    const images = await search.searchImages('q');
+    expect(images.map((i) => i.imageUrl)).toEqual(['https://cdn.example/photo.jpg']);
+  });
 });

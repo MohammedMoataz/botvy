@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../api/models.dart';
 import '../reminders/reminders_screen.dart';
 import '../settings/settings_screen.dart';
+import '../../api/api_client.dart';
 import 'chat_controller.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -154,7 +155,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 }
 
 class ChatBubble extends StatelessWidget {
-  const ChatBubble({required this.message});
+  const ChatBubble({super.key, required this.message});
 
   final ChatMessage message;
 
@@ -227,7 +228,7 @@ class ChatBubble extends StatelessWidget {
 /// partially-arrived reply mid-stream just renders as the plain text it
 /// currently is, and corrects itself on the next token.
 class AssistantMarkdown extends StatelessWidget {
-  const AssistantMarkdown({required this.content});
+  const AssistantMarkdown({super.key, required this.content});
 
   final String content;
 
@@ -239,6 +240,7 @@ class AssistantMarkdown extends StatelessWidget {
 
     return MarkdownBody(
       data: content,
+      imageBuilder: (uri, title, alt) => _RemoteImage(uri: uri, alt: alt ?? title ?? ''),
       // Off: MarkdownBody's own selection works block by block, so a drag
       // cannot cross a paragraph. The list is wrapped in a SelectionArea,
       // which selects the whole conversation instead.
@@ -274,5 +276,60 @@ class AssistantMarkdown extends StatelessWidget {
     // and other schemes can reach things the browser cannot.
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+/// An image in a reply.
+///
+/// The src is a relative `/media?...` path, resolved here against whatever
+/// gateway the app is currently pointed at — an absolute URL would rot the
+/// moment the user switches between the emulator, the LAN and a tunnel.
+/// A broken one becomes a tappable link, which is more useful than a grey box.
+class _RemoteImage extends ConsumerWidget {
+  const _RemoteImage({required this.uri, required this.alt});
+
+  final Uri uri;
+  final String alt;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final resolved = Uri.parse(ref.watch(apiClientProvider).baseUrl).resolveUri(uri);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          resolved.toString(),
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) => progress == null
+              ? child
+              : const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+          errorBuilder: (context, error, stack) => InkWell(
+            onTap: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.broken_image_outlined, size: 16, color: scheme.outline),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    alt.isEmpty ? 'Image' : alt,
+                    style: TextStyle(
+                      color: scheme.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

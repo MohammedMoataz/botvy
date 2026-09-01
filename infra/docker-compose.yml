@@ -114,6 +114,8 @@ services:
       # Like N8N_URL, the in-network address is the container default; .env
       # holds a host-side one only when the gateway runs outside compose.
       SEARXNG_URL: http://searxng:8080
+      # Signs the /media image URLs. Empty leaves images as plain links.
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-}
       OLLAMA_THINKING: ${OLLAMA_THINKING:-false}
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       # Must be a path *inside* the container (/run/secrets/<file>.json — see
