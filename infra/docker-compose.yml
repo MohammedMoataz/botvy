@@ -64,6 +64,23 @@ services:
       postgres:
         condition: service_healthy
 
+  # Metasearch front-end. Deliberately has no published port: only the gateway
+  # talks to it, and the whole point is that the phone never contacts a search
+  # engine directly. Configuration lives in ./searxng/settings.yml, which must
+  # enable the JSON format the gateway reads.
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      # Docker-internal traffic all arrives from one address; the bot limiter
+      # reads that as a flood and starts answering 429.
+      SEARXNG_LIMITER: "false"
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET not set}
+    volumes:
+      - ./searxng:/etc/searxng:ro
+      - searxng_data:/var/cache/searxng
+
   gateway:
     build:
       context: ..
@@ -94,6 +111,11 @@ services:
       # host-side one (localhost:5679) that bootstrap.mjs needs.
       N8N_API_KEY: ${N8N_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Like N8N_URL, the in-network address is the container default; .env
+      # holds a host-side one only when the gateway runs outside compose.
+      SEARXNG_URL: http://searxng:8080
+      OLLAMA_THINKING: ${OLLAMA_THINKING:-false}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       # Must be a path *inside* the container (/run/secrets/<file>.json — see
       # the bind mount below), NOT a host path. Empty disables push and Google
       # Sign-in, which the gateway degrades to. Set but unreadable is a boot
@@ -162,3 +184,4 @@ services:
 volumes:
   pg_data:
   n8n_data:
+  searxng_data:

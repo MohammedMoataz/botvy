@@ -7,37 +7,80 @@ import { RemindersService } from '../reminders/reminders.service.js';
 import { CoachingService } from '../coaching/coaching.service.js';
 import { classifyCheckin } from '../coaching/checkin-classifier.js';
 import { loadPrompt } from '../llm/prompts.js';
-import { formatInTz, localDate } from '../common/time.js';
+import { formatInTz, localDate, wallClockToUtc } from '../common/time.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { SearchService, type SearchResult } from '../search/search.service.js';
+import { preferSoonestDay, resolveRelativePhrase } from './relative-time.js';
 
 // How many turns go into the prompt is a setting (chat.historyLimit): it is
 // the main lever on latency for CPU inference, so it gets tuned live.
 const INTENT_HISTORY_LIMIT = 4;
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const UPCOMING_REMINDERS_IN_PROMPT = 5;
+/** Snippets take the room the conversation would otherwise have. */
+const SEARCH_HISTORY_LIMIT = 8;
 
 const INTENT_SCHEMA = {
   type: 'object',
   properties: {
     intent: {
       type: 'string',
-      enum: ['chat', 'set_reminder', 'list_reminders', 'cancel_reminder'],
+      enum: ['chat', 'set_reminder', 'list_reminders', 'cancel_reminder', 'web_search'],
     },
+    title: { type: 'string' },
+    remindAt: { type: 'string' },
+    // Empty for every intent but web_search; the schema keeps the
+    // required-all shape so the grammar stays a fixed set of keys.
+    query: { type: 'string' },
+    needsClarification: { type: 'boolean' },
+    clarifyQuestion: { type: 'string' },
+  },
+  // Only the intent is required. The schema is a decoding grammar, so every
+  // required key is tokens the model must emit before the answer can start —
+  // measured at 48 tokens and 3s per turn with all six, 19 tokens and 1.5s
+  // with one. The fields it does not need are simply absent.
+  required: ['intent'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * Re-asked when the first pass says "reminder" and then leaves out the time.
+ * Requiring the fields makes the grammar emit them; scoping that to the
+ * reminder path keeps the cost off every ordinary turn.
+ */
+const REMINDER_SCHEMA = {
+  type: 'object',
+  properties: {
     title: { type: 'string' },
     remindAt: { type: 'string' },
     needsClarification: { type: 'boolean' },
     clarifyQuestion: { type: 'string' },
   },
-  required: ['intent', 'title', 'remindAt', 'needsClarification', 'clarifyQuestion'],
+  required: ['title', 'remindAt', 'needsClarification', 'clarifyQuestion'],
   additionalProperties: false,
 } as const;
 
 interface IntentResult {
-  intent: 'chat' | 'set_reminder' | 'list_reminders' | 'cancel_reminder';
-  title: string;
-  remindAt: string;
-  needsClarification: boolean;
-  clarifyQuestion: string;
+  intent: 'chat' | 'set_reminder' | 'list_reminders' | 'cancel_reminder' | 'web_search';
+  title?: string;
+  /** The user's own wall clock, no zone: "2026-09-02T18:00". */
+  remindAt?: string;
+  query?: string;
+  needsClarification?: boolean;
+  clarifyQuestion?: string;
+}
+
+/** Numbered for the model to cite as [1], [2]. */
+function formatSearchResults(results: SearchResult[]): string {
+  return results
+    .map((r, i) => `[${i + 1}] ${r.title}\n${r.content}`)
+    .join('\n\n');
+}
+
+/** The visible source list, in markdown, built from the results themselves. */
+function formatSources(results: SearchResult[]): string {
+  const lines = results.map((r, i) => `${i + 1}. [${r.title || r.url}](${r.url})`);
+  return `\n\n## Sources\n${lines.join('\n')}\n`;
 }
 
 /** One message a phone composed while offline. */
@@ -72,6 +115,7 @@ export class ChatService {
     private readonly reminders: RemindersService,
     private readonly coaching: CoachingService,
     private readonly settings: SettingsService,
+    private readonly search: SearchService,
   ) {}
 
   async history(userId: string, limit = 50) {
@@ -103,8 +147,9 @@ export class ChatService {
     if (result.intent === 'cancel_reminder') {
       const active = await this.reminders.list(userId, 'active');
       if (active.length === 0) return 'You have no active reminders to cancel.';
-      const target = result.title
-        ? active.find((r) => r.title.toLowerCase().includes(result.title.toLowerCase()))
+      const wanted = result.title?.toLowerCase();
+      const target = wanted
+        ? active.find((r) => r.title.toLowerCase().includes(wanted))
         : undefined;
       if (!target) {
         return `I could not tell which reminder to cancel. You have: ${active
@@ -119,8 +164,11 @@ export class ChatService {
       if (result.needsClarification || !result.remindAt) {
         return result.clarifyQuestion || 'When would you like to be reminded?';
       }
-      const remindAt = new Date(result.remindAt);
-      if (Number.isNaN(remindAt.getTime())) {
+      // The model writes the time on the user's own clock; turning that into an
+      // instant is arithmetic, and a small model gets it wrong — asked for UTC
+      // it returned both the wrong hour and the wrong day.
+      const remindAt = wallClockToUtc(result.remindAt, timezone);
+      if (!remindAt) {
         this.logger.warn(`model produced an unparseable remindAt: ${result.remindAt}`);
         return null; // fall through to a normal chat reply
       }
@@ -173,15 +221,48 @@ export class ChatService {
     const intentPrompt = loadPrompt('intent.md', {
       history: history || '(none)',
       message,
-      now: now.toISOString(),
+      // The user's own clock, not UTC: the model writes wall-clock times, and
+      // giving it a UTC reference is what made it do arithmetic it gets wrong.
+      now: formatInTz(now, timezone),
       timezone,
       today: localDate(now, timezone),
     });
-    return this.llm.extract<IntentResult>({
+    const result = await this.llm.extract<IntentResult>({
       messages: [{ role: 'user', content: intentPrompt }],
       schemaName: 'intent',
       schema: INTENT_SCHEMA,
     });
+
+    if (result?.intent !== 'set_reminder') return result;
+
+    // "in two hours" is arithmetic, not language: the model left it out
+    // entirely often enough that it is worth doing here, where it cannot be
+    // wrong.
+    const relative = resolveRelativePhrase(message, now, timezone);
+    if (relative) {
+      return { ...result, remindAt: relative, needsClarification: false };
+    }
+
+    // A reminder with no time is not a reminder. Rather than asking the user
+    // for something they already said, ask the model again with a grammar that
+    // cannot skip the field.
+    let filled = result;
+    if (!filled.remindAt) {
+      const details = await this.llm.extract<Omit<IntentResult, 'intent'>>({
+        messages: [{ role: 'user', content: intentPrompt }],
+        schemaName: 'reminder',
+        schema: REMINDER_SCHEMA,
+      });
+      if (details) filled = { ...filled, ...details };
+    }
+
+    if (filled.remindAt) {
+      filled = {
+        ...filled,
+        remindAt: preferSoonestDay(filled.remindAt, message, now, timezone),
+      };
+    }
+    return filled;
   }
 
   /** The few reminders worth knowing about, so "what's next?" needs no tool call. */
@@ -379,11 +460,20 @@ export class ChatService {
             data: { userId, role: 'user', content: userMessage },
           });
 
+          // A question that needs the live web. Classification happens before
+          // any web text exists, so a snippet cannot talk the classifier into
+          // an action — by the time results are in, the only thing left to do
+          // is answer.
+          let searchResults: SearchResult[] = [];
+          if (intentResult && intent === 'web_search') {
+            searchResults = await this.search.search(intentResult.query || userMessage);
+          }
+
           // Reminder intents are executed deterministically in code and
           // answered with a templated confirmation — no second model call
           // just to phrase "Reminder set", which the predecessor system
           // wasted a call on for every single reminder.
-          if (intentResult && intent !== 'chat') {
+          if (intentResult && intent !== 'chat' && intent !== 'web_search') {
             const reply = await this.handleReminderIntent(userId, intentResult, timezone);
             if (reply) {
               subscriber.next({ type: 'token', data: reply });
@@ -396,16 +486,31 @@ export class ChatService {
             }
           }
 
-          const systemPrompt = loadPrompt('chat.md', {
-            today: localDate(nowDate, timezone),
-            now: formatInTz(nowDate, timezone),
-            timezone,
-            reminders: await this.upcomingRemindersLine(userId, timezone),
-            coaching: await this.coachingLine(userId),
-          });
+          // With results in hand the prompt changes shape: the snippets are
+          // the material to answer from, and they displace most of the
+          // conversation rather than being added to it. An empty search falls
+          // through to an ordinary reply, so a search outage is invisible.
+          const searching = searchResults.length > 0;
+          const systemPrompt = searching
+            ? loadPrompt('search.md', {
+                today: localDate(nowDate, timezone),
+                timezone,
+                question: userMessage,
+                results: formatSearchResults(searchResults),
+              })
+            : loadPrompt('chat.md', {
+                today: localDate(nowDate, timezone),
+                now: formatInTz(nowDate, timezone),
+                timezone,
+                reminders: await this.upcomingRemindersLine(userId, timezone),
+                coaching: await this.coachingLine(userId),
+              });
+          const history = searching
+            ? historyRows.slice(-SEARCH_HISTORY_LIMIT)
+            : historyRows;
           const chatMessages: ChatMessage[] = [
             { role: 'system', content: systemPrompt },
-            ...historyRows.map((m): ChatMessage => ({ role: m.role, content: m.content })),
+            ...history.map((m): ChatMessage => ({ role: m.role, content: m.content })),
             { role: 'user', content: userMessage },
           ];
 
@@ -414,6 +519,16 @@ export class ChatService {
           for await (const chunk of stream) {
             fullReply += chunk;
             subscriber.next({ type: 'token', data: chunk });
+          }
+
+          // The source list is built here from the actual results, never
+          // copied from the model's output: a small model mangles long URLs,
+          // and echoing an attacker-supplied one back as a tappable link is
+          // the whole injection payoff.
+          if (searching) {
+            const sources = formatSources(searchResults);
+            fullReply += sources;
+            subscriber.next({ type: 'token', data: sources });
           }
 
           await this.prisma.message.create({

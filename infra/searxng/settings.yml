@@ -1,0 +1,53 @@
+# SearXNG for Botvy.
+#
+# Only the gateway talks to this, over the compose network, and only through
+# the JSON API. Three settings below are load-bearing and easy to lose:
+#   - `formats` must include `json`, or /search?format=json answers 403.
+#   - `limiter` must stay off: every request arrives from one docker-internal
+#     address, which the bot detection reads as a flood.
+#   - the engine list is short and the timeout small, because a reply here
+#     blocks a user's chat turn — the default engine set waits for the slowest.
+
+use_default_settings: true
+
+general:
+  instance_name: "Botvy"
+  # Nothing user-facing is served from here; no reason to advertise a contact.
+  enable_metrics: false
+
+server:
+  # Overridden by SEARXNG_SECRET in compose; a value must still be present for
+  # the file to validate.
+  secret_key: "set-via-SEARXNG_SECRET"
+  limiter: false
+  public_instance: false
+  image_proxy: false
+  method: "GET"
+
+search:
+  safe_search: 1
+  autocomplete: ""
+  default_lang: "auto"
+  formats:
+    - html
+    - json
+
+outgoing:
+  # A search that takes longer than this is worse than no search: the user is
+  # waiting on it before the model has even started generating.
+  request_timeout: 3.0
+  max_request_timeout: 6.0
+  pool_connections: 20
+  pool_maxsize: 10
+
+engines:
+  - name: duckduckgo
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: wikipedia
+    disabled: false
+  - name: bing images
+    disabled: false
+  - name: duckduckgo images
+    disabled: false
