@@ -36,6 +36,28 @@ with no network, no server and no Google reachability.
 - Run `dart run build_runner build --delete-conflicting-outputs` after touching
   the database; the generated files are committed.
 
+## Which gateway it talks to
+
+The URL is **not** compiled in. The app reads it from secure storage and only
+falls back to `kDefaultBaseUrl` on a fresh install, so a user can point the app
+anywhere from Settings without a new build.
+
+That fallback is injected at build time, which is how a release carries whatever
+the tunnel is actually serving:
+
+```powershell
+node ..\..\infra\build-mobile.mjs                        # ask the running tunnel
+node ..\..\infra\build-mobile.mjs https://botvy.example  # or say it outright
+node ..\..\infra\build-mobile.mjs --check                # print it, build nothing
+```
+
+It validates the URL, runs `test/base_url_test.dart` with the same value the
+APK is about to carry, then builds. Underneath it is just
+`--dart-define=BOTVY_BASE_URL=...`.
+
+A quick-tunnel hostname changes whenever that container restarts, so baking one
+in only makes sense for a named tunnel — the script warns when you do it anyway.
+
 ## Working on it
 
 ```powershell
