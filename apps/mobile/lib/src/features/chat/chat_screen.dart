@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/models.dart';
 import '../reminders/reminders_screen.dart';
@@ -101,11 +103,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     return RefreshIndicator(
       onRefresh: ref.read(chatControllerProvider.notifier).loadHistory,
-      child: ListView.builder(
-        controller: _scroll,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        itemCount: chat.messages.length,
-        itemBuilder: (context, i) => _Bubble(message: chat.messages[i]),
+      // One selection region across the whole conversation. Markdown renders
+      // as a tree of widgets, so per-bubble selection would only ever let the
+      // user grab one paragraph at a time.
+      child: SelectionArea(
+        child: ListView.builder(
+          controller: _scroll,
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          itemCount: chat.messages.length,
+          itemBuilder: (context, i) => ChatBubble(message: chat.messages[i]),
+        ),
       ),
     );
   }
@@ -146,8 +153,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message});
+class ChatBubble extends StatelessWidget {
+  const ChatBubble({required this.message});
 
   final ChatMessage message;
 
@@ -180,12 +187,15 @@ class _Bubble extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SelectableText(
-                    message.content,
-                    style: TextStyle(
-                      color: isUser ? scheme.onPrimaryContainer : scheme.onSurface,
-                    ),
-                  ),
+                  // Only the assistant writes markdown. A user who types an
+                  // asterisk meant an asterisk.
+                  if (isUser)
+                    Text(
+                      message.content,
+                      style: TextStyle(color: scheme.onPrimaryContainer),
+                    )
+                  else
+                    AssistantMarkdown(content: message.content),
                   // Sent while offline: it is safely stored and goes out on its
                   // own, so the user is told rather than asked to retype it.
                   if (message.isQueued)
@@ -207,5 +217,62 @@ class _Bubble extends StatelessWidget {
               ),
       ),
     );
+  }
+}
+
+/// An assistant reply, rendered as markdown.
+///
+/// The model already answers in markdown — headings, bullets, bold, links —
+/// and rendering it as plain text put the asterisks and hashes on screen. A
+/// partially-arrived reply mid-stream just renders as the plain text it
+/// currently is, and corrects itself on the next token.
+class AssistantMarkdown extends StatelessWidget {
+  const AssistantMarkdown({required this.content});
+
+  final String content;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final body = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurface);
+
+    return MarkdownBody(
+      data: content,
+      // Off: MarkdownBody's own selection works block by block, so a drag
+      // cannot cross a paragraph. The list is wrapped in a SelectionArea,
+      // which selects the whole conversation instead.
+      selectable: false,
+      onTapLink: (text, href, title) => _open(href),
+      styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+        p: body,
+        listBullet: body,
+        a: body?.copyWith(
+          color: scheme.primary,
+          decoration: TextDecoration.underline,
+        ),
+        code: theme.textTheme.bodySmall?.copyWith(
+          fontFamily: 'monospace',
+          backgroundColor: scheme.surfaceContainerHighest,
+        ),
+        codeblockDecoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        blockquoteDecoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          border: Border(left: BorderSide(color: scheme.primary, width: 3)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _open(String? href) async {
+    if (href == null) return;
+    final uri = Uri.tryParse(href);
+    // Only ever hand the OS a web address: a markdown link is model output,
+    // and other schemes can reach things the browser cannot.
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 }
