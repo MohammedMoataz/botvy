@@ -28,6 +28,7 @@ model User {
   lastLoginAt  DateTime?    @map("last_login_at")
 
   refreshTokens RefreshToken[]
+  conversations Conversation[]
   messages      Message[]
   usageLogs     UsageLog[]
   devices       Device[]
@@ -224,10 +225,55 @@ enum MessageRole {
   assistant
 }
 
+/// One named chat. The user creates these, renames them, and keeps a topic in
+/// its own thread instead of one endless transcript.
+///
+/// Two-way synced, so every field here is copied from Reminder's proven shape:
+/// `updatedAt` for the cursor, a `deletedAt` tombstone rather than a row that
+/// vanishes, and the same conflict rule in SyncService.
+model Conversation {
+  /// Minted by whichever side creates it, and the gateway takes the phone's
+  /// uuid verbatim. That is what lets a message name its conversation the
+  /// instant the user opens one, with no network and no create round trip.
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Empty until someone renames it. The client shows the first user message
+  /// instead, so an auto-title is never written and can never collide with a
+  /// rename made a second later.
+  title    String  @default("")
+  pinned   Boolean @default(false)
+  archived Boolean @default(false)
+
+  /// Null for an ordinary chat. The one thread the nightly cycle speaks into
+  /// carries the reserved literal `coaching`, and the unique index below is
+  /// what makes it exactly one per user — no enum, no partial index.
+  clientId String? @map("client_id")
+
+  /// A tombstone, like Reminder's: a hard delete cannot appear in a sync delta,
+  /// so an offline device would never learn the chat is gone. Purged by the
+  /// sweep past `reminders.tombstoneDays`, which cascades the messages — which
+  /// is why Message needs no tombstone of its own.
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  messages Message[]
+
+  @@unique([userId, clientId])
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
 model Message {
   id        Int         @id @default(autoincrement())
   userId    String      @map("user_id")
   user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Required on purpose. Six call sites create messages, and one that forgot
+  /// this would write a row no device could file — a compile error is cheaper
+  /// than finding that in production.
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role      MessageRole
   content   String
   // Set for messages the phone composed offline and flushed later: clientId
@@ -239,6 +285,7 @@ model Message {
 
   @@unique([userId, clientId])
   @@index([userId, id(sort: Desc)])
+  @@index([conversationId, id(sort: Desc)])
   @@map("messages")
 }
 

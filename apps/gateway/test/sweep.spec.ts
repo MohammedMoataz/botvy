@@ -27,6 +27,7 @@ function makeService(opts: { tokens?: string[]; claimed?: number } = {}) {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     reminder: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    conversation: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     device: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     setting: { upsert: vi.fn().mockResolvedValue({}) },
   };
@@ -83,6 +84,21 @@ describe('SweepService.run', () => {
     const where = prisma.reminderNotification.deleteMany.mock.calls[0][0].where;
     expect(where.sentAt).toBeNull();
     expect(where.notifyAt.lt).toEqual(new Date('2026-08-31T10:00:00Z'));
+  });
+
+  it('purges deleted chats on the same horizon as deleted reminders', async () => {
+    // One horizon for both on purpose: the sync's full-snapshot fallback reads
+    // this same setting, so a shorter one here would drop a tombstone while a
+    // device's cursor was still being trusted, and the deletion would never
+    // reach it. The messages go with the chat through the foreign key.
+    const { service, prisma } = makeService();
+    await service.run(NOW);
+
+    const horizon = new Date('2026-08-02T10:00:00Z'); // 30 days before NOW
+    expect(prisma.conversation.deleteMany).toHaveBeenCalledWith({
+      where: { deletedAt: { lt: horizon } },
+    });
+    expect(prisma.reminder.deleteMany.mock.calls[0][0].where.deletedAt.lt).toEqual(horizon);
   });
 
   it('records when it last ran so a stalled scheduler is visible', async () => {

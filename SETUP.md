@@ -224,6 +224,28 @@ window. Do not give the intent call and the chat call different windows —
 Ollama keys a loaded model by context size, so two values make it reload on
 every single turn. That cost 39 seconds to the first token; one value costs 3.
 
+### Chats
+
+Each user has many named chats, and one of them is special. The chat whose
+`client_id` is `coaching` is where the evening check-in and the daily program
+are written, and it is the only chat the gateway refuses to delete or archive —
+the nightly cycle has to have somewhere visible to speak. The database enforces
+one per user; there is no flag to keep in step.
+
+Two consequences worth knowing:
+
+- **A reply only counts as the check-in inside that chat.** The classifier
+  matches whole words, `rest` and `not` among them, so before this the sentence
+  "does this need rest time?" typed anywhere at 22:00 recorded a missed day.
+  Answering in another chat now leaves the check-in open for the real answer.
+- **A message that names no chat goes to Coaching.** That covers a phone still
+  on an older build and anything queued before the upgrade.
+
+Deleting a chat deletes its messages immediately and leaves a tombstone, purged
+by the sweep on `reminders.tombstoneDays` like a reminder's. Chat titles are
+never written by the gateway: an empty title means unnamed and the app shows the
+first message instead, which is what keeps a rename from racing an auto-title.
+
 ### What lives on the phone
 
 The app keeps the user's whole account in its own SQLite database — reminders,

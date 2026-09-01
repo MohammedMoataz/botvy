@@ -7,6 +7,7 @@ import { ChatBatchDto, SendMessageDto } from './dto.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/jwt.strategy.js';
 import { UsageService } from '../usage/usage.service.js';
+import { ConversationsService } from './conversations.service.js';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -14,6 +15,7 @@ export class ChatController {
   constructor(
     private readonly chat: ChatService,
     private readonly usage: UsageService,
+    private readonly conversations: ConversationsService,
   ) {}
 
   @Post()
@@ -28,7 +30,12 @@ export class ChatController {
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
-    return this.chat.streamReply(user.userId, dto.message);
+    // Resolved here rather than inside the stream: a NotFoundException thrown
+    // in the Observable is caught by the service's own handler and reaches the
+    // phone as "The assistant is unavailable right now", which is a lie it
+    // cannot act on. Out here a deleted or foreign chat is an honest 404.
+    const conversation = await this.conversations.resolve(user.userId, dto.conversationId);
+    return this.chat.streamReply(user.userId, conversation, dto.message);
   }
 
   /**
@@ -47,8 +54,14 @@ export class ChatController {
   }
 
   @Get('history')
-  async getHistory(@CurrentUser() user: AuthenticatedUser, @Query('limit') limit?: string) {
+  async getHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('limit') limit?: string,
+    @Query('conversationId') conversationId?: string,
+  ) {
     const parsed = limit ? Number.parseInt(limit, 10) : undefined;
-    return this.chat.history(user.userId, parsed);
+    // The server id, not the phone's: reading history means you have synced,
+    // and a GET must never create a row.
+    return this.chat.history(user.userId, parsed, conversationId);
   }
 }

@@ -45,10 +45,17 @@ class ChatState {
       );
 }
 
-/// autoDispose is load-bearing, not tidiness: it wipes the message list when
-/// the chat screen goes away on logout, so the next user to sign in on this
-/// device cannot see the previous user's conversation.
-class ChatController extends AutoDisposeNotifier<ChatState> {
+/// One chat's screen state, keyed by the chat's id.
+///
+/// A family rather than one controller with a `switchTo`: switching then
+/// disposes the old SSE subscription, drops its message list and resets
+/// `streaming` through the existing `onDispose`, instead of that teardown being
+/// hand-written and kept in step with `build` for ever.
+///
+/// autoDispose is load-bearing beyond that: it wipes the message list when the
+/// chat screen goes away on logout, so the next user to sign in on this device
+/// cannot see the previous user's conversation.
+class ChatController extends AutoDisposeFamilyNotifier<ChatState, String> {
   StreamSubscription<SseEvent>? _sub;
 
   /// Riverpod 2's Notifier exposes no `mounted`, and both reading and writing
@@ -56,16 +63,24 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
   /// race, so every async continuation goes through [_update].
   bool _disposed = false;
 
+  /// Held while a reply is arriving, so switching chats mid-answer and coming
+  /// back finds it finished rather than lost.
+  KeepAliveLink? _keepAlive;
+
   @override
-  ChatState build() {
+  ChatState build(String arg) {
     ref.onDispose(() {
       _disposed = true;
       _sub?.cancel();
+      _keepAlive?.close();
     });
     // Fire-and-forget: the UI renders the loading state meanwhile.
     Future.microtask(loadHistory);
     return const ChatState(loading: true);
   }
+
+  /// This chat's id.
+  String get conversationId => arg;
 
   ApiClient get _api => ref.read(apiClientProvider);
 
@@ -87,7 +102,7 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
     // Fetching separately here was a second round trip for rows /sync already
     // carries, and it meant the screen could show an error for a conversation
     // it already had.
-    final cached = await _db.watchMessages().first;
+    final cached = await _readMessages();
     _update((s) => s.copyWith(
           messages: [for (final m in cached) _fromLocal(m)],
           loading: false,
@@ -95,16 +110,46 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
 
     await ref.read(syncServiceProvider).sync();
     if (_disposed) return;
-    final merged = await _db.watchMessages().first;
+    final merged = await _readMessages();
     _update((s) => s.copyWith(messages: [for (final m in merged) _fromLocal(m)]));
   }
 
-  void send(String text) {
+  /// This chat's messages.
+  ///
+  /// The coaching chat also shows messages with no chat of their own: rows
+  /// cached before this app had chats, and anything typed offline before its
+  /// chat reached the gateway. That is where the server files them, and it is
+  /// what keeps a whole pre-upgrade history on screen until the re-pull
+  /// redistributes it.
+  Future<List<LocalMessage>> _readMessages() async {
+    final chat = await _db.findConversation(arg);
+    return _db
+        .watchConversationMessages(arg, includeUnassigned: chat?.isCoaching ?? false)
+        .first;
+  }
+
+  Future<void> send(String text) async {
     final trimmed = text.trim();
     if (_disposed || trimmed.isEmpty || state.streaming) return;
 
     final clientId = _uuid.v4();
     final composedAt = DateTime.now();
+
+    // The chat row is written here rather than when the user tapped "New chat",
+    // so one they open and abandon litters neither the list nor the gateway.
+    // pendingOp stays null: /chat and /chat/batch both create by id, and the
+    // pull brings the server's copy back — there is no create to push.
+    if (await _db.findConversation(arg) == null) {
+      await _db.upsertConversation(ConversationsCompanion.insert(
+        id: arg,
+        updatedAt: Value(composedAt),
+        lastMessageAt: Value(composedAt),
+      ));
+    } else {
+      await _db.bumpLastMessageAt(arg, composedAt);
+    }
+    if (_disposed) return;
+
     final userMessage =
         ChatMessage(role: 'user', content: trimmed, clientId: clientId);
     final assistant =
@@ -115,8 +160,9 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
           clearError: true,
         ));
 
+    _keepAlive ??= ref.keepAlive();
     _sub?.cancel();
-    _sub = _api.sendMessage(trimmed).listen(
+    _sub = _api.sendMessage(trimmed, conversationId: arg).listen(
       (event) {
         // 'heartbeat' keeps the connection open and 'intent' is diagnostic --
         // neither is ever rendered.
@@ -164,6 +210,7 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
     message.syncState = SyncStates.queued;
     await _db.insertMessage(ChatMessagesCompanion.insert(
       clientId: Value(message.clientId),
+      conversationId: Value(arg),
       role: 'user',
       content: message.content,
       composedAt: composedAt,
@@ -181,6 +228,7 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
   ChatMessage _fromLocal(LocalMessage row) => ChatMessage(
         id: row.serverId,
         clientId: row.clientId,
+        conversationId: row.conversationId,
         role: row.role,
         content: row.content,
         createdAt: row.composedAt,
@@ -188,6 +236,8 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
       );
 
   void _finish({String? error}) {
+    _keepAlive?.close();
+    _keepAlive = null;
     _update((s) {
       for (final m in s.messages) {
         m.streaming = false;
@@ -204,4 +254,5 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
 }
 
 final chatControllerProvider =
-    NotifierProvider.autoDispose<ChatController, ChatState>(ChatController.new);
+    NotifierProvider.autoDispose.family<ChatController, ChatState, String>(
+        ChatController.new);

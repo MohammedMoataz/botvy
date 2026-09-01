@@ -43,6 +43,10 @@ function makeService(opts: { stored?: string[]; intent?: unknown } = {}) {
   // A queued message is answered from the conversation, never from the web:
   // the batch path does not search.
   const search = { search: vi.fn().mockResolvedValue([]) };
+  // These messages name no chat, which files them in the coaching one.
+  const conversations = {
+    resolve: vi.fn().mockResolvedValue({ id: 'conv-coaching', clientId: 'coaching' }),
+  };
 
   const service = new ChatService(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,11 +63,13 @@ function makeService(opts: { stored?: string[]; intent?: unknown } = {}) {
     settings as any,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     search as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    conversations as any,
     // Image proxying off: nothing here renders images.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     { get: vi.fn(() => undefined) } as any,
   );
-  return { service, prisma, llm, reminders, search, created };
+  return { service, prisma, llm, reminders, search, conversations, created };
 }
 
 const COMPOSED = new Date('2026-09-01T06:00:00Z');

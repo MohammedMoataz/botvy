@@ -4,6 +4,7 @@ import { PushService } from '../push/push.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { DEFAULT_TIMEZONE, localDate } from '../common/time.js';
 import { CoachingService } from './coaching.service.js';
+import { ConversationsService } from '../chat/conversations.service.js';
 
 export interface NightlyResult {
   considered: number;
@@ -55,6 +56,7 @@ export class NightlyService {
     private readonly prisma: PrismaService,
     private readonly push: PushService,
     private readonly coaching: CoachingService,
+    private readonly conversations: ConversationsService,
     private readonly settings: SettingsService,
   ) {}
 
@@ -74,15 +76,24 @@ export class NightlyService {
     now: Date,
   ): Promise<number> {
     const tokens = profile.user.devices.map((d) => d.fcmToken).filter((t): t is string => !!t);
+    const t = await this.copyFor(profile.language);
 
     await this.coaching.markAwaitingCheckin(profile.userId, now);
 
+    // The question is written into the coaching chat, not only pushed. It used
+    // to exist solely as a notification, so a user who opened the app instead
+    // of tapping it was expected to answer a question that was nowhere on
+    // screen — and the answer arrived in a transcript with no question above it.
+    const conversation = await this.conversations.speak(
+      profile.userId,
+      t('checkinBody', 'Did you train and eat as planned today?'),
+    );
+
     if (tokens.length === 0) return 0;
-    const t = await this.copyFor(profile.language);
     const result = await this.push.send(tokens, {
       title: t('checkinTitle', 'Evening check-in'),
       body: t('checkinBody', 'Did you train and eat as planned today?'),
-      data: { type: 'checkin' },
+      data: { type: 'checkin', conversationId: conversation.id },
     });
     return result.delivered;
   }
@@ -172,11 +183,17 @@ export class NightlyService {
       muscleGroups: program.muscleGroups,
     });
 
+    // The program in full, in the coaching chat. The push body is capped at
+    // 240 characters and `program.text` was stored nowhere — WorkoutRecord
+    // keeps the exercises and muscle groups, not the prose — so until now the
+    // plan the model wrote was truncated into a notification and then lost.
+    const conversation = await this.conversations.speak(profile.userId, program.text);
+
     if (tokens.length === 0) return none;
     const result = await this.push.send(tokens, {
       title: t('programTitle', "Today's program"),
       body: program.text.slice(0, 240),
-      data: { type: 'program' },
+      data: { type: 'program', conversationId: conversation.id },
     });
     return { ...none, sent: result.delivered };
   }

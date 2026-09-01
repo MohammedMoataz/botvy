@@ -5,9 +5,12 @@ import { NightlyService } from './nightly.service.js';
 import { ProgramGenerator } from './program-generator.js';
 import { PushModule } from '../push/push.module.js';
 import { LlmModule } from '../llm/llm.module.js';
+import { ConversationsModule } from '../chat/conversations.module.js';
 
 @Module({
-  imports: [PushModule, LlmModule],
+  // ConversationsModule, not ChatModule — ChatModule imports this one, so the
+  // nightly cycle reaches conversations through the small module both share.
+  imports: [PushModule, LlmModule, ConversationsModule],
   controllers: [CoachingController],
   providers: [CoachingService, NightlyService, ProgramGenerator],
   exports: [CoachingService, NightlyService, ProgramGenerator],
