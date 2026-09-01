@@ -197,9 +197,24 @@ export class SyncService {
       return { entity: 'reminder', id: push.id, clientId: push.clientId, reason: 'stale', server: row };
     }
 
-    if (push.deleted) {
+    if (push.deleted === true) {
       await this.reminders.remove(userId, push.id);
       return null;
+    }
+
+    // An explicit `false` is an undo, and it has to run before the update
+    // below: `ownedOrThrow` treats a tombstone as not-found, so a restore that
+    // went through the ordinary edit path would 404 on its own row.
+    if (push.deleted === false && row.deletedAt) {
+      await this.reminders.restore(userId, push.id);
+      return null;
+    }
+
+    // An ordinary edit for a row that has since been deleted. Reported rather
+    // than attempted: `update` would throw not-found and take the whole sync
+    // with it, and the device needs to be told the row is gone.
+    if (row.deletedAt) {
+      return { entity: 'reminder', id: push.id, clientId: push.clientId, reason: 'gone', server: row };
     }
 
     await this.reminders.update(userId, push.id, {

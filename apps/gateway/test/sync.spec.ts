@@ -15,6 +15,8 @@ function makeService(
     serverUpdatedAt?: Date;
     /** The conversation row the server holds, if the test needs one. */
     chatRow?: unknown;
+    /** Set to make the reminder a tombstone, for the undo paths. */
+    reminderDeletedAt?: Date;
     messages?: unknown[];
   } = {},
 ) {
@@ -23,7 +25,7 @@ function makeService(
     userId: 'u1',
     title: 'Dentist',
     updatedAt: opts.serverUpdatedAt ?? new Date('2026-09-01T12:00:00Z'),
-    deletedAt: null,
+    deletedAt: opts.reminderDeletedAt ?? null,
   };
 
   const prisma = {
@@ -46,6 +48,7 @@ function makeService(
     create: vi.fn().mockResolvedValue(serverRow),
     update: vi.fn().mockResolvedValue(serverRow),
     remove: vi.fn().mockResolvedValue({ id: 'r1', deleted: true }),
+    restore: vi.fn().mockResolvedValue(serverRow),
   };
   const coaching = { upsertProfile: vi.fn().mockResolvedValue({}) };
   const settings = {
@@ -327,6 +330,47 @@ describe('SyncService — pushing the profile', () => {
     await service.sync('u1', { push: { profile: { optedIn: true } as never } });
 
     expect(coaching.upsertProfile).toHaveBeenCalled();
+  });
+});
+
+describe('SyncService — undoing a delete', () => {
+  it('restores a tombstoned reminder when the push says deleted:false', async () => {
+    const base = ago(60_000);
+    const { service, reminders } = makeService({
+      serverUpdatedAt: base,
+      reminderDeletedAt: ago(30_000),
+    });
+    const result = await service.sync('u1', {
+      push: { reminders: [push({ deleted: false, baseUpdatedAt: base })] },
+    });
+
+    expect(reminders.restore).toHaveBeenCalledWith('u1', 'r1');
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('leaves an ordinary edit alone — only an explicit false is an undo', async () => {
+    const base = ago(60_000);
+    const { service, reminders } = makeService({ serverUpdatedAt: base });
+    await service.sync('u1', { push: { reminders: [push({ baseUpdatedAt: base })] } });
+
+    expect(reminders.restore).not.toHaveBeenCalled();
+    expect(reminders.update).toHaveBeenCalled();
+  });
+
+  it('reports an ordinary edit to a deleted row rather than throwing', async () => {
+    // `update` treats a tombstone as not-found, so attempting it would take the
+    // whole sync down instead of telling this one device the row is gone.
+    const base = ago(60_000);
+    const { service, reminders } = makeService({
+      serverUpdatedAt: base,
+      reminderDeletedAt: ago(30_000),
+    });
+    const result = await service.sync('u1', {
+      push: { reminders: [push({ baseUpdatedAt: base })] },
+    });
+
+    expect(reminders.update).not.toHaveBeenCalled();
+    expect(result.rejected[0]).toMatchObject({ entity: 'reminder', reason: 'gone' });
   });
 });
 

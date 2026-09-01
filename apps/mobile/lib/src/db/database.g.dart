@@ -58,6 +58,12 @@ class $RemindersTable extends Reminders
   late final GeneratedColumn<DateTime> baseUpdatedAt =
       GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
           type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   static const VerificationMeta _pendingOpMeta =
       const VerificationMeta('pendingOp');
   @override
@@ -82,6 +88,7 @@ class $RemindersTable extends Reminders
         leadTimes,
         updatedAt,
         baseUpdatedAt,
+        deletedAt,
         pendingOp,
         pushAttempts
       ];
@@ -134,6 +141,10 @@ class $RemindersTable extends Reminders
           baseUpdatedAt.isAcceptableOrUnknown(
               data['base_updated_at']!, _baseUpdatedAtMeta));
     }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
     if (data.containsKey('pending_op')) {
       context.handle(_pendingOpMeta,
           pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
@@ -169,6 +180,8 @@ class $RemindersTable extends Reminders
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
       baseUpdatedAt: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
       pendingOp: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
       pushAttempts: attachedDatabase.typeMapping
@@ -209,6 +222,11 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
   /// would lose all of them.
   final DateTime? baseUpdatedAt;
 
+  /// Set when the reminder has been deleted. The row stays: it is what the
+  /// Deleted view lists and what Restore undoes. Cleared on the server's
+  /// horizon, when a full snapshot stops carrying it.
+  final DateTime? deletedAt;
+
   /// Null once the server agrees with this row.
   final String? pendingOp;
 
@@ -225,6 +243,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
       required this.leadTimes,
       this.updatedAt,
       this.baseUpdatedAt,
+      this.deletedAt,
       this.pendingOp,
       required this.pushAttempts});
   @override
@@ -243,6 +262,9 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
     }
     if (!nullToAbsent || baseUpdatedAt != null) {
       map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
     if (!nullToAbsent || pendingOp != null) {
       map['pending_op'] = Variable<String>(pendingOp);
@@ -267,6 +289,9 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
       baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(baseUpdatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
       pendingOp: pendingOp == null && nullToAbsent
           ? const Value.absent()
           : Value(pendingOp),
@@ -286,6 +311,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
       leadTimes: serializer.fromJson<String>(json['leadTimes']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
       pendingOp: serializer.fromJson<String?>(json['pendingOp']),
       pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
     );
@@ -302,6 +328,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
       'leadTimes': serializer.toJson<String>(leadTimes),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
       'pendingOp': serializer.toJson<String?>(pendingOp),
       'pushAttempts': serializer.toJson<int>(pushAttempts),
     };
@@ -316,6 +343,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
           String? leadTimes,
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<DateTime?> deletedAt = const Value.absent(),
           Value<String?> pendingOp = const Value.absent(),
           int? pushAttempts}) =>
       LocalReminder(
@@ -328,6 +356,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         baseUpdatedAt:
             baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
         pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
         pushAttempts: pushAttempts ?? this.pushAttempts,
       );
@@ -343,6 +372,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
       baseUpdatedAt: data.baseUpdatedAt.present
           ? data.baseUpdatedAt.value
           : this.baseUpdatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
       pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
       pushAttempts: data.pushAttempts.present
           ? data.pushAttempts.value
@@ -361,6 +391,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
           ..write('leadTimes: $leadTimes, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('pendingOp: $pendingOp, ')
           ..write('pushAttempts: $pushAttempts')
           ..write(')'))
@@ -369,7 +400,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
 
   @override
   int get hashCode => Object.hash(id, clientId, title, remindAt, status,
-      leadTimes, updatedAt, baseUpdatedAt, pendingOp, pushAttempts);
+      leadTimes, updatedAt, baseUpdatedAt, deletedAt, pendingOp, pushAttempts);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -382,6 +413,7 @@ class LocalReminder extends DataClass implements Insertable<LocalReminder> {
           other.leadTimes == this.leadTimes &&
           other.updatedAt == this.updatedAt &&
           other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.deletedAt == this.deletedAt &&
           other.pendingOp == this.pendingOp &&
           other.pushAttempts == this.pushAttempts);
 }
@@ -395,6 +427,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
   final Value<String> leadTimes;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> baseUpdatedAt;
+  final Value<DateTime?> deletedAt;
   final Value<String?> pendingOp;
   final Value<int> pushAttempts;
   final Value<int> rowid;
@@ -407,6 +440,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
     this.leadTimes = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.baseUpdatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.pendingOp = const Value.absent(),
     this.pushAttempts = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -420,6 +454,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
     this.leadTimes = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.baseUpdatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.pendingOp = const Value.absent(),
     this.pushAttempts = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -435,6 +470,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
     Expression<String>? leadTimes,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? baseUpdatedAt,
+    Expression<DateTime>? deletedAt,
     Expression<String>? pendingOp,
     Expression<int>? pushAttempts,
     Expression<int>? rowid,
@@ -448,6 +484,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
       if (leadTimes != null) 'lead_times': leadTimes,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (pendingOp != null) 'pending_op': pendingOp,
       if (pushAttempts != null) 'push_attempts': pushAttempts,
       if (rowid != null) 'rowid': rowid,
@@ -463,6 +500,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
       Value<String>? leadTimes,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? baseUpdatedAt,
+      Value<DateTime?>? deletedAt,
       Value<String?>? pendingOp,
       Value<int>? pushAttempts,
       Value<int>? rowid}) {
@@ -475,6 +513,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
       leadTimes: leadTimes ?? this.leadTimes,
       updatedAt: updatedAt ?? this.updatedAt,
       baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       pendingOp: pendingOp ?? this.pendingOp,
       pushAttempts: pushAttempts ?? this.pushAttempts,
       rowid: rowid ?? this.rowid,
@@ -508,6 +547,9 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
     if (baseUpdatedAt.present) {
       map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
     }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (pendingOp.present) {
       map['pending_op'] = Variable<String>(pendingOp.value);
     }
@@ -531,6 +573,7 @@ class RemindersCompanion extends UpdateCompanion<LocalReminder> {
           ..write('leadTimes: $leadTimes, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('pendingOp: $pendingOp, ')
           ..write('pushAttempts: $pushAttempts, ')
           ..write('rowid: $rowid')
@@ -3336,6 +3379,7 @@ typedef $$RemindersTableCreateCompanionBuilder = RemindersCompanion Function({
   Value<String> leadTimes,
   Value<DateTime?> updatedAt,
   Value<DateTime?> baseUpdatedAt,
+  Value<DateTime?> deletedAt,
   Value<String?> pendingOp,
   Value<int> pushAttempts,
   Value<int> rowid,
@@ -3349,6 +3393,7 @@ typedef $$RemindersTableUpdateCompanionBuilder = RemindersCompanion Function({
   Value<String> leadTimes,
   Value<DateTime?> updatedAt,
   Value<DateTime?> baseUpdatedAt,
+  Value<DateTime?> deletedAt,
   Value<String?> pendingOp,
   Value<int> pushAttempts,
   Value<int> rowid,
@@ -3386,6 +3431,9 @@ class $$RemindersTableFilterComposer
 
   ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
       column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get pendingOp => $composableBuilder(
       column: $table.pendingOp, builder: (column) => ColumnFilters(column));
@@ -3428,6 +3476,9 @@ class $$RemindersTableOrderingComposer
       column: $table.baseUpdatedAt,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get pendingOp => $composableBuilder(
       column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
 
@@ -3468,6 +3519,9 @@ class $$RemindersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
       column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
   GeneratedColumn<String> get pendingOp =>
       $composableBuilder(column: $table.pendingOp, builder: (column) => column);
@@ -3510,6 +3564,7 @@ class $$RemindersTableTableManager extends RootTableManager<
             Value<String> leadTimes = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
             Value<String?> pendingOp = const Value.absent(),
             Value<int> pushAttempts = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -3523,6 +3578,7 @@ class $$RemindersTableTableManager extends RootTableManager<
             leadTimes: leadTimes,
             updatedAt: updatedAt,
             baseUpdatedAt: baseUpdatedAt,
+            deletedAt: deletedAt,
             pendingOp: pendingOp,
             pushAttempts: pushAttempts,
             rowid: rowid,
@@ -3536,6 +3592,7 @@ class $$RemindersTableTableManager extends RootTableManager<
             Value<String> leadTimes = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
             Value<String?> pendingOp = const Value.absent(),
             Value<int> pushAttempts = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -3549,6 +3606,7 @@ class $$RemindersTableTableManager extends RootTableManager<
             leadTimes: leadTimes,
             updatedAt: updatedAt,
             baseUpdatedAt: baseUpdatedAt,
+            deletedAt: deletedAt,
             pendingOp: pendingOp,
             pushAttempts: pushAttempts,
             rowid: rowid,

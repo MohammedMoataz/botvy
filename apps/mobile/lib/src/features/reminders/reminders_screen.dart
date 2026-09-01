@@ -43,8 +43,79 @@ class RemindersScreen extends ConsumerWidget {
                 ),
               ],
             ),
-          Expanded(child: _body(context, ref, reminders, controller)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: SegmentedButton<bool>(
+              segments: [
+                const ButtonSegment(value: false, label: Text('Active')),
+                ButtonSegment(
+                  value: true,
+                  label: Text(reminders.deleted.isEmpty
+                      ? 'Deleted'
+                      : 'Deleted (${reminders.deleted.length})'),
+                ),
+              ],
+              selected: {reminders.showDeleted},
+              onSelectionChanged: (_) => controller.toggleDeletedView(),
+            ),
+          ),
+          Expanded(
+            child: reminders.showDeleted
+                ? _deletedBody(context, reminders, controller)
+                : _body(context, ref, reminders, controller),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Recently deleted, with what each one was and a way back.
+  ///
+  /// Bounded by the gateway's own tombstone horizon rather than by anything
+  /// kept here: once the server purges a tombstone it stops appearing in a full
+  /// snapshot, and the row goes with it.
+  Widget _deletedBody(
+    BuildContext context,
+    RemindersState reminders,
+    RemindersController controller,
+  ) {
+    if (reminders.deleted.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: controller.refresh,
+        child: ListView(
+          children: const [
+            SizedBox(height: 120),
+            Padding(
+              padding: EdgeInsets.all(32),
+              child: Text(
+                'Nothing deleted recently.\nDeleted reminders stay here for a while, then go for good.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: controller.refresh,
+      child: ListView.separated(
+        padding: const EdgeInsets.only(bottom: 88),
+        itemCount: reminders.deleted.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, i) {
+          final reminder = reminders.deleted[i];
+          return _DeletedTile(
+            reminder: reminder,
+            onRestore: () async {
+              await controller.restore(reminder.id);
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('"${reminder.title}" restored')),
+              );
+            },
+          );
+        },
       ),
     );
   }
@@ -134,7 +205,9 @@ class RemindersScreen extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete reminder?'),
-        content: Text('"${reminder.title}" will be removed permanently.'),
+        content: Text(
+          '"${reminder.title}" moves to Deleted. You can restore it from there.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -147,7 +220,58 @@ class RemindersScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed == true) await controller.remove(reminder.id);
+    if (confirmed != true) return;
+
+    await controller.remove(reminder.id);
+    if (!context.mounted) return;
+    // The undo the user actually wants is the one for the tap they just
+    // regretted; the Deleted view is for the ones they regret later.
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${reminder.title}" deleted'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => controller.restore(reminder.id),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row in the undo list: what it was, when it went, and a way back.
+class _DeletedTile extends StatelessWidget {
+  const _DeletedTile({required this.reminder, required this.onRestore});
+
+  final Reminder reminder;
+  final VoidCallback onRestore;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final state = reminder.state();
+
+    return ListTile(
+      leading: Icon(
+        switch (state) {
+          ReminderState.completed => Icons.check_circle_outline,
+          ReminderState.cancelled => Icons.cancel_outlined,
+          ReminderState.overdue => Icons.alarm_on,
+          ReminderState.upcoming => Icons.alarm,
+        },
+        color: scheme.outline,
+      ),
+      title: Text(reminder.title, style: TextStyle(color: scheme.onSurfaceVariant)),
+      subtitle: Text([
+        state.label,
+        formatRemindAt(reminder.remindAt),
+        if (reminder.pendingSync) 'waiting to sync',
+      ].join('  ·  ')),
+      trailing: TextButton.icon(
+        onPressed: onRestore,
+        icon: const Icon(Icons.restore, size: 18),
+        label: const Text('Restore'),
+      ),
+    );
   }
 }
 
@@ -176,12 +300,17 @@ class _ReminderTile extends StatelessWidget {
 
     final tile = ListTile(
       leading: Icon(
-        switch (reminder.status) {
-          'done' => Icons.check_circle_outline,
-          'cancelled' => Icons.cancel_outlined,
-          _ => Icons.alarm,
+        switch (reminder.state()) {
+          ReminderState.completed => Icons.check_circle_outline,
+          ReminderState.cancelled => Icons.cancel_outlined,
+          ReminderState.overdue => Icons.alarm_on,
+          ReminderState.upcoming => Icons.alarm,
         },
-        color: finished ? scheme.outline : scheme.primary,
+        color: finished
+            ? scheme.outline
+            : reminder.state() == ReminderState.overdue
+                ? scheme.error
+                : scheme.primary,
       ),
       title: Text(
         reminder.title,
@@ -195,7 +324,11 @@ class _ReminderTile extends StatelessWidget {
           Expanded(
             child: Text([
               formatRemindAt(reminder.remindAt),
-              if (finished) reminder.status,
+              // Overdue is the one state with no stored counterpart: an active
+              // reminder whose moment has passed. Saying so is the difference
+              // between "you have not dealt with this" and silence.
+              if (finished || reminder.state() == ReminderState.overdue)
+                reminder.state().label,
               if (!finished && labels.isNotEmpty) 'alerts: $labels',
             ].join('  ·  ')),
           ),

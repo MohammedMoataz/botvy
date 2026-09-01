@@ -57,6 +57,16 @@ Setup, the environment contract and the verification steps live in `SETUP.md`.
   `not`. Without the conversation condition, an ordinary sentence in an
   unrelated chat records a missed day and zeroes the streak.
 
+- **Deleting a reminder must not touch its status.** The status is the only
+  record of whether it was completed, cancelled or never dealt with, and the
+  Deleted view exists to show exactly that. `remove()` writing `cancelled`
+  alongside the tombstone erased it and made every restore a lie.
+
+- **`pending_op != 'x'` is NULL for a clean row, and NULL is falsy.** Any drift
+  filter meaning "not this pending operation" has to be written
+  `pendingOp.isNull() | pendingOp.equals(x).not()`, or it hides every row that
+  has no pending operation — which is nearly all of them. Bitten twice now.
+
 - **A rejection from `/sync` carries the table it came from.** Both entities
   share the rejection shape, so the device has to branch on `entity`; writing a
   refused chat through the reminder path corrupts rather than crashes.

@@ -71,6 +71,46 @@ void main() {
     });
   });
 
+  group('what a reminder is now', () {
+    final now = DateTime(2026, 9, 1, 12);
+
+    test('one whose moment has passed is overdue, not merely active', () {
+      // The state nobody writes: it arrives because the clock moved. Storing it
+      // would need a job to do the writing, and the job would be the bug.
+      final past = _at('r1', now.subtract(const Duration(hours: 1)));
+      expect(past.state(now), ReminderState.overdue);
+      expect(past.status, 'active'); // the stored value is untouched
+    });
+
+    test('one still ahead is upcoming', () {
+      expect(_at('r1', now.add(const Duration(hours: 1))).state(now),
+          ReminderState.upcoming);
+    });
+
+    test('a finished one keeps saying which way it finished', () {
+      // The distinction deleting used to destroy: it stamped 'cancelled' over
+      // everything, so a completed reminder came back from the dead as an
+      // abandoned one.
+      final done = _at('r1', now.subtract(const Duration(days: 1)), status: 'done');
+      final cancelled =
+          _at('r2', now.subtract(const Duration(days: 1)), status: 'cancelled');
+
+      expect(done.state(now), ReminderState.completed);
+      expect(cancelled.state(now), ReminderState.cancelled);
+    });
+
+    test('a finished reminder is never reported as overdue', () {
+      final done = _at('r1', now.subtract(const Duration(days: 9)), status: 'done');
+      expect(done.state(now), isNot(ReminderState.overdue));
+    });
+
+    test('every state has something to show the user', () {
+      for (final state in ReminderState.values) {
+        expect(state.label, isNotEmpty);
+      }
+    });
+  });
+
   group('formatRemindAt', () {
     // DateTime(...) is always local, so these read the same in every zone.
     final now = DateTime(2026, 9, 1, 9, 0);

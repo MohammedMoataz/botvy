@@ -184,8 +184,9 @@ void main() {
       expect((await h.db.allReminders()).map((r) => r.id), ['r1']);
     });
 
-    test('a tombstone in a delta removes the local row', () async {
-      // This is how a deletion made elsewhere reaches the device at all.
+    test('a tombstone in a delta takes it out of the list but keeps it', () async {
+      // How a deletion made elsewhere reaches the device — and the row stays,
+      // because it is what the Deleted view lists and what Restore undoes.
       final h = harness();
       addTearDown(h.db.close);
       await h.db.upsertReminder(RemindersCompanion.insert(
@@ -203,7 +204,31 @@ void main() {
 
       await h.sync.sync();
 
-      expect(await h.db.allReminders(), isEmpty);
+      expect(await h.db.watchReminders().first, isEmpty);
+      expect((await h.db.watchDeletedReminders().first).map((r) => r.id), ['r1']);
+    });
+
+    test('a restore made elsewhere puts it back', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertReminder(RemindersCompanion.insert(
+        id: 'r1',
+        title: 'Dentist',
+        remindAt: DateTime(2026, 9, 2, 20),
+        deletedAt: Value(DateTime(2026, 9, 1)),
+      ));
+      await h.db.setValue(SyncKeys.cursor, 'cursor-0');
+      h.api.next = SyncResult(
+        now: 'cursor-2',
+        lastMessageId: 0,
+        full: false,
+        reminders: [serverReminder()], // no deletedAt any more
+      );
+
+      await h.sync.sync();
+
+      expect((await h.db.watchReminders().first).map((r) => r.id), ['r1']);
+      expect(await h.db.watchDeletedReminders().first, isEmpty);
     });
 
     test('stores check-ins and programs so history reads offline', () async {
@@ -317,6 +342,35 @@ void main() {
       expect(row.pushAttempts, 1);
       // The cursor still advanced: one refused row cannot stall the pass.
       expect(await h.db.getValue(SyncKeys.cursor), 'cursor-2');
+    });
+
+    test('an undo is pushed as an explicit false, not as an ordinary edit', () async {
+      // The gateway refuses an ordinary edit to a tombstoned row, so omitting
+      // the field would make every restore fail with "gone".
+      final h = harness();
+      addTearDown(h.db.close);
+      await h.db.upsertReminder(RemindersCompanion.insert(
+        id: 'r1',
+        clientId: const Value('r1'),
+        title: 'Dentist',
+        remindAt: DateTime(2026, 9, 2, 20),
+        updatedAt: Value(DateTime(2026, 9, 1, 10)),
+        pendingOp: const Value(ReminderOps.restore),
+      ));
+
+      await h.sync.sync();
+
+      expect(h.api.lastReminders.single['deleted'], false);
+    });
+
+    test('a delete is still pushed as a true', () async {
+      final h = harness();
+      addTearDown(h.db.close);
+      await addPending(h.db, 'r1', op: ReminderOps.delete);
+
+      await h.sync.sync();
+
+      expect(h.api.lastReminders.single['deleted'], true);
     });
 
     test('an offline pass burns no attempt', () async {
