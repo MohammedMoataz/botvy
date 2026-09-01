@@ -12,6 +12,8 @@ export interface SweepResult {
   /** Claimed without a push because every device already holds a local alarm. */
   deliveredLocally: number;
   expired: number;
+  /** Deleted reminders whose tombstone is past the retention window. */
+  purgedTombstones: number;
 }
 
 // Retry window and batch size are settings (reminders.expiryHours,
@@ -44,10 +46,11 @@ export class SweepService {
    * being marked delivered to nobody.
    */
   async run(now: Date = new Date()): Promise<SweepResult> {
-    const [expiryHours, batch, copy] = await Promise.all([
+    const [expiryHours, batch, copy, tombstoneDays] = await Promise.all([
       this.settings.get('reminders.expiryHours'),
       this.settings.get('reminders.sweepBatch'),
       this.settings.get('push.copy'),
+      this.settings.get('reminders.tombstoneDays'),
     ]);
 
     const expiredRows = await this.prisma.reminderNotification.deleteMany({
@@ -57,8 +60,20 @@ export class SweepService {
       },
     });
 
+    // Tombstones exist so an offline device can learn about a deletion. Once
+    // they are older than any offline stretch the sync will still honour, they
+    // are just dead rows. A device that has been away longer than this is
+    // given a full snapshot instead, so nothing is lost by purging.
+    const purgedTombstones = await this.prisma.reminder.deleteMany({
+      where: { deletedAt: { lt: new Date(now.getTime() - tombstoneDays * 86_400_000) } },
+    });
+
     const due = await this.prisma.reminderNotification.findMany({
-      where: { sentAt: null, notifyAt: { lte: now }, reminder: { status: 'active' } },
+      where: {
+        sentAt: null,
+        notifyAt: { lte: now },
+        reminder: { status: 'active', deletedAt: null },
+      },
       include: { reminder: { include: { user: { include: { devices: true } } } } },
       orderBy: { notifyAt: 'asc' },
       take: batch,
@@ -122,7 +137,8 @@ export class SweepService {
       this.logger.log(
         `sweep: ${due.length} due, ${markedSent} claimed, ${pushed} delivered, ` +
           `${deliveredLocally} left to local alarms, ${skippedNoDevice} held (no device), ` +
-          `${devicesRemoved} stale devices removed, ${expiredRows.count} expired`,
+          `${devicesRemoved} stale devices removed, ${expiredRows.count} expired, ` +
+          `${purgedTombstones.count} tombstones purged`,
       );
     }
 
@@ -144,6 +160,7 @@ export class SweepService {
       skippedNoDevice,
       deliveredLocally,
       expired: expiredRows.count,
+      purgedTombstones: purgedTombstones.count,
     };
   }
 

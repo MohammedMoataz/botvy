@@ -28,3 +28,20 @@ Setup, the environment contract and the verification steps live in `SETUP.md`.
   coaching tick write `ops.*` rows; `/health` and the admin portal report them
   as stale. A silent 401 between n8n and the gateway once went unnoticed for
   days.
+
+- **The phone has a schema, and it breaks silently.** Any change to
+  `apps/mobile/lib/src/db/database.dart` needs a `schemaVersion` bump *and* a
+  matching branch in the `MigrationStrategy` in the same file. Drift's default
+  `onUpgrade` throws, so the failure mode is every existing install refusing to
+  open, taking unsent reminders with it.
+
+- **Two timestamps on a reminder mean two different things.** `updatedAt` is
+  when this device last edited the row; `baseUpdatedAt` is the server's own
+  value for the version it last pulled, and a local edit must never touch it.
+  The gateway accepts a push outright while the base still matches — send the
+  local time instead and every offline edit falls through to a clock
+  comparison, which a slow handset loses.
+
+- **The sync delete-sweep runs only against a full snapshot.** A delta lists
+  what changed; treating it as the complete set deletes every reminder that
+  simply did not change. Deletions arrive as tombstones instead.

@@ -45,6 +45,12 @@ export const SETTINGS = {
     default: 24,
     description: 'How long an undelivered notification keeps being retried.',
   },
+  'reminders.tombstoneDays': {
+    schema: z.number().int().positive().max(365),
+    default: 30,
+    description:
+      'How long a deleted reminder is remembered so an offline phone can learn it is gone. A device away longer gets a full snapshot instead.',
+  },
   'coaching.checkinTime': {
     schema: timeOfDay,
     default: '21:00',

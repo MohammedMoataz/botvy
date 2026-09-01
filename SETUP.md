@@ -208,6 +208,7 @@ one generated file; the project's own tests live beside it.
 | `/admin` in a browser | login works; Overview shows live numbers and a running reminder sweep |
 | n8n editor at `:5679` | reachable **only** from the machine itself |
 | `node test/intent-fixture.mjs` (in `apps/gateway`) | 23/23 — run it after changing the model or the intent prompt |
+| `POST /sync` with an empty body | `full: true` and a `now` cursor — the app's whole conversation with the gateway goes through this one route |
 
 `sweepStale: true` means the scheduled jobs are not reaching the gateway.
 Check that n8n actually has the shared secret — `docker exec botvy-n8n-1
@@ -222,6 +223,28 @@ rejects the field and every call fails), and `OLLAMA_NUM_CTX` pins the context
 window. Do not give the intent call and the chat call different windows —
 Ollama keys a loaded model by context size, so two values make it reload on
 every single turn. That cost 39 seconds to the first token; one value costs 3.
+
+### What lives on the phone
+
+The app keeps the user's whole account in its own SQLite database — reminders,
+chat, coaching settings, check-ins and past programs — and reconciles it with
+Postgres through one `POST /sync`. Practical consequences:
+
+- **Everything the app shows works with no connection**, including Settings and
+  the History screen. Edits queue and go up on the next round trip.
+- **Deleted reminders are soft-deleted.** A hard delete cannot appear in a sync
+  delta, so a deletion made in the admin portal would never reach a phone. Rows
+  are really removed by the sweep after `reminders.tombstoneDays` (default 30,
+  in the `settings` table).
+- **A phone offline longer than that horizon gets a full snapshot** rather than
+  a delta, because the tombstones that would have told it about deletions have
+  been purged.
+- Concurrent edits resolve newest-wins, and the loser is replaced on the phone
+  rather than dropped silently.
+
+One thing that follows from this and is easy to forget: an allergy the user
+edits offline does not protect them until it syncs, because the gateway
+withholds unsafe plans based on its own copy.
 
 ### Web search
 
@@ -459,6 +482,14 @@ cd apps\gateway
 npx prisma migrate dev --name what_changed
 ```
 
+The phone has a schema too, and it is the one that breaks silently. Drift's
+default `onUpgrade` throws, so any change to `apps/mobile/lib/src/db/database.dart`
+means bumping `schemaVersion` **and** extending the `MigrationStrategy` in the
+same file. An install that already has data fails to open otherwise, taking
+every unsent reminder and queued message with it. `test/migration_test.dart`
+builds an old-shaped database and asserts the upgrade preserves them; add a
+case to it rather than trusting the change.
+
 ### Moving to another machine
 
 1. Push the repo; clone it on the new machine
@@ -508,6 +539,17 @@ should be empty.
 
 **n8n's API returns 401 to everything.** No owner account exists yet. Run
 `bootstrap.mjs`.
+
+**A `/sync` push is rejected as stale when it obviously is not, but only from
+a script on this machine.** The Docker VM's clock drifts ahead of the host —
+measured at ~6 seconds here. The app is unaffected, because it sends the
+server's own timestamp as its conflict base and that path never looks at a
+clock. A hand-written test client that omits `baseUpdatedAt` falls through to
+the comparison and loses. Check it with:
+
+```powershell
+"host: " + [DateTime]::UtcNow.ToString('o'); docker exec botvy-gateway-1 date -u -Ins
+```
 
 **A port is already taken.** This machine ran an older botvy whose n8n used
 5678, so this stack uses **5679**. Check for a stale process:

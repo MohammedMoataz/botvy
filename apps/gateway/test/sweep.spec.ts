@@ -26,6 +26,7 @@ function makeService(opts: { tokens?: string[]; claimed?: number } = {}) {
       updateMany: vi.fn().mockResolvedValue({ count: opts.claimed ?? 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    reminder: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     device: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     setting: { upsert: vi.fn().mockResolvedValue({}) },
   };
@@ -34,6 +35,7 @@ function makeService(opts: { tokens?: string[]; claimed?: number } = {}) {
     'reminders.expiryHours': 24,
     'reminders.sweepBatch': 200,
     'push.copy': { reminder: { en: 'Reminder' } },
+    'reminders.tombstoneDays': 30,
   };
   const settings = { get: vi.fn().mockImplementation((key: string) => defaults[key]) };
 

@@ -5,6 +5,7 @@ import '../../api/api_client.dart';
 import '../../api/models.dart';
 import '../../app_providers.dart';
 import '../auth/auth_controller.dart';
+import 'coaching_controller.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -97,12 +98,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-/// The profile the gateway keeps for this user: the timezone every reminder is
-/// resolved against, and the coaching cycle's opt-in and times.
-final _profileProvider = FutureProvider.autoDispose<CoachingProfile?>(
-  (ref) => ref.watch(apiClientProvider).coachingProfile(),
-);
-
 const _weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 class _CoachingSection extends ConsumerWidget {
@@ -110,13 +105,9 @@ class _CoachingSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(_profileProvider);
+    final coaching = ref.watch(coachingControllerProvider);
+    final scheme = Theme.of(context).colorScheme;
     final scheduler = ref.watch(notificationSchedulerProvider);
-
-    Future<void> patch(Map<String, dynamic> change) async {
-      await ref.read(apiClientProvider).updateCoachingProfile(change);
-      ref.invalidate(_profileProvider);
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,27 +119,53 @@ class _CoachingSection extends ConsumerWidget {
           // rather than letting a late alarm look like a bug.
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.warning_amber, color: Theme.of(context).colorScheme.error),
+            leading: Icon(Icons.warning_amber, color: scheme.error),
             title: const Text('Exact alarms are off'),
             subtitle: const Text(
               'Android may delay reminders by a few minutes. Enable "Alarms & '
               'reminders" for Botvy in system settings.',
             ),
           ),
-        profile.when(
-          loading: () => const Padding(
+        // The settings live on the device, so they open and edit with no
+        // connection; this only says the server has not been told yet.
+        if (coaching.pending)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Chip(
+                avatar: Icon(Icons.sync, size: 14, color: scheme.outline),
+                label: const Text('Waiting to sync'),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ),
+        if (coaching.loading)
+          const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: LinearProgressIndicator(),
+          )
+        else
+          _CoachingFields(
+            profile: coaching.profile,
+            onPatch: (change) => _apply(ref, change),
           ),
-          error: (e, _) => ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.cloud_off),
-            title: const Text('Coaching settings need a connection'),
-            subtitle: Text('$e'),
-          ),
-          data: (data) => _CoachingFields(profile: data, onPatch: patch),
-        ),
       ],
+    );
+  }
+
+  /// Bridges the field widgets' patch map onto the typed controller, so the
+  /// fields themselves did not have to change.
+  Future<void> _apply(WidgetRef ref, Map<String, dynamic> change) {
+    final controller = ref.read(coachingControllerProvider.notifier);
+    return controller.patch(
+      optedIn: change['optedIn'] as bool?,
+      trainingDays: (change['trainingDays'] as List?)?.cast<int>(),
+      allergies: (change['allergies'] as List?)?.cast<String>(),
+      gymTime: change['gymTime'] as String?,
+      checkinTime: change['checkinTime'] as String?,
+      programTime: change['programTime'] as String?,
+      language: change['language'] as String?,
     );
   }
 }

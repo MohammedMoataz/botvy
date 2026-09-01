@@ -83,31 +83,20 @@ class ChatController extends AutoDisposeNotifier<ChatState> {
   Future<void> loadHistory() async {
     if (!_update((s) => s.copyWith(loading: true, clearError: true))) return;
 
+    // The local store is the history — sync fills it, and this only reads it.
+    // Fetching separately here was a second round trip for rows /sync already
+    // carries, and it meant the screen could show an error for a conversation
+    // it already had.
     final cached = await _db.watchMessages().first;
     _update((s) => s.copyWith(
           messages: [for (final m in cached) _fromLocal(m)],
           loading: false,
         ));
 
-    try {
-      final messages = await _api.history();
-      for (final m in messages) {
-        if (m.id == null) continue;
-        await _db.upsertServerMessage(
-          serverId: m.id!,
-          clientId: m.clientId,
-          role: m.role,
-          content: m.content,
-          composedAt: m.createdAt ?? DateTime.now(),
-        );
-      }
-      final merged = await _db.watchMessages().first;
-      _update((s) => s.copyWith(messages: [for (final m in merged) _fromLocal(m)]));
-    } on ApiException catch (e) {
-      // Offline with a cache is not an error worth a banner over the history.
-      if (cached.isEmpty) _update((s) => s.copyWith(error: e.message));
-    }
-    ref.read(syncServiceProvider).kick();
+    await ref.read(syncServiceProvider).sync();
+    if (_disposed) return;
+    final merged = await _db.watchMessages().first;
+    _update((s) => s.copyWith(messages: [for (final m in merged) _fromLocal(m)]));
   }
 
   void send(String text) {

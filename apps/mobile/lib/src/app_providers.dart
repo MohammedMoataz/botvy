@@ -33,5 +33,6 @@ final pushServiceProvider = Provider<PushService>(
     ref.watch(apiClientProvider),
     ref.watch(databaseProvider),
     ref.watch(notificationSchedulerProvider),
+    ref.watch(syncServiceProvider),
   ),
 );
