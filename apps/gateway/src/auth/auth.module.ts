@@ -8,6 +8,7 @@ import { AuthService } from './auth.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { GoogleAuthService } from './google-auth.service.js';
 import { JwtAuthGuard, RolesGuard } from './roles.guard.js';
+import { AdminSeedService } from './admin-seed.service.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { JwtAuthGuard, RolesGuard } from './roles.guard.js';
   providers: [
     AuthService,
     GoogleAuthService,
+    AdminSeedService,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
