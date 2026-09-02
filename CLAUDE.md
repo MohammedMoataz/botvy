@@ -81,3 +81,13 @@ Setup, the environment contract and the verification steps live in `SETUP.md`.
 - **A rejection from `/sync` carries the table it came from.** Both entities
   share the rejection shape, so the device has to branch on `entity`; writing a
   refused chat through the reminder path corrupts rather than crashes.
+
+- **A fixture pinned to a real date is a time bomb.** `planNotifications` drops
+  a lead time whose moment has passed, so a reminder fixture dated in the future
+  starts failing the day the clock reaches it — for reasons unrelated to any
+  change. Write reminder fixtures relative to `Date.now()`.
+
+- **The seeded admin is `admin`/`admin` and the portal is public.** The gateway
+  creates it when the `ADMIN_EMAIL` account is missing and never resets an
+  existing one, so a changed password sticks. It warns on every boot until it is
+  changed, via `POST /auth/password`.
