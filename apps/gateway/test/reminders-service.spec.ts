@@ -11,7 +11,10 @@ function makeService(existing?: Record<string, unknown>) {
     id: 'r1',
     userId: 'u1',
     title: 'Dentist',
-    remindAt: new Date('2026-09-02T17:00:00Z'),
+    // Relative, not a pinned date: planNotifications drops a lead time whose
+    // moment has already passed, so a fixture pinned to a real date quietly
+    // starts failing the day the clock reaches it. This one did.
+    remindAt: new Date(Date.now() + 30 * 86_400_000),
     leadTimes: ['1d', '2h', '0m'],
     status: 'active',
     deletedAt: null,
@@ -42,7 +45,7 @@ function makeService(existing?: Record<string, unknown>) {
 describe('RemindersService.update', () => {
   it('re-plans a reschedule from the reminder\'s own lead times', async () => {
     const { service, prisma } = makeService();
-    await service.update('u1', 'r1', { remindAt: new Date('2026-12-01T17:00:00Z') });
+    await service.update('u1', 'r1', { remindAt: new Date(Date.now() + 60 * 86_400_000) });
 
     const rows = prisma.reminderNotification.createMany.mock.calls[0][0].data;
     expect(rows.map((r: { label: string }) => r.label)).toEqual([
@@ -88,7 +91,7 @@ describe('RemindersService.create', () => {
     const { service, prisma } = makeService();
     const result = await service.create('u1', {
       title: 'Dentist',
-      remindAt: new Date('2026-09-02T17:00:00Z'),
+      remindAt: new Date(Date.now() + 30 * 86_400_000),
       clientId: 'c1',
     });
 
@@ -105,7 +108,7 @@ describe('RemindersService.create', () => {
     prisma.reminder.findUnique.mockResolvedValue(null);
     await service.create('u1', {
       title: 'Dentist',
-      remindAt: new Date('2026-09-02T17:00:00Z'),
+      remindAt: new Date(Date.now() + 30 * 86_400_000),
       leadTimes: ['3h', '0m'],
       clientId: 'c2',
     });

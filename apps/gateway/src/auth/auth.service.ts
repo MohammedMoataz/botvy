@@ -10,7 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { parseDurationToMs } from './duration.js';
 import { assertRegistrationOpen } from './registration-gate.js';
-import type { RegisterDto, LoginDto } from './dto.js';
+import type { ChangePasswordDto, RegisterDto, LoginDto } from './dto.js';
 
 interface AccessTokenPayload {
   sub: string;
@@ -61,6 +61,32 @@ export class AuthService {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+    return this.issueTokenPair(user.id, user.role);
+  }
+
+  /**
+   * Changes a password, and signs every other session out.
+   *
+   * Revoking the refresh tokens is the point: a password is usually changed
+   * because someone else might know the old one, and leaving their session
+   * alive would make the change cosmetic. The caller keeps working — access
+   * tokens are short-lived and this issues a fresh pair.
+   */
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !(await this.passwordMatches(user.passwordHash, dto.currentPassword))) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await argon2.hash(dto.newPassword) },
+    });
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
     return this.issueTokenPair(user.id, user.role);
   }
 

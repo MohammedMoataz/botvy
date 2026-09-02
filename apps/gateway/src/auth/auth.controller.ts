@@ -1,9 +1,18 @@
 import { Body, Controller, Post } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service.js';
 import { Public } from './public.decorator.js';
 import { GoogleAuthService } from './google-auth.service.js';
-import { GoogleSignInDto, LoginDto, RefreshDto, RegisterDto, TokenPairDto } from './dto.js';
+import { CurrentUser } from './current-user.decorator.js';
+import type { AuthenticatedUser } from './jwt.strategy.js';
+import {
+  ChangePasswordDto,
+  GoogleSignInDto,
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+  TokenPairDto,
+} from './dto.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -45,5 +54,16 @@ export class AuthController {
   @ApiOkResponse({ type: TokenPairDto })
   refresh(@Body() dto: RefreshDto) {
     return this.auth.refresh(dto.refreshToken);
+  }
+
+  /**
+   * Not public: proving you know the current password is not enough on its own,
+   * you also have to be holding that account's access token.
+   */
+  @Post('password')
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: TokenPairDto })
+  changePassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(user.userId, dto);
   }
 }

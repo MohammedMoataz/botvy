@@ -42,6 +42,13 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  // Seeded on first boot when the database has no admin, so a fresh install
+  // has a way in. Change them here and the seeded account follows; leave them
+  // and the gateway warns on every boot, because this admin portal is on the
+  // one surface that is publicly reachable.
+  ADMIN_EMAIL: z.string().min(1).default('admin'),
+  ADMIN_PASSWORD: z.string().min(1).default('admin'),
+
   CHAT_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(20),
   CHAT_DAILY_QUOTA_TOKENS: z.coerce.number().int().positive().default(50000),
   PORT: z.coerce.number().int().positive().default(8080),

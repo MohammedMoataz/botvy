@@ -102,17 +102,46 @@ rejects every API call until an owner exists; an API key's raw value is
 returned exactly once; and the error-handler workflow must be imported
 before anything referencing it, or n8n silently drops the reference.
 
-**4. Create your admin account**
+**4. Log in as the admin**
 
-Registration is open, and the first account is an ordinary user. Promote it:
+The gateway seeds one on first boot, so there is nothing to do here:
+
+| | |
+|---|---|
+| Username | `admin` |
+| Password | `admin` |
+
+> **Change it.** The admin portal is served by the gateway, which is the one
+> thing in this stack that is deliberately public — so anyone who finds your
+> hostname can try `admin`/`admin` and get the user list, every device, and the
+> settings. The gateway says so in its log on every boot until you do.
+
+Either set it before the first boot:
+
+```
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=something-only-you-know
+```
+
+or change it afterwards:
 
 ```powershell
-curl -X POST http://localhost:8080/auth/register -H "Content-Type: application/json" `
-  -d '{\"email\":\"you@example.com\",\"password\":\"a-real-password\"}'
+$t = (curl -s -X POST http://localhost:8080/auth/login -H "Content-Type: application/json" `
+  -d '{\"email\":\"admin\",\"password\":\"admin\"}' | ConvertFrom-Json).accessToken
 
-docker exec botvy-postgres-1 psql -U botvy -d botvy `
-  -c "UPDATE users SET role='admin' WHERE email='you@example.com'"
+curl -X POST http://localhost:8080/auth/password -H "Content-Type: application/json" `
+  -H "Authorization: Bearer $t" `
+  -d '{\"currentPassword\":\"admin\",\"newPassword\":\"something-only-you-know\"}'
 ```
+
+Changing it signs every other session out, and it sticks: the seeder only ever
+*creates* the account, never resets its password. A new password must be at
+least 8 characters, so there is no route back to the shipped default short of
+deleting the account — which does bring it back on the next boot, because it is
+a default.
+
+`ADMIN_EMAIL` is matched literally and does not have to be an email, which is
+why `admin` works as a username. Registration still requires a real address.
 
 **5. Check it worked**
 
@@ -261,6 +290,14 @@ Three consequences worth knowing:
   chat of its own, and the app opens that. The move happens *before* the message
   is stored, so the track never holds it. A turn that stays gets
   `prompts/coaching.md` rather than the general assistant's prompt.
+- **The coach knows the body it is coaching.** Weight, height, a BMI computed
+  in code rather than by the model, goal, experience, training days, gym time,
+  liked and disliked foods, and allergies all go into the prompt — and into
+  `search.md` too, so a searched answer about protein or a training split is
+  answered for *this* person rather than repeating whatever figure a result
+  quotes. An allergy is stated as a prohibition, not a preference. Fields that
+  have not been filled in are left out entirely rather than sent as "unknown",
+  which otherwise has the model asking for them again mid-answer.
 
 **Emptying a chat** is `cleared: true` on a pushed conversation. The messages
 are deleted for real and the conversation records `clearedUpToMessageId`, which

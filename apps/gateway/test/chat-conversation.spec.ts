@@ -17,7 +17,13 @@ const COACHING = { id: 'conv-coaching', clientId: COACHING_CLIENT_ID };
 const OTHER = { id: 'conv-work', clientId: null };
 
 function makeService(
-  opts: { awaiting?: boolean; history?: unknown[]; intent?: string } = {},
+  opts: {
+    awaiting?: boolean;
+    history?: unknown[];
+    intent?: string;
+    profile?: Record<string, unknown>;
+    searchResults?: unknown[];
+  } = {},
 ) {
   const created: Record<string, unknown>[] = [];
   const prisma = {
@@ -45,13 +51,24 @@ function makeService(
   const reminders = { list: vi.fn().mockResolvedValue([]), create: vi.fn() };
   const coaching = {
     userTimezone: vi.fn().mockResolvedValue('Africa/Cairo'),
-    getProfile: vi.fn().mockResolvedValue({ optedIn: false }),
+    getProfile: vi.fn().mockResolvedValue(
+      opts.profile ?? {
+        optedIn: false,
+        trainingDays: [],
+        likedFoods: [],
+        dislikedFoods: [],
+        allergies: [],
+      },
+    ),
     isAwaitingCheckin: vi.fn().mockResolvedValue(opts.awaiting ?? false),
     recordCheckin: vi.fn().mockResolvedValue({}),
     context: vi.fn().mockResolvedValue({ streak: 3, completionRatio: 1 }),
   };
   const settings = { get: vi.fn().mockResolvedValue(20) };
-  const search = { search: vi.fn().mockResolvedValue([]) };
+  const search = {
+    search: vi.fn().mockResolvedValue(opts.searchResults ?? []),
+    searchImages: vi.fn().mockResolvedValue([]),
+  };
   const conversations = {
     resolve: vi.fn().mockImplementation((_u: string, id?: string) =>
       Promise.resolve(id === OTHER.id ? OTHER : COACHING),
@@ -239,6 +256,78 @@ describe('the coaching chat is a track, not a general assistant', () => {
 
     expect(coaching.recordCheckin).toHaveBeenCalled();
     expect(conversations.createFor).not.toHaveBeenCalled();
+  });
+});
+
+describe('the coach knows who it is coaching', () => {
+  const profile = {
+    optedIn: true,
+    weightKg: 82,
+    heightCm: 180,
+    goal: 'lose fat',
+    experience: 'intermediate',
+    trainingDays: [1, 3, 5],
+    gymTime: '18:00',
+    likedFoods: ['rice'],
+    dislikedFoods: ['okra'],
+    allergies: ['peanut'],
+  };
+
+  it('puts their body and their programme in the coaching prompt', async () => {
+    const { service, llm } = makeService({ intent: 'coaching', profile });
+    await drain(service.streamReply('u1', COACHING, 'how much should I eat today?'));
+
+    const system = llm.chat.mock.calls[0][0][0].content as string;
+    expect(system).toContain('82 kg');
+    expect(system).toContain('180 cm');
+    expect(system).toContain('lose fat');
+    expect(system).toContain('intermediate');
+    expect(system).toContain('Monday');
+  });
+
+  it('does the BMI arithmetic in code, not in a 3B model', async () => {
+    const { service, llm } = makeService({ intent: 'coaching', profile });
+    await drain(service.streamReply('u1', COACHING, 'am I where I should be?'));
+
+    // 82 / 1.8^2 = 25.3
+    expect(llm.chat.mock.calls[0][0][0].content).toContain('BMI 25.3');
+  });
+
+  it('states an allergy as a prohibition', async () => {
+    const { service, llm } = makeService({ intent: 'coaching', profile });
+    await drain(service.streamReply('u1', COACHING, 'what should I snack on?'));
+
+    expect(llm.chat.mock.calls[0][0][0].content).toContain('MUST NOT eat peanut');
+  });
+
+  it('carries the profile into a web search too', async () => {
+    // A question about protein or a training split is still a question about
+    // *this* body — and a search result cheerfully recommending peanuts must
+    // not be passed on.
+    const { service, llm } = makeService({
+      intent: 'web_search',
+      profile,
+      searchResults: [{ title: 'Best snacks', url: 'https://x.test', snippet: 'peanuts' }],
+    });
+    await drain(service.streamReply('u1', OTHER, 'best post-workout snack?'));
+
+    const system = llm.chat.mock.calls[0][0][0].content as string;
+    expect(system).toContain('MUST NOT eat peanut');
+    expect(system).toContain('82 kg');
+  });
+
+  it('leaves out what has not been filled in, rather than saying "unknown"', async () => {
+    // A model told "weight: unknown" asks for it again mid-answer, and the
+    // profile screen is where that belongs.
+    const { service, llm } = makeService({
+      intent: 'coaching',
+      profile: { optedIn: true, trainingDays: [], likedFoods: [], dislikedFoods: [], allergies: [] },
+    });
+    await drain(service.streamReply('u1', COACHING, 'what now?'));
+
+    const system = llm.chat.mock.calls[0][0][0].content as string;
+    expect(system).not.toContain('kg');
+    expect(system).toContain('(nothing on file)');
   });
 });
 
