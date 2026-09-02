@@ -91,6 +91,13 @@ interface IntentResult {
   clarifyQuestion?: string;
 }
 
+const WEEKDAYS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** ISO weekday number to a name the model can read back to the user. */
+function weekdayName(day: number): string {
+  return WEEKDAYS[day] ?? String(day);
+}
+
 /** Numbered for the model to cite as [1], [2]. */
 function formatSearchResults(results: SearchResult[]): string {
   return results
@@ -359,6 +366,46 @@ export class ChatService {
     return `Enrolled. Today is ${day}. Current streak: ${context.streak} day(s); ${Math.round(
       context.completionRatio * 100,
     )}% of recent check-ins completed.`;
+  }
+
+  /**
+   * Who the user is, physically: what the coach has to reason from.
+   *
+   * Only what has been filled in. An empty field is left out entirely rather
+   * than sent as "unknown" — a model told "weight: unknown" tends to ask for
+   * it again mid-answer, and the profile screen is where that belongs.
+   *
+   * Allergies are stated as a prohibition, not a preference, because that is
+   * what they are: the nightly generator withholds a whole plan over one.
+   */
+  private async profileLine(userId: string): Promise<string> {
+    const profile = await this.coaching.getProfile(userId);
+    if (!profile) return '(nothing on file)';
+
+    const facts: string[] = [];
+    if (profile.weightKg) facts.push(`weight ${profile.weightKg} kg`);
+    if (profile.heightCm) facts.push(`height ${profile.heightCm} cm`);
+    if (profile.weightKg && profile.heightCm) {
+      const bmi = profile.weightKg / (profile.heightCm / 100) ** 2;
+      // Computed here rather than left to the model: a 3B model doing this
+      // arithmetic mid-sentence gets it wrong often enough to matter.
+      facts.push(`BMI ${bmi.toFixed(1)}`);
+    }
+    if (profile.goal) facts.push(`goal: ${profile.goal}`);
+    if (profile.experience) facts.push(`experience: ${profile.experience}`);
+    if (profile.trainingDays.length > 0) {
+      facts.push(`trains on ${profile.trainingDays.map(weekdayName).join(', ')}`);
+    }
+    if (profile.gymTime) facts.push(`usually trains at ${profile.gymTime}`);
+    if (profile.likedFoods.length > 0) facts.push(`likes ${profile.likedFoods.join(', ')}`);
+    if (profile.dislikedFoods.length > 0) {
+      facts.push(`dislikes ${profile.dislikedFoods.join(', ')}`);
+    }
+    if (profile.allergies.length > 0) {
+      facts.push(`MUST NOT eat ${profile.allergies.join(', ')} — allergic`);
+    }
+
+    return facts.length > 0 ? facts.join('; ') : '(nothing on file)';
   }
 
   /**
@@ -670,6 +717,11 @@ export class ChatService {
                 today: localDate(nowDate, timezone),
                 timezone,
                 question: userMessage,
+                // A search about protein or a training split is still a
+                // question about *this* body. Without the profile the model
+                // parrots whatever general figure the results quote, and can
+                // recommend something they are allergic to.
+                profile: await this.profileLine(userId),
                 results: formatSearchResults(searchResults),
               })
             : coachingTurn
@@ -677,6 +729,7 @@ export class ChatService {
                   today: localDate(nowDate, timezone),
                   now: formatInTz(nowDate, timezone),
                   timezone,
+                  profile: await this.profileLine(userId),
                   coaching: await this.coachingLine(userId),
                 })
               : loadPrompt('chat.md', {
