@@ -1,6 +1,8 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 2.0.0 (MAJOR: principles I, IV, V, VI redefined for the
+- Version change: 1.0.0 → 2.0.0 → 2.1.0 (2.1.0 MINOR, same day: principle IX expanded
+  with repository and unit-of-work ports per store, at the owner's request)
+- 2.0.0 (MAJOR: principles I, IV, V, VI redefined for the
   v2 platform; four principles added; technology constraints rewritten)
 - Modified principles:
   - I. Gateway Owns All Data → I. The API Owns All Data; Each Context Owns Its Store
@@ -120,7 +122,10 @@ Conversations, Meetings & Calendar, Sync, Operations). Inside a context, every
 feature is one vertical slice folder holding its command or query, handler,
 DTO, endpoint and test. Contexts communicate through domain events written to
 the transactional outbox and relayed by the worker, or through query handlers —
-never through shared services or shared collections. The shared kernel holds
+never through shared services or shared collections. Feature and domain code depend
+on repository and unit-of-work ports declared in the context's domain layer; only the
+context's infrastructure layer imports a database driver, one adapter per store, so a
+new store is a new adapter and never a handler change. The shared kernel holds
 only cross-cutting infrastructure (time, auth, settings, outbox, LLM client,
 push, media) and helpers proven duplicated three times.
 Rationale: the v1 chat service became an 802-line junction box because
@@ -195,4 +200,4 @@ principle or materially expanded guidance, PATCH for wording. Every phase plan
 MUST carry the Constitution Check table and justify any deviation in its
 Complexity Tracking section, never absorb it silently.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-29 | **Last Amended**: 2026-09-05
+**Version**: 2.1.0 | **Ratified**: 2026-08-29 | **Last Amended**: 2026-09-05

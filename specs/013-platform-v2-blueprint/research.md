@@ -443,6 +443,38 @@ chat transport, phase order).
 
 ---
 
+### R-31 Repository pattern and unit of work across stores
+
+- **Decision**: Every context defines its repository **ports** in its domain layer
+  (`TaskRepository`, `UserRepository`, …) returning aggregates, never driver types.
+  Infrastructure provides one adapter per store (`MongoTaskRepository` on Mongoose,
+  `PrismaUserRepository` on Prisma) bound to the port by Nest DI in the context
+  module. Writes run inside a `UnitOfWork` port with one adapter per store
+  (`MongoUnitOfWork` = client session + transaction; `PrismaUnitOfWork` =
+  interactive `$transaction`); the outbox writer joins the Mongo unit of work and
+  runs from a post-commit hook for Prisma. Mappers (`toDomain` / `toPersistence`)
+  own the document↔aggregate translation and read-time upcasting by `schemaVersion`.
+  Read models are separate read repositories / query services returning DTOs with
+  projection. `shared/persistence` holds `AggregateRoot`, the `Repository`,
+  `SyncableRepository` and `UnitOfWork` ports, `MongoRepositoryBase`,
+  `PrismaRepositoryBase` and `InMemoryRepositoryBase` (for handler tests). Feature
+  and domain code may not import `mongoose`, `@prisma/client` or `mongodb` — a lint
+  rule enforces it.
+- **Rationale**: user requirement (2026-09-05): the platform already spans two
+  databases and must be able to add more (a cache, a search index, another SQL
+  store) without touching handlers. Ports plus a per-store unit of work keep the
+  driver at the edge of each context; in-memory adapters make handler tests fast
+  and driverless.
+- **Alternatives**: one generic repository over a multi-driver ORM (MikroORM) —
+  a single abstraction hiding two different consistency models; handlers calling
+  Mongoose models directly (v1 style — coupled to Prisma, which is exactly what did
+  not port).
+- **Sources**: user instruction 2026-09-05; https://martinfowler.com/eaaCatalog/repository.html ;
+  https://martinfowler.com/eaaCatalog/unitOfWork.html ;
+  https://docs.nestjs.com/fundamentals/custom-providers
+
+---
+
 ## Part B — Product patterns adopted (from reference apps)
 
 ### P-01 Tasks (Todoist, TickTick, Things 3)
