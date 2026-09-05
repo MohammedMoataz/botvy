@@ -171,9 +171,9 @@ in use keep working until v2 reaches parity.
   context and the slice.
 
 **Spine**
-- **FR-009** The API MUST accept commands over REST, queries over GraphQL and a
-  persistent connection over WebSocket, each behind the same credential check, with
-  member, administrator and machine principals distinguished.
+- **FR-009** The system MUST accept state changes, data reads and a live connection
+  as three separate channels, each behind the same credential check, and MUST
+  distinguish member, administrator and machine callers on every one of them.
 - **FR-010** A command's side effects for other parts of the system MUST be
   recorded as events in the same transaction as the command's own write, and MUST be
   delivered at least once by the worker to in-process handlers and to the automation
