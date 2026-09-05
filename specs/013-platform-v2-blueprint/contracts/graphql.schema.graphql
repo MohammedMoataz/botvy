@@ -1,0 +1,207 @@
+"""
+Botvy v2 — GraphQL query contract (code-first in NestJS; this SDL is the
+committed reference). Queries only: every mutation is a REST command.
+Auth: JWT (user) unless marked @admin. All queries are scoped to the caller.
+Cursor pagination uses opaque `after` strings derived from `_id`/`seq`.
+"""
+
+scalar DateTime
+scalar Date          # YYYY-MM-DD in the member's zone
+scalar JSON
+
+# ---------- Identity / Profile ----------
+
+type User { id: ID!, email: String!, displayName: String, role: Role!, status: UserStatus!, createdAt: DateTime!, lastLoginAt: DateTime }
+enum Role { user admin }
+enum UserStatus { active banned }
+
+type Device { id: ID!, installId: String!, kind: DeviceKind!, name: String, hasPush: Boolean!, lastSeenAt: DateTime }
+enum DeviceKind { android ios chrome_extension web }
+
+type BodyMetric { at: DateTime!, weightKg: Float, heightCm: Float, note: String }
+type Profile {
+  userId: ID!, displayName: String, photoUrl: String, timezone: String!, locale: String!
+  goal: String, experience: String, heightCm: Float
+  latestWeightKg: Float, bmi: Float            # computed in code
+  bodyMetrics(last: Int = 30): [BodyMetric!]!
+  symptoms: [String!]!, likedFoods: [String!]!, dislikedFoods: [String!]!, allergies: [String!]!
+}
+type QuietHours { from: String!, to: String! }
+type Preferences {
+  eveningPlanTime: String!, morningBriefingTime: String!, nextPracticeCutoff: String!
+  defaultLeadTimes: [String!]!, mealMode: MealMode!, aiSuggestions: Boolean!
+  quietHours: QuietHours, weekStartsOn: Int!, checkinEnabled: Boolean!
+}
+enum MealMode { llm library }
+
+# ---------- Planning ----------
+
+type Label { id: ID!, name: String!, color: String!, sortOrder: Int!, openCount: Int! }
+type LabelRef { id: ID, name: String, color: String }
+enum TaskStatus { open completed cancelled }
+type Recurrence { dtstart: DateTime!, rrule: String!, mode: RecurrenceMode, exdates: [DateTime!]!, humanText: String! }
+enum RecurrenceMode { schedule completion }
+type Task {
+  id: ID!, title: String!, notes: String, dueAt: DateTime, allDay: Boolean!, priority: Int!
+  label: LabelRef, status: TaskStatus!, completedAt: DateTime, recurrence: Recurrence
+  estimatedMinutes: Int, deferCount: Int!, source: String!, updatedAt: DateTime!, deletedAt: DateTime
+}
+enum TaskView { today upcoming overdue completed deleted all }
+input TaskFilter { view: TaskView, labelId: ID, priority: Int, from: DateTime, to: DateTime, search: String }
+type TaskConnection { nodes: [Task!]!, endCursor: String, hasNextPage: Boolean! }
+
+# ---------- Reminders ----------
+
+enum ReminderStatus { active done cancelled }
+enum ReminderState { upcoming overdue completed cancelled }    # derived
+type Reminder { id: ID!, title: String!, remindAt: DateTime!, leadTimes: [String!]!, status: ReminderStatus!, state: ReminderState!, snoozedUntil: DateTime, updatedAt: DateTime!, deletedAt: DateTime }
+enum ReminderView { active deleted all }
+
+# ---------- Daily Rhythm ----------
+
+enum PlanStatus { draft confirmed skipped }
+type PlanTask { id: ID!, title: String!, priority: Int!, dueAt: DateTime, status: TaskStatus! }
+type PlanTraining { sessionId: ID!, title: String!, sport: String!, startAt: DateTime!, status: SessionStatus! }
+type DailyPlan {
+  date: Date!, status: PlanStatus!, tasks: [PlanTask!]!, training: PlanTraining
+  workoutLine: String, mealLine: String, promptedAt: DateTime, confirmedAt: DateTime, briefedAt: DateTime
+}
+type Checkin { date: Date!, mood: Int, adhered: Boolean, note: String }
+type Streak { current: Int!, best: Int!, lastAdheredDate: Date, weekAdherence: [Boolean]! }
+
+# ---------- Training ----------
+
+type Slot { id: ID!, weekday: Int!, start: String!, durationMin: Int!, sport: String!, location: String }
+type AthleteProfile { sports: [String!]!, slots: [Slot!]! }
+enum SessionStatus { planned completed cancelled skipped }
+type SetEntry { targetReps: Int, targetWeightKg: Float, targetDurationSec: Int, targetDistanceM: Int, actualReps: Int, actualWeightKg: Float, actualDurationSec: Int, actualDistanceM: Int, done: Boolean! }
+type MediaRef { type: String!, url: String!, caption: String }
+type Exercise { id: ID!, name: String!, notes: String, sets: [SetEntry!]!, mediaRefs: [MediaRef!]! }
+type Session {
+  id: ID!, plannedAt: DateTime!, durationMin: Int!, sport: String!, title: String!, focus: String
+  programId: ID, weekIndex: Int, suggestionId: ID, exercises: [Exercise!]!, status: SessionStatus!, completedAt: DateTime, notes: String
+}
+type NextPractice { session: Session, isToday: Boolean!, reason: String! }   # reason: 'today' | 'after-cutoff' | 'none-scheduled'
+type ProgramSessionTemplate { templateId: ID!, weekday: Int, title: String!, focus: String, exercises: [Exercise!]! }
+type ProgramWeek { index: Int!, sessions: [ProgramSessionTemplate!]! }
+type Program { id: ID!, title: String!, sport: String!, source: String!, sourceLinks: [Link!]!, weeks: [ProgramWeek!]!, status: String! }
+type Workout { id: ID!, name: String!, sport: String!, exercises: [Exercise!]!, tags: [String!]! }
+
+# ---------- Knowledge ----------
+
+enum LinkKind { article website video playlist }
+enum LinkStatus { queued fetching extracting summarising done failed }
+type KnowledgeDoc { title: String, author: String, publishedAt: DateTime, summary: String!, keyPoints: [String!]!, media: [MediaRef!]!, durationSec: Int }
+type Link { id: ID!, url: String!, kind: LinkKind!, title: String, tags: [String!]!, status: LinkStatus!, failReason: String, attempts: Int!, parentId: ID, children: [Link!]!, doc: KnowledgeDoc, addedAt: DateTime!, processedAt: DateTime }
+enum SuggestionStatus { pending accepted dismissed }
+type SuggestionDraft { title: String!, focus: String, exercises: [Exercise!]! }
+type Suggestion { id: ID!, forDate: Date!, sport: String!, draft: SuggestionDraft!, sourceLinks: [Link!]!, rationale: String!, status: SuggestionStatus!, acceptedSessionId: ID, createdAt: DateTime! }
+
+# ---------- Nutrition ----------
+
+type Meal { id: ID!, name: String!, kind: String!, ingredients: [String!]!, tags: [String!]! }
+type MealSuggestion { date: Date!, mode: MealMode!, meals: [MealItem!]!, line: String, withheld: Boolean!, withheldReason: String }
+type MealItem { kind: String!, name: String! }
+
+# ---------- Conversations ----------
+
+enum ConversationKind { coach planner free }
+type Conversation { id: ID!, kind: ConversationKind!, title: String!, pinned: Boolean!, archived: Boolean!, clearedUpToSeq: Int!, lastMessageAt: DateTime, unread: Int! }
+enum MessageRole { user assistant system }
+type Message { seq: Int!, conversationId: ID!, role: MessageRole!, content: String!, clientId: String, composedAt: DateTime, intent: JSON, createdAt: DateTime! }
+type MessageConnection { nodes: [Message!]!, endCursor: String, hasNextPage: Boolean! }
+type QuickQuestion { id: ID!, scope: ConversationKind!, text: String!, mood: String!, isMine: Boolean! }
+
+# ---------- Meetings & Calendar ----------
+
+type Location { onlineLink: String, address: String }
+type Override { originalStart: DateTime!, startAt: DateTime, durationMin: Int, title: String, cancelled: Boolean }
+type MeetingRecurrence { dtstart: DateTime!, rrule: String!, humanText: String!, exdates: [DateTime!]!, overrides: [Override!]! }
+enum MeetingStatus { scheduled completed cancelled }
+type Meeting {
+  id: ID!, title: String!, description: String, startAt: DateTime!, durationMin: Int!, allDay: Boolean!
+  location: Location!, prepNotes: String, prepMinutes: Int!, reminderOffsets: [Int!]!, recurrence: MeetingRecurrence, status: MeetingStatus!
+  nextOccurrence: DateTime
+}
+type CalendarEvent { id: ID!, title: String!, notes: String, startAt: DateTime!, endAt: DateTime!, allDay: Boolean!, color: String, recurrence: Recurrence }
+enum AgendaKind { meeting prep task session event }
+type AgendaItem {
+  kind: AgendaKind!, id: ID!, occurrenceAt: DateTime!, endAt: DateTime, title: String!, subtitle: String
+  color: String, meeting: Meeting, task: Task, session: Session, event: CalendarEvent
+}
+type AgendaDay { date: Date!, items: [AgendaItem!]! }
+
+# ---------- Operations / Admin ----------
+
+type JobStatus { job: String!, lastRunAt: DateTime, lastOkAt: DateTime, lastError: String, stale: Boolean! }
+type Health { status: String!, postgres: Boolean!, mongo: Boolean!, ollama: Boolean!, pushConfigured: Boolean!, jobs: [JobStatus!]! }
+type Setting { key: String!, value: JSON!, default: JSON!, description: String!, updatedAt: DateTime, updatedBy: String }
+type Stats { users: Int!, activeToday: Int!, devices: Int!, tasksOpen: Int!, remindersActive: Int!, messages24h: Int!, tokens24h: Int!, ingestionQueued: Int!, ingestionFailed: Int! }
+type Workflow { id: ID!, name: String!, active: Boolean!, lastRunAt: DateTime, webhookPath: String }
+type UsageRow { day: Date!, kind: String!, model: String!, promptTokens: Int!, completionTokens: Int!, calls: Int! }
+type UserConnection { nodes: [User!]!, endCursor: String, hasNextPage: Boolean! }
+type LinkConnection { nodes: [Link!]!, endCursor: String, hasNextPage: Boolean! }
+
+# ---------- Root ----------
+
+type Query {
+  # identity / profile
+  me: User!
+  myDevices: [Device!]!
+  profile: Profile!
+  preferences: Preferences!
+
+  # planning
+  tasks(filter: TaskFilter, first: Int = 50, after: String): TaskConnection!
+  task(id: ID!): Task
+  labels(includeDeleted: Boolean = false): [Label!]!
+
+  # reminders
+  reminders(view: ReminderView = active): [Reminder!]!
+
+  # daily rhythm
+  todayPlan(date: Date): DailyPlan!             # defaults to today in the member's zone
+  tomorrowDraft: DailyPlan!
+  plans(from: Date!, to: Date!): [DailyPlan!]!
+  checkins(from: Date!, to: Date!): [Checkin!]!
+  streak: Streak!
+
+  # training
+  athleteProfile: AthleteProfile!
+  nextPractice: NextPractice!
+  sessions(from: DateTime!, to: DateTime!): [Session!]!
+  session(id: ID!): Session
+  programs(status: String): [Program!]!
+  program(id: ID!): Program
+  workouts(sport: String): [Workout!]!
+
+  # knowledge
+  links(status: LinkStatus, kind: LinkKind, first: Int = 50, after: String): LinkConnection!
+  link(id: ID!): Link
+  suggestions(status: SuggestionStatus = pending): [Suggestion!]!
+
+  # nutrition
+  meals(kind: String): [Meal!]!
+  todayMeals(date: Date): MealSuggestion
+
+  # conversations
+  conversations(includeArchived: Boolean = false): [Conversation!]!
+  messages(conversationId: ID!, afterSeq: Int, first: Int = 50): MessageConnection!
+  quickQuestions(scope: ConversationKind!): [QuickQuestion!]!
+
+  # meetings & calendar
+  meeting(id: ID!): Meeting
+  meetings(includeCompleted: Boolean = false): [Meeting!]!
+  agenda(from: DateTime!, to: DateTime!): [AgendaDay!]!    # merges meetings(+prep), timed tasks, sessions, events
+  monthOverview(year: Int!, month: Int!): [AgendaDay!]!
+
+  # operations (public health is REST; these are admin)
+  health: Health!                              # @admin
+  stats: Stats!                                # @admin
+  users(search: String, status: UserStatus, first: Int = 50, after: String): UserConnection!   # @admin
+  devices(userId: ID): [Device!]!              # @admin
+  settings: [Setting!]!                        # @admin
+  workflows: [Workflow!]!                      # @admin
+  ingestionQueue(status: LinkStatus): [Link!]! # @admin (all users)
+  usage(from: Date!, to: Date!, userId: ID): [UsageRow!]!   # @admin
+}
