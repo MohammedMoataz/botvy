@@ -115,7 +115,7 @@ apps/
 │   │   │   ├── llm/              # OllamaClient: chat(stream), extract(schema), summarize
 │   │   │   ├── push/             # FCM sender (from v1)
 │   │   │   ├── media/            # signed proxy + SSRF guard (from v1)
-│   │   │   └── persistence/      # PrismaService (identity), MongooseModule config, migrate hooks
+│   │   │   └── persistence/      # Repository/UnitOfWork ports; Mongo, Prisma and InMemory bases; PrismaService, Mongoose config, migrations
 │   │   └── contexts/
 │   │       ├── identity/         # PostgreSQL
 │   │       │   ├── domain/       # User, Credential, RefreshTokenFamily, Device, ServiceClient
@@ -191,6 +191,56 @@ are expressed as a `QueryBus` call to another context's query (read) or an event
 (write side-effects). Commands return `{ id, updatedAt }` or an ack — never a view.
 Two slices that need the same 30-line helper duplicate it until a third needs it;
 then it moves to `shared/`.
+
+### Persistence ports (repository pattern across stores)
+
+The platform spans two stores today and must absorb more without touching
+handlers. Every context therefore talks to storage only through ports it declares
+in its own domain layer:
+
+```text
+contexts/planning/
+├── domain/
+│   ├── task.aggregate.ts            # extends AggregateRoot — collects domain events
+│   ├── task.repository.ts           # abstract class TaskRepository (the port): findById, save, remove, pullSince, applyChange
+│   └── task-read.repository.ts      # abstract class TaskReadRepository: findToday(userId, date), list(filter, cursor) → DTOs
+└── infrastructure/
+    ├── task.schema.ts               # Mongoose schema (driver types stay here)
+    ├── task.mapper.ts               # toDomain(doc) — upcasts by schemaVersion — / toPersistence(aggregate)
+    ├── mongo-task.repository.ts     # extends MongoRepositoryBase<Task, TaskDoc> implements TaskRepository
+    ├── mongo-task-read.repository.ts
+    └── in-memory-task.repository.ts # implements TaskRepository for handler specs
+```
+
+`shared/persistence/` supplies the pieces every context reuses: `AggregateRoot`,
+the `Repository<T>` / `SyncableRepository<T>` / `ReadRepository` ports, the
+`UnitOfWork` port, and one adapter set per store — `MongoUnitOfWork` (client
+session + transaction, outbox writer enlisted), `MongoRepositoryBase` (session
+handling, `updatedAt` optimistic check, tombstones, `pullSince`), `PrismaUnitOfWork`
+(interactive `$transaction`, outbox written from a post-commit hook),
+`PrismaRepositoryBase`, and `InMemoryRepositoryBase`. A handler receives the port
+and the unit of work by DI:
+
+```ts
+@CommandHandler(CreateTaskCommand)
+export class CreateTaskHandler {
+  constructor(private readonly tasks: TaskRepository, private readonly uow: UnitOfWork) {}
+  async execute(cmd: CreateTaskCommand) {
+    return this.uow.run(async () => {
+      const task = Task.schedule(cmd);          // raises TaskScheduled
+      await this.tasks.save(task);              // aggregate + its events, one transaction
+      return { id: task.id, updatedAt: task.updatedAt };
+    });
+  }
+}
+```
+
+The context module binds ports to adapters (`{ provide: TaskRepository, useClass:
+MongoTaskRepository }`); a test module binds the in-memory adapter. Feature and
+domain folders may not import `mongoose`, `mongodb` or `@prisma/client` — an
+`oxlint` `no-restricted-imports` rule fails the build if they do. Adding a store
+(a cache, a search index, another SQL database) is a new adapter set under
+`shared/persistence/<store>/` and new bindings; no handler changes.
 
 ### Principals and guards
 

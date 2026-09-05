@@ -48,6 +48,11 @@ until the foundation phase makes it real.
 - **A context never reads another context's collection.** Cross-context needs
   are a `QueryBus` call or an outbox event. If two slices need the same helper,
   duplicate it; move it to `shared/` on the third copy.
+- **Handlers never import a database driver.** A context declares its repository
+  and unit-of-work ports in `domain/`; only `infrastructure/` imports `mongoose`,
+  `mongodb` or `@prisma/client`, one adapter per store. Handler specs bind the
+  in-memory adapter. A new store is a new adapter set under `shared/persistence/`,
+  never a handler change — the lint rule `no-restricted-imports` enforces it.
 - **Domain events go through the outbox in the same transaction.** Publishing
   straight to the EventBus after `save()` loses events on a crash. Consumers are
   idempotent on `eventId`; the relay delivers at least once.
