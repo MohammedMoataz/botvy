@@ -16,7 +16,7 @@ chat transport, phase order).
 ### R-01 Topology: modular monolith, two deployables
 
 - **Decision**: One NestJS codebase with bounded contexts as modules. Two processes
-  built from it — `api` (REST + GraphQL + WebSocket) and `worker` (outbox relay,
+  built from it — `backend` (REST + GraphQL + WebSocket) and `worker` (outbox relay,
   LLM jobs, link ingestion, sweeps) — selected by `BOTVY_ROLE`. Contexts never read
   another context's collections; they communicate through events.
 - **Rationale**: solo maintenance on one host. The v1 survey's pressure point 05
@@ -389,7 +389,7 @@ chat transport, phase order).
 ### R-26 Public edge: Caddy
 
 - **Decision**: a `caddy` container is the only published port. Routes: `/` →
-  `web:3000`; `/api/*`, `/graphql`, `/ws`, `/health`, `/media` → `api:8080`.
+  `frontend:3000`; `/api/*`, `/graphql`, `/ws`, `/health`, `/media` → `backend:8080`.
   Cloudflare tunnel (or LAN) targets Caddy only.
 - **Rationale**: v1 kept one origin by having the gateway serve the SPA; a Next
   server breaks that. Caddy keeps constitution V (single public surface) true with
@@ -400,8 +400,8 @@ chat transport, phase order).
 
 ### R-27 Runtime, images, CI/CD
 
-- **Decision**: Node 24 LTS; pnpm 9 workspace; 3-stage Dockerfiles for `api`
-  (also runs `worker` via `BOTVY_ROLE`) and `web` (standalone). GitHub Actions:
+- **Decision**: Node 24 LTS; pnpm 9 workspace; 3-stage Dockerfiles for `backend`
+  (also runs `worker` via `BOTVY_ROLE`) and `frontend` (standalone). GitHub Actions:
   build + test every app on PR; on tag build images to GHCR; deploy job over SSH
   runs `docker compose pull && docker compose up -d` with the image tag in `.env`.
   Flutter APK via `subosito/flutter-action` (+ optional Firebase App Distribution);

@@ -22,7 +22,7 @@ node infra/bootstrap.mjs              # prisma migrate deploy, migrate-mongo up,
                                       # service client for n8n, workflow import (error handler first)
 ```
 
-Services: `caddy` (:80/:443, the only published port), `web` (Next.js), `api`,
+Services: `caddy` (:80/:443, the only published port), `frontend` (Next.js), `backend`,
 `worker`, `postgres`, `mongo` (replica set `rs0`, auto-initiated by its
 healthcheck), `mongodump` (nightly), `n8n` (127.0.0.1:5679), `cloudflared`
 (profile `tunnel`). Ollama runs on the host.
@@ -35,9 +35,9 @@ curl http://localhost/health          # expect {"status":"ok", "postgres":true, 
 
 ```powershell
 pnpm install
-pnpm --filter @botvy/api dev              # BOTVY_ROLE=api, watch mode, http://localhost:8080  (/docs, /graphql playground)
-pnpm --filter @botvy/api dev:worker       # BOTVY_ROLE=worker
-pnpm --filter @botvy/web dev              # http://localhost:3000
+pnpm --filter @botvy/backend dev          # BOTVY_ROLE=backend, watch mode, http://localhost:8080  (/docs, /graphql playground)
+pnpm --filter @botvy/backend dev:worker       # BOTVY_ROLE=worker
+pnpm --filter @botvy/frontend dev              # http://localhost:3000
 pnpm --filter @botvy/extension dev        # WXT dev build → load apps/extension/.output/chrome-mv3 in chrome://extensions
 cd apps/mobile; flutter run --dart-define=BOTVY_BASE_URL=http://10.0.2.2:8080
 ```
@@ -52,7 +52,7 @@ generate` (OpenAPI → TS types, GraphQL SDL → TS types; Dart models via
 pnpm -r lint
 pnpm -r test                               # vitest: api/worker/packages; Playwright: web, extension
 cd apps/mobile; flutter analyze; flutter test
-node apps/api/test/intent-fixture.mjs      # live Ollama intent harness (manual)
+node apps/backend/test/intent-fixture.mjs      # live Ollama intent harness (manual)
 ```
 
 Smoke path after `up -d`:
