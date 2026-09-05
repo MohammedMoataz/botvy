@@ -125,8 +125,9 @@ chat transport, phase order).
   Mongo transaction as the aggregate write. The `worker` opens a change stream on
   `outbox`, dispatches each event to in-process handlers (EventBus) and to
   registered n8n webhooks, then marks it delivered. Events carry a UUID for
-  idempotent consumers. Identity (Postgres) writes its events to the Mongo outbox
-  after commit (at-least-once; consumers idempotent).
+  idempotent consumers. Identity (Postgres) writes its events to an
+  `identity_outbox` table inside the same Prisma transaction; the relay polls it and
+  forwards into the Mongo outbox, so that hop is at-least-once as well.
 - **Rationale**: no broker justified on one host; change streams beat polling
   (no cadence, no missed window). n8n subscribes by webhook, satisfying "automation
   workflow or background job for those events".
@@ -452,7 +453,8 @@ chat transport, phase order).
   module. Writes run inside a `UnitOfWork` port with one adapter per store
   (`MongoUnitOfWork` = client session + transaction; `PrismaUnitOfWork` =
   interactive `$transaction`); the outbox writer joins the Mongo unit of work and
-  runs from a post-commit hook for Prisma. Mappers (`toDomain` / `toPersistence`)
+  for Prisma writes to `identity_outbox` in the same transaction, which the relay
+  forwards. Mappers (`toDomain` / `toPersistence`)
   own the document↔aggregate translation and read-time upcasting by `schemaVersion`.
   Read models are separate read repositories / query services returning DTOs with
   projection. `shared/persistence` holds `AggregateRoot`, the `Repository`,
@@ -495,7 +497,8 @@ chat transport, phase order).
 
 - Evening ritual = review today, roll unfinished tasks forward (increment
   `deferCount`), confirm tomorrow's short list. Morning ritual = the plan for
-  today with the training slot. Botvy's 22:00 / 08:00 prompts map onto these.
+  today with the training slot. Botvy's 21:00 plan prompt, 22:00 end-of-day summary and 08:00 briefing map onto
+  these.
 - Unfinished tasks are never silently re-dated; the rollover is explicit and
   counted.
 - Sources: https://get-alfred.ai/blog/sunsama-vs-motion ;
@@ -550,7 +553,7 @@ chat transport, phase order).
 
 | Brief said | Resolved as |
 |---|---|
-| "set it by 10pm by default … remind at the end of the day with the highest priority tasks in the next day and if the user has a training" | One evening ritual at `eveningPlanTime` (22:00): shows tomorrow's draft (top-priority tasks + training flag), asks to confirm/edit. No separate nudge time; adding one later is a single preference. |
+| "set it by 10pm by default … remind at the end of the day with the highest priority tasks in the next day and if the user has a training" | Two evening touches, both preferences: `planTomorrowTime` (21:00) asks about tomorrow and shows the draft; `endOfDayTime` (22:00) sets the plan (auto-confirming an unanswered draft — "set it by 10pm by default"), sends the summary naming top-priority tasks and whether there is training, and asks the check-in. |
 | "next day practice if the clock passed 9 o'clock (configurable)" | `nextPracticeCutoff` preference, default 21:00 local. |
 | "an optional label" | One label per task (`labelId`), snapshot of name + colour on the task. Many-to-many not modelled (YAGNI; array upgrade is a small migration). |
 | "meals should be generic" | `mealMode` preference: `llm` (generic suggestion) or `library` (rotate the user's own meals, no LLM call). Allergies always excluded; a suggestion containing a declared allergen is withheld. |

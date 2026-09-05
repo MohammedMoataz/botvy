@@ -53,15 +53,20 @@ CREATE TABLE "service_clients" (
   "id" UUID PRIMARY KEY, "name" TEXT UNIQUE NOT NULL, "token_hash" TEXT NOT NULL,
   "scopes" TEXT[] NOT NULL DEFAULT '{}', "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
   "last_used_at" TIMESTAMPTZ, "revoked_at" TIMESTAMPTZ);
+CREATE TABLE "identity_outbox" (                   -- Identity's events, same transaction as the change
+  "id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "aggregate" JSONB NOT NULL, "user_id" UUID,
+  "payload" JSONB NOT NULL, "occurred_at" TIMESTAMPTZ NOT NULL DEFAULT now(), "forwarded_at" TIMESTAMPTZ);
+CREATE INDEX "identity_outbox_pending_idx" ON "identity_outbox"("forwarded_at", "occurred_at");
 ```
 
-Prisma schema declares `User`, `RefreshToken`, `Device`, `ServiceClient` exactly as
-in the blueprint §1. v1's `reminders`, `messages`, `conversations`,
+Prisma schema declares `User`, `RefreshToken`, `Device`, `ServiceClient` and
+`IdentityOutbox` exactly as in the blueprint §1. v1's `reminders`, `messages`, `conversations`,
 `coaching_profiles`, `checkins`, `workout_records`, `usage_log`, `settings`,
 `reminder_notifications` tables remain in the database, undeclared and untouched
 (F-02). Ports in P0: `UserRepository` (findById, findByLogin, save),
-`ServiceClientRepository` (findByName, verifyToken(hash), touch). The admin seed
-(ported) runs through `UserRepository`.
+`ServiceClientRepository` (findByName, verifyToken(hash), touch),
+`IdentityOutboxRepository` (append within the current transaction, listPending,
+markForwarded). The admin seed (ported) runs through `UserRepository`.
 
 ## 3. MongoDB — shared infrastructure + Operations (Mongoose)
 
@@ -102,6 +107,9 @@ pattern compiles against a hand-built v1 file — the harness later phases exten
 `chrome.storage.local` under `botvy.auth`.
 
 ## 6. Events introduced in P0
+
+Identity's events (none in P0 beyond the seed) travel PostgreSQL `identity_outbox` →
+forwarder → Mongo `outbox`; Operations' events start in the Mongo outbox directly.
 
 | Event | Producer | Payload | Consumers |
 |---|---|---|---|

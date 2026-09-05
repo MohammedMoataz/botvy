@@ -35,7 +35,7 @@ instruction; media is proxied
 
 **Scale/Scope**: ~40 backend files, ~14 mobile files, ~4 frontend files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|

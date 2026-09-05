@@ -47,7 +47,10 @@ program apply guarding, skip semantics.
 
 - [ ] T660 [P] `migrate-mongo` indexes; Arabic sport names and RTL screenshots
 - [ ] T661 [P] Coach prompt gains the training line (sport, focus, streak of sessions) through `ProfileSummaryQuery`'s sibling `TrainingSummaryQuery`
-- [ ] T662 Record gate evidence; open `021-knowledge-ingestion`
+- [ ] T662 [P] P4's `intent-executor` gains `set_slots` ("gym Monday and Wednesday at six") and `log_session` ("I trained legs today"); fixture sentences added to the intent corpus (EN + AR)
+- [ ] T663 [P] `purge-on-deleted` handler for `athlete_profiles`, `sessions`, `programs`, `workouts` on `identity.UserDeleted`; spec
+- [ ] T664 [P] Onboarding gains a sports step (registered into P1's step registry) so a new athlete picks sports and slots on first run
+- [ ] T665 Record gate evidence; open `021-knowledge-ingestion`
 
 ## Dependencies
 

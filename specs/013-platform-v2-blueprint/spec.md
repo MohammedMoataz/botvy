@@ -56,10 +56,12 @@ each later phase fits a shape that was designed for it.
 ### User Story 1 — Sign in and set up who I am (Priority: P1)
 
 A new member registers with email, password and a matching confirmation, or with
-Google. They set a display name and photo, confirm their time zone, and enter
+Google. A short first-run walkthrough then sets them up in a minute: display name
+and photo, time zone confirmed from the device, language, a preview of the three
+daily times, and — once the training feature exists — their sports. They enter
 optional body facts (height, weight, symptoms), foods they like and dislike, and
-allergies. Their defaults (evening plan time 22:00, morning briefing 08:00,
-next-practice cut-off 21:00) are shown and editable.
+allergies. Their defaults (plan-tomorrow prompt 21:00, end-of-day summary 22:00, morning
+briefing 08:00, next-practice cut-off 21:00) are shown and editable.
 
 **Why this priority**: every other feature keys off the account, time zone and
 profile.
@@ -73,8 +75,8 @@ profile and preferences are identical on both.
    **Then** submission is blocked with an inline message and nothing is sent.
 2. **Given** a Google account, **When** the member signs in with Google for the
    first time, **Then** an account is created and the profile screen opens.
-3. **Given** a signed-in member, **When** they change the evening plan time to
-   21:30, **Then** the next evening prompt arrives at 21:30 in their time zone.
+3. **Given** a signed-in member, **When** they change the end-of-day time to
+   21:30, **Then** the next end-of-day summary arrives at 21:30 in their time zone.
 4. **Given** the seeded administrator, **When** they sign in with `admin`/`admin`,
    **Then** they reach the admin portal and are warned to change the password.
 
@@ -138,30 +140,37 @@ alarm fires → snooze 5 minutes → fires again.
 
 ### User Story 4 — A daily rhythm that plans with me (Priority: P1)
 
-Every evening at the member's chosen time (default 22:00) Botvy proposes
-tomorrow: the highest-priority tasks, whether tomorrow has training, and a meal
-line. The member confirms or edits. Every morning at their chosen time (default
-08:00) Botvy briefs them on today's plan. Unfinished tasks roll forward
-explicitly and are counted as carried over. A short daily check-in (mood, did
-you follow the plan) feeds a streak.
+The day has three touches, each at a time the member chooses. In the evening
+(default 21:00) Botvy asks what tomorrow should look like and proposes a draft: the
+highest-priority tasks, whether tomorrow has training, and a meal line; the member
+confirms, edits or ignores it. At the end of the day (default 22:00) Botvy sets the
+plan — the confirmed one, or the draft if nothing was answered — and sends the
+end-of-day summary: tomorrow's top priorities and whether there is training, with a
+short check-in (mood, did you follow today's plan) that feeds a streak. In the
+morning (default 08:00) Botvy briefs them on today's plan. Unfinished tasks roll
+forward explicitly and are counted as carried over.
 
 **Why this priority**: this is the "follow-up program" that turns lists into
 coaching.
 
-**Independent Test**: set evening time to two minutes ahead → the prompt arrives
-in the coach chat and as a notification → confirm → set morning time two minutes
-ahead → the briefing lists the same tasks plus training slot.
+**Independent Test**: set the plan-prompt time two minutes ahead → the question and
+draft arrive in the coach chat and as a notification → do nothing → set the
+end-of-day time two minutes ahead → the summary arrives naming the top priorities
+and training, and the plan is set → set the morning time two minutes ahead → the
+briefing lists the same tasks plus the training slot.
 
 **Acceptance Scenarios**:
 
 1. **Given** three open tasks for tomorrow and a training session tomorrow at
-   18:00, **When** the evening prompt fires, **Then** it lists the tasks ordered by
+   18:00, **When** the plan prompt fires, **Then** it lists the tasks ordered by
    priority and states "Training: Upper body 18:00".
-2. **Given** a member in Cairo and one in Berlin, **When** the clock passes 22:00
-   in each zone, **Then** each receives the prompt at their own 22:00 and only once.
-3. **Given** the service was down at 22:00, **When** it returns at 22:40,
-   **Then** the prompt is still sent that evening (never skipped, never doubled).
-4. **Given** the check-in reply "I rested today" typed in an unrelated chat,
+2. **Given** the member never answered the prompt, **When** the end-of-day time
+   passes, **Then** the draft becomes the plan and the summary says so.
+3. **Given** a member in Cairo and one in Berlin, **When** the clock passes 22:00
+   in each zone, **Then** each receives the summary at their own 22:00 and only once.
+4. **Given** the service was down at 22:00, **When** it returns at 22:40,
+   **Then** the summary is still sent that evening (never skipped, never doubled).
+5. **Given** the check-in reply "I rested today" typed in an unrelated chat,
    **When** it is sent, **Then** it does not count as a check-in.
 
 ---
@@ -316,7 +325,7 @@ queue and usage. The public website describes the product and links to the app.
 ### User Story 12 — Everything is mine to configure (cross-cutting, P1)
 
 Every default named in this document is a preference the member can change:
-evening plan time, morning briefing time, next-practice cut-off, default lead
+plan-prompt time, end-of-day time, morning briefing time, next-practice cut-off, default lead
 times, meal mode, suggestions on/off, quiet hours, language (English/Arabic),
 label colours. Operator-level defaults (for new members) are editable in the admin
 portal.
@@ -382,8 +391,12 @@ portal.
   alerts through the same mechanism as reminders.
 
 **Daily rhythm**
-- **FR-D01** At the member's evening time, Botvy MUST present tomorrow's draft
-  (top-priority tasks, training if any, meal line) and accept confirmation/edits.
+- **FR-D01** At the member's plan-prompt time, Botvy MUST ask about tomorrow and
+  present a draft (top-priority tasks, training if any, meal line), accepting
+  confirmation or edits.
+- **FR-D01a** At the member's end-of-day time, Botvy MUST set tomorrow's plan (the
+  confirmed one, else the draft) and send a summary naming the top-priority tasks
+  and whether there is training.
 - **FR-D02** At the member's morning time, Botvy MUST present today's plan.
 - **FR-D03** Prompts MUST fire once per local day per member, and MUST catch up
   if the system was unavailable at the scheduled minute.
@@ -405,6 +418,11 @@ portal.
 - **FR-C05** Replies MUST stream and MUST be cancellable.
 - **FR-C06** Messages composed offline MUST be delivered later, interpreted as of
   the time they were typed.
+- **FR-C07** The coach MUST record facts a member states in conversation (weight,
+  height, goal, foods, allergies, meals, training days) into their profile after a
+  short confirmation, so nothing has to be re-entered in a form.
+- **FR-C08** A list answer (today's tasks, reminders, meetings, the plan) MUST be
+  shown as a structured, tappable list, not only as prose.
 
 **Meetings & calendar**
 - **FR-M01** A meeting has name, description, start, duration, location (online
@@ -515,9 +533,10 @@ portal.
   account exists.
 - Saving a YouTube link is a personal, low-volume use of public content by the
   member; Botvy documents the platform's terms and does not redistribute content.
-- The daily rhythm is one evening touch and one morning touch; a separate
-  end-of-day nudge is folded into the evening prompt (one preference away if
-  wanted).
+- The evening has two touches — a plan prompt (default 21:00) and an end-of-day
+  summary (default 22:00) that sets the plan when nothing was answered and asks the
+  check-in — followed by the morning briefing (default 08:00). All three are
+  preferences.
 - One label per task.
 
 ## Out of scope (this blueprint)

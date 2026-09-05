@@ -29,8 +29,9 @@ consumer needs — never whole documents (consumers query their own read side).
 | `reminders.ReminderScheduled` / `ReminderRescheduled` / `ReminderSnoozed` | Reminders | `{ reminderId, remindAt, leadTimes }` | Notifications → (re)plan alerts |
 | `reminders.ReminderCompleted` / `ReminderCancelled` / `ReminderDeleted` / `ReminderPurged` | Reminders | `{ reminderId }` | Notifications → drop unsent alerts |
 | `notifications.AlertSent` / `AlertFailed` | Notifications | `{ alertId, source, deviceIds, error? }` | Operations → usage/audit; Conversations → `alert.fired` to sockets |
-| `rhythm.PlanTomorrowPrompted` | Rhythm | `{ date, taskIds, trainingSessionId?, mealLine? }` | Notifications → alert `evening`; Conversations → `chat.message` to sockets |
-| `rhythm.PlanConfirmed` / `PlanSkipped` | Rhythm | `{ date, taskIds }` | Planning → `rollover` for tasks left from today (deferCount+1) |
+| `rhythm.PlanTomorrowPrompted` | Rhythm | `{ date, taskIds, trainingSessionId?, mealLine? }` | Notifications → alert `plan`; Conversations → `chat.message` to sockets |
+| `rhythm.EndOfDaySummarySent` | Rhythm | `{ date, taskIds, trainingSessionId?, autoConfirmed, checkinAsked }` | Notifications → alert `end_of_day`; Conversations → `chat.message`; Planning → `rollover` for today's leftovers |
+| `rhythm.PlanConfirmed` / `PlanSkipped` | Rhythm | `{ date, taskIds, autoConfirmed }` | Rhythm (self) → the morning briefing reads it |
 | `rhythm.MorningBriefingSent` | Rhythm | `{ date }` | Notifications → alert `morning`; Conversations → `chat.message` |
 | `rhythm.CheckinRecorded` | Rhythm | `{ date, mood, adhered }` | Conversations → adjust quick questions (mood); Rhythm (self) → streak |
 | `training.SportsChanged` / `SlotsChanged` | Training | `{ sports, slots }` | Training (self) → re-materialise sessions 14 days |
@@ -56,7 +57,7 @@ consumer needs — never whole documents (consumers query their own read side).
 | Saga | Listens | Does |
 |---|---|---|
 | `AlertPlanningSaga` (Notifications) | every *Scheduled/Rescheduled/Completed/Cancelled/Deleted* above | keeps `alerts` consistent with sources; rolling 14-day window for recurring meetings |
-| `TomorrowDraftSaga` (Rhythm) | `TaskScheduled`, `SessionScheduled`, `MealPlanReady` | marks tomorrow's draft stale so the evening prompt rebuilds it |
+| `TomorrowDraftSaga` (Rhythm) | `TaskScheduled`, `SessionScheduled`, `MealPlanReady` | marks tomorrow's draft stale so the plan prompt (or the end-of-day touch) rebuilds it |
 | `SessionMaterialiserSaga` (Training) | `SlotsChanged`, `ProgramApplied`, nightly tick | materialises planned sessions 14 days ahead |
 | `SuggestionSaga` (Knowledge) | `SessionScheduled` (+ `aiSuggestions`) | generates a suggestion when the member has relevant sources |
 | `UserLifecycleSaga` (all) | `UserRegistered`, `UserDeleted` | bootstraps / removes per-context documents |

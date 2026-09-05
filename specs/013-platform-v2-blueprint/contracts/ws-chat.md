@@ -34,9 +34,10 @@ Rate limit: `chat.send` ≤ `settings.chat.ratePerMin` per user; excess → `cha
 | Event | Payload | Notes |
 |---|---|---|
 | `chat.accepted` | `{ requestId, conversationId, userSeq }` | user message persisted with its `seq` |
-| `chat.intent` | `{ requestId, intent: 'chat'\|'set_task'\|'set_reminder'\|'set_meeting'\|'list'\|'cancel'\|'record_metric'\|'checkin'\|'web_search', args }` | emitted once the grammar-constrained extraction returns; `chat` = plain conversation |
+| `chat.intent` | `{ requestId, intent: 'chat'\|'set_task'\|'set_reminder'\|'set_meeting'\|'list'\|'cancel'\|'record_metric'\|'update_profile'\|'add_meal'\|'set_slots'\|'log_session'\|'checkin', args }` | emitted once the grammar-constrained extraction returns; `chat` = plain conversation. `update_profile` covers foods, allergies, goal, symptoms; `add_meal`, `set_slots`, `log_session` arrive with P8/P6 |
 | `chat.moved` | `{ requestId, fromConversationId, toConversationId, title }` | a turn started in `coach`/`planner` that is off-topic is moved to a new `free` conversation **before** the reply streams |
 | `chat.token` | `{ requestId, text }` | one token or chunk; leading spaces preserved |
+| `chat.card` | `{ requestId, kind: 'tasks'\|'reminders'\|'meetings'\|'plan'\|'sessions', items: [{ id, title, subtitle?, at?, status?, deepLink }] }` | emitted for list intents before `chat.done`; clients render a tappable list (complete, open) instead of prose |
 | `chat.heartbeat` | `{ requestId }` | every 15 s while the model is silent |
 | `chat.done` | `{ requestId, assistantSeq, usage: { model, promptTokens, completionTokens }, actions: [{ type, id }] }` | `actions` lists commands executed in code (task/reminder/meeting ids) |
 | `chat.error` | `{ requestId, code: 'model_unavailable'\|'rate_limited'\|'quota'\|'protected'\|'internal', message }` | user message is kept; no assistant message stored except for `model_unavailable` (a system note) |

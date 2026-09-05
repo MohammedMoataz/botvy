@@ -6,9 +6,9 @@
 
 **Status**: Draft (phase P3 of `specs/013-platform-v2-blueprint`)
 
-**Input**: Blueprint P3 — "evening ritual 22:00 (tomorrow draft: top priorities +
-training flag → confirm), morning briefing 08:00, check-in, streak, daily plan
-snapshot; per-timezone tick."
+**Input**: Blueprint P3 — "plan prompt 21:00 (tomorrow's draft → confirm), end-of-day
+summary 22:00 (sets the plan, top priorities + training, check-in), morning briefing
+08:00, streak, daily plan snapshot; per-timezone tick."
 
 ## Why this feature exists
 
@@ -20,30 +20,38 @@ lets the coach know it is talking to someone on day nine rather than day one.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 — Plan tomorrow, every evening (Priority: P1)
+### User Story 1 — Plan tomorrow, and have it set by the end of the day (Priority: P1)
 
-At the member's evening time — 22:00 unless they changed it — Botvy proposes
-tomorrow: the highest-priority tasks already due, whether there is training, and the
-day's meal line. The member confirms, edits the selection, or skips. Anything left
-unfinished today is offered for tomorrow, marked with how many times it has been
-carried.
+Two evening touches, each at a time the member chooses. At the plan-prompt time —
+21:00 unless changed — Botvy asks what tomorrow should look like and proposes a
+draft: the highest-priority tasks already due, whether there is training, and the
+day's meal line, with anything left unfinished today offered too, marked with how
+many times it has been carried. The member confirms, edits, or ignores it. At the
+end-of-day time — 22:00 unless changed — Botvy sets tomorrow's plan (the confirmed
+one, or the draft if nothing was answered) and sends the end-of-day summary:
+tomorrow's top priorities and whether there is training.
 
-**Independent Test**: set the evening time two minutes ahead → the proposal arrives
-as a notification and in the coach chat → confirm → tomorrow's plan holds exactly the
-confirmed tasks.
+**Independent Test**: set the plan-prompt time two minutes ahead → the question and
+draft arrive as a notification and in the coach chat → ignore them → set the
+end-of-day time two minutes ahead → the summary arrives, names the top priorities
+and the training, and tomorrow's plan holds exactly the draft.
 
 **Acceptance Scenarios**:
 
-1. **Given** four tasks due tomorrow and a training session, **When** the proposal
+1. **Given** four tasks due tomorrow and a training session, **When** the prompt
    arrives, **Then** it lists the tasks by priority and names the training with its time.
-2. **Given** three tasks still open today, **When** the proposal arrives, **Then**
+2. **Given** three tasks still open today, **When** the prompt arrives, **Then**
    they are offered for tomorrow with their carried-over count.
-3. **Given** the member edits the selection and confirms, **When** the morning comes,
-   **Then** the briefing shows what was confirmed, not the original proposal.
-4. **Given** the member never answers, **When** the morning comes, **Then** the
-   briefing still works from the proposal.
-5. **Given** the member skips the evening, **When** the next evening comes, **Then**
-   the ritual runs again as usual.
+3. **Given** the member edits the selection and confirms, **When** the end-of-day
+   summary arrives, **Then** it reflects the confirmed selection and the morning
+   briefing shows the same.
+4. **Given** the member never answers, **When** the end-of-day time passes, **Then**
+   the draft becomes the plan, the summary says it was set automatically, and the
+   morning briefing works from it.
+5. **Given** the member skips the plan, **When** the end-of-day time passes, **Then**
+   the summary still names tomorrow's training and the next evening runs as usual.
+6. **Given** no tasks and no training tomorrow, **When** the summary arrives,
+   **Then** it says so plainly rather than sending an empty list.
 
 ---
 
@@ -66,32 +74,32 @@ chat. The home screen shows the same thing whenever it is opened.
 
 ### User Story 3 — Once a day, in my own time zone (Priority: P1)
 
-Two members in different countries each get their prompts at their own local time,
-exactly once a day. If the system was down at that minute, the prompt still arrives
-when it comes back, on the same day. It never arrives twice.
+Two members in different countries each get their three touches at their own local
+times, exactly once a day each. If the system was down at a touch's minute, that
+touch still arrives when it comes back, on the same day. It never arrives twice.
 
-**Independent Test**: two accounts with different time zones and the same evening
-time → each is prompted at their own 22:00 → stop the system over one member's 22:00
-and restart at 22:40 → they are prompted once, that evening.
+**Independent Test**: two accounts with different time zones and the same end-of-day
+time → each gets the summary at their own 22:00 → stop the system over one member's
+22:00 and restart at 22:40 → they get it once, that evening.
 
 **Acceptance Scenarios**:
 
-1. **Given** members in Cairo and Berlin, **When** each local 22:00 passes, **Then**
-   each is prompted once and neither is prompted at the other's time.
+1. **Given** members in Cairo and Berlin, **When** each local 21:00 and 22:00 pass,
+   **Then** each gets the prompt and the summary once, and neither at the other's time.
 2. **Given** the system was unavailable at the member's time, **When** it returns
    the same day, **Then** the prompt is sent; if it returns the next day, that day
    is simply missed, never sent late as if it were today.
 3. **Given** a day on which the clock goes forward, **When** the prompt time falls
    inside the missing hour, **Then** it fires once, at the first valid moment.
-4. **Given** the member changes the evening time after being prompted today,
-   **When** the new time passes today, **Then** they are not prompted a second time.
+4. **Given** the member changes the end-of-day time after today's summary was sent,
+   **When** the new time passes today, **Then** no second summary is sent.
 
 ---
 
 ### User Story 4 — A short check-in and a streak (Priority: P1)
 
-With the evening proposal, Botvy asks how the day went: a mood from a simple scale and
-whether the plan was followed, with an optional note. Answering builds a streak of
+With the end-of-day summary, Botvy asks how the day went: a mood from a simple scale
+and whether the plan was followed, with an optional note. Answering builds a streak of
 consecutive days followed. The check-in is only interpreted inside the coaching
 conversation, so ordinary sentences elsewhere never count.
 
@@ -103,15 +111,16 @@ conversation, so ordinary sentences elsewhere never count.
    **Then** nothing is recorded.
 3. **Given** a day answered "no", **When** the streak is shown, **Then** it restarts
    from zero and the best streak is remembered.
-4. **Given** the member turned check-ins off, **When** the evening comes, **Then**
-   only the plan is proposed and no question is asked.
+4. **Given** the member turned check-ins off, **When** the end of day comes, **Then**
+   only the summary is sent and no question is asked.
 
 ---
 
 ### User Story 5 — See the day at a glance (Priority: P1)
 
 The home screen greets the member and shows today: the plan's tasks with what is
-done, the training slot, the meal line, the streak and the week's adherence.
+done and a completion ring (done of total), the training slot, the meal line, the
+streak and the week's adherence.
 
 **Acceptance Scenarios**:
 
@@ -122,10 +131,10 @@ done, the training slot, the meal line, the streak and the week's adherence.
 
 ### Edge Cases
 
-- A member registers at 23:00: no evening prompt is invented for a day already
-  ending; the first prompt is the next evening.
-- The member travels and changes time zone after being prompted: no second prompt
-  that day.
+- A member registers at 23:00: no prompt or summary is invented for a day already
+  ending; the first touch is the next evening.
+- The member travels and changes time zone after a touch was sent: no second copy
+  of that touch that day.
 - Quiet hours cover the member's own morning time: the briefing is the member's own
   choice, so it is not held back.
 - A member with no tasks and no training: the proposal says so plainly rather than
@@ -135,21 +144,25 @@ done, the training slot, the meal line, the streak and the week's adherence.
 
 ## Requirements *(mandatory)*
 
-- **FR-001** At each member's evening time the system MUST propose tomorrow: the
-  highest-priority tasks due, the training session if any, and the meal line.
+- **FR-001** At each member's plan-prompt time the system MUST ask about tomorrow
+  and propose a draft: the highest-priority tasks due, the training session if any,
+  and the meal line.
+- **FR-001a** At each member's end-of-day time the system MUST set tomorrow's plan
+  (the confirmed one, else the draft, marked as set automatically) and send a
+  summary naming the top-priority tasks and whether there is training.
 - **FR-002** Unfinished tasks from today MUST be offered for tomorrow with a count of
   how many times they have been carried.
 - **FR-003** The member MUST be able to confirm, edit or skip the proposal, and the
   result MUST be stored as that day's plan.
 - **FR-004** At each member's morning time the system MUST send today's plan; when
   none was confirmed it MUST build one from what is due.
-- **FR-005** Prompts MUST be delivered as a notification and written into the
-  coaching conversation, so a member who opens the app sees the question on screen.
-- **FR-006** Prompts MUST fire once per member per local day and MUST catch up the
-  same day after downtime; they MUST NOT fire twice if a preference changes after
+- **FR-005** Every touch MUST be delivered as a notification and written into the
+  coaching conversation, so a member who opens the app sees it on screen.
+- **FR-006** Each touch MUST fire once per member per local day and MUST catch up the
+  same day after downtime; a touch MUST NOT fire twice if a preference changes after
   the fact.
-- **FR-007** A check-in MUST record mood, whether the plan was followed and an
-  optional note; it MUST be interpretable only inside the coaching conversation and
+- **FR-007** A check-in, asked with the end-of-day summary, MUST record mood,
+  whether the plan was followed and an optional note; it MUST be interpretable only inside the coaching conversation and
   only within the allowed window.
 - **FR-008** A streak MUST count consecutive followed days and MUST remember the best.
 - **FR-009** Check-ins MUST be switchable off per member.
@@ -160,22 +173,25 @@ done, the training slot, the meal line, the streak and the week's adherence.
 ### Key Entities
 
 **Daily plan** (a date, its chosen tasks, the training slot, the meal line, and
-whether it was proposed, confirmed or skipped), **Check-in**, **Streak**,
+whether it was proposed, confirmed, set automatically or skipped), **Check-in**, **Streak**,
 **Rhythm state** (what has already been sent today, and whether an answer is awaited).
 
 ## Success Criteria *(mandatory)*
 
-- **SC-001** Prompts arrive within 5 minutes of the member's chosen time on 99% of days.
-- **SC-002** Exactly one evening and one morning prompt per member per local day
-  across a 14-day run, including a day with a daylight-saving change.
+- **SC-001** Each touch arrives within 5 minutes of the member's chosen time on 99%
+  of days.
+- **SC-002** Exactly one plan prompt, one end-of-day summary and one morning briefing
+  per member per local day across a 14-day run, including a day with a
+  daylight-saving change.
 - **SC-003** A member confirms tomorrow in under 60 seconds from the notification.
 - **SC-004** Zero check-ins recorded from messages outside the coaching conversation.
 - **SC-005** Home renders today's plan offline in under 300 ms.
 
 ## Assumptions
 
-- The evening ritual carries both the plan proposal and the check-in question; a
-  separate end-of-day nudge is not sent (blueprint assumption).
+- The evening has two touches — the plan prompt and the end-of-day summary that
+  carries the check-in; both times and the morning time are per-member preferences
+  seeded from Owner defaults.
 - "Highest priority" means the top five tasks by priority then due time, editable by
   the member.
 - Training comes from the training feature when it lands; until then the slot is

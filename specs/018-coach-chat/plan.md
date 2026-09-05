@@ -37,7 +37,7 @@ null on failure and the caller falls back to plain conversation; arithmetic in c
 
 **Scale/Scope**: ~45 backend files, ~15 mobile files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|
@@ -70,7 +70,7 @@ contexts/conversations/
 ├── application/
 │   ├── prompt-assembler.ts          # builds system + history from ProfileSummaryQuery, TodayPlanQuery, StreakQuery, NextSessionQuery
 │   ├── intent-extractor.ts          # llm.extract with the JSON schema; returns null on failure
-│   ├── intent-executor.ts           # maps an intent to a CommandBus dispatch + a templated confirmation
+│   ├── intent-executor.ts           # maps an intent to a CommandBus dispatch + a templated confirmation (+ chat.card for lists)
 │   └── turn-runner.ts               # the one place a turn's steps are ordered, shared by the socket and the batch
 └── features/
     ├── send-message/ (WS) cancel/ (WS) batch/ (REST)
@@ -88,9 +88,10 @@ step knows about another.
 2. if conversation is coach AND a check-in is awaited → capture-checkin-reply (P3 command)
        recorded → templated reply, done.   unclear → continue
 3. intent = IntentExtractor.extract(text, now, tz)                      → chat.intent
-4. if intent is set/list/cancel/record and it belongs elsewhere:
+4. if intent is set/list/cancel/record/update_profile and it belongs elsewhere:
        relative times resolved in code, required fields checked (ask if missing),
        CommandBus.execute(...) in the owning context, templated confirmation, done
+       (list intents also emit chat.card with the structured items; update_profile confirms in one line first)
 5. if the conversation is pinned and the intent does not belong there → create a new
        conversation, emit moved, and continue there
 6. PromptAssembler.build(kind) → llm.chat(stream) → chat.token…                → chat.done

@@ -32,7 +32,7 @@ when food cannot be produced
 
 **Scale/Scope**: ~25 backend files, ~10 mobile files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|

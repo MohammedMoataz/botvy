@@ -55,7 +55,8 @@ sweep, the drift ladder and the `pendingOp` filter.
 - [ ] T260 Remove the `ping` slice, `pings` collection migration, `ping_echo.json` and the default subscription; the spine is now proven by `planning.TaskScheduled` (blueprint F-13)
 - [ ] T261 [P] `migrate-mongo` script for the new collections' indexes
 - [ ] T262 [P] Arabic strings for tasks and reminders; RTL screenshots
-- [ ] T263 Record gate evidence; open `017-daily-rhythm`
+- [ ] T263 [P] `purge-on-deleted` handlers for `tasks`, `labels`, `reminders` (Planning, Reminders) and unsent `alerts` (Notifications) on `identity.UserDeleted`; spec: two deliveries, one purge
+- [ ] T264 Record gate evidence; open `017-daily-rhythm`
 
 ## Dependencies
 

@@ -54,8 +54,11 @@ until the foundation phase makes it real.
   in-memory adapter. A new store is a new adapter set under `shared/persistence/`,
   never a handler change — the lint rule `no-restricted-imports` enforces it.
 - **Domain events go through the outbox in the same transaction.** Publishing
-  straight to the EventBus after `save()` loses events on a crash. Consumers are
-  idempotent on `eventId`; the relay delivers at least once.
+  straight to the EventBus after `save()` loses events on a crash. Identity's
+  events go to PostgreSQL's `identity_outbox` in the same Prisma transaction and the
+  relay forwards them; a post-commit write to Mongo would lose the event if the
+  process died in between. Consumers are idempotent on `eventId`; the relay delivers
+  at least once.
 - **MongoDB unique indexes treat missing and null as one value.** Any uniqueness
   over an optional field (`clientId`, `nameLower`) needs a partial index with
   `$exists: true` — Postgres NULL-distinct semantics did not port.
@@ -92,8 +95,9 @@ until the foundation phase makes it real.
   per user, and the classifier matches whole words including `rest` and `not`.
   Without the conversation condition, an ordinary sentence in an unrelated chat
   records a missed day and zeroes the streak.
-- **Claim the date, then send.** The rhythm tick sets `lastEveningPromptDate`
-  before building the prompt, so a 5-minute tick asks once a day and a gateway
+- **Claim the date, then send.** The rhythm tick sets the touch's claim date
+  (`lastPlanPromptDate`, `lastEndOfDayDate`, `lastMorningBriefingDate`) before
+  building the message, so a 5-minute tick fires each touch once a day and a gateway
   that was down at 22:00 catches up instead of skipping the day.
 - **The phone has a schema, and it breaks silently.** Any change to a drift table
   needs a `schemaVersion` bump *and* a matching branch in the `MigrationStrategy`

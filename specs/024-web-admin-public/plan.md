@@ -34,7 +34,7 @@ are client components; no analytics or third-party scripts on the public site
 **Scale/Scope**: ~45 frontend files, ~8 backend files (audit query, guard rails,
 subscriptions editor endpoint)
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|

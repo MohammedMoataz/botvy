@@ -1,5 +1,7 @@
 <!--
 Sync Impact Report
+- 2.1.1 (PATCH, same day): principle I clarifies that every store keeps its own
+  transactional outbox (PostgreSQL's `identity_outbox`), closing an at-most-once hop
 - Version change: 1.0.0 → 2.0.0 → 2.1.0 (2.1.0 MINOR, same day: principle IX expanded
   with repository and unit-of-work ports per store, at the owner's request)
 - 2.0.0 (MAJOR: principles I, IV, V, VI redefined for the
@@ -37,8 +39,9 @@ the API, each bounded context owns its store: Identity & Access owns PostgreSQL
 (users, credentials, refresh tokens, devices, service clients); every other
 context owns its MongoDB collections. A context MUST NOT read or write another
 context's tables or collections; it asks through a query handler or reacts to an
-event. There are no cross-store joins and no distributed transactions — Identity
-publishes events after commit and consumers are idempotent.
+event. There are no cross-store joins and no distributed transactions — each store
+records its events in its own outbox inside the same transaction, the worker
+relays them, and consumers are idempotent.
 Rationale: a single writer per store eliminates concurrency bugs and keeps
 validation and auth in one reviewable place; store-per-context keeps the seams
 that let a context become its own service later without a rewrite.
@@ -200,4 +203,4 @@ principle or materially expanded guidance, PATCH for wording. Every phase plan
 MUST carry the Constitution Check table and justify any deviation in its
 Complexity Tracking section, never absorb it silently.
 
-**Version**: 2.1.0 | **Ratified**: 2026-08-29 | **Last Amended**: 2026-09-05
+**Version**: 2.1.1 | **Ratified**: 2026-08-29 | **Last Amended**: 2026-09-05

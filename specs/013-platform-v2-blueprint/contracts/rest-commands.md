@@ -44,7 +44,7 @@ duplicate), `422` domain rule (e.g. allergen), `429` throttled.
 | `POST /tasks/:id/complete` · `/reopen` · `/cancel` | user | `{ at? }` |
 | `POST /tasks/:id/defer` | user | `{ toDate }` → increments `deferCount` |
 | `DELETE /tasks/:id` · `POST /tasks/:id/restore` · `POST /tasks/:id/purge` | user | tombstone / clear / hard-delete (tombstones only) |
-| `POST /tasks/rollover` | user | `{ fromDate, toDate, taskIds? }` — explicit carry-over used by the evening ritual |
+| `POST /tasks/rollover` | user | `{ fromDate, toDate, taskIds? }` — explicit carry-over run by the end-of-day touch |
 | `POST /labels` · `PATCH /labels/:id` · `DELETE /labels/:id` | user | `{ id, name, color?, sortOrder? }` |
 
 ## Reminders
@@ -72,7 +72,7 @@ duplicate), `422` domain rule (e.g. allergen), `429` throttled.
 | `POST /rhythm/plans/:date/skip` | user | |
 | `POST /rhythm/checkins` | user | `{ date?, mood?, adhered?, note? }` |
 | `POST /internal/rhythm/tick` | service (`internal:tick`) | → `{ evening: n, morning: n, users: n }` |
-| `POST /internal/rhythm/prompt` | service | `{ userId?, kind: 'evening'\|'morning' }` — unconditional, for an operator pressing Run |
+| `POST /internal/rhythm/prompt` | service | `{ userId?, kind: 'plan'\|'end_of_day'\|'morning' }` — unconditional, for an operator pressing Run |
 
 ## Conversations (chat)
 

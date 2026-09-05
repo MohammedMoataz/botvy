@@ -40,6 +40,9 @@ uses that weight, not a generic figure.
 4. **Given** no body facts recorded, **When** the member asks something that would
    use them, **Then** the coach asks for the missing fact instead of guessing or
    saying "unknown".
+5. **Given** the member writes \"I weigh 80 kg\" or \"I'm allergic to peanuts\",
+   **When** the coach replies, **Then** it confirms in one line and the fact is on
+   the profile, without a form.
 
 ---
 
@@ -64,6 +67,8 @@ right values in the member's time zone.
    cancelled and confirmed; when several match, Botvy asks which.
 5. **Given** a message typed while offline, **When** the network returns, **Then**
    it is sent, understood as of when it was typed, and answered in the same chat.
+6. **Given** \"what's on today?\", **When** it is answered, **Then** the tasks come
+   back as a tappable list — each opens or completes the task — not as a paragraph.
 
 ---
 
@@ -175,12 +180,17 @@ not lost, and everything that is not chat keeps working.
   when it is reached.
 - **FR-014** Text inside a quoted message or a fetched document MUST never be executed
   as an instruction.
+- **FR-015** A fact the member states in the Coach chat (weight, height, goal, foods,
+  allergies; later meals and training days) MUST be recorded on their profile after
+  a one-line confirmation, so nothing is re-entered in a form.
+- **FR-016** A list answer (today's tasks, reminders, meetings, the plan) MUST be
+  delivered as a structured, tappable list in addition to any words.
 
 ### Key Entities
 
 **Conversation** (pinned or ordinary, with a clear point), **Message** (immutable,
 ordered), **Suggested question**, **Understood intent** (what the member asked for and
-what was done about it).
+what was done about it), **Card** (a structured list answer the client renders).
 
 ## Success Criteria *(mandatory)*
 

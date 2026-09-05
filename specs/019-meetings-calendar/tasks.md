@@ -45,7 +45,8 @@ window reconciliation, agenda ordering, DST stability.
 ## Phase 7 — Polish
 
 - [ ] T560 [P] `migrate-mongo` indexes; Arabic strings for the repeat picker (plural and dual forms); RTL screenshots
-- [ ] T561 Record gate evidence; open `020-training`
+- [ ] T561 [P] `purge-on-deleted` handler for `meetings` and `calendar_events` on `identity.UserDeleted`; spec
+- [ ] T562 Record gate evidence; open `020-training`
 
 ## Dependencies
 

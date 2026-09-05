@@ -28,7 +28,7 @@ type Profile {
 }
 type QuietHours { from: String!, to: String! }
 type Preferences {
-  eveningPlanTime: String!, morningBriefingTime: String!, nextPracticeCutoff: String!
+  planTomorrowTime: String!, endOfDayTime: String!, morningBriefingTime: String!, nextPracticeCutoff: String!
   defaultLeadTimes: [String!]!, mealMode: MealMode!, aiSuggestions: Boolean!
   quietHours: QuietHours, weekStartsOn: Int!, checkinEnabled: Boolean!
 }
@@ -63,8 +63,8 @@ enum PlanStatus { draft confirmed skipped }
 type PlanTask { id: ID!, title: String!, priority: Int!, dueAt: DateTime, status: TaskStatus! }
 type PlanTraining { sessionId: ID!, title: String!, sport: String!, startAt: DateTime!, status: SessionStatus! }
 type DailyPlan {
-  date: Date!, status: PlanStatus!, tasks: [PlanTask!]!, training: PlanTraining
-  workoutLine: String, mealLine: String, promptedAt: DateTime, confirmedAt: DateTime, briefedAt: DateTime
+  date: Date!, status: PlanStatus!, autoConfirmed: Boolean!, tasks: [PlanTask!]!, training: PlanTraining
+  workoutLine: String, mealLine: String, promptedAt: DateTime, confirmedAt: DateTime, summarisedAt: DateTime, briefedAt: DateTime
 }
 type Checkin { date: Date!, mood: Int, adhered: Boolean, note: String }
 type Streak { current: Int!, best: Int!, lastAdheredDate: Date, weekAdherence: [Boolean]! }

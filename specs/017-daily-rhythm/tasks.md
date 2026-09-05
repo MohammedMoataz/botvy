@@ -15,16 +15,17 @@ the classifier's conversation confinement and window, streak arithmetic, rollove
 
 ## Phase 2 — The clock (US3)
 
-- [ ] T310 `features/tick/` — service-only `POST /internal/rhythm/tick`: page members with preferences, compute local date and time, claim-then-send for evening and morning, stamp the heartbeat, return counts; specs: Cairo vs Berlin once each; down at 22:00 and back at 22:40 sends once that day; back the next day sends nothing for the missed day; DST forward day fires once; a preference change after the claim does not re-fire
+- [ ] T310 `features/tick/` — service-only `POST /internal/rhythm/tick`: page members with preferences, compute local date and time, claim-then-send for the three touches (plan prompt, end of day, morning), each with its own claim date, stamp the heartbeat, return counts; specs: Cairo vs Berlin once each; down at 22:00 and back at 22:40 sends once that day; back the next day sends nothing for the missed day; DST forward day fires once; a preference change after the claim does not re-fire
 - [ ] T311 [P] `features/prompt-now/` — service-only unconditional prompt for an operator pressing Run (`{ userId?, kind }`)
 - [ ] T312 [P] `workflows/rhythm_tick.json` — five-minute schedule + webhook, 600 s timeout, error workflow referenced; imported by `bootstrap.mjs`
 
-## Phase 3 — The evening ritual (US1)
+## Phase 3 — The evening: plan prompt and end-of-day summary (US1)
 
 - [ ] T320 `features/tick` draft builder: tasks due tomorrow (top five by priority then time) + tasks still open today with their `deferCount` + `NextSessionQuery(tomorrow)` + `TodayMealsQuery(tomorrow)`; writes `daily_plans[tomorrow]` as `draft`; raises `PlanTomorrowPrompted`; spec: an empty day produces a plan that says so, not an empty list
 - [ ] T321 [P] Prompt delivery: write the proposal into the coaching conversation (Conversations command from P1's bootstrap) and raise the event that Notifications turns into an alert; spec: both happen exactly once per claim
 - [ ] T322 [P] `features/confirm-plan/` and `features/skip-plan/` — store the chosen ids, set status, raise `PlanConfirmed`/`PlanSkipped`
-- [ ] T323 Planning saga on `PlanConfirmed` → `rollover` for tasks moved from today, incrementing `deferCount`; spec asserts the count the next proposal shows
+- [ ] T323 Planning saga on `EndOfDaySummarySent` → `rollover` for tasks moved from today, incrementing `deferCount`; spec asserts the count the next proposal shows
+- [ ] T324 `features/tick` end-of-day branch — claim, auto-confirm an unanswered draft (`autoConfirmed: true`), send the summary (top-priority tasks, training yes/no) into the coach chat and as an alert, set `awaitingCheckin` when `checkinEnabled`, raise `EndOfDaySummarySent`; specs: an unanswered draft becomes the plan; a confirmed one is untouched; an empty day says so
 
 ## Phase 4 — The morning briefing (US2)
 
@@ -40,7 +41,7 @@ the classifier's conversation confinement and window, streak arithmetic, rollove
 ## Phase 6 — Mobile (US5)
 
 - [ ] T350 Drift 3 → 4: `daily_plans`, `checkins`, `rhythm_state` tables (pull-only plus the two push operations), guarded branch, ladder test extended
-- [ ] T351 `features/home` — greeting, today's plan card (tasks with checkboxes, training slot, meal line), streak with the week's adherence dots, "plan tomorrow" card when a draft awaits; reads drift only
+- [ ] T351 `features/home` — greeting, today's plan card (tasks with checkboxes, a completion ring done/total, training slot, meal line), streak with the week's adherence dots, "plan tomorrow" card when a draft awaits; reads drift only
 - [ ] T352 [P] `features/rhythm` — confirm sheet (task list with add/remove and carried-over badges) and check-in sheet (mood slider, followed toggle, note); notification actions route here
 - [ ] T353 [P] Sync adapters for the three tables registered with the facade; cubit specs against the in-memory database
 
@@ -48,7 +49,8 @@ the classifier's conversation confinement and window, streak arithmetic, rollove
 
 - [ ] T360 [P] `migrate-mongo` indexes; Arabic strings; RTL screenshots
 - [ ] T361 [P] Admin: rhythm heartbeat on the Overview; "Run rhythm tick" from the Automation page
-- [ ] T362 Record gate evidence; open `018-coach-chat`
+- [ ] T362 [P] `purge-on-deleted` handler for `daily_plans`, `checkins`, `rhythm_states` on `identity.UserDeleted`; spec
+- [ ] T363 Record gate evidence; open `018-coach-chat`
 
 ## Dependencies
 
@@ -61,11 +63,12 @@ T341 is called by P4 but specced here.
 1. `pnpm --filter @botvy/backend test` — the six clock specs, the classifier guards,
    streak and rollover.
 2. `cd apps/mobile && flutter test && flutter analyze`.
-3. Manual: set the evening time two minutes ahead → the proposal arrives as a
-   notification and appears in the coach chat → confirm → set the morning time two
-   minutes ahead → the briefing lists exactly the confirmed tasks; repeat with a
+3. Manual: set the plan-prompt time two minutes ahead → the question and draft
+   arrive as a notification and in the coach chat → ignore → set the end-of-day
+   time two minutes ahead → the summary arrives and the plan is set → set the
+   morning time two minutes ahead → the briefing lists exactly those tasks; repeat with a
    second account in another time zone and confirm neither sees the other's timing.
-4. Stop the backend over a member's evening time, restart 40 minutes later → the
-   prompt arrives once that evening.
+4. Stop the backend over a member's end-of-day time, restart 40 minutes later → the
+   summary arrives once that evening.
 5. `/health` shows `rhythm.tick` fresh; stopping n8n for 16 minutes turns it stale
    and `/health` degraded.

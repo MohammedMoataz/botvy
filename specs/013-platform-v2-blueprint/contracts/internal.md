@@ -24,8 +24,8 @@ job stale after 15 minutes and the admin overview shows the same.
 | Method & path | Scope | Behaviour | Response |
 |---|---|---|---|
 | `POST /internal/notifications/sweep` | sweep | Find due unsent alerts (batch `settings.notifications.sweepBatch`), skip users with no push device (leave unsent), skip devices with `lastSeenAt >= plannedAt`, **claim** each row atomically, send FCM, expire alerts older than `expiryHours`, purge tombstones past `tombstoneDays`, delete devices whose tokens FCM reports invalid | `{ claimed, sent, skippedLocal, expired, purged, ms }` |
-| `POST /internal/rhythm/tick` | tick | For each member: local `today`/`HH:mm`; evening prompt if due and not yet claimed today; morning briefing likewise; check-in question at evening prompt when `checkinEnabled` | `{ users, evening, morning, checkins, ms }` |
-| `POST /internal/rhythm/prompt` | tick | `{ userId?, kind: 'evening'\|'morning' }` unconditional (operator "Run") | `{ sent }` |
+| `POST /internal/rhythm/tick` | tick | For each member: local `today`/`HH:mm`; plan prompt (21:00) if due and not yet claimed today; end-of-day summary (22:00) likewise, auto-confirming an unanswered draft and asking the check-in when `checkinEnabled`; morning briefing (08:00) likewise | `{ users, planPrompts, endOfDay, morning, checkins, ms }` |
+| `POST /internal/rhythm/prompt` | tick | `{ userId?, kind: 'plan'\|'end_of_day'\|'morning' }` unconditional (operator "Run") | `{ sent }` |
 | `POST /internal/knowledge/ingest/:linkId` | ingest | Re-run the ingestion pipeline for one link regardless of state | `{ status }` |
 | `POST /internal/alerts` | alerts | `{ workflow, error, executionId? }` → push to all admin devices + `audit_log` | `{ notified }` |
 

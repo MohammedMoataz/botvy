@@ -45,7 +45,8 @@ chunked summarisation, the preference gate and injection containment.
 - [ ] T750 [P] Registry keys `knowledge.maxAttempts`, `maxChars`, `playlistMaxItems`, `concurrency` with schemas and descriptions
 - [ ] T751 [P] `test/ingest-fixture.mjs` + 10 saved article fixtures for the faithfulness review (SC-004)
 - [ ] T752 [P] `SETUP.md` section on the platform-terms caveat and the `yt-dlp` fallback
-- [ ] T753 Record gate evidence including the fixture review; open `022-nutrition-daily-plan`
+- [ ] T753 [P] `purge-on-deleted` handler for `links`, `knowledge_docs`, `suggestions` on `identity.UserDeleted`; spec
+- [ ] T754 Record gate evidence including the fixture review; open `022-nutrition-daily-plan`
 
 ## Dependencies
 
