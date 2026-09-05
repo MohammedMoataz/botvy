@@ -63,7 +63,7 @@ default user-configurable; English + Arabic (RTL); solo-maintainable
 
 | Principle | Status | How this plan complies |
 |---|---|---|
-| I. The API owns all data; each context owns its store | PASS | Only `api`/`worker` touch Postgres or Mongo; contexts never read another's collections; Identity ↔ Mongo contexts via query handlers + outbox events |
+| I. The API owns all data; each context owns its store | PASS | Only `backend`/`worker` touch Postgres or Mongo; contexts never read another's collections; Identity ↔ Mongo contexts via query handlers + outbox events |
 | II. n8n is workflow infrastructure only | PASS | n8n holds one service token, no data; workflows in git; calls `/internal/*`; subscribes to events via webhooks |
 | III. Local-first LLM | PASS | Ollama only; models as settings; grammar-constrained extraction |
 | IV. Forward-only migrations | PASS | Prisma + `migrate-mongo` forward-only; `schemaVersion` on documents; mobile drift ladder rule |
@@ -102,7 +102,7 @@ specs/013-platform-v2-blueprint/
 
 ```text
 apps/
-├── api/                          # NestJS — builds both `api` and `worker` (BOTVY_ROLE)
+├── backend/                      # NestJS — builds both `backend` and `worker` (BOTVY_ROLE)
 │   ├── src/
 │   │   ├── main.ts               # role switch: http+graphql+ws edge | worker
 │   │   ├── app.module.ts
@@ -139,7 +139,7 @@ apps/
 │   ├── test/                     # vitest specs live beside slices; fixtures + intent harness here
 │   ├── migrations/mongo/         # migrate-mongo scripts
 │   └── Dockerfile
-├── web/                          # Next.js 16
+├── frontend/                     # Next.js 16
 │   ├── app/(marketing)/          # landing, features, download
 │   ├── app/(admin)/              # overview, users, devices, settings, workflows, ingestion, usage
 │   ├── stores/                   # MobX stores (from packages/sdk) provisioned per request
@@ -161,7 +161,7 @@ packages/
 ├── sdk/                          # typed REST client, socket client, MobX stores (web + extension)
 └── tokens/                       # tokens.json → css vars, dart theme
 infra/
-├── docker-compose.yml            # caddy, web, api, worker, postgres, mongo, mongodump, n8n, cloudflared
+├── docker-compose.yml            # caddy, frontend, backend, worker, postgres, mongo, mongodump, n8n, cloudflared
 ├── Caddyfile
 ├── mongo/init-replica.sh
 └── bootstrap.mjs                 # migrations (both stores), n8n owner/API key, workflow import

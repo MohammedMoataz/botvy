@@ -11,7 +11,7 @@ task list — the phase's own `tasks.md` expands them.
 
 Format: `[ID] [P?] Description` — `[P]` = can run in parallel within the phase.
 
-Legend for surfaces: **API** (api+worker), **MOB** (Flutter), **WEB** (Next.js),
+Legend for surfaces: **API** (apps/backend: `backend` + `worker` processes), **MOB** (Flutter), **WEB** (Next.js),
 **EXT** (extension), **INF** (compose/CI), **PKG** (shared packages).
 
 ---
@@ -21,8 +21,8 @@ Legend for surfaces: **API** (api+worker), **MOB** (Flutter), **WEB** (Next.js),
 **Goal**: an empty but complete skeleton of every surface, both stores, the
 outbox, the edge and CI/CD — so every later phase adds slices, not plumbing.
 
-- [ ] T001 INF Restructure the monorepo: `apps/{api,web,extension,mobile}`, `packages/{contracts,sdk,tokens}`; move v1 to `legacy/` (read-only until P11) — keep `pnpm-workspace.yaml`
-- [ ] T002 [P] API Bootstrap NestJS 12 app with `BOTVY_ROLE` switch (`api` | `worker`), pino logging, zod env schema (fail-fast)
+- [ ] T001 INF Restructure the monorepo: `apps/{backend,frontend,extension,mobile}`, `packages/{contracts,sdk,tokens}`; move v1 to `legacy/` (read-only until P11) — keep `pnpm-workspace.yaml`
+- [ ] T002 [P] API Bootstrap NestJS 12 app with `BOTVY_ROLE` switch (`backend` | `worker`), pino logging, zod env schema (fail-fast)
 - [ ] T003 [P] API Persistence: PrismaService (Postgres, Identity schema from `data-model.md §1`), MongooseModule (replica set URI), `migrate-mongo` wiring, health probes for both
 - [ ] T004 [P] API Shared kernel: `shared/time` (port `common/time.ts` + tests), `shared/cqrs` (base Command/Query/Event, Result, uuidv7), `shared/auth` (Principal, JwtAuthGuard, GqlAuthGuard, WsAuthGuard, RolesGuard, ServiceTokenGuard), `shared/settings` (registry + Mongo service + cache + `SettingChanged` invalidation), `shared/outbox` (OutboxWriter in tx, OutboxRelay change stream, webhook fan-out with HMAC), `shared/llm` (OllamaClient chat/extract/summarize), `shared/push` (port), `shared/media` (port)
 - [ ] T005 [P] API GraphQL code-first module with Apollo, DataLoader factory, `me` placeholder resolver; Socket.IO gateway with handshake auth and rooms
@@ -31,7 +31,7 @@ outbox, the edge and CI/CD — so every later phase adds slices, not plumbing.
 - [ ] T008 [P] WEB Next.js 16 skeleton: route groups `(marketing)` + `(admin)`, MobX provider per request, PrimeReact pinned MIT line + tokens theme, login page, standalone Dockerfile
 - [ ] T009 [P] EXT WXT skeleton: side panel (React + MobX + Bootstrap), background worker (alarms, socket keep-alive stub), Dexie schema, sign-in screen
 - [ ] T010 [P] MOB Flutter skeleton: `flutter_bloc`, `go_router`, `get_it`, tokens → `flex_color_scheme` light/dark, l10n en/ar with RTL, drift `botvy_v2.sqlite` with `SyncColumns` mixin and migration ladder test harness, dio client + socket client ports
-- [ ] T011 INF compose: caddy (Caddyfile routes), web, api, worker, postgres, mongo (RS healthcheck init), mongodump, n8n, cloudflared profile; `.env.example` contract; `bootstrap.mjs` (both migrations, n8n owner/API key, service client, workflow import)
+- [ ] T011 INF compose: caddy (Caddyfile routes), frontend, backend, worker, postgres, mongo (RS healthcheck init), mongodump, n8n, cloudflared profile; `.env.example` contract; `bootstrap.mjs` (both migrations, n8n owner/API key, service client, workflow import)
 - [ ] T012 INF GitHub Actions: `ci.yml` (lint+test all apps), `release.yml` (tags → GHCR images → SSH `compose pull && up -d`), `mobile.yml` (APK artifact), `extension.yml` (zip artifact)
 - [ ] T013 API One end-to-end proof: a `PingCommand` writes an outbox event → relay → in-process handler + n8n webhook → heartbeat stamped
 

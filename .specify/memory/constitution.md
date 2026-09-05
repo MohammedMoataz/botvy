@@ -28,7 +28,7 @@ Sync Impact Report
 ## Core Principles
 
 ### I. The API Owns All Data; Each Context Owns Its Store
-The NestJS API (the `api` and `worker` processes built from one codebase) is the
+The NestJS API (the `backend` and `worker` processes built from one codebase) is the
 only process permitted to read or write application data. n8n, the phone, the
 web app and the Chrome extension interact exclusively through the API. Inside
 the API, each bounded context owns its store: Identity & Access owns PostgreSQL
