@@ -9,8 +9,8 @@ research R-15, P-02, P-04; phases P1 and P2 for preferences, tasks and alerts.
 ## Summary
 
 One context (Daily Rhythm) with a per-member clock: a five-minute tick from n8n
-decides, for each member, whether *their* local evening or morning time has arrived,
-claims the date before sending, builds the draft from Planning (and later Training and
+decides, for each member, whether *their* local plan-prompt, end-of-day or morning
+time has arrived, claims that touch's date before sending, builds the draft from Planning (and later Training and
 Nutrition through their query ports), writes it into the coaching conversation,
 schedules an alert, and records the check-in and streak. Plus the Home screen that
 reads it all from the phone's own copy.
@@ -27,8 +27,8 @@ implementation, prefer hand-drawn to avoid the dependency)
 `daily_plans`, `checkins`, `rhythm_state` (schemaVersion 3 → 4, pull-only plus two
 push operations)
 
-**Testing**: vitest — two time zones each fire once; downtime catch-up same day and
-not the next; DST forward day fires once; a preference change after firing does not
+**Testing**: vitest — two time zones each fire each touch once; downtime catch-up same
+day and not the next; an unanswered draft is set at the end of day; DST forward day fires once; a preference change after firing does not
 re-fire; check-in classification confined to the coaching conversation and its window;
 streak arithmetic (ported `adherence.ts` specs); rollover increments `deferCount`
 
@@ -40,7 +40,7 @@ conversation must exist (created in P1) before a prompt can be written into it
 
 **Scale/Scope**: ~30 backend files, ~12 mobile files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|
@@ -84,22 +84,31 @@ contexts/rhythm/
 ```text
 for each member with preferences (paged, projection: userId, timezone, times, flags):
   today  = localDate(now, tz);  hhmm = localHhMm(now, tz)
-  if hhmm >= eveningPlanTime and state.lastEveningPromptDate != today:
-      claim(today)                      # write first — this is what makes it once-a-day and catch-up-safe
+
+  if hhmm >= planTomorrowTime and state.lastPlanPromptDate != today:        # default 21:00
+      claim(today)                      # write first — once a day, catch-up safe
       draft = build(tomorrow)           # tasks due tomorrow (top 5 by priority, then time) + unfinished today
                                         # + NextSessionQuery(tomorrow) + TodayMealsQuery(tomorrow)
       save daily_plans[tomorrow] status=draft
-      write the prompt into the coaching conversation (Conversations command)
+      write the question + draft into the coaching conversation
       plan an alert (Notifications event) and emit PlanTomorrowPrompted
-      if checkinEnabled: state.awaitCheckin(now)
-  same shape for morningBriefingTime / lastMorningBriefingDate → MorningBriefingSent
+
+  if hhmm >= endOfDayTime and state.lastEndOfDayDate != today:              # default 22:00
+      claim(today)
+      plan = daily_plans[tomorrow]; if plan.status == draft → confirm(autoConfirmed=true)   # "set it by 10pm by default"
+      write the summary (top-priority tasks, training yes/no) into the coaching conversation
+      plan an alert; if checkinEnabled → state.awaitCheckin(now) and append the question
+      emit EndOfDaySummarySent          # Planning's rollover saga reacts to this
+
+  if hhmm >= morningBriefingTime and state.lastMorningBriefingDate != today: # default 08:00
+      claim(today); send today's plan; emit MorningBriefingSent
 stamp ops_heartbeats['rhythm.tick']
 ```
 
 A member whose local date is already the next day when they register gets no
-back-dated prompt: the claim is keyed on the local date, and the first eligible
-evening is the next one. A preference changed after the claim cannot re-fire because
-the claim is per date, not per time.
+back-dated touch: each claim is keyed on the local date, and the first eligible
+touch is the next evening. A preference changed after a claim cannot re-fire that
+touch because the claim is per date, not per time.
 
 ### Draft building and cross-context reads
 
@@ -113,13 +122,13 @@ edit in those phases.
 ### Confirmation and rollover
 
 `confirm-plan` stores the chosen task ids, sets `status: confirmed`, raises
-`PlanConfirmed`. A Planning saga on `PlanConfirmed` runs `rollover` for tasks that
+`PlanConfirmed`. A Planning saga on `EndOfDaySummarySent` runs `rollover` for tasks that
 were open today and are in the confirmed set for tomorrow, moving their `dueAt` and
 incrementing `deferCount` (the count the next proposal displays).
 
 ### Check-in
 
-The evening prompt sets `awaitingCheckin` with `awaitingSince`. In P4 the chat gateway
+The end-of-day summary sets `awaitingCheckin` with `awaitingSince`. In P4 the chat gateway
 routes a reply in the coaching conversation to `capture-checkin-reply`, which runs the
 ported keyword classifier; `unclear` falls through to a normal chat turn rather than
 guessing. Until P4 lands, the phone posts the check-in explicitly from a card
@@ -129,7 +138,7 @@ notification action.
 ### Mobile
 
 `features/home` — greeting with the member's name, today's plan card (tasks with
-checkboxes, training slot, meal line), streak with the week's adherence dots, and a
+checkboxes, a completion ring showing done of total, training slot, meal line), streak with the week's adherence dots, and a
 "plan tomorrow" card when a draft is awaiting confirmation. `features/rhythm` —
 the confirm sheet (task list with add/remove, carried-over badges) and the check-in
 sheet (mood slider 0–100, followed yes/no, note). Notification taps route to the right
@@ -149,7 +158,8 @@ command as usual.
 pnpm --filter @botvy/backend test    # two zones once each, catch-up, DST, no re-fire after a preference change,
                                      # classifier confined to the coaching conversation, streak, rollover
 cd apps/mobile; flutter test; flutter analyze
-# manual: set evening time two minutes out → prompt as notification and in the coach chat → confirm →
-#         set morning time two minutes out → briefing lists the confirmed tasks
+# manual: set the plan-prompt time two minutes out → question + draft as notification and in the coach chat →
+#         ignore → set the end-of-day time two minutes out → summary arrives and the plan is set →
+#         set the morning time two minutes out → briefing lists exactly those tasks
 curl -s http://localhost/health | jq '.jobs["rhythm.tick"]'
 ```

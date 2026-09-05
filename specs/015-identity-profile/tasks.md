@@ -48,6 +48,7 @@ verification, bootstrap idempotency, BMI, empty-field omission, drift ladder.
 - [ ] T143 Mobile drift `schemaVersion` 1 → 2: `profile`, `preferences`, `devices_local` tables with a guarded `from >= 1 && from < 2` branch and a ladder test that opens a v1-shaped file
 - [ ] T144 [P] Frontend: real login (email/password + Google), Users table (search, role menu, ban switch), Devices, Service clients (secret dialog shown once), default-password warning on Overview
 - [ ] T145 [P] Extension: sign-in view wired to `AuthStore`, Google through `chrome.identity.launchWebAuthFlow`, tokens in `chrome.storage.local`, signed-in placeholder panel
+- [ ] T146 [P] Mobile `features/onboarding`: step registry (feature modules contribute steps), first-run walkthrough — name + optional photo, time zone detected and confirmable, language, preview of the three daily times — skippable and resumable from Settings; `onboardingCompletedAt` on the profile; cubit spec: skipping leaves defaults intact
 
 ## Phase 6 — Contracts and polish
 

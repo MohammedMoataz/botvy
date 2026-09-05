@@ -36,7 +36,7 @@ only path; permissions kept minimal for store review
 
 **Scale/Scope**: ~30 extension files, ~6 files in `@botvy/sdk`
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|

@@ -34,7 +34,7 @@ recurrence; the alert window is a setting, not a constant
 
 **Scale/Scope**: ~35 backend files, ~14 mobile files, ~6 extension files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|
@@ -98,7 +98,10 @@ meeting it expands the next `meetings.alertWindowDays`, computes the desired ale
 (one per `reminderOffsets` entry plus one for the preparation block when
 `prepMinutes > 0`) and reconciles against `alerts` — creating what is missing,
 deleting what no longer belongs. Because alerts carry `source.occurrenceAt`, the
-unique index makes reconciliation idempotent.
+unique index makes reconciliation idempotent. A meeting created without explicit
+offsets takes the member's `defaultLeadTimes` (`'1h'`, `'0m'`) converted to minute
+offsets **at creation** and stored on the meeting, so a later preference change
+never silently moves existing reminders.
 
 ### Agenda query
 

@@ -59,7 +59,7 @@ default user-configurable; English + Arabic (RTL); solo-maintainable
 
 ## Constitution Check
 
-*GATE — evaluated against constitution v2.0.0 (amended alongside this plan).*
+*GATE — evaluated against constitution v2.1.1 (amended alongside this plan).*
 
 | Principle | Status | How this plan complies |
 |---|---|---|
@@ -152,7 +152,7 @@ apps/
     ├── lib/
     │   ├── app/                  # router (go_router), theme (tokens → flex_color_scheme), DI (get_it), l10n
     │   ├── core/                 # db (drift, sync mixin), sync engine, notifications, api (dio, socket), push
-    │   └── features/             # auth, home, tasks, reminders, rhythm, chat, meetings, calendar,
+    │   └── features/             # auth, onboarding, home, tasks, reminders, rhythm, chat, meetings, calendar,
     │                             # athlete, knowledge, nutrition, profile, settings
     │                             # each: presentation/ application/ (cubits) domain/ data/
     └── test/
@@ -192,6 +192,20 @@ are expressed as a `QueryBus` call to another context's query (read) or an event
 Two slices that need the same 30-line helper duplicate it until a third needs it;
 then it moves to `shared/`.
 
+### SOLID in practice
+
+- **Single responsibility** — one slice per feature; a handler does one thing and the
+  `TurnRunner`/saga classes only order steps.
+- **Open/closed** — new behaviour is a new slice, adapter or event handler; existing
+  handlers are not edited to add a consumer.
+- **Liskov** — every store adapter passes the same contract test suite as the
+  in-memory adapter, so a handler cannot tell which store it runs on.
+- **Interface segregation** — write repositories and read repositories are separate
+  ports; a query handler never sees `save()`.
+- **Dependency inversion** — handlers depend on ports declared in their context's
+  domain layer; infrastructure depends inward, never the reverse. The lint rule on
+  driver imports makes the inversion enforceable rather than aspirational.
+
 ### Persistence ports (repository pattern across stores)
 
 The platform spans two stores today and must absorb more without touching
@@ -217,7 +231,7 @@ the `Repository<T>` / `SyncableRepository<T>` / `ReadRepository` ports, the
 `UnitOfWork` port, and one adapter set per store — `MongoUnitOfWork` (client
 session + transaction, outbox writer enlisted), `MongoRepositoryBase` (session
 handling, `updatedAt` optimistic check, tombstones, `pullSince`), `PrismaUnitOfWork`
-(interactive `$transaction`, outbox written from a post-commit hook),
+(interactive `$transaction`; events written to `identity_outbox` in the same transaction),
 `PrismaRepositoryBase`, and `InMemoryRepositoryBase`. A handler receives the port
 and the unit of work by DI:
 
@@ -260,8 +274,16 @@ userId, payload, occurredAt, deliveredAt: null, attempts }`). The `worker` runs
 `OutboxRelay`: a resumable change stream on inserts → EventBus publish (in-process
 handlers and sagas) → webhook fan-out to n8n subscriptions registered in
 `settings.automation.subscriptions` → `deliveredAt` set. Delivery is at-least-once;
-every handler is idempotent on `eventId`. Identity (Postgres) writes its events
-into the Mongo outbox immediately after its Prisma transaction commits.
+every handler is idempotent on `eventId`.
+
+Identity lives in PostgreSQL, which has no change stream and cannot join a Mongo
+transaction, so a post-commit write to the Mongo outbox would be at-most-once (a
+crash between the two writes loses the event). Instead Identity writes its events to
+its own `identity_outbox` table **inside the same Prisma transaction** as the change.
+The relay polls that table (every 2 s; `LISTEN/NOTIFY` is a later optimisation) and
+forwards each row into the Mongo `outbox`, marking it forwarded. Every hop is
+therefore at-least-once, with no window in which a committed change can lose its
+event.
 
 ### Time
 
@@ -294,20 +316,38 @@ templated reply — no second inference; (5) otherwise assemble the prompt
 (`coach.md` or `planner.md` or `chat.md`) with the profile line (BMI in code,
 allergies as prohibitions), today's plan, streak, and stream `chat.token`s;
 (6) persist both messages with the next per-user `seq`, record usage, emit
-`chat.done`. `chat.cancel` aborts the Ollama stream. Coach-initiated messages
-(evening prompt, check-in question) are written by Daily Rhythm handlers and
-pushed as `chat.message` to connected sockets.
+`chat.done`. A list intent (today's tasks, reminders, meetings, the plan) also
+emits `chat.card` with the structured items so clients render a tappable list, not
+prose. A stated fact ("I weigh 80 kg", "I'm allergic to peanuts") is an
+`update_profile` intent dispatched to Profile after a one-line confirmation.
+`chat.cancel` aborts the Ollama stream. Coach-initiated messages
+(plan prompt, end-of-day summary, check-in question) are written by Daily Rhythm
+handlers and pushed as `chat.message` to connected sockets.
 
 ### Daily Rhythm tick
 
 n8n fires `/internal/rhythm/tick` every 5 minutes. For each member with
-preferences: compute local `today` + `HH:mm`; if `now >= eveningPlanTime` and
-`lastEveningPromptDate != today` → **claim the date, then** build tomorrow's
-draft (`tasks` due tomorrow by priority, tomorrow's training session from a
-`NextSessionQuery`, meal line from Nutrition via `TodayMealsQuery`), write it to
-`daily_plans[tomorrow]` with `status: draft`, write the prompt into the `coach`
-conversation, schedule an alert (Notifications) and emit `PlanTomorrowPrompted`.
-Same shape for the morning briefing. Stamp `ops_heartbeats.rhythm_tick`.
+preferences, compute local `today` + `HH:mm` and evaluate three touches, each with
+its own claim date so a five-minute pulse fires each once per local day and catches
+up after downtime:
+
+- **Plan prompt** (`planTomorrowTime`, default 21:00): if due and
+  `lastPlanPromptDate != today` → **claim the date, then** build tomorrow's draft
+  (`tasks` due tomorrow by priority, unfinished tasks from today with their
+  `deferCount`, tomorrow's session from `NextSessionQuery`, meal line from
+  `TodayMealsQuery`), write `daily_plans[tomorrow]` as `draft`, write the question
+  into the `coach` conversation, schedule an alert and emit `PlanTomorrowPrompted`.
+- **End of day** (`endOfDayTime`, default 22:00): if due and
+  `lastEndOfDayDate != today` → claim, then set tomorrow's plan (`confirmed` if the
+  member answered, else the draft auto-confirmed with `autoConfirmed: true`), send
+  the summary (top-priority tasks, training yes/no) into the coach chat and as an
+  alert, ask the check-in when `checkinEnabled` (sets `awaitingCheckin`), emit
+  `EndOfDaySummarySent`, and run the Planning `rollover` for today's leftovers.
+- **Morning briefing** (`morningBriefingTime`, default 08:00): if due and
+  `lastMorningBriefingDate != today` → claim, then send today's plan and emit
+  `MorningBriefingSent`.
+
+Stamp `ops_heartbeats.rhythm_tick`.
 
 ### Recurrence
 

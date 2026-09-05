@@ -37,7 +37,9 @@ behaviour, degradation and past-day immutability.
 - [ ] T850 Drift 8 → 9: `meals`, `meal_suggestions`, guarded branch, ladder test extended; sync adapter for meals registered
 - [ ] T851 [P] `features/nutrition` — meal library with kind chips, mode switch mirrored from preferences, today's line on home with regenerate and "use one of mine"
 - [ ] T852 [P] Registry keys `nutrition.mealsPerDay` (default 3) and the allergen family list; Arabic strings and RTL screenshots
-- [ ] T853 Record gate evidence; open `023-chrome-extension`
+- [ ] T853 [P] P4's `intent-executor` gains `add_meal` ("add grilled chicken to my meals") and food likes/dislikes through `update_profile`; fixture sentences added (EN + AR)
+- [ ] T854 [P] `purge-on-deleted` handler for `meals` and `meal_suggestions` on `identity.UserDeleted`; spec
+- [ ] T855 Record gate evidence; open `023-chrome-extension`
 
 ## Dependencies
 

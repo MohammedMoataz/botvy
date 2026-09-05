@@ -58,7 +58,7 @@ drivers only in `infrastructure/`; en + ar with RTL on every client skeleton
 
 ## Constitution Check
 
-*GATE — constitution v2.1.0.*
+*GATE — constitution v2.1.1.*
 
 | Principle | Status | How |
 |---|---|---|
@@ -112,9 +112,9 @@ apps/
 │   │   │   ├── persistence/
 │   │   │   │   ├── ports/            # aggregate-root.ts, repository.ts, syncable-repository.ts, read-repository.ts, unit-of-work.ts
 │   │   │   │   ├── mongo/            # mongoose.module.ts, mongo-unit-of-work.ts, mongo-repository.base.ts, mapper.ts
-│   │   │   │   ├── prisma/           # prisma.service.ts, prisma-unit-of-work.ts, prisma-repository.base.ts
+│   │   │   │   ├── prisma/           # prisma.service.ts, prisma-unit-of-work.ts (events → identity_outbox in-tx), prisma-repository.base.ts
 │   │   │   │   └── memory/           # in-memory-repository.base.ts, in-memory-unit-of-work.ts
-│   │   │   ├── outbox/               # outbox.schema.ts, outbox-writer.ts, outbox-relay.ts (change stream + relay_state), webhook-fanout.ts (HMAC), outbox.module.ts
+│   │   │   ├── outbox/               # outbox.schema.ts, outbox-writer.ts, outbox-relay.ts (change stream + relay_state), identity-outbox-forwarder.ts (Postgres poll), webhook-fanout.ts (HMAC), outbox.module.ts
 │   │   │   ├── settings/             # settings.registry.ts (zod keys), settings.service.ts (Mongo + TTL cache + SettingChanged), settings.module.ts
 │   │   │   ├── llm/                  # ollama.client.ts (chat stream, extract with format, summarize), llm.module.ts
 │   │   │   ├── push/                 # ported v1 push.service.ts
@@ -188,9 +188,11 @@ session through `AsyncLocalStorage` so `MongoRepositoryBase.save` writes the
 document **and** appends the aggregate's pulled events to `outbox` in the same
 session; `onCommit` callbacks run after commit (used for socket nudges).
 `PrismaUnitOfWork.run` uses the interactive `$transaction`; its `save` cannot
-join the Mongo outbox, so `PrismaRepositoryBase.save` queues events and the unit
-of work's post-commit hook writes them to `outbox` (at-least-once; consumers
-idempotent). `InMemoryUnitOfWork` runs the work and collects events for
+join the Mongo outbox, so `PrismaRepositoryBase.save` writes the aggregate's events
+to the `identity_outbox` table **inside the same transaction**. A post-commit write
+to Mongo would be at-most-once (a crash between the two writes loses the event);
+the table makes the hop at-least-once, and the worker's forwarder copies rows into
+the Mongo `outbox` (upsert by `eventId`) and marks them forwarded. `InMemoryUnitOfWork` runs the work and collects events for
 assertions. Every repository adapter extends the store base and takes a `Mapper<T,
 Doc>` with `toDomain` (upcasting by `schemaVersion`) and `toPersistence`.
 Context modules bind ports: `{ provide: PingRepository, useClass:
@@ -210,7 +212,7 @@ port; refuses user JWTs), `RolesGuard` (`@Roles`), plus `@ServiceOnly()` /
 
 ### Settings registry (initial keys)
 
-`defaults.timezone`, `defaults.eveningPlanTime`, `defaults.morningBriefingTime`,
+`defaults.timezone`, `defaults.planTomorrowTime`, `defaults.endOfDayTime`, `defaults.morningBriefingTime`,
 `defaults.nextPracticeCutoff`, `defaults.leadTimes`, `defaults.mealMode`,
 `defaults.aiSuggestions`, `reminders.tombstoneDays`, `notifications.sweepBatch`,
 `notifications.expiryHours`, `rhythm.checkinWindowHours`, `chat.historyLimit`,
@@ -233,7 +235,11 @@ event: `EventBus.publish` to in-process handlers (registered per context by
 `settings.automation.subscriptions` (POST JSON, `X-Botvy-Event`,
 `X-Botvy-Signature: sha256=hmac`), then `$set deliveredAt`, `attempts++`, save
 resume token; failures backoff 1 m / 5 m / 30 m / 2 h then park with `lastError`.
-Heartbeat `outbox.relay` every loop.
+Heartbeat `outbox.relay` every loop. A second loop, `IdentityOutboxForwarder`, polls
+PostgreSQL's `identity_outbox` every 2 s for `forwardedAt IS NULL` rows through
+Identity's `IdentityOutboxRepository` port, upserts each into the Mongo `outbox` by
+`eventId`, and marks it forwarded — the only place the worker touches Identity's
+store, and it does so through a port.
 
 ### Health and heartbeats
 

@@ -34,7 +34,7 @@ absence; the cut-off is a preference
 
 **Scale/Scope**: ~40 backend files, ~18 mobile files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|

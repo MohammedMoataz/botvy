@@ -73,8 +73,8 @@ alarm; PC↔phone task propagation < 10 s; all T208 tests green.
 
 ## Phase 3 — Daily Rhythm (`017-daily-rhythm`)
 
-- [ ] T301 API Rhythm context: `rhythm_states`, tick (per-user local time, claim-then-send, catch-up), evening prompt → `daily_plans` draft (tasks by priority, tomorrow's session via `NextSessionQuery`, meal line via Nutrition query — stubs until P6/P8), morning briefing, confirm/skip, rollover of unfinished tasks (`deferCount`), check-in record + streak (`adherence.ts` port), check-in classifier (port, coach-chat only)
-- [ ] T302 [P] API Notifications: `evening`/`morning`/`checkin` alerts; Conversations: write prompts into `coach` (system/assistant messages) and `chat.message` push (Conversations context skeleton for messages/seq lands here)
+- [ ] T301 API Rhythm context: `rhythm_states`, tick (per-user local time, claim-then-send, catch-up), plan prompt (default 21:00) → `daily_plans` draft (tasks by priority, tomorrow's session via `NextSessionQuery`, meal line via Nutrition query — stubs until P6/P8), end-of-day summary (default 22:00: auto-confirms an unanswered draft, names top priorities + training, asks the check-in), morning briefing, confirm/skip, rollover of unfinished tasks (`deferCount`), check-in record + streak (`adherence.ts` port), check-in classifier (port, coach-chat only)
+- [ ] T302 [P] API Notifications: `plan`/`end_of_day`/`morning`/`checkin` alerts; Conversations: write prompts into `coach` (system/assistant messages) and `chat.message` push (Conversations context skeleton for messages/seq lands here)
 - [ ] T303 [P] MOB Home screen (greeting, today's plan, streak, week adherence dots), Rhythm cards (confirm tomorrow, check-in with mood slider), notification tap routing
 - [ ] T304 INF n8n `rhythm_tick.json` (cron + unconditional webhook); admin Run button
 - [ ] T305 API Tests: Cairo vs Berlin fire at their own 22:00 once; downtime catch-up; DST day fires once; check-in ignored outside coach chat; rollover increments `deferCount`
@@ -86,7 +86,7 @@ the member's times; streak updates; T305 green; `ops_heartbeats.rhythm_tick` fre
 
 ## Phase 4 — Coach Chat (`018-coach-chat`)
 
-- [ ] T401 API Conversations context complete: pinned `coach`/`planner` (protected), `free` chats, `messages` with per-user `seq`, clear watermark, quick questions (global + user, mood-aware), WS gateway (`chat.send/cancel`, events per `ws-chat.md`), batch offline replay, intent extraction (grammar-constrained, `intent.md`) → CommandBus dispatch to Planning/Reminders/Meetings/Profile with templated confirmation, prompt assembly (`coach.md`/`planner.md`/`chat.md`: profile line with BMI in code, allergies as prohibitions, today's plan, streak), `chat.moved`, usage + quota, cancel
+- [ ] T401 API Conversations context complete: pinned `coach`/`planner` (protected), `free` chats, `messages` with per-user `seq`, clear watermark, quick questions (global + user, mood-aware), WS gateway (`chat.send/cancel`, events per `ws-chat.md`), batch offline replay, intent extraction (grammar-constrained, `intent.md`) → CommandBus dispatch to Planning/Reminders/Meetings/Profile with templated confirmation, prompt assembly (`coach.md`/`planner.md`/`chat.md`: profile line with BMI in code, allergies as prohibitions, today's plan, streak), `chat.moved`, `chat.card` for list intents, `update_profile` intent, usage + quota, cancel
 - [ ] T402 [P] MOB Chat feature: pinned section divider, quick chips, streaming bubbles via socket, stop button, offline queue → batch, markdown rendering (`flutter_markdown_plus`), moved-conversation handling
 - [ ] T403 [P] WEB (admin) Usage page; quick-questions management
 - [ ] T404 API Tests: intent fixtures (EN/AR relative time), protected conversation rejections, seq monotonic per user, cancel aborts stream, quota enforcement
@@ -201,3 +201,5 @@ Within a phase, `[P]` tasks touch different apps and can proceed together.
 - Every branchy rule (recurrence, conflict, claim, cutoff, allergen) has a test; fixtures relative to `Date.now()`.
 - Every new synced table on the phone bumps `schemaVersion` with a matching migration branch and an old-schema open test.
 - Arabic RTL screenshots reviewed for new screens.
+- Every context adds a purge handler for `identity.UserDeleted` covering its collections, with a spec.
+- Every chat-visible capability adds its intent to the coach/planner executor with fixture sentences (EN + AR).

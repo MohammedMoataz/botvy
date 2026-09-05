@@ -31,7 +31,7 @@ written down rather than assumed
 **Scale/Scope**: ~15 infrastructure and documentation files, ~6 backend changes from
 review findings, one import script if the Owner wants it
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|

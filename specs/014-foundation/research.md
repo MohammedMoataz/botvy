@@ -125,7 +125,10 @@ Only decisions specific to standing the platform up are recorded here.
   after each processed event. On start it resumes from the token; if the token is
   invalid (oplog rolled over), it first drains `outbox` rows with
   `deliveredAt: null` ordered by `occurredAt`, then opens a fresh stream. Delivery
-  is at-least-once; every handler is idempotent on `eventId`.
+  is at-least-once; every handler is idempotent on `eventId`. Identity's events are
+  picked up from PostgreSQL's `identity_outbox` (written in the same transaction as
+  the change) by a 2-second poll and copied into the Mongo outbox, upsert by
+  `eventId` — a post-commit write to Mongo would have been at-most-once.
 - **Sources**: R-08; https://www.mongodb.com/docs/manual/changeStreams/#resume-a-change-stream
 
 ### F-12 Contract generation

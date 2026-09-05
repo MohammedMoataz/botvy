@@ -47,6 +47,10 @@ photo, time zone and preferences appear.
    with the same message.
 5. **Given** a successful registration, **When** the member opens the app, **Then**
    their profile, preferences and two pinned chats already exist.
+6. **Given** a first sign-in, **When** the walkthrough runs, **Then** it asks only for
+   a name, an optional photo, the time zone (detected, confirmable) and the language,
+   previews the three daily times, finishes in under a minute, and can be skipped
+   and resumed from Settings.
 
 ---
 
@@ -114,15 +118,15 @@ and the history; add an allergy → it is listed as a prohibition, not a prefere
 
 ### User Story 5 — Make the defaults mine (Priority: P1)
 
-A member opens preferences and changes the evening planning time, the morning
+A member opens preferences and changes the plan-prompt time, the end-of-day time, the morning
 briefing time, the next-practice cut-off, the default reminder lead times, the meal
 mode, whether background suggestions run, quiet hours, the first day of the week and
 their language. The Owner can change what new members start with.
 
 **Acceptance Scenarios**:
 
-1. **Given** the evening time changed to 21:30, **When** the next evening comes,
-   **Then** the prompt arrives at 21:30 in the member's time zone.
+1. **Given** the end-of-day time changed to 21:30, **When** the next evening comes,
+   **Then** the summary arrives at 21:30 in the member's time zone.
 2. **Given** the Owner changes the default morning time, **When** a new member
    registers, **Then** they start with the new value and existing members keep theirs.
 3. **Given** quiet hours set, **When** an alert would fire inside them, **Then** it
@@ -159,6 +163,9 @@ other machines use. Every such action is recorded.
 
 ### Functional Requirements
 
+- **FR-000** A first-run walkthrough MUST collect only name, optional photo, time zone
+  and language, MUST preview the daily times, MUST be skippable and resumable, and
+  MUST accept later steps from other features (sports, when training exists).
 - **FR-001** Registration MUST require an email, a password of at least 8 characters
   and a matching confirmation; the confirmation MUST be checked on the client and the
   password rule on the server.

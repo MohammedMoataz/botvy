@@ -85,6 +85,17 @@ model ServiceClient {                          // machine principals (n8n, futur
   lastUsedAt DateTime?
   revokedAt  DateTime?
 }
+
+model IdentityOutbox {                         // Identity's events, written in the SAME transaction as the change
+  id          String    @id                      // eventId (uuid)
+  name        String                             // 'identity.UserRegistered' …
+  aggregate   Json                               // { type, id }
+  userId      String?
+  payload     Json
+  occurredAt  DateTime  @default(now())
+  forwardedAt DateTime?                          // set by the relay after copying into the Mongo outbox
+  @@index([forwardedAt, occurredAt])
+}
 ```
 
 Rules: refresh-token reuse (presenting a revoked/replaced token) revokes the whole
@@ -113,7 +124,8 @@ Mongo contexts delete their documents on it.
 
 ```ts
 { _id: string,
-  eveningPlanTime: 'HH:mm' /* 22:00 */, morningBriefingTime: 'HH:mm' /* 08:00 */,
+  planTomorrowTime: 'HH:mm' /* 21:00 */, endOfDayTime: 'HH:mm' /* 22:00 */,
+  morningBriefingTime: 'HH:mm' /* 08:00 */,
   nextPracticeCutoff: 'HH:mm' /* 21:00 */,
   defaultLeadTimes: string[] /* ['1h','0m'] */, mealMode: 'llm'|'library',
   aiSuggestions: boolean, quietHours: { from: 'HH:mm', to: 'HH:mm' }|null,
@@ -195,11 +207,11 @@ a rolling 14-day window.
 
 ```ts
 { _id, userId, date: 'YYYY-MM-DD',
-  status: 'draft'|'confirmed'|'skipped',
+  status: 'draft'|'confirmed'|'skipped', autoConfirmed: boolean,   // true when the end-of-day touch set it
   tasks: [{ id, title, priority, dueAt }],            // snapshot at prompt time; re-snapshotted on confirm
   training: { sessionId, title, sport, startAt }|null,
   workoutLine: string|null, mealLine: string|null,     // "Workout: Upper body | Meals: oats, chicken salad, lentil soup"
-  promptedAt: Date|null, confirmedAt: Date|null, briefedAt: Date|null,
+  promptedAt: Date|null, confirmedAt: Date|null, summarisedAt: Date|null, briefedAt: Date|null,
   createdAt, updatedAt, schemaVersion }
 ```
 
@@ -213,14 +225,16 @@ a rolling 14-day window.
 **`rhythm_states`** — `_id = userId`
 
 ```ts
-{ _id, lastEveningPromptDate: string|null, lastMorningBriefingDate: string|null,
+{ _id, lastPlanPromptDate: string|null, lastEndOfDayDate: string|null,
+  lastMorningBriefingDate: string|null,
   awaitingCheckin: boolean, awaitingSince: Date|null,
   streak: { current: number, best: number, lastAdheredDate: string|null }, updatedAt }
 ```
 
-Claim-then-send: the tick sets `lastEveningPromptDate = today` **before** building
-and sending the prompt, so a 5-minute tick asks once a day and a gateway that was
-down at 22:00 catches up when it returns.
+Claim-then-send: the tick sets the touch's claim date (`lastPlanPromptDate`,
+`lastEndOfDayDate`, `lastMorningBriefingDate`) **before** building and sending, so a
+5-minute tick fires each touch once a day and a gateway that was down at 22:00
+catches up when it returns.
 
 ### 2.6 Training context
 
@@ -386,13 +400,18 @@ Occurrences are computed with `rrule` for the requested window; `exdates` remove
 // index { deliveredAt: 1, occurredAt: 1 }; TTL on deliveredAt (7 d)
 ```
 
+Identity's events do not start here: they are written to PostgreSQL's
+`identity_outbox` in the same transaction as the change (§1) and copied into this
+collection by the relay, keyed by the same `eventId`, so a duplicate copy is a
+no-op.
+
 **`settings`** — `_id = key`, `{ value: any, updatedAt, updatedBy }`; keys and zod
 schemas live in `settings.registry.ts`. Registry (initial):
 
 | Key | Default | Read by |
 |---|---|---|
 | `defaults.timezone` | `Africa/Cairo` | new profiles |
-| `defaults.eveningPlanTime` / `morningBriefingTime` / `nextPracticeCutoff` | `22:00` / `08:00` / `21:00` | new preferences |
+| `defaults.planTomorrowTime` / `endOfDayTime` / `morningBriefingTime` / `nextPracticeCutoff` | `21:00` / `22:00` / `08:00` / `21:00` | new preferences |
 | `defaults.leadTimes` | `["1h","0m"]` | new preferences, reminders |
 | `defaults.mealMode` / `aiSuggestions` | `llm` / `true` | new preferences |
 | `reminders.tombstoneDays` | `30` | sweep **and** sync full-snapshot rule |

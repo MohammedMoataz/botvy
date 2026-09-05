@@ -36,7 +36,7 @@ login accepts a bare username; empty profile fields omitted everywhere
 
 **Scale/Scope**: ~45 backend files, 12 mobile files, 6 frontend files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|
@@ -120,7 +120,10 @@ the screen and the contract; the enforcement task is listed in P2's tasks.
 ### Clients
 
 - **Mobile**: `features/auth` (sign-in, register with confirm field, Google button,
-  forgot-password placeholder), `features/profile` (photo picker + cropper, body
+  forgot-password placeholder), `features/onboarding` (a first-run walkthrough of
+  steps registered by feature modules: name + photo, time zone, language, daily
+  times preview here; sports arrive with P6 — skippable, resumable from Settings,
+  marks `onboardingCompletedAt` on the profile), `features/profile` (photo picker + cropper, body
   metrics with history chart placeholder, foods and allergies chips),
   `features/preferences` (every default, time pickers, language, quiet hours).
   `AuthCubit` holds tokens in secure storage; `go_router` redirects on

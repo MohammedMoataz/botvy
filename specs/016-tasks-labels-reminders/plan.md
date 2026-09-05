@@ -39,7 +39,7 @@ deletion horizon is one setting read by both the sweep and the sync
 
 **Scale/Scope**: ~70 backend files, ~30 mobile files, ~10 extension files
 
-## Constitution Check (v2.1.0)
+## Constitution Check (v2.1.1)
 
 | Principle | Status | How |
 |---|---|---|
