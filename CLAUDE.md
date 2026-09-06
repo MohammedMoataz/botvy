@@ -10,16 +10,24 @@ Read those before proposing structure, technology or shell commands.
 `specs/001`–`012` record what v1 built and why; `specs/013-platform-v2-blueprint`
 is the whole-platform plan for v2, and each implementation phase (`014` onward)
 is its own spec-kit feature on its own branch. `.specify/memory/constitution.md`
-(v2.0.0) holds the twelve rules every change is held to — the API is the only
+(v2.1.1) holds the twelve rules every change is held to — the API is the only
 writer to either store and each bounded context owns its own; n8n holds one
 credential and no data; migrations only go forward; one public port; three
 principal kinds; bounded contexts talk through events; commands (REST), queries
 (GraphQL) and streams (WebSocket) stay separate; times belong to the user;
 secrets in env, operator knobs in `settings`, member knobs in preferences.
 
-Setup, the environment contract and the verification steps for v1 live in
-`SETUP.md`; v2's target loop is `specs/013-platform-v2-blueprint/quickstart.md`
-until the foundation phase makes it real.
+`SETUP.md` is v2's: prerequisites, the environment contract, the run, the
+verification gate, backups **and the restore for both stores**. v1's own guide
+moved with it to `legacy/SETUP.md`.
+
+The foundation phase has landed, so the layout in the blueprint is the layout on
+disk: `apps/{backend,frontend,extension,mobile}`, `packages/{contracts,sdk,tokens}`,
+`infra/` and `workflows/`. v1 lives whole under `legacy/` and is read-only — the
+root tsconfig, oxlint, Prettier and `.gitattributes` all exclude it, and nothing
+in the v2 tree imports from it. `infra/verify.mjs` is the phase gate as a command:
+containers healthy, exactly one non-loopback published port, both stores answering,
+and a second `bootstrap.mjs` run that changes nothing.
 
 ## Things that are easy to get wrong here
 

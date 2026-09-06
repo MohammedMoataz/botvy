@@ -117,7 +117,7 @@ that number, under 20 minutes; record it here.
 ## Phase 8 — Polish
 
 - [X] T090 [P] `SETUP.md` (v2), written once and only here: prerequisites (including the Windows/PowerShell developer loop and the Linux or WSL2 production recommendation), env contract table, run, bootstrap, verify, backups **and the restore step for both stores** (FR-005), the `BOTVY_TAG` and deploy paragraph from T062, tunnel, "v1 lives in legacy/"
-- [ ] T091 [P] `CLAUDE.md`: confirm the persistence rule and the `legacy/` rule read true after the move; update paths
+- [X] T091 [P] `CLAUDE.md`: confirm the persistence rule and the `legacy/` rule read true after the move; update paths
 - [ ] T092 Record gate evidence in this file (commands + output) and mark the phase done; open `015-identity-profile` with `/speckit-specify`
 
 ---
