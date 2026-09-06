@@ -10,7 +10,7 @@
     "dev:token": "tsx scripts/dev-token.ts",
     "prisma:generate": "prisma generate --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
     "postinstall": "prisma generate --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
-    "build": "pnpm prisma:generate && nest build",
+    "build": "prisma generate --schema src/contexts/identity/infrastructure/prisma/schema.prisma && nest build",
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",
