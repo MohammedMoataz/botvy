@@ -74,6 +74,9 @@ importers:
       helmet:
         specifier: ^8.0.0
         version: 8.3.0
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.3
       migrate-mongo:
         specifier: ^11.0.0
         version: 11.0.0(mongodb@6.21.0)
@@ -117,6 +120,9 @@ importers:
       '@nestjs/testing':
         specifier: ^12.0.1
         version: 12.0.1(@nestjs/common@12.0.1(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.0.1)(@nestjs/platform-express@12.0.1)
+      '@types/jsonwebtoken':
+        specifier: ^9.0.7
+        version: 9.0.10
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.1
@@ -6813,7 +6819,7 @@ snapshots:
   '@types/jsonwebtoken@9.0.10':
     dependencies:
       '@types/ms': 2.1.0
-      '@types/node': 22.20.1
+      '@types/node': 24.13.3
 
   '@types/long@4.0.2': {}
 
