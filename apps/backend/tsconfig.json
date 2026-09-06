@@ -8,7 +8,9 @@
     "target": "ES2023",
     "lib": ["ES2023"],
     "outDir": "./dist",
-    "rootDir": "./src",
+    // rootDir is set only in tsconfig.build.json. Here the program also covers
+    // test/ and scripts/, which sit outside src/ — and rootDir would reject
+    // them even though this config never emits anything.
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"]
