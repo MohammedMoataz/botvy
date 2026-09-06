@@ -60,8 +60,8 @@ Renaming or recolouring a label updates every task that uses it.
 
 ### User Story 3 — Work the list (Priority: P1)
 
-Today groups the day's tasks under a clear heading and separates them from
-everything else. Upcoming shows the days ahead; Overdue shows what slipped;
+Today groups the day's tasks under the heading "To Do — Today" and separates them
+from everything else. Upcoming shows the days ahead; Overdue shows what slipped;
 Completed and Deleted keep their own views. A task can be completed, reopened,
 cancelled, moved to another day, deleted with an undo, restored, or erased for good.
 
@@ -97,7 +97,7 @@ ending the series.
 ### User Story 5 — Be reminded, offline (Priority: P1)
 
 A member sets a reminder for a moment, with one or more advance warnings. It rings on
-the phone at that moment with no network, no server and no Google. It can be snoozed,
+the phone at that moment with no network, no server and no third-party service. It can be snoozed,
 completed or cancelled from the notification. A reminder that was deleted keeps the
 record of what became of it and can be restored.
 
@@ -126,9 +126,11 @@ completed, cancelled or deleted.
 
 **Acceptance Scenarios**:
 
-1. **Given** a task due at 09:00 and quiet hours until 08:00, **When** the alert is
-   planned, **Then** it fires at 09:00 (outside the window) — and one planned at
-   03:00 fires at 08:00 instead.
+1. **Given** a task due at 08:30 with an advance warning an hour ahead, and quiet
+   hours until 08:00, **When** the alerts are planned, **Then** the one at the
+   member's own moment still fires at 08:30, and the advance warning — which the
+   system derived, and which would have landed at 07:30 inside the window — is held
+   back to 08:00.
 2. **Given** a task completed before its alert, **When** the moment arrives,
    **Then** nothing is sent.
 3. **Given** no device has push configured, **When** the fallback runs, **Then** the
@@ -156,8 +158,9 @@ forever.
 
 ### Edge Cases
 
-- A reminder set for a moment already past: refused with the reason, or planned for
-  the next sensible moment if the member confirms.
+- A reminder set for a moment already past: refused with the reason, or — if the
+  member confirms — planned for the next moment with that same clock time in their
+  own zone, which is the following day when the time of day has already gone by.
 - A task due at a time that does not exist locally (daylight saving spring forward):
   the alert lands at the first valid moment after it.
 - Exact alarms not permitted by the phone: the member is told, and alarms degrade to
@@ -196,14 +199,21 @@ forever.
   a new moment.
 
 **Alerts**
+
+Two kinds of alert are distinguished throughout, and the difference decides what
+quiet hours may move: the alert at the moment the member chose themselves — a
+reminder's moment, a task's own due time — is the member's, and the system never
+moves it; every advance warning is one Botvy derived from that moment, and those are
+the alerts the system generated.
+
 - **FR-011** Alerts MUST fire on the device with no network.
 - **FR-012** The server MUST provide a fallback that delivers only to devices which
   have not been in touch since the alert was planned, MUST claim each alert before
   sending so two runs cannot both send it, and MUST leave an alert unsent when no
   device can receive it.
 - **FR-013** Completing, cancelling or deleting a source MUST remove its unsent alerts.
-- **FR-014** Quiet hours MUST hold back alerts the system generated; a moment the
-  member chose explicitly MUST still fire.
+- **FR-014** Quiet hours MUST hold an alert the system generated back to the end of
+  the window; an alert at a moment the member chose MUST still fire at that moment.
 - **FR-015** An alert whose moment has passed while the device was off MUST NOT fire
   retroactively.
 
@@ -212,7 +222,9 @@ forever.
   and MUST converge on reconnection without duplicates.
 - **FR-017** A conflicting change MUST resolve deterministically, and the losing
   device MUST be shown the winning version.
-- **FR-018** Deletions MUST reach every device.
+- **FR-018** A deletion MUST travel as a record of the deletion rather than as an
+  absence, so that a device receiving only what changed never mistakes the list for
+  the whole picture and erases what merely stayed the same.
 - **FR-019** A device that has been away longer than the deletion horizon MUST
   receive a complete set rather than a partial one.
 - **FR-020** A change the server refuses MUST be visible to the member and retryable,

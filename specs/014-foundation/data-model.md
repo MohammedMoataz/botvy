@@ -13,7 +13,8 @@ abstract class AggregateRoot<Id = string> {
   readonly id: Id; readonly userId: string; updatedAt: Date; schemaVersion: number;
   protected raise(event: DomainEvent): void; pullEvents(): DomainEvent[];
 }
-interface DomainEvent { eventId: string; name: string; context: string; aggregate: { type: string; id: string }; userId: string | null; occurredAt: Date; payload: unknown }
+// the blueprint envelope (contracts/events.md) verbatim — same field set, same order, no P0 dialect
+interface DomainEvent { eventId: string; name: string; context: string; aggregate: { type: string; id: string }; userId: string | null; occurredAt: Date; payload: unknown; schemaVersion: number }
 
 abstract class Repository<T extends AggregateRoot> {
   abstract findById(userId: string, id: string): Promise<T | null>;
@@ -55,18 +56,32 @@ CREATE TABLE "service_clients" (
   "last_used_at" TIMESTAMPTZ, "revoked_at" TIMESTAMPTZ);
 CREATE TABLE "identity_outbox" (                   -- Identity's events, same transaction as the change
   "id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "aggregate" JSONB NOT NULL, "user_id" UUID,
-  "payload" JSONB NOT NULL, "occurred_at" TIMESTAMPTZ NOT NULL DEFAULT now(), "forwarded_at" TIMESTAMPTZ);
+  "payload" JSONB NOT NULL, "schema_version" INT NOT NULL DEFAULT 1,
+  "occurred_at" TIMESTAMPTZ NOT NULL DEFAULT now(), "forwarded_at" TIMESTAMPTZ);
 CREATE INDEX "identity_outbox_pending_idx" ON "identity_outbox"("forwarded_at", "occurred_at");
 ```
+
+The table has no `context` column and needs none: every name is
+`<context>.<Event>`, so the forwarder splits it on the dot when it writes the Mongo
+row. One source for the value cannot drift from itself; two columns holding the same
+fact can.
 
 Prisma schema declares `User`, `RefreshToken`, `Device`, `ServiceClient` and
 `IdentityOutbox` exactly as in the blueprint §1. v1's `reminders`, `messages`, `conversations`,
 `coaching_profiles`, `checkins`, `workout_records`, `usage_log`, `settings`,
 `reminder_notifications` tables remain in the database, undeclared and untouched
 (F-02). Ports in P0: `UserRepository` (findById, findByLogin, save),
-`ServiceClientRepository` (findByName, verifyToken(hash), touch),
+`DeviceRepository` (listByUser, listByUsers — read-only in P0; registration arrives
+with P1), `ServiceClientRepository` (findByName, upsert, verifyToken(hash), touch),
 `IdentityOutboxRepository` (append within the current transaction, listPending,
-markForwarded). The admin seed (ported) runs through `UserRepository`.
+markForwarded). The admin seed and the `n8n` service-client seed (both at boot, both
+idempotent) run through `UserRepository` and `ServiceClientRepository`.
+
+`DevicesQuery { userIds }` → `[{ userId, deviceId, kind, pushToken?, lastSeenAt }]` is
+the QueryBus handler over `DeviceRepository`. It exists in P0 because
+`internal-alerts` already needs to reach an administrator's phone, and a Mongo context
+reaching into Identity's tables to find one is precisely what principle I forbids;
+P2's notification sweep binds the same query rather than a second one.
 
 ## 3. MongoDB — shared infrastructure + Operations (Mongoose)
 
@@ -74,13 +89,28 @@ markForwarded). The admin seed (ported) runs through `UserRepository`.
 |---|---|---|---|
 | `settings` | Operations | `{ _id: key, value, updatedAt, updatedBy }` | `_id` |
 | `ops_heartbeats` | Operations | `{ _id: job, lastRunAt, lastOkAt, lastDurationMs, lastError }` | `_id` |
-| `outbox` | shared | `{ _id: ObjectId, eventId, name, context, aggregate: { type, id }, userId, payload, occurredAt, deliveredAt, attempts, lastError, nextAttemptAt }` | `{ eventId: 1 }` unique · `{ deliveredAt: 1, occurredAt: 1 }` · TTL `{ deliveredAt: 1 }` 7 d (partial: deliveredAt exists) |
+| `audit_log` | Operations | `{ _id: ObjectId, actor: Principal, action, target: { type, id }, at, meta }` | `{ at: -1 }` · `{ 'actor.id': 1, at: -1 }` |
+| `outbox` | shared | `{ _id: ObjectId, eventId, name, context, aggregate: { type, id }, userId, payload, schemaVersion, occurredAt, deliveredAt, attempts, lastError, nextAttemptAt }` | `{ eventId: 1 }` unique · `{ deliveredAt: 1, occurredAt: 1 }` · TTL `{ deliveredAt: 1 }` 7 d (partial: deliveredAt exists) |
 | `relay_state` | shared | `{ _id: 'outbox', resumeToken, updatedAt }` | `_id` |
+| `idempotency_keys` | shared | `{ _id: <principalId>:<key>, route, status, response, createdAt }` | `_id` · TTL `{ createdAt: 1 }` 24 h |
 | `pings` | Operations (demo) | `{ _id: uuidv7, userId, clientId, at, schemaVersion }` | `{ userId: 1, clientId: 1 }` unique |
 
-`migrate-mongo` script `0001-foundation-indexes.js` creates the indexes above and is
-idempotent. `settings` documents are created lazily on first `set`; reads fall
-back to registry defaults.
+`migrate-mongo` script `0001-foundation-indexes.js` creates the indexes above —
+including `idempotency_keys`' 24-hour TTL, without which the collection grows for
+ever — and is idempotent. `settings` documents are created lazily on first `set`;
+reads fall back to registry defaults.
+
+`idempotency_keys` is keyed by principal **and** key so one member's key can never
+return another's answer; `status` and `response` are what the interceptor replays on
+a repeat, and the TTL is the retention decision from the plan's constants table.
+
+`audit_log` is append-only: Operations exposes an `AuditPort` with a single
+`record(entry)` and no update or delete, and every context that performs an
+administrative action writes through it rather than through a collection of its own.
+P0 writes one row itself — the settings PATCH — and ships the port because P1's role
+change, ban and password change all write here (blueprint `events.md`,
+`identity.PasswordChanged` → Operations → `audit_log`), and a port added in P1 would
+mean P1 also owning a collection the blueprint gives to Operations.
 
 ## 4. Phone (drift) — `botvy_v2.sqlite`, `schemaVersion = 1`
 
@@ -96,10 +126,14 @@ mixin SyncColumns on Table {              // defined in P0, first used by P2's t
 class KeyValues extends Table { TextColumn get key => text()(); TextColumn get value => text()(); Set<Column> get primaryKey => {key}; }
 ```
 
-`MigrationStrategy` has `onCreate: createAll` and an `onUpgrade` ladder with no
-branches yet; `test/migration_ladder_test.dart` asserts that opening a v1-shaped
-file is refused clearly (different file name) and that a future `from < 2` branch
-pattern compiles against a hand-built v1 file — the harness later phases extend.
+`MigrationStrategy` has `onCreate: createAll` and an `onUpgrade` that throws on a step
+it does not recognise — drift's own default, and the reason a forgotten branch bricks
+every existing install rather than failing loudly in CI.
+`test/migration_ladder_test.dart` makes exactly two assertions, because there is
+exactly one version to assert about: opening a fresh file at `schemaVersion 1`
+produces every declared table, and opening a hand-built file stamped `schemaVersion 0`
+fails with the migration's own error, not a driver error. Later phases add one case
+per bump; the harness exists so that adding one is a line rather than a fixture.
 
 ## 5. Extension (Dexie) — `botvy` database v1
 
@@ -125,4 +159,9 @@ forwarder → Mongo `outbox`; Operations' events start in the Mongo outbox direc
 `N8N_URL` · `N8N_API_KEY?` · `OLLAMA_BASE_URL` · `FIREBASE_CREDENTIALS_FILE?` ·
 `MEDIA_SIGNING_SECRET` · `MEDIA_DIR` (/data/media) · `CORS_ORIGINS?` ·
 `ADMIN_EMAIL` · `ADMIN_PASSWORD` · `ALLOW_REGISTRATION` · `LOG_LEVEL`. Compose adds
-`POSTGRES_*`, `N8N_*`, `EDGE_PORT`, `CADDY_SITE`, `TUNNEL_TOKEN?`, `BOTVY_TAG`.
+`POSTGRES_*`, `N8N_*`, `N8N_BIND` (default `127.0.0.1:5679`), `EDGE_PORT`,
+`CADDY_SITE`, `BACKUP_CRON` (default `0 3 * * *`), `TUNNEL_TOKEN?`, `BOTVY_TAG`, and
+passes `INTERNAL_SERVICE_TOKEN` and `AUTOMATION_WEBHOOK_SECRET` through to the n8n
+container as `BOTVY_INTERNAL_TOKEN` / `BOTVY_WEBHOOK_SECRET` so the committed
+workflows can authenticate and verify signatures without storing a credential of
+their own.

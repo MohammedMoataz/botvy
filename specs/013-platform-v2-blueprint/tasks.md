@@ -80,7 +80,7 @@ alarm; PC↔phone task propagation < 10 s; all T208 tests green.
 - [ ] T305 API Tests: Cairo vs Berlin fire at their own 22:00 once; downtime catch-up; DST day fires once; check-in ignored outside coach chat; rollover increments `deferCount`
 
 **Gate**: evening + morning prompts arrive on the phone and in the coach chat at
-the member's times; streak updates; T305 green; `ops_heartbeats.rhythm_tick` fresh.
+the member's times; streak updates; T305 green; `ops_heartbeats` row `rhythm.tick` fresh.
 
 ---
 
@@ -88,7 +88,7 @@ the member's times; streak updates; T305 green; `ops_heartbeats.rhythm_tick` fre
 
 - [ ] T401 API Conversations context complete: pinned `coach`/`planner` (protected), `free` chats, `messages` with per-user `seq`, clear watermark, quick questions (global + user, mood-aware), WS gateway (`chat.send/cancel`, events per `ws-chat.md`), batch offline replay, intent extraction (grammar-constrained, `intent.md`) → CommandBus dispatch to Planning/Reminders/Meetings/Profile with templated confirmation, prompt assembly (`coach.md`/`planner.md`/`chat.md`: profile line with BMI in code, allergies as prohibitions, today's plan, streak), `chat.moved`, `chat.card` for list intents, `update_profile` intent, usage + quota, cancel
 - [ ] T402 [P] MOB Chat feature: pinned section divider, quick chips, streaming bubbles via socket, stop button, offline queue → batch, markdown rendering (`flutter_markdown_plus`), moved-conversation handling
-- [ ] T403 [P] WEB (admin) Usage page; quick-questions management
+- [ ] T403 [P] API Registry keys `chat.dailyQuotaTokens`; `usage_log` written from `conversations.MessageSent` by Operations (the admin Usage and quick-question screens are P10 T1001)
 - [ ] T404 API Tests: intent fixtures (EN/AR relative time), protected conversation rejections, seq monotonic per user, cancel aborts stream, quota enforcement
 
 **Gate**: "remind me to call Dad in two hours" creates the reminder at the right

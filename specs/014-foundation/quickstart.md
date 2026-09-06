@@ -7,14 +7,23 @@ server), Node 24 (`corepack enable` gives pnpm 9), Flutter stable + Android SDK,
 Ollama installed natively with `qwen2.5:3b-instruct` pulled and `OLLAMA_HOST=0.0.0.0`.
 Optional: Firebase service account, Cloudflare tunnel token.
 
+The commands below are PowerShell, because that is where this loop is developed; each
+has an obvious POSIX equivalent and nothing in the stack depends on the shell. For a
+server, run the engine on Linux or in WSL2 rather than on the Windows host.
+
 ## Bring the stack up
 
 ```powershell
 Copy-Item infra/.env.example .env      # fill every ${VAR:?} value the file documents
 docker compose --env-file .env -f infra/docker-compose.yml up -d --build
-node infra/bootstrap.mjs               # migrations (both stores), n8n owner/API key, service client, workflows
+node infra/bootstrap.mjs               # migrations (both stores), n8n owner/API key, workflows; verifies the n8n service client the backend seeded at boot
+node infra/verify.mjs                  # health, one non-loopback published port, a second bootstrap run that changes nothing, elapsed seconds (SC-001: under 300)
 curl http://localhost/health           # {"status":"ok","postgres":true,"mongo":true,"ollama":true,...}
 ```
+
+The n8n editor is published on loopback only (`N8N_BIND`, default
+`127.0.0.1:5679`) — reach it through an SSH tunnel, or set `N8N_BIND` elsewhere if
+v1's n8n already has that port.
 
 v1 keeps running from its own tree if you still need it:
 
@@ -47,7 +56,7 @@ Spine proof (US4):
 ```powershell
 $TOKEN = pnpm --filter @botvy/backend --silent dev:token
 curl -s -X POST http://localhost/api/v1/ping -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d '{"clientId":"018f3c2e-7c1a-7f7e-9c2b-3d5a1b2c3d4e"}'
-# → 202 {"id":"…","at":"…"}; within 10 s n8n → Executions shows "Botvy Ping Echo" succeeded
+# → 202 {"id":"…","updatedAt":"…"}; within 10 s n8n → Executions shows "Botvy Ping Echo" succeeded
 # repeat the same request → 200, same body, no second execution
 curl -s http://localhost/health | jq .jobs     # outbox.relay and ping fresh
 ```

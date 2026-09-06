@@ -62,7 +62,7 @@ Smoke path after `up -d`:
 2. Create a task due in 3 minutes → `alerts` row planned → phone alarm fires with
    airplane mode on.
 3. `docker compose exec n8n …` or admin → Workflows → Run "Rhythm tick" →
-   `ops_heartbeats.rhythm_tick` updates; `/health` stays `ok`.
+   the `ops_heartbeats` row `rhythm.tick` updates; `/health` stays `ok`.
 4. Send "remind me to stretch in 10 minutes" in the Planner chat → `chat.intent`
    `set_reminder` → reminder appears in the list.
 5. Open the extension side panel → the task from step 2 is listed; complete it →

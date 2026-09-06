@@ -13,10 +13,10 @@ expansion, AI program suggestions, suggestions toggle."
 
 Members who train collect links: an article about a training split, a video of a
 movement, a playlist someone recommended. Those links sit unread, and the knowledge in
-them never reaches the week they actually train. This phase lets Botvy read them —
-locally, on the member's own machine — and turn them into something usable: a summary
-worth reading in a minute, and a suggestion for the next session that cites where it
-came from.
+them never reaches the week they actually train. This phase lets Botvy read them — on
+the Owner's own server, never a cloud service — and turn them into something usable: a
+summary worth reading in a minute, and a suggestion for the next session that cites
+where it came from.
 
 Nothing here happens without the member's consent: saving a link is a choice, and
 the whole suggestion mechanism can be switched off.
@@ -48,9 +48,8 @@ done within minutes; the playlist becomes three entries, each reaching done.
 
 ### User Story 2 — Read the summary, not the article (Priority: P1)
 
-A finished entry shows a short summary, the key points, any images or clips it found,
-how long the original is, and a link back to it. The member can open the original at
-any time.
+A finished entry shows a short summary, the key points, any images it found, how long
+the original is, and a link back to it. The member can open the original at any time.
 
 **Acceptance Scenarios**:
 
@@ -95,17 +94,28 @@ retry or clear an entry.
 
 1. **Given** a link stuck failing, **When** the Owner opens the queue, **Then** it is
    listed with its reason and attempt count.
+2. **Given** a failed entry the Owner retries, **When** the read succeeds, **Then** the
+   member sees it done without having asked for anything.
+3. **Given** an entry the Owner clears, **When** the queue is opened again, **Then** it
+   is gone from the member's list too and the clearing is recorded in the audit trail.
 
 ### Edge Cases
 
 - A link behind a login or a paywall: it fails with a clear reason rather than storing
   a login page as if it were the article.
-- A playlist with hundreds of videos: only the first N are taken, the member is told,
-  and they can ask for more.
-- A video with no transcript available: the entry finishes with what could be
-  gathered, or fails plainly — never silently empty.
-- The model is unavailable while summarising: the entry waits and resumes rather than
-  failing permanently.
+- A playlist with hundreds of videos: only the first N are taken and the member is told
+  how many were left behind.
+- A playlist holding a video the member had already saved on its own: the entry they
+  have is adopted into the playlist's group rather than read a second time or refused.
+- A video with no transcript available: the entry finishes on the title, description
+  and duration alone, and says the summary was built without a transcript — never
+  silently empty and never a bare failure.
+- The model is unavailable while summarising, or the machine dies mid-read: the entry
+  stays where it stopped, returns to waiting on its own once it has sat there too long,
+  and resumes from that step. Neither an outage nor a crash counts as an attempt, so a
+  bad afternoon cannot exhaust the retry limit.
+- A member who pastes links faster than they could ever read them: past the day's
+  quota, saving is refused with a plain reason and the links already queued carry on.
 - A source that changes after being read: the stored summary is what was read, dated.
 - A link that is not about training at all: it is stored and summarised; suggestions
   simply do not use it.
@@ -113,7 +123,8 @@ retry or clear an entry.
 
 ## Requirements *(mandatory)*
 
-- **FR-001** A member MUST be able to save a link, optionally tagged, and to remove it.
+- **FR-001** A member MUST be able to save a link, optionally tagged, and to remove it,
+  whether they paste it or share it into Botvy from another app on their phone.
 - **FR-002** Botvy MUST recognise whether a link is an article or page, a single video
   or a playlist, and MUST expand a playlist into one entry per video, grouped.
 - **FR-003** Every entry MUST show its state: waiting, reading, summarising, done or
@@ -121,13 +132,14 @@ retry or clear an entry.
 - **FR-004** A failure MUST NOT block other entries, and repeated failure MUST stop
   after a limit rather than retrying forever.
 - **FR-005** Saving the same link twice MUST NOT read it twice.
-- **FR-006** A finished entry MUST hold a summary, key points, references to any media
+- **FR-006** A finished entry MUST hold a summary, key points, references to any images
   found, the source's title and length, and a link to the original.
 - **FR-007** A summary MUST name its source.
 - **FR-008** Media MUST be shown through Botvy, never by the member's device
   contacting the source directly.
-- **FR-009** When suggestions are enabled and an upcoming session matches saved
-  material, Botvy MUST propose session content citing the sources used.
+- **FR-009** When suggestions are enabled and a session at least a day away matches
+  saved material, Botvy MUST propose session content citing the sources used; a session
+  too close to change is left alone.
 - **FR-010** A suggestion MUST be acceptable into the session or dismissable, and a
   dismissed suggestion MUST NOT return for the same session.
 - **FR-011** Turning suggestions off MUST stop all background generation for that
@@ -138,13 +150,24 @@ retry or clear an entry.
 - **FR-014** The Owner MUST be able to see the whole queue, with reasons, and to retry
   or clear an entry.
 - **FR-015** The limits — how many videos of a playlist, how much text is kept, how
-  many attempts — MUST be Owner settings.
+  many attempts, how many links one member may save in a day, and how long an entry may
+  sit mid-read before it is picked up again — MUST be Owner settings; a save past the
+  day's quota MUST be refused with a reason rather than queued.
+- **FR-016** An entry left mid-read by a crash or a model outage MUST return to waiting
+  on its own and resume, and neither MUST count against the attempt limit.
+- **FR-017** When reading stops running, or work sits waiting past the Owner's
+  threshold, the system MUST report itself degraded rather than appear healthy.
 
 ### Key Entities
 
 **Link** (what the member saved, its kind, its state, its parent when it came from a
 playlist), **Reading** (the extracted text or transcript and the summary),
 **Suggestion** (proposed session content with the sources it came from).
+
+The words the member reads are not quite the words the system stores: waiting is
+`queued`, reading covers both `fetching` and `extracting`, summarising and done and
+failed keep their names, a saved page is a `website`, and the entity called Reading
+here is the Knowledge Document the blueprint names.
 
 ## Success Criteria *(mandatory)*
 
@@ -156,16 +179,23 @@ playlist), **Reading** (the extracted text or transcript and the summary),
 - **SC-004** At least 8 of 10 fixture articles produce a summary a reviewer judges
   faithful.
 - **SC-005** Zero instructions embedded in fetched content are ever executed.
-- **SC-006** A member decides whether to watch a video from its summary in under 30
-  seconds.
+- **SC-006** Every finished entry answers "is this worth my time" on one screen: a
+  summary of at most 150 words, the source's title, its length, and a link out — checked
+  over the same 10 fixtures as SC-004.
+- **SC-007** An entry stranded mid-read by a killed worker is back at waiting within the
+  Owner's threshold, with its attempt count unchanged.
 
 ## Assumptions
 
-- Saving a link is a personal, low-volume act by the member; Botvy fetches on their
-  behalf and stores the result only for them. The platform's terms are documented, and
-  nothing is redistributed.
-- Only the first videos of a large playlist are taken by default; the limit is a
-  setting.
+- Saving a link is a personal, low-volume act by the member — the daily quota is what
+  keeps that true rather than a hope; Botvy fetches on their behalf and stores the
+  result only for them. The platform's terms are documented, and nothing is
+  redistributed.
+- Only the first videos of a large playlist are taken, and that is the end of it: the
+  limit is a setting, and there is no way for the member to ask for the rest in this
+  phase. The Owner raises the setting if it turns out to matter.
+- Media means images. Video and audio embedded inside a page are not collected in this
+  phase, and a video entry's own media is the source it already links to.
 - Summaries are produced by the local model; their quality follows the model the Owner
   runs.
 - Suggestions match on sport and tags, not on deep understanding of the training plan.

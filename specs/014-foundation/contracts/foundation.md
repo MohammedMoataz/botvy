@@ -9,10 +9,10 @@ remain the target; this file lists what exists after this phase.
 |---|---|---|---|
 | `GET /health` | public | Liveness + readiness + job freshness | `{ status: 'ok'\|'degraded', postgres: bool, mongo: bool, ollama: bool, pushConfigured: bool, jobs: { 'outbox.relay': { lastOkAt, stale }, ping: {…} }, version }` |
 | `GET /docs` · `GET /docs-json` | public (dev), admin (prod) | Swagger UI / OpenAPI JSON | HTML / JSON |
-| `POST /api/v1/ping` | user (kind `user`) | Demonstration command | `202 { id, at }`; repeat with same `clientId` or `Idempotency-Key` → same body, `200` |
-| `PATCH /api/v1/admin/settings/:key` | admin | Set an operator value | `{ key, value, updatedAt }`; `400` schema failure; `403` for `ops.*` keys |
-| `GET /api/v1/admin/settings` | admin | Registry with current values | `[{ key, value, default, description, updatedAt }]` |
-| `POST /internal/alerts` | service (`internal:alerts`) | n8n error workflow → push to admins | `{ notified }` |
+| `POST /api/v1/ping` | user (kind `user`) | Demonstration command | `202 { id, updatedAt }` (the blueprint's ack shape); repeat with same `clientId` or `Idempotency-Key` → same body, `200` |
+| `PATCH /api/v1/admin/settings/:key` | admin | Set an operator value | `{ key, value, updatedAt }`; `400` schema failure; `403 { code: 'setting_read_only' }` when the registry entry is `readOnly` — the flag decides, not the key's prefix. Every attempt, applied or refused, writes an `audit_log` row |
+| `GET /api/v1/admin/settings` | admin | Registry with current values | `[{ key, value, default, schema, readOnly, description, updatedAt }]` |
+| `POST /internal/alerts` | service (`internal:alerts`) | n8n error workflow → push to admins (their devices come from Identity's `DevicesQuery`, never from a direct read) + `audit_log` row | `{ notified }` |
 | `GET /media?sig=…` | user | Signed proxy (ported) | bytes |
 
 Guards: `JwtAuthGuard` global (`@Public()` opt-out) → `RolesGuard` → kind checks
@@ -63,8 +63,17 @@ headers: `X-Botvy-Event`, `X-Botvy-Event-Id`, `X-Botvy-Signature: sha256=<hmac>`
 
 | File | Trigger | Does |
 |---|---|---|
-| `error_handler.json` | error trigger | `POST /internal/alerts` with `{ workflow, error }` (imported first) |
-| `ping_echo.json` | webhook `POST /webhook/botvy/pinged` | verifies `X-Botvy-Signature` (Crypto node) → Set node echo; no outbound call. Exists to make US4 observable |
+| `error_handler.json` | error trigger | `POST /internal/alerts` with `{ workflow, error }`, `X-Service-Token: {{$env.BOTVY_INTERNAL_TOKEN}}` (imported first) |
+| `ping_echo.json` | webhook `POST /webhook/botvy/pinged` | verifies `X-Botvy-Signature` (Crypto node, key `{{$env.BOTVY_WEBHOOK_SECRET}}`) → drops the run when `X-Botvy-Event-Id` is already in the workflow's static data, otherwise records it and echoes through a Set node; no outbound call. Exists to make US4 observable |
+
+Both secrets reach n8n as environment (`BOTVY_INTERNAL_TOKEN`,
+`BOTVY_WEBHOOK_SECRET` in the compose service, from the same `.env` the API reads),
+not as credentials in n8n's database — n8n still holds one credential and no data
+(principle II).
+
+Delivery is at-least-once (FR-010), so `ping_echo` is the phase's worked example of a
+subscriber that deduplicates: repeated attempts of one `X-Botvy-Event-Id` leave one
+execution, which is what SC-004 measures.
 
 Default `settings.automation.subscriptions`:
 `[{ event: 'operations.Pinged', url: 'http://n8n:5678/webhook/botvy/pinged', enabled: true }]`.
@@ -73,8 +82,15 @@ Default `settings.automation.subscriptions`:
 
 Idempotent order: wait for `postgres` and `mongo` healthchecks → `prisma migrate
 deploy` → `migrate-mongo up` → n8n owner (once) → n8n API key (minted once, written
-to `.env` as `N8N_API_KEY`) → service client `n8n` with scopes
-`internal:alerts internal:sweep internal:tick internal:ingest` (token =
-`INTERNAL_SERVICE_TOKEN` from `.env`, hashed into `service_clients`) → import
-`error_handler.json` then `ping_echo.json` (upsert by name, placeholder id rewrite,
-activate) → `GET /health` must read `ok`.
+to `.env` as `N8N_API_KEY`) → **verify** the service client `n8n` (scopes
+`internal:alerts internal:sweep internal:tick internal:ingest`) by calling
+`POST /internal/alerts` with `INTERNAL_SERVICE_TOKEN` and requiring any answer other
+than `401` → import `error_handler.json` then `ping_echo.json` (upsert by name,
+placeholder id rewrite, activate) → `GET /health` must read `ok`.
+
+The script does not create that service client, and opens neither store. The backend
+seeds the `n8n` row itself at boot, beside the admin seed, through Identity's
+`ServiceClientRepository`; a bootstrap script writing `service_clients` directly would
+make a second writer of a store the API owns, which principle I forbids. Bootstrap
+only proves the seed happened, so a stale `INTERNAL_SERVICE_TOKEN` fails here rather
+than at the first n8n error hours later.

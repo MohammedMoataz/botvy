@@ -27,8 +27,8 @@ last release, and no way to edit a member's profile from anywhere but the phone.
 
 A visitor registers with an email address, a password and a matching confirmation,
 or with their Google account. They land in the app already set up: their time zone
-detected from the device and confirmable, their language chosen, two pinned chats
-waiting, and every default visible and editable.
+detected from the device and confirmable, their language chosen, and every default
+visible and editable.
 
 **Independent Test**: register on the phone → sign out → sign in → the same name,
 photo, time zone and preferences appear.
@@ -46,7 +46,7 @@ photo, time zone and preferences appear.
    register or to sign in with Google for the first time, **Then** both are refused
    with the same message.
 5. **Given** a successful registration, **When** the member opens the app, **Then**
-   their profile, preferences and two pinned chats already exist.
+   their profile and their preferences already exist.
 6. **Given** a first sign-in, **When** the walkthrough runs, **Then** it asks only for
    a name, an optional photo, the time zone (detected, confirmable) and the language,
    previews the three daily times, finishes in under a minute, and can be skipped
@@ -58,21 +58,22 @@ photo, time zone and preferences appear.
 
 A member signs in with email or username and password, or with Google. The session
 survives closing the app and restarting the phone. Changing the password signs out
-every other device. A stolen and replayed session token is detected and kills the
-whole chain it belongs to.
+every other device. A stolen and replayed credential is detected and kills the whole
+chain it belongs to.
 
 **Independent Test**: sign in on two devices → change the password on one → the
-other is signed out on its next request; replay an old refresh token → refused and
-the family is revoked.
+other is signed out on its next request; replay a spent renewal credential → refused
+and the whole chain is revoked.
 
 **Acceptance Scenarios**:
 
 1. **Given** the seeded administrator, **When** they sign in with `admin` / `admin`,
    **Then** they are admitted and warned to change the password.
-2. **Given** a valid session, **When** the access token expires, **Then** the client
-   refreshes silently and the member notices nothing.
-3. **Given** a refresh token that was already exchanged, **When** it is presented
-   again, **Then** it is refused and every token in its family is revoked.
+2. **Given** a valid session, **When** the session credential expires, **Then** the
+   app renews it silently and the member notices nothing.
+3. **Given** a renewal credential that was already exchanged, **When** it is
+   presented again, **Then** it is refused and every credential in its chain is
+   revoked.
 4. **Given** a Google account not yet known, **When** the member signs in with
    Google and registration is open, **Then** an account is created and no password
    is set; signing in with a password later is impossible until one is set.
@@ -108,7 +109,7 @@ and the history; add an allergy → it is listed as a prohibition, not a prefere
 **Acceptance Scenarios**:
 
 1. **Given** a photo taken on the phone, **When** it is uploaded, **Then** it appears
-   on the profile within seconds and is not readable by another member.
+   on the profile within 5 seconds and is not readable by another member.
 2. **Given** a height and a weight, **When** the profile is read, **Then** the body
    mass index is present and correct without the member calculating it.
 3. **Given** an empty field, **When** the profile is used elsewhere, **Then** it is
@@ -121,7 +122,8 @@ and the history; add an allergy → it is listed as a prohibition, not a prefere
 A member opens preferences and changes the plan-prompt time, the end-of-day time, the morning
 briefing time, the next-practice cut-off, the default reminder lead times, the meal
 mode, whether background suggestions run, quiet hours, the first day of the week and
-their language. The Owner can change what new members start with.
+whether the evening check-in is asked at all. Their language sits with the rest of
+who they are, on the profile. The Owner can change what new members start with.
 
 **Acceptance Scenarios**:
 
@@ -165,7 +167,8 @@ other machines use. Every such action is recorded.
 
 - **FR-000** A first-run walkthrough MUST collect only name, optional photo, time zone
   and language, MUST preview the daily times, MUST be skippable and resumable, and
-  MUST accept later steps from other features (sports, when training exists).
+  MUST accept later steps from other features (sports, when training exists). The
+  system MUST remember when a member finished it, so it is never offered twice.
 - **FR-001** Registration MUST require an email, a password of at least 8 characters
   and a matching confirmation; the confirmation MUST be checked on the client and the
   password rule on the server.
@@ -173,12 +176,14 @@ other machines use. Every such action is recorded.
   administrator account works.
 - **FR-003** Google sign-in MUST verify the credential with Google on the server;
   a client-supplied identity MUST never be trusted.
-- **FR-004** Sessions MUST be short-lived and refreshable; a refresh MUST rotate,
-  and re-use of a rotated credential MUST revoke the whole chain.
+- **FR-004** A session credential MUST expire within 15 minutes and be renewable; a
+  renewal MUST replace the credential it used, and re-use of a spent one MUST revoke
+  the whole chain.
 - **FR-005** Changing the password MUST require the current one and MUST end every
   other session.
-- **FR-006** Registration MUST be closable by the Owner; when closed it MUST also
-  block first-time Google sign-ins.
+- **FR-006** Registration MUST be closable by the Owner from the admin portal, taking
+  effect without the platform being restarted; when closed it MUST also block
+  first-time Google sign-ins.
 - **FR-007** Each installation MUST register once and be listable and removable by
   its owner; the system MUST record when each device was last in touch.
 - **FR-008** A member MUST be able to set display name, photo, time zone, language;
@@ -190,8 +195,8 @@ other machines use. Every such action is recorded.
 - **FR-010** A member's photo MUST be readable only by that member and the Owner.
 - **FR-011** Every default named in the blueprint MUST be an editable preference,
   seeded per member from an Owner-level default at registration.
-- **FR-012** Creating a member MUST create their profile, preferences and the two
-  pinned chats; deleting a member MUST remove all of it.
+- **FR-012** Creating a member MUST create their profile and their preferences;
+  deleting a member MUST remove all of it.
 - **FR-013** The Owner MUST be able to change roles, ban and unban, and create and
   revoke machine credentials, and each action MUST be recorded with who did it.
 - **FR-014** A banned member MUST be refused sign-in and MUST stop receiving
@@ -228,6 +233,8 @@ credentials with reuse detection), **Device**, **Machine credential**,
 
 ## Out of scope
 
+- The member's two pinned conversations with the coach and the planner: they arrive
+  with the daily rhythm phase, which is what gives them something to say.
 - Two-factor authentication, passkeys, single sign-on providers other than Google.
 - Password reset / account recovery by email.
 - Member-to-member visibility of any kind.

@@ -107,8 +107,9 @@ written setup, reaching a working system without reading the source.
 
 1. **Given** a clean machine, **When** the setup is followed, **Then** a working
    system is reached and the health page reads healthy.
-2. **Given** the release, **When** the app and extension are installed from the
-   published artefacts, **Then** they connect to that system.
+2. **Given** the release, **When** the app and the extension are installed from the
+   published artefacts and pointed at that system's own address, **Then** they connect
+   to it without either of them being rebuilt.
 
 ---
 
@@ -135,28 +136,41 @@ are written down.
 
 ## Requirements *(mandatory)*
 
-- **FR-001** Backups of both stores MUST run on a schedule, MUST be verifiable, and
-  MUST be documented.
+- **FR-001** Backups of both stores MUST run on a schedule and MUST be documented.
+  Each night's archives MUST be verified — every one of them opened and its contents
+  listed rather than merely counted — and the outcome MUST be reported back to the
+  system, so it can say for itself when it last had a backup it knows is good and
+  complain when that becomes too long ago.
 - **FR-002** A restore onto a clean machine MUST be performed at least once, by
   following the written procedure only, and the result MUST be recorded.
 - **FR-003** After a restore the system MUST reach a healthy state and scheduled work
   MUST resume without manual steps.
-- **FR-004** A security review MUST cover the exposed surface, credentials, logging,
-  rate limiting and the consequence of losing any single secret; every finding MUST be
-  fixed or recorded with an explicit decision.
+- **FR-004** A security review MUST cover the exposed surface, which origins are
+  allowed to reach it and what protective headers it returns, every credential and the
+  consequence of losing any single one, the boundaries that separate members from
+  machines and from administrators, rate limiting, logging, and whether the automation
+  editor can be reached from outside; it MUST record how a machine credential is
+  replaced while the system keeps running. Every finding MUST be fixed or recorded with
+  an explicit decision.
 - **FR-005** The credential inherited from the old system MUST be replaced and the old
   one invalidated.
 - **FR-006** Logs and diagnostics MUST NOT contain passwords, tokens or member content.
 - **FR-007** The old system MUST be stopped only after a parity checklist is complete,
   its data archived readably, and its code removed from the repository.
 - **FR-008** An optional one-time import of the old reminders and conversations MUST
-  be available, MUST be safe to run twice, and MUST mark what it imported.
+  be available, MUST be safe to run twice, MUST mark what it imported, and MUST keep
+  each imported item at the time it originally happened rather than the time it was
+  imported.
 - **FR-009** Setup documentation MUST let someone who did not build the system install
   it from the published release.
 - **FR-010** Every stated outcome of the platform MUST be measured and recorded, with
   a plan for anything missed.
 - **FR-011** The release MUST publish the server images, the app and the extension
-  together, versioned.
+  together, all four carrying the same version.
+- **FR-012** A member who was banned in the old system MUST still be banned in the new
+  one, and that MUST be confirmed before the old system is stopped.
+- **FR-013** Someone who installs the published app or extension MUST be able to point
+  it at their own system without rebuilding either.
 
 ### Key Entities
 
@@ -174,6 +188,10 @@ review, with its decision), **Parity checklist**, **Import run** (what it moved,
   complete.
 - **SC-005** A person following the setup reaches a healthy system in under 30 minutes.
 - **SC-006** Every stated platform outcome has a recorded measurement.
+- **SC-007** The system reads healthy, with every scheduled job reporting freshly, on
+  each of seven consecutive days after the release.
+- **SC-008** Every member-facing screen passes a right-to-left review in the released
+  build.
 
 ## Assumptions
 

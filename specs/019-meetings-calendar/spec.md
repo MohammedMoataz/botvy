@@ -69,8 +69,9 @@ rest unchanged.
 ### User Story 3 — See the day, the week and the month (Priority: P1)
 
 One calendar shows meetings, tasks that have a time, training sessions and personal
-events together. A day view lists them in order with their preparation blocks; a
-month view shows which days are busy; the home screen shows today.
+events together. A day view lists them in order with their preparation blocks; a week
+view puts seven such days side by side; a month view shows which days are busy; the
+home screen shows today.
 
 **Acceptance Scenarios**:
 
@@ -81,6 +82,9 @@ month view shows which days are busy; the home screen shows today.
    from the device's own copy.
 3. **Given** a month with three busy days, **When** the month is opened, **Then**
    those days are marked and tapping one opens that day.
+4. **Given** a week with meetings on three of its days, **When** the week is opened,
+   **Then** each day stands in its own column with its items in time order, and the
+   week can be stepped forward and back.
 
 ---
 
@@ -105,6 +109,8 @@ and training.
 
 1. **Given** two meetings tomorrow, **When** the evening proposal arrives, **Then**
    it names them with their times.
+2. **Given** a meeting at 10:00 today, **When** the morning briefing arrives, **Then**
+   it names the meeting and its time alongside the day's tasks.
 
 ### Edge Cases
 
@@ -113,7 +119,8 @@ and training.
 - Daylight saving inside a repeating series: each occurrence keeps its local wall
   time, not a fixed offset.
 - A member travels: a meeting that is fixed to a place keeps its local time there when
-  they mark it so; otherwise it follows them.
+  they mark it so; otherwise it follows them, and its advance warnings move with it as
+  soon as the new time zone is saved rather than the next day.
 - An occurrence moved onto a date that is already skipped: the move wins and the skip
   is cleared.
 - A series edited so that an already-moved occurrence would fall outside the new rule:
@@ -124,7 +131,11 @@ and training.
 ## Requirements *(mandatory)*
 
 - **FR-001** A meeting MUST hold a name, an optional description, a start, a length,
-  and a location that is either an online link or an address.
+  and a location. At least one of an online link and an address MUST be given, and both
+  MAY be — a meeting held in a room that is also dialled into is one meeting, not two.
+  A member who names no length gets their own default meeting length. A meeting always
+  occupies a stretch of the day; something that fills a whole day is a personal event
+  (FR-011), not a meeting.
 - **FR-002** A meeting MUST support preparation notes and a preparation time, which
   MUST appear as its own block before the meeting.
 - **FR-003** A meeting MUST support one or more advance reminders, defaulting to the
@@ -141,13 +152,24 @@ and training.
 - **FR-008** Reminders MUST be produced for occurrences within a rolling window and
   MUST stop for skipped, moved-away, cancelled or deleted occurrences.
 - **FR-009** A calendar MUST merge meetings, timed tasks, training sessions and
-  personal events in day, week and month views, each recognisable.
-- **FR-010** The calendar and today's list MUST be readable offline.
+  personal events in day, week and month views, each recognisable. A day counts as busy
+  — and is marked so in the week and month views — when it holds at least one item of
+  any kind.
+- **FR-010** The calendar and today's list MUST be readable offline, which includes
+  working out where a repeating meeting falls without asking the server.
 - **FR-011** Personal events MUST support a title, a time or a whole day, a colour and
-  an optional repeat.
-- **FR-012** The daily rhythm MUST include the day's meetings.
-- **FR-013** A meeting MUST be completable or cancellable, and deletion MUST be
-  undoable like everything else.
+  an optional repeat. A repeating event MUST behave exactly as a repeating meeting
+  does: the same rules for skipping one, moving one, and ending the series.
+- **FR-012** The daily rhythm MUST include the day's meetings, in both the evening
+  proposal for tomorrow and the morning briefing for today.
+- **FR-013** A meeting MUST be completable or cancellable as a whole; within a
+  repeating series a single occurrence is skipped or moved rather than completed or
+  cancelled, because the outcome belongs to the meeting and not to one of its dates.
+  Deletion MUST be undoable like everything else, and a deleted meeting or event MUST
+  stay recoverable for the platform's undo window before it is removed for good.
+- **FR-014** When a member changes the time zone their profile keeps, every future
+  occurrence that is not fixed to a place MUST be re-read in the new zone and its
+  advance warnings re-issued at once, rather than waiting for the next nightly pass.
 
 ### Key Entities
 
@@ -159,7 +181,7 @@ event).
 ## Success Criteria *(mandatory)*
 
 - **SC-001** A six-week weekly meeting with one skip and one move renders exactly five
-  occurrences, one at the moved time, on phone and browser alike.
+  occurrences, one at the moved time, on phone and extension alike.
 - **SC-002** Reminders arrive for 100% of occurrences in the rolling window and for
   none that were skipped or cancelled.
 - **SC-003** A month view of 200 occurrences renders in under 300 ms on the phone.
@@ -179,5 +201,6 @@ event).
 ## Out of scope
 
 - Invitations, attendees, free/busy, scheduling links.
+- Whole-day meetings: a whole-day entry is a personal event in this phase.
 - Two-way sync with an external calendar; file import or export.
 - Travel-time estimation between locations.

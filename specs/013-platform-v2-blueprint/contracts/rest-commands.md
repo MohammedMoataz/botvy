@@ -15,7 +15,7 @@ duplicate), `422` domain rule (e.g. allergen), `429` throttled.
 
 | Method & path | Auth | Body → Result |
 |---|---|---|
-| `POST /auth/register` | public | `{ email, password, passwordConfirm, displayName?, locale? }` → `{ accessToken, refreshToken, user }`; refused when `ALLOW_REGISTRATION=false`; password ≥ 8; confirm must match (client and server) |
+| `POST /auth/register` | public | `{ email, password, passwordConfirm, displayName?, locale? }` → `{ accessToken, refreshToken, user }`; refused when the registry key `auth.registrationOpen` is false; password ≥ 8; confirm must match (client and server) |
 | `POST /auth/login` | public | `{ login /* email or username */, password, device?: { installId, kind, name } }` → tokens |
 | `POST /auth/google` | public | `{ idToken, device? }` → tokens (server verifies with Google; creates account if allowed) |
 | `GET /auth/google/start` · `GET /auth/google/callback` | public | OAuth code flow for web and `chrome.identity.launchWebAuthFlow` |
@@ -71,7 +71,7 @@ duplicate), `422` domain rule (e.g. allergen), `429` throttled.
 | `POST /rhythm/plans/:date/confirm` | user | `{ taskIds, training?: boolean }` |
 | `POST /rhythm/plans/:date/skip` | user | |
 | `POST /rhythm/checkins` | user | `{ date?, mood?, adhered?, note? }` |
-| `POST /internal/rhythm/tick` | service (`internal:tick`) | → `{ evening: n, morning: n, users: n }` |
+| `POST /internal/rhythm/tick` | service (`internal:tick`) | → `{ users, planPrompts, endOfDay, morning, checkins, ms }` (see `internal.md`) |
 | `POST /internal/rhythm/prompt` | service | `{ userId?, kind: 'plan'\|'end_of_day'\|'morning' }` — unconditional, for an operator pressing Run |
 
 ## Conversations (chat)
@@ -129,6 +129,7 @@ Live turns go over WebSocket — see `ws-chat.md`.
 |---|---|---|
 | `POST /meals` · `PATCH /meals/:id` · `DELETE /meals/:id` | user | `{ id, name, kind, ingredients?, tags? }` |
 | `POST /nutrition/today/regenerate` | user | regenerates today's meal line (respects `mealMode`, allergies) |
+| `POST /nutrition/today/replace` | user | `{ mealId }` — swaps one meal in today's line, keeps the rest |
 
 ## Sync
 
@@ -140,12 +141,13 @@ Live turns go over WebSocket — see `ws-chat.md`.
 
 | Method & path | Auth | Body |
 |---|---|---|
-| `PATCH /admin/settings/:key` | admin | `{ value }` validated by the registry schema; `ops.*` keys refused |
+| `PATCH /admin/settings/:key` | admin | `{ value }` validated by the registry schema; a key whose registry entry is `readOnly` is refused |
 | `POST /admin/users/:id/role` | admin | `{ role }` |
 | `POST /admin/users/:id/ban` · `/unban` | admin | |
 | `POST /admin/service-clients` · `DELETE /admin/service-clients/:id` | admin | `{ name, scopes }` → token shown once |
 | `POST /admin/workflows/:id/activate` · `/deactivate` · `/run` | admin | proxied to n8n; run fires the companion webhook |
 | `POST /admin/knowledge/:linkId/retry` | admin | |
+| `DELETE /admin/knowledge/:linkId` | admin | clears a stuck or failed entry; writes an `audit_log` row |
 | `POST /internal/alerts` | service (`internal:alerts`) | `{ workflow, error }` → pushes to admin devices |
 | `GET /health` | public | `{ status: 'ok'\|'degraded', postgres, mongo, ollama, push, jobs: { [job]: { lastOkAt, stale } } }` |
 | `GET /media?sig=…` | user | signed proxy for external images (SSRF-guarded) |

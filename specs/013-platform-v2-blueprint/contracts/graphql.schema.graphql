@@ -11,7 +11,7 @@ scalar JSON
 
 # ---------- Identity / Profile ----------
 
-type User { id: ID!, email: String!, displayName: String, role: Role!, status: UserStatus!, createdAt: DateTime!, lastLoginAt: DateTime }
+type User { id: ID!, email: String!, displayName: String, role: Role!, status: UserStatus!, createdAt: DateTime!, lastLoginAt: DateTime, deviceCount: Int! }   # deviceCount resolved for @admin only
 enum Role { user admin }
 enum UserStatus { active banned }
 
@@ -134,11 +134,14 @@ type AgendaDay { date: Date!, items: [AgendaItem!]! }
 # ---------- Operations / Admin ----------
 
 type JobStatus { job: String!, lastRunAt: DateTime, lastOkAt: DateTime, lastError: String, stale: Boolean! }
-type Health { status: String!, postgres: Boolean!, mongo: Boolean!, ollama: Boolean!, pushConfigured: Boolean!, jobs: [JobStatus!]! }
-type Setting { key: String!, value: JSON!, default: JSON!, description: String!, updatedAt: DateTime, updatedBy: String }
+type Health { status: String!, postgres: Boolean!, mongo: Boolean!, ollama: Boolean!, pushConfigured: Boolean!, defaultAdminPassword: Boolean!, jobs: [JobStatus!]! }
+type Setting { key: String!, value: JSON!, default: JSON!, schema: JSON!, readOnly: Boolean!, description: String!, updatedAt: DateTime, updatedBy: String }
+                                             # `schema` is the registry's zod shape as JSON — the admin form renders its control from it
 type Stats { users: Int!, activeToday: Int!, devices: Int!, tasksOpen: Int!, remindersActive: Int!, messages24h: Int!, tokens24h: Int!, ingestionQueued: Int!, ingestionFailed: Int! }
 type Workflow { id: ID!, name: String!, active: Boolean!, lastRunAt: DateTime, webhookPath: String }
-type UsageRow { day: Date!, kind: String!, model: String!, promptTokens: Int!, completionTokens: Int!, calls: Int! }
+type UsageRow { day: Date!, kind: String!, model: String!, promptTokens: Int!, completionTokens: Int!, calls: Int!, userId: ID }   # userId non-null only when grouped per member
+type AuditEntry { id: ID!, at: DateTime!, actorType: String!, actorId: ID!, actorLabel: String!, action: String!, targetType: String!, targetId: ID, meta: JSON }
+type AuditConnection { nodes: [AuditEntry!]!, endCursor: String, hasNextPage: Boolean! }
 type UserConnection { nodes: [User!]!, endCursor: String, hasNextPage: Boolean! }
 type LinkConnection { nodes: [Link!]!, endCursor: String, hasNextPage: Boolean! }
 
@@ -203,5 +206,6 @@ type Query {
   settings: [Setting!]!                        # @admin
   workflows: [Workflow!]!                      # @admin
   ingestionQueue(status: LinkStatus): [Link!]! # @admin (all users)
-  usage(from: Date!, to: Date!, userId: ID): [UsageRow!]!   # @admin
+  usage(from: Date!, to: Date!, userId: ID, byMember: Boolean = false): [UsageRow!]!   # @admin
+  audit(actor: ID, action: String, targetType: String, from: DateTime, to: DateTime, first: Int = 50, after: String): AuditConnection!   # @admin
 }

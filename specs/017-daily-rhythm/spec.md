@@ -32,7 +32,7 @@ one, or the draft if nothing was answered) and sends the end-of-day summary:
 tomorrow's top priorities and whether there is training.
 
 **Independent Test**: set the plan-prompt time two minutes ahead → the question and
-draft arrive as a notification and in the coach chat → ignore them → set the
+draft arrive as a notification and in the coach conversation → ignore them → set the
 end-of-day time two minutes ahead → the summary arrives, names the top priorities
 and the training, and tomorrow's plan holds exactly the draft.
 
@@ -59,7 +59,7 @@ and the training, and tomorrow's plan holds exactly the draft.
 
 At the member's morning time — 08:00 unless changed — Botvy sends today's plan: the
 tasks, the training slot if any, and the meal line, as a notification and in the coach
-chat. The home screen shows the same thing whenever it is opened.
+conversation. The home screen shows the same thing whenever it is opened.
 
 **Acceptance Scenarios**:
 
@@ -98,15 +98,16 @@ time → each gets the summary at their own 22:00 → stop the system over one m
 
 ### User Story 4 — A short check-in and a streak (Priority: P1)
 
-With the end-of-day summary, Botvy asks how the day went: a mood from a simple scale
-and whether the plan was followed, with an optional note. Answering builds a streak of
-consecutive days followed. The check-in is only interpreted inside the coaching
-conversation, so ordinary sentences elsewhere never count.
+With the end-of-day summary, Botvy asks how the day went: a mood anywhere from nought
+to a hundred and whether the plan was followed, with an optional note. Answering builds
+a streak of consecutive days followed. The check-in is only interpreted inside the coach
+conversation, so ordinary sentences elsewhere never count, and only for a window that
+starts when the question is asked — twelve hours unless the Owner sets it otherwise.
 
 **Acceptance Scenarios**:
 
-1. **Given** the question was asked, **When** the member answers in the coaching
-   chat within the allowed window, **Then** the day is recorded and the streak updates.
+1. **Given** the question was asked, **When** the member answers in the coach
+   conversation inside that window, **Then** the day is recorded and the streak updates.
 2. **Given** the same words typed in an unrelated chat, **When** they are sent,
    **Then** nothing is recorded.
 3. **Given** a day answered "no", **When** the streak is shown, **Then** it restarts
@@ -157,18 +158,22 @@ streak and the week's adherence.
 - **FR-004** At each member's morning time the system MUST send today's plan; when
   none was confirmed it MUST build one from what is due.
 - **FR-005** Every touch MUST be delivered as a notification and written into the
-  coaching conversation, so a member who opens the app sees it on screen.
+  coach conversation, so a member who opens the app sees it on screen. Every member
+  MUST have that conversation from the moment they register, before any touch is due.
 - **FR-006** Each touch MUST fire once per member per local day and MUST catch up the
   same day after downtime; a touch MUST NOT fire twice if a preference changes after
   the fact.
-- **FR-007** A check-in, asked with the end-of-day summary, MUST record mood,
-  whether the plan was followed and an optional note; it MUST be interpretable only inside the coaching conversation and
-  only within the allowed window.
+- **FR-007** A check-in, asked with the end-of-day summary, MUST record a mood between
+  nought and a hundred, whether the plan was followed and an optional note; it MUST be
+  interpretable only inside the coach conversation and only within a window that begins
+  when the question is asked — a length the Owner sets, twelve hours by default.
 - **FR-008** A streak MUST count consecutive followed days and MUST remember the best.
 - **FR-009** Check-ins MUST be switchable off per member.
 - **FR-010** Today's plan MUST be readable offline on the phone.
 - **FR-011** Every time in this feature MUST be a per-member preference.
 - **FR-012** A failure to generate the meal line MUST NOT prevent the plan being sent.
+- **FR-013** The three touches happen at times the member chose for themselves, so a
+  member's quiet hours MUST NOT hold any of them back or move them.
 
 ### Key Entities
 
@@ -184,7 +189,9 @@ whether it was proposed, confirmed, set automatically or skipped), **Check-in**,
   per member per local day across a 14-day run, including a day with a
   daylight-saving change.
 - **SC-003** A member confirms tomorrow in under 60 seconds from the notification.
-- **SC-004** Zero check-ins recorded from messages outside the coaching conversation.
+  This one is observed with real members after release; nothing that can be built
+  proves it, so it is watched rather than gated.
+- **SC-004** Zero check-ins recorded from messages outside the coach conversation.
 - **SC-005** Home renders today's plan offline in under 300 ms.
 
 ## Assumptions
@@ -192,8 +199,8 @@ whether it was proposed, confirmed, set automatically or skipped), **Check-in**,
 - The evening has two touches — the plan prompt and the end-of-day summary that
   carries the check-in; both times and the morning time are per-member preferences
   seeded from Owner defaults.
-- "Highest priority" means the top five tasks by priority then due time, editable by
-  the member.
+- "Highest priority" means the top few tasks by priority then due time — how many is
+  an Owner setting, five by default — editable by the member.
 - Training comes from the training feature when it lands; until then the slot is
   simply absent and the plan reads correctly without it.
 - The meal line likewise arrives with the nutrition feature; until then it is absent.
@@ -203,3 +210,6 @@ whether it was proposed, confirmed, set automatically or skipped), **Check-in**,
 - Time-boxing tasks into hours of the day.
 - Weekly or monthly reviews.
 - Coaching advice generated from the check-in (the coach reads the streak from P4).
+- Everything else the coach conversation will become — free chats, the assistant's own
+  replies, quick questions. This feature creates the conversation and writes its own
+  three touches into it; P4 makes it a conversation you can talk back to.
