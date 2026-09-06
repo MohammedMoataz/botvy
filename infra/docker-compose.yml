@@ -1,0 +1,233 @@
+# The whole platform. One published port, everything else on the Docker network.
+#
+# Principle V is the shape of this file: `caddy` is the only service with a
+# `ports:` entry reaching beyond loopback. n8n binds to 127.0.0.1 so the Owner
+# can reach its editor through an SSH tunnel without it being on the internet —
+# which the principle permits, and which `verify.mjs` excludes when it counts
+# public ports.
+
+name: botvy
+
+x-backend-env: &backend-env
+  NODE_ENV: ${NODE_ENV:-production}
+  DATABASE_URL: ${DATABASE_URL:?set it in .env}
+  MONGO_URL: ${MONGO_URL:?set it in .env}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set it in .env}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set it in .env}
+  JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+  JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
+  AUTOMATION_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:?set it in .env}
+  MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set it in .env}
+  MEDIA_DIR: /data/media
+  N8N_URL: http://n8n:5678
+  N8N_API_KEY: ${N8N_API_KEY:-}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+  CORS_ORIGINS: ${CORS_ORIGINS:-}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  # The only service publishing beyond loopback.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '${EDGE_PORT:-80}:80'
+    environment:
+      # A bare ":80" serves plain HTTP behind the tunnel, which terminates TLS.
+      # Set it to a hostname to have Caddy get its own certificate instead.
+      CADDY_SITE: ${CADDY_SITE:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks: [botvy]
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-frontend:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      # Same-origin through Caddy; the browser never learns the backend's name.
+      NEXT_PUBLIC_API_BASE: ''
+    networks: [botvy]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-backend:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      BOTVY_ROLE: backend
+      PORT: 8080
+    volumes:
+      - media:/data/media
+      - ${FIREBASE_CREDENTIALS_DIR:-./secrets}:/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [botvy]
+
+  # Same image, different role. The worker has no HTTP edge beyond /healthz.
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-backend:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      BOTVY_ROLE: worker
+      WORKER_PORT: 8081
+    volumes:
+      - media:/data/media
+      - ${FIREBASE_CREDENTIALS_DIR:-./secrets}:/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      # Marking the worker healthy on process start would hide a dead relay,
+      # which is the one thing this container exists to run.
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8081/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
+    networks: [botvy]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set it in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-botvy}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-botvy}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [botvy]
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    # A replica set of one. Not optional: transactions and change streams both
+    # need one, and the outbox needs both.
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo/init-replica.sh:/scripts/init-replica.sh:ro
+    healthcheck:
+      # Initiates the set on first boot and is a plain status read afterwards,
+      # so the healthcheck is also the thing that makes the set exist.
+      test: ['CMD', 'bash', '/scripts/init-replica.sh']
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    networks: [botvy]
+
+  mongodump:
+    image: mongo:8
+    restart: unless-stopped
+    environment:
+      MONGO_URL: ${MONGO_URL:?set it in .env}
+      BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+    volumes:
+      - ../backups/mongo:/backups
+      - ./backup-mongo.sh:/usr/local/bin/backup-mongo.sh:ro
+    entrypoint: ['/bin/bash', '-c']
+    command:
+      - |
+        echo "$${BACKUP_CRON} /usr/local/bin/backup-mongo.sh" > /etc/cron.d/botvy
+        crontab /etc/cron.d/botvy
+        cron -f
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks: [botvy]
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    # Loopback only. Principle V permits localhost; the Owner reaches the editor
+    # through an SSH tunnel. Settable, or removable entirely on a host where
+    # v1's n8n already holds this port.
+    ports:
+      - '${N8N_BIND:-127.0.0.1:5679}:5678'
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_DATABASE: ${N8N_DB:-n8n}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:?set it in .env}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Africa/Cairo}
+      N8N_DIAGNOSTICS_ENABLED: 'false'
+      # Both secrets come from the same .env the API reads, as environment.
+      # Never a second credential stored in n8n's own database, so principle
+      # II's "one credential and no data" still reads true.
+      BOTVY_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
+      BOTVY_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:?set it in .env}
+      BOTVY_API_BASE: http://backend:8080
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [botvy]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: [tunnel]
+    # Not `${TUNNEL_TOKEN:?}`, even though it is required to run this service.
+    # A required variable is interpolated by `compose config` regardless of
+    # profile, so demanding it here would make the verification gate — which
+    # reads `config` to count published ports — fail on every host that does not
+    # use a tunnel. cloudflared refuses an empty token loudly enough.
+    command: ['tunnel', '--no-autoupdate', 'run', '--token', '${TUNNEL_TOKEN:-}']
+    depends_on:
+      caddy:
+        condition: service_started
+    networks: [botvy]
+
+networks:
+  botvy:
+    driver: bridge
+
+volumes:
+  pg_data:
+  mongo_data:
+  n8n_data:
+  media:
+  caddy_data:
+  caddy_config:

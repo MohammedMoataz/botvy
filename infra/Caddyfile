@@ -1,0 +1,48 @@
+# The single public surface.
+#
+# Everything the outside world can reach comes through here, and nothing else
+# publishes a port beyond loopback. The routes below are the whole of the
+# platform's public API; PostgreSQL, Mongo, n8n, the worker and the model server
+# are on the Docker network and are not reachable from here at all.
+
+{$CADDY_SITE} {
+	encode zstd gzip
+
+	# The API's surfaces. Commands, queries and the live connection are three
+	# separate channels behind the same credential check, which is why they are
+	# listed separately rather than proxied as one prefix.
+	@api path /api/* /graphql /health /media /media/* /docs /docs/*
+	handle @api {
+		reverse_proxy backend:8080
+	}
+
+	# The socket. Long-lived, so it gets no read timeout: a chat turn can take
+	# longer than a request, and cutting it off mid-answer looks to the member
+	# like the assistant stopped talking.
+	handle /ws* {
+		reverse_proxy backend:8080 {
+			transport http {
+				read_timeout 0
+			}
+		}
+	}
+
+	# Everything else is the web app: the marketing pages and the admin portal.
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	header {
+		# The edge owns these, so every surface gets them whether or not its own
+		# framework remembered to.
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
