@@ -97,7 +97,7 @@ that number, under 20 minutes; record it here.
 
 ## Phase 6 — User Story 4: the spine (P1)
 
-- [ ] T070 [US4] `contexts/operations/domain/ping.aggregate.ts` (raises `operations.Pinged`), `ping.repository.ts` (port), `infrastructure/ping.schema.ts`, `ping.mapper.ts`, `mongo-ping.repository.ts` (unique `(userId, clientId)` → no-op on repeat), `in-memory-ping.repository.ts`
+- [X] T070 [US4] `contexts/operations/domain/ping.aggregate.ts` (raises `operations.Pinged`), `ping.repository.ts` (port), `infrastructure/ping.schema.ts`, `ping.mapper.ts`, `mongo-ping.repository.ts` (unique `(userId, clientId)` → no-op on repeat), `in-memory-ping.repository.ts`
 - [ ] T071 [US4] `features/ping/`: `ping.command.ts`, `ping.handler.ts` (`uow.run` → save), `ping.controller.ts` (`POST /api/v1/ping`, `@UsersOnly`, `Idempotency-Key`, ack `{ id, updatedAt }` per contracts), `ping.spec.ts` (in-memory: one event per new clientId, none on repeat) (F-13, FR-012)
 - [ ] T072 [US4] Worker `features/ping/pinged.handler.ts` (`@EventsHandler` → `heartbeat.stamp('ping')`); default subscription `operations.Pinged` → `http://n8n:5678/webhook/botvy/pinged` in `settings.registry.ts`
 - [ ] T073 [US4] `dev:token` script (`apps/backend/scripts/dev-token.ts`: mints a 1 h user JWT for `ADMIN_EMAIL`; refuses to run when `NODE_ENV=production`)
