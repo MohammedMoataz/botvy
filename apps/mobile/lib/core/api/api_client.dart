@@ -25,9 +25,9 @@ const String kApiPrefix = '/api/v1';
 
 /// Shared instance so `main()` can read persisted state before the container
 /// exists without standing up a throwaway one.
-const FlutterSecureStorage kSecureStorage = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
-);
+// flutter_secure_storage 10 removed `encryptedSharedPreferences`: encrypted
+// storage is the only mode now, so the option no longer exists to ask for.
+const FlutterSecureStorage kSecureStorage = FlutterSecureStorage();
 
 /// What the gateway hands back on sign-in and on refresh.
 class TokenPair {

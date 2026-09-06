@@ -65,7 +65,7 @@ class NotificationScheduler {
     tz.setLocalLocation(tz.getLocation(await deviceTimezone()));
 
     await _plugin.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
       ),
@@ -120,10 +120,10 @@ class NotificationScheduler {
   /// app is foregrounded, which Android otherwise does not draw.
   Future<void> show(String title, String body, {String? payload}) async {
     await _plugin.show(
-      DateTime.now().millisecondsSinceEpoch & 0x7fffffff,
-      title,
-      body,
-      details,
+      id: DateTime.now().millisecondsSinceEpoch & 0x7fffffff,
+      title: title,
+      body: body,
+      notificationDetails: details,
       payload: payload,
     );
   }
@@ -151,7 +151,10 @@ class NotificationScheduler {
 /// The IANA zone the handset is in, e.g. `Africa/Cairo`.
 Future<String> deviceTimezone() async {
   try {
-    return await FlutterTimezone.getLocalTimezone();
+    // flutter_timezone 5 answers with a TimezoneInfo; the identifier is the
+    // part that names an IANA zone.
+    final info = await FlutterTimezone.getLocalTimezone();
+    return info.identifier;
   } catch (e) {
     debugPrint('could not read the device time zone, assuming UTC: $e');
     return 'UTC';

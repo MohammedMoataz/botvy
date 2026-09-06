@@ -1,0 +1,26 @@
+# Code generation for the phone.
+#
+# drift generates the database; that runs on every build and is what
+# `test/migration_ladder_test.dart` exercises.
+#
+# The API client generator is present but switched off. It reads
+# `packages/contracts/openapi.json`, which the backend writes at runtime in
+# generation mode — so on a fresh clone the file does not exist yet and the
+# generator aborts the whole codegen run rather than skipping itself, taking
+# drift down with it. Turn it on in the same change that starts committing the
+# generated contract, not before.
+targets:
+  $default:
+    builders:
+      swagger_dart_code_generator:
+        enabled: false
+        options:
+          input_folder: '../../packages/contracts/'
+          output_folder: 'lib/core/api/generated/'
+          separate_models: true
+      drift_dev:
+        enabled: true
+        options:
+          # The schema is the Dart definition; a mismatch should be a compile
+          # error rather than a runtime surprise on somebody's phone.
+          store_date_time_values_as_text: true
