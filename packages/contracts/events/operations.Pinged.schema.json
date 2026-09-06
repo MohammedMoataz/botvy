@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "operations.Pinged",
+  "description": "Payload of operations.Pinged. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "pingId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "clientId": {
+      "type": "string"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "pingId",
+    "clientId",
+    "at"
+  ],
+  "additionalProperties": false
+}

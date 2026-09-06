@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DomainEvent",
+  "description": "Every event travels in this envelope. Delivery is at-least-once, so a subscriber discards an eventId it has already seen.",
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "context": {
+      "type": "string"
+    },
+    "aggregate": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "userId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {},
+    "schemaVersion": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "eventId",
+    "name",
+    "context",
+    "aggregate",
+    "userId",
+    "occurredAt",
+    "schemaVersion"
+  ],
+  "additionalProperties": false
+}
