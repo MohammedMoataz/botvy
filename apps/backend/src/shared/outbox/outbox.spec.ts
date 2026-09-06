@@ -153,6 +153,23 @@ describe('retry ladder', () => {
   });
 });
 
+interface RecordedPost {
+  post: HttpPost;
+  calls: Array<{ url: string; headers: Record<string, string>; body: string }>;
+}
+
+/** A fanout target that records what it was handed instead of reaching a network. */
+function recordingPost(): RecordedPost {
+  const calls: RecordedPost['calls'] = [];
+  return {
+    calls,
+    post: async (url, body, headers) => {
+      calls.push({ url, body, headers });
+      return { ok: true, status: 200 };
+    },
+  };
+}
+
 describe('webhook fanout', () => {
   const event: DomainEvent = {
     eventId: 'evt-9',
@@ -170,17 +187,6 @@ describe('webhook fanout', () => {
     { event: 'operations.Pinged', url: 'http://n8n:5678/webhook/disabled', enabled: false },
     { event: 'identity.UserRegistered', url: 'http://n8n:5678/webhook/other', enabled: true },
   ];
-
-  function recordingPost(): { post: HttpPost; calls: Array<{ url: string; headers: Record<string, string>; body: string }> } {
-    const calls: Array<{ url: string; headers: Record<string, string>; body: string }> = [];
-    return {
-      calls,
-      post: async (url, body, headers) => {
-        calls.push({ url, body, headers });
-        return { ok: true, status: 200 };
-      },
-    };
-  }
 
   it('delivers only to enabled subscriptions for that event', async () => {
     const { post, calls } = recordingPost();
