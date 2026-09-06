@@ -41,9 +41,13 @@ Only decisions specific to standing the platform up are recorded here.
   `mongodb://mongo:27017/botvy?replicaSet=rs0&directConnection=true`.
   `migrate-mongo` (ESM config in `apps/backend/migrations/mongo/`) runs from
   `bootstrap.mjs` and from the backend's `pnpm migrate:mongo`; the first migration
-  creates the indexes for `settings`, `ops_heartbeats`, `outbox`, `relay_state`,
-  `pings`. The compose healthcheck runs `mongosh --quiet --eval "try { rs.status().ok }
-  catch (e) { rs.initiate({_id:'rs0', members:[{_id:0, host:'mongo:27017'}]}).ok }"`.
+  creates the indexes for `settings`, `ops_heartbeats`, `audit_log`, `outbox`,
+  `relay_state`, `idempotency_keys` and `pings`. The compose healthcheck runs
+  `infra/mongo/init-replica.sh` (the blueprint's name for it), whose body is
+  `mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',
+  members:[{_id:0, host:'mongo:27017'}]}).ok }"` — a healthcheck rather than a
+  one-shot init container, so a set that is somehow lost is re-initiated rather than
+  leaving a container reporting healthy with no set behind it.
 - **Rationale**: transactions and change streams need a replica set (R-04);
   `directConnection` avoids the driver trying to resolve the replica-set host from
   outside the compose network during development.
@@ -68,13 +72,27 @@ Only decisions specific to standing the platform up are recorded here.
   `tls internal`. Published port `${EDGE_PORT:-80}:80` (+ `443` when TLS is local).
 - **Rationale**: R-26; a configurable port avoids collisions with the v1 stack still
   running on the same host.
+- **The n8n editor is the other publish, and it is deliberate**: `n8n` binds
+  `${N8N_BIND:-127.0.0.1:5679}:5678`. Principle V permits exactly this — it requires
+  the supporting services to stay "on the Docker network or localhost" — and a
+  loopback publish is what lets the Owner reach the editor through an SSH tunnel
+  instead of exposing it. On a host where v1's n8n already holds 5679 (v1's own
+  compose publishes it), set `N8N_BIND` to another loopback port or to the empty
+  string to drop the publish entirely; the API reaches n8n over the compose network
+  either way. `verify.mjs` counts only publishes bound to a non-loopback address, so
+  "exactly one public port" stays a check rather than a claim.
 
 ### F-06 CI/CD shape
 
-- **Decision**: `.github/workflows/ci.yml` — jobs `backend` (pnpm, `prisma generate`,
-  `nest build`, `vitest run`), `frontend` (`next build`), `extension` (`wxt build`
-  + zip artifact), `packages` (typecheck + tests), `mobile` (`flutter analyze`,
-  `flutter test`, debug APK artifact). `.github/workflows/release.yml` on `v*` tags:
+- **Decision**: `.github/workflows/ci.yml` — jobs `backend` (pnpm, lint,
+  `prisma generate`, `nest build`, `vitest run`), `frontend` (lint, `next build`),
+  `extension` (lint, `wxt build` + zip artifact), `packages` (lint, typecheck +
+  tests), `mobile` (`flutter analyze`, `flutter test`, debug APK artifact), every one
+  of them with `timeout-minutes: 15`. Lint runs inside each job rather than as a
+  sixth: a surface whose lint fails should fail its own job, which is what FR-016's
+  "each as its own job" and US3's "the others still report" ask for. The blueprint
+  lists `mobile.yml` and `extension.yml` as separate files; they are jobs here — same
+  isolation, one file to keep in step (VIII). `.github/workflows/release.yml` on `v*` tags:
   build + push `ghcr.io/<owner>/botvy-backend` and `botvy-frontend`, release
   APK + extension zip as GitHub release assets, then a `deploy` job that runs over SSH
   `cd /opt/botvy && sed -i BOTVY_TAG=… .env && docker compose pull && docker compose up -d`
@@ -106,17 +124,23 @@ Only decisions specific to standing the platform up are recorded here.
 
 ### F-09 Logging and request context
 
-- **Decision**: `nestjs-pino` for structured logs; an `AsyncLocalStorage`-backed
-  `RequestContext` carries `requestId`, `principal`, and — set by the CQRS
-  interceptor — `context` and `slice`, so every line from a handler is attributable
-  (FR-008).
+- **Decision**: `nestjs-pino` for structured logs — pino's default line-delimited
+  JSON, one object per line carrying `level`, `time`, `msg` and `req.id`, pretty-printed
+  only in development. An `AsyncLocalStorage`-backed `RequestContext` carries
+  `requestId`, `principal`, and — set by the CQRS interceptor — `context` and `slice`,
+  so every line from a handler is attributable (FR-008). Log retention is the
+  container runtime's (`json-file`, rotated by compose's `max-size` / `max-file`), not
+  the application's: an application that prunes its own logs is a second thing to keep
+  running.
 - **Alternatives**: Nest's default logger (unstructured).
 
 ### F-10 Settings cache across two processes
 
 - **Decision**: in-memory cache with a 60 s TTL (v1 behaviour) plus immediate
   invalidation on `operations.SettingChanged` delivered through the outbox to both
-  processes. Cross-process staleness is bounded by the TTL.
+  processes. Cross-process staleness is bounded by the TTL. The TTL is a constant, not
+  a registry key — a key that governed the cache would have to be read through the
+  cache — and it is listed as such in the plan's constants table (XII).
 - **Alternatives**: no cache (v1 pressure point 07); Redis pub/sub (new process).
 
 ### F-11 Outbox relay resumability

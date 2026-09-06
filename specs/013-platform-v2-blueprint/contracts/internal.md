@@ -15,6 +15,7 @@ member endpoints reject service principals. Scopes gate routes:
 | `internal:ingest` | `POST /internal/knowledge/ingest/:linkId` |
 | `internal:alerts` | `POST /internal/alerts` |
 | `internal:events` | `POST /internal/events/ack` (webhook delivery acks, optional) |
+| `internal:ops` | `POST /internal/ops/heartbeat` — `{ job, ok, durationMs, error?, meta? }`; the only way a job running outside the API (the backup container) reaches `ops_heartbeats`, since nothing but the API writes a store |
 
 Every internal job writes `ops_heartbeats[job]` on completion; `/health` marks a
 job stale after 15 minutes and the admin overview shows the same.

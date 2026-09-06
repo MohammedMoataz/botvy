@@ -133,7 +133,7 @@ Mongo contexts delete their documents on it.
   updatedAt, schemaVersion }
 ```
 
-Profile photo bytes live on the `media` volume at `/data/media/<userId>/avatar-<hash>.jpg`
+Profile photo bytes live on the `media` volume at `/data/media/<userId>/avatar-<hash>.webp`
 and are served by `GET /api/v1/profile/photo` (auth) — no GridFS.
 
 ### 2.2 Planning context
@@ -270,7 +270,8 @@ after → the first `planned` session with `plannedAt > end of today`.
 { _id, userId, title, sport, source: 'user'|'suggestion'|'link', sourceLinkIds: string[],
   weeks: [{ index, sessions: [{ templateId, weekday: number|null, title, focus,
             exercises: [{ name, sets: [{ targetReps?, targetWeightKg?, ... }], mediaRefs: [] }] }] }],
-  status: 'active'|'archived', createdAt, updatedAt, deletedAt, schemaVersion }
+  status: 'active'|'archived', appliedStartDate: string|null,   /* the local date the member applied it; week arithmetic counts from here */
+  createdAt, updatedAt, deletedAt, schemaVersion }
 ```
 
 **`workouts`** (syncable) — the member's own library
@@ -406,22 +407,40 @@ collection by the relay, keyed by the same `eventId`, so a duplicate copy is a
 no-op.
 
 **`settings`** — `_id = key`, `{ value: any, updatedAt, updatedBy }`; keys and zod
-schemas live in `settings.registry.ts`. Registry (initial):
+schemas live in `settings.registry.ts`, each with a default, a description and a
+`readOnly` flag. `PATCH /admin/settings/:key` refuses a key whose registry entry is
+`readOnly` (the system writes it); every other key is editable from the portal — the
+flag, not a key prefix, is what makes a key un-editable. Registry (initial):
 
 | Key | Default | Read by |
 |---|---|---|
 | `defaults.timezone` | `Africa/Cairo` | new profiles |
 | `defaults.planTomorrowTime` / `endOfDayTime` / `morningBriefingTime` / `nextPracticeCutoff` | `21:00` / `22:00` / `08:00` / `21:00` | new preferences |
 | `defaults.leadTimes` | `["1h","0m"]` | new preferences, reminders |
+| `defaults.quietHours` | `{ from: "22:00", to: "07:00" }` | new preferences, alert shifting |
+| `defaults.weekStartsOn` | `monday` | new preferences, calendar and week views |
+| `defaults.checkinEnabled` | `true` | new preferences, end-of-day touch |
+| `defaults.locale` | `en` | new profiles when registration omits one |
+| `defaults.meetingDurationMin` | `30` | new preferences, meeting editor |
 | `defaults.mealMode` / `aiSuggestions` | `llm` / `true` | new preferences |
 | `reminders.tombstoneDays` | `30` | sweep **and** sync full-snapshot rule |
 | `notifications.sweepBatch` / `expiryHours` | `200` / `24` | sweep |
 | `rhythm.checkinWindowHours` | `12` | check-in capture |
+| `rhythm.draftTopN` | `5` | tomorrow's draft — how many priorities the touches name |
 | `chat.historyLimit` | `20` | prompt assembly |
+| `chat.dailyQuotaTokens` | `120000` | per-member daily allowance |
 | `llm.chatModel` / `extractModel` / `summarizeModel` / `numCtx` | `qwen2.5:3b-instruct` ×3 / `8192` | LLM client |
 | `knowledge.maxAttempts` / `maxChars` / `playlistMaxItems` | `3` / `60000` / `50` | ingestion |
+| `knowledge.maxLinksPerDay` | `20` | per-member add-link quota |
+| `knowledge.concurrency` | `1` | ingestion worker |
+| `knowledge.stuckAfterMinutes` | `30` | re-queue sweep for rows stalled mid-pipeline |
+| `nutrition.mealsPerDay` | `3` | meal-line drafting |
+| `auth.registrationOpen` | `true` | registration endpoint |
+| `backup.retentionDays` / `backup.staleHours` | `14` / `48` | backup prune, `/health` freshness |
+| `ops.staleAfterMinutes` | `15` | heartbeat freshness (`readOnly: false`) |
 | `push.copy` | per kind, per language | alerts |
 | `automation.subscriptions` | `[]` | outbox relay → n8n webhooks |
+| `ops.lastBackupAt` / `ops.adminPasswordIsDefault` | written by the system | `readOnly: true` — the portal shows them, never edits |
 | `labels.palette` | 12 hex colours | label picker |
 
 **`ops_heartbeats`** — `_id = job` (`notifications.sweep`, `rhythm.tick`,

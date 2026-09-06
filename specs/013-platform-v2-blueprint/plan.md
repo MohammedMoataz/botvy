@@ -347,7 +347,7 @@ up after downtime:
   `lastMorningBriefingDate != today` → claim, then send today's plan and emit
   `MorningBriefingSent`.
 
-Stamp `ops_heartbeats.rhythm_tick`.
+Stamp the `ops_heartbeats` row `rhythm.tick`.
 
 ### Recurrence
 

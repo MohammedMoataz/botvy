@@ -16,9 +16,13 @@ running. They need one place that answers: is everything alive, who is using it,
 is configured, what is queued, and what did I change last week. Members also need
 somewhere to send a friend who asks what this is, and somewhere to download the app.
 
-The admin portal has existed since the foundation as a login and a health page. This
-phase makes it the operator's actual console, and gives the public site its first
-real content.
+The admin portal has been growing since the foundation. It began as a login and a
+health page, and each later phase added the screen that watched over what it built:
+the member list, devices, service clients, the warning that the shipped administrator
+password is still in place, and the queue of links being read. This phase adds what
+nothing else owned — settings, automation, usage and the record of what was changed —
+joins the existing screens into one console, and gives the public site its first real
+content.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -53,7 +57,7 @@ unbans. Every one of those acts is recorded with who did it and when.
 1. **Given** a member promoted, **When** they reload, **Then** the admin screens are
    available to them.
 2. **Given** a member banned, **When** they try to use the app, **Then** they are
-   refused and stop receiving notifications.
+   refused, and the reminders and briefings queued for them stop arriving.
 3. **Given** any of these acts, **When** the record is opened, **Then** it names the
    act, the target, the person and the moment.
 
@@ -124,8 +128,8 @@ English and Arabic and says plainly that everything runs on the owner's own mach
 
 **Acceptance Scenarios**:
 
-1. **Given** a visitor on a phone, **When** the page loads, **Then** it reads well at
-   that size and the download is obvious.
+1. **Given** a visitor on a phone, **When** the page loads at 360 pixels wide,
+   **Then** it reads without sideways scrolling and the download is obvious.
 2. **Given** Arabic selected, **When** the page renders, **Then** it reads
    right-to-left throughout.
 
@@ -155,9 +159,11 @@ English and Arabic and says plainly that everything runs on the owner's own mach
 - **FR-005** Every administrative act MUST be recorded with the act, the target, the
   person and the moment, and the record MUST be viewable.
 - **FR-006** The portal MUST show every operator setting with its meaning, default and
-  current value, MUST validate a change against the setting's rule, and MUST apply it
-  without a restart.
-- **FR-007** Settings the system writes for itself MUST be visible but not editable.
+  current value, MUST offer a control suited to the kind of value the setting's own
+  published rule describes, MUST validate a change against that rule, and MUST apply
+  it without a restart.
+- **FR-007** A setting marked as written by the system MUST be shown as such, MUST be
+  readable, and any change to it MUST be refused.
 - **FR-008** The portal MUST list automation workflows with their state and last run,
   and allow activating, deactivating and running one.
 - **FR-009** The portal MUST show which events are forwarded to automation and allow
@@ -169,7 +175,7 @@ English and Arabic and says plainly that everything runs on the owner's own mach
   app and extension downloads, and state that everything runs on the owner's hardware.
 - **FR-013** Both the portal and the site MUST be available in English and Arabic with
   correct right-to-left layout.
-- **FR-014** The portal MUST be usable on a phone-sized screen.
+- **FR-014** The portal MUST be usable at 360 pixels wide, with no sideways scrolling.
 
 ### Key Entities
 
@@ -182,10 +188,11 @@ subscription**, **Reading queue entry**, **Usage row**.
 - **SC-002** 100% of administrative acts produce a record.
 - **SC-003** A setting change takes effect on the next use without a restart, in under
   a minute.
-- **SC-004** The Owner completes each of: promote, ban, change a setting, run a
-  workflow, retry a failed link — in under 30 seconds each from the overview.
-- **SC-005** The public site scores at least 90 for performance and accessibility in a
-  standard audit.
+- **SC-004** Each of promote, ban, change a setting, run a workflow and retry a failed
+  link is reachable from the overview in at most three steps, counted as the
+  navigations and confirmations between the overview and the act taking effect.
+- **SC-005** Every public page scores at least 90 for both performance and
+  accessibility in an automated audit.
 - **SC-006** Both surfaces pass right-to-left review in Arabic.
 
 ## Assumptions

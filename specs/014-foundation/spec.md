@@ -39,7 +39,7 @@ configuration, and the freshness of every scheduled job.
 **Acceptance Scenarios**:
 
 1. **Given** a filled environment file, **When** the Owner starts the stack, **Then**
-   every container reports healthy and exactly one port is reachable from outside.
+   every part reports healthy and exactly one port is reachable from beyond the host.
 2. **Given** the stack is up, **When** the Owner opens the health page, **Then** it
    names each store, the model server, push, and each scheduled job with a fresh/stale
    state, folded into `ok` or `degraded`.
@@ -58,8 +58,8 @@ with hot reload where the platform supports it, and can run every test suite wit
 one command per surface.
 
 **Independent Test**: `install` → start each surface → each answers on its
-documented port (or loads in Chrome / the emulator) → each test command passes on a
-fresh checkout.
+documented port (or loads in the browser / on a phone emulator) → each test command
+passes on a fresh checkout.
 
 **Acceptance Scenarios**:
 
@@ -67,7 +67,8 @@ fresh checkout.
    mode, **Then** the interactive API documentation and the query playground open in a
    browser.
 2. **Given** the extension built in development mode, **When** it is loaded into
-   Chrome, **Then** its side panel opens showing the sign-in screen.
+   the browser, **Then** its side panel opens showing the sign-in screen, in the
+   browser's language and right-to-left when Arabic.
 3. **Given** the phone app on an emulator, **When** it starts, **Then** it opens to
    a sign-in screen in the device's language, right-to-left when Arabic.
 4. **Given** shared types regenerated from the running API, **When** the web and
@@ -111,7 +112,9 @@ automation tool's execution list → the health page shows the relay job fresh.
    member credential, **Then** it is acknowledged, and the automation tool records one
    delivery for it within 10 seconds.
 2. **Given** the same command is sent twice with the same idempotency key, **When**
-   both are processed, **Then** exactly one event is delivered.
+   both are processed, **Then** exactly one event is recorded, and however many times
+   that event is offered to the automation tool it leaves one execution behind,
+   because the subscriber discards a repeat of an event id it has already seen.
 3. **Given** the worker is stopped, **When** the command is sent, **Then** the event
    is stored and delivered as soon as the worker returns — never lost.
 4. **Given** a scheduled job has not run for 15 minutes, **When** the health page
@@ -125,6 +128,10 @@ The v1 gateway, admin portal, phone app source and infrastructure remain in the
 repository as a read-only reference and remain deployable, so the phones already
 in use keep working until v2 reaches parity.
 
+**Independent Test**: after the restructure, start the v1 stack from its own tree
+and see it serve on its own ports; the only change to any v1 file in the history is
+the move itself.
+
 **Acceptance Scenarios**:
 
 1. **Given** the v2 restructure, **When** the v1 stack is started from its own
@@ -134,41 +141,47 @@ in use keep working until v2 reaches parity.
 
 ### Edge Cases
 
-- The product store is started for the first time and is not yet a replica set: it
-  initialises itself; a second start does not re-initialise.
+- The product store is started for the first time: it prepares itself for
+  transactions and change notification during that first start; a second start does
+  not repeat the preparation.
 - The identity store already holds v1 tables: v2 uses the identity tables and leaves
   the rest untouched.
-- Ports 80/443 already taken on the host: the edge port is configurable.
+- The default edge ports are already taken on the host: the edge port is configurable.
 - Push credentials absent: the system runs and reports push as not configured;
-  present but unreadable: start fails, because that is a declared intent to have push.
+  declared but unreadable when the system starts: the start fails, because that is a
+  declared intent to have push; readable at start and unreadable afterwards: the
+  system keeps running and the health page reads `degraded` with push marked down.
 - The automation tool is down: events queue and deliver later; the health page shows
   the relay as fresh (it ran) but delivery attempts as pending.
-- Windows host: the documented loop works from PowerShell; the production
-  recommendation is a Linux or WSL2 engine.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 **Stack**
-- **FR-001** One compose file MUST start every v2 process, the two stores, the
-  automation tool, the edge and the backup job; exactly one container MUST publish a port.
+- **FR-001** One declaration MUST start every v2 process, the two stores, the
+  automation tool, the edge and the backup job from a single command; exactly one of
+  them MUST publish a port reachable from beyond the host. A part published only to
+  the host's own loopback address is not reachable from beyond it and does not count.
 - **FR-002** Every required environment value MUST be validated at start; a missing
   or malformed value MUST prevent start with a message naming it.
 - **FR-003** A single bootstrap command MUST apply both stores' migrations, create
   the automation tool's owner and API key on first run, register the machine
   credential it uses, and import the committed workflows — idempotently.
-- **FR-004** The product store MUST run as a replica set from first start without
-  manual steps.
-- **FR-005** A nightly backup of the product store MUST be produced to a host volume.
+- **FR-004** The product store MUST support transactions and change notification from
+  its first start, with no manual initialisation step by the Owner.
+- **FR-005** A nightly backup of each store MUST be produced to a host volume, MUST
+  record when it last succeeded, and backups older than a configured retention window
+  MUST be pruned; the documented restore step MUST accompany them.
 
 **Health & observability**
 - **FR-006** A public health page MUST report each store, the model server, push
   configuration and every scheduled job's freshness, folded into `ok` or `degraded`.
 - **FR-007** Every scheduled or event-driven job MUST record a heartbeat; a job
   silent for 15 minutes MUST read stale.
-- **FR-008** Logs MUST be structured and MUST carry the acting principal, the
-  context and the slice.
+- **FR-008** Every log line MUST be one machine-readable record — a single object per
+  line, with a level, a timestamp and a request correlation id — and MUST carry the
+  acting principal, the context and the slice.
 
 **Spine**
 - **FR-009** The system MUST accept state changes, data reads and a live connection
@@ -179,7 +192,10 @@ in use keep working until v2 reaches parity.
   delivered at least once by the worker to in-process handlers and to the automation
   tool's subscriptions; consumers MUST deduplicate on the event id.
 - **FR-011** Operator-tunable values MUST live in a registry with a schema, a default
-  and a description, editable without restart.
+  and a description, editable without restart. An entry the system writes for itself
+  MUST be marked read-only in the registry, and the administrative edit MUST refuse
+  exactly those entries — the mark, not the name of the value, is what makes one
+  un-editable.
 - **FR-012** A demonstration command MUST exist to prove FR-009/010/011 end to end
   and MUST be removable once a real feature covers the same path.
 
@@ -201,6 +217,14 @@ in use keep working until v2 reaches parity.
 - **FR-018** v1 sources and infrastructure MUST move to a `legacy/` directory
   unchanged and MUST remain runnable from there.
 
+**Shared services later phases build on**
+- **FR-019** Resolving a member's local time, talking to the model server and serving
+  signed media MUST exist as shared services in this phase, carrying v1's behaviour
+  and v1's tests, so a later phase adds a caller rather than plumbing.
+- **FR-020** Administrative actions MUST be recordable in an append-only trail — who
+  acted, on what, and when. This phase provides the record and the single way to
+  write it; the phases that add administrative actions provide the writers.
+
 ### Key Entities
 
 - **Principal**: who is acting — member (with role) or machine (with scopes).
@@ -209,6 +233,7 @@ in use keep working until v2 reaches parity.
 - **Outbox event**: a recorded fact awaiting delivery.
 - **Workflow**: a committed automation definition imported into the automation tool.
 - **Service client**: a machine credential with scopes.
+- **Audit record**: an administrative action, its actor, its target and its moment.
 
 ## Success Criteria *(mandatory)*
 
@@ -219,8 +244,9 @@ in use keep working until v2 reaches parity.
 - **SC-002** A fresh checkout reaches a running API, web, extension and phone dev
   loop in under 20 minutes following the quickstart alone.
 - **SC-003** Pull-request checks complete in under 15 minutes.
-- **SC-004** The demonstration command is delivered to the automation tool within
-  10 seconds in 100% of 20 consecutive attempts, exactly once each.
+- **SC-004** The demonstration command reaches the automation tool within 10 seconds
+  in 100% of 20 consecutive attempts, and each attempt leaves exactly one execution
+  behind once the subscriber has discarded repeats of an event id it already saw.
 - **SC-005** A stopped job is visible as stale on the health page within 15 minutes.
 - **SC-006** v1 starts from `legacy/` with no edits after the restructure.
 
@@ -230,9 +256,10 @@ in use keep working until v2 reaches parity.
   v1's non-identity tables stay in place, ignored, until the hardening phase.
 - The phone app is developed under a distinct application id suffix so it installs
   beside v1 during development; the release id is decided in the hardening phase.
-- The deploy target is a single host reachable over SSH; its address and key are
-  repository secrets and may be absent.
-- The model server runs on the host, outside the compose stack, as in v1.
+- The deploy target is a single host the release process can reach with a stored
+  credential; its address and that credential are repository secrets and may be absent.
+- The model server runs on the host, beside the managed stack rather than inside it,
+  as in v1.
 
 ## Out of scope
 

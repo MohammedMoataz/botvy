@@ -16,8 +16,9 @@ the one they most want the coach to know about. This phase gives Botvy the athle
 week: which sports they practise, when they train, what a session contains, what they
 actually did, and — the screen they will open most — what the next practice is.
 
-It is deliberately one model for every sport. Gym, football, cross-fit, calisthenics
-and swimming differ in what a set means, not in how a week is shaped.
+It is deliberately one model for every sport. Gym, football, crossfit, calisthenics,
+swimming, running and cycling differ in what a set means, not in how a week is shaped,
+and a member whose sport is not among them names their own.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -67,6 +68,10 @@ A member opens a session and logs it: for a gym session, the sets with their rep
 weights; for swimming or running, distance and time; for a game, simply that it
 happened, with notes. A session can be completed, cancelled or skipped.
 
+**Independent Test**: log a gym session of three exercises with their reps and weights,
+then skip the next one → the first shows what was done beside what was planned, and the
+second stays in the week marked skipped.
+
 **Acceptance Scenarios**:
 
 1. **Given** a session with planned sets, **When** it is logged, **Then** what was
@@ -84,6 +89,11 @@ A member creates or accepts a program: a number of weeks, each with sessions, ea
 with exercises and targets. Applying it fills the upcoming sessions in their slots.
 A program can be archived and another applied.
 
+**Independent Test**: apply a four-week program from a Monday onto slots that already
+hold planned content → the member is told what would be replaced, and once they agree
+the first week's sessions carry the program's titles and exercises while the fourth
+week carries them too, on the day it is created.
+
 **Acceptance Scenarios**:
 
 1. **Given** a four-week program applied from Monday, **When** the week is viewed,
@@ -92,6 +102,9 @@ A program can be archived and another applied.
    **Then** the member is told what will be replaced before it happens.
 3. **Given** a program archived, **When** future weeks arrive, **Then** its sessions
    stop being created and the slots stay, empty.
+4. **Given** a program archived, **When** the sessions it already filled are viewed,
+   **Then** they keep their titles and exercises — archiving stops the program from
+   filling anything new and never rewrites a week the member can already see.
 
 ---
 
@@ -99,6 +112,9 @@ A program can be archived and another applied.
 
 A member saves workouts they like — a name, a sport, its exercises — and drops one
 into a session without retyping it.
+
+**Independent Test**: save a workout of five exercises, apply it to an empty session →
+the session holds those five exercises with their targets and they can still be edited.
 
 **Acceptance Scenarios**:
 
@@ -111,6 +127,9 @@ into a session without retyping it.
 
 Today's list shows the day's training as its own item, not as a task. The calendar
 shows it beside meetings. The evening proposal names tomorrow's session.
+
+**Independent Test**: with a session at 18:00 today, open Today, the calendar and the
+evening proposal → the session is in all three, and it cannot be ticked off in the list.
 
 **Acceptance Scenarios**:
 
@@ -126,7 +145,8 @@ shows it beside meetings. The evening proposal names tomorrow's session.
 - Two sports at the same hour on the same day: both are kept and shown; the member
   decides.
 - A session in the past that was never logged: it shows as missed and can still be
-  logged late.
+  logged late. Missed is a reading of the clock, not an outcome anyone records, so
+  logging it late needs no correction first.
 - A program shorter than the weeks remaining: it ends and the slots continue empty
   until another is applied.
 - The cut-off falls before a session that is still to happen today: the session is
@@ -134,8 +154,9 @@ shows it beside meetings. The evening proposal names tomorrow's session.
 
 ## Requirements *(mandatory)*
 
-- **FR-001** A member MUST be able to choose one or more sports from a known list plus
-  an "other" option with their own name.
+- **FR-001** A member MUST be able to choose one or more sports from a known list —
+  gym, football, crossfit, calisthenics, swimming, running, cycling — plus an "other"
+  option with their own name.
 - **FR-002** A member MUST be able to define weekly slots (day, time, length, sport,
   optional place), and changing them MUST affect future sessions only.
 - **FR-003** Sessions MUST be created ahead for the coming weeks from the slots, so
@@ -150,14 +171,31 @@ shows it beside meetings. The evening proposal names tomorrow's session.
 - **FR-007** The cut-off hour MUST be a per-member preference.
 - **FR-008** A program MUST consist of weeks, each with sessions and exercises with
   targets; applying it MUST fill upcoming slot sessions and MUST warn before replacing
-  existing content.
+  existing content. A week that falls beyond the sessions created so far MUST be filled
+  as those sessions come into being, so a program longer than the populated horizon
+  still lands in full; archiving it MUST stop that filling without rewriting sessions
+  it has already filled.
 - **FR-009** A member MUST be able to keep a personal workout library and apply an
   entry to a session.
 - **FR-010** Today's list MUST show the day's training as a distinct item that cannot
   be completed as a task.
-- **FR-011** The calendar and the daily rhythm MUST include training.
+- **FR-011** The calendar MUST show training beside meetings, and the evening and
+  morning touches MUST name the session they concern.
 - **FR-012** Everything in this feature MUST be usable offline and MUST synchronise.
 - **FR-013** A rest day MUST NOT be stored; the absence of a session is the rest day.
+- **FR-014** A member MUST be reminded of a session before it starts, at their own lead
+  time, and a session completed, cancelled or skipped MUST NOT go on reminding them.
+- **FR-015** A member MUST be able to set their slots and log a session by saying so in
+  the coach chat, in English or Arabic, and asking what training is coming MUST be
+  answered with a list of sessions the member can open, not with prose.
+- **FR-016** A new member MUST be offered a sports-and-slots step during first-run
+  onboarding, so an athlete arrives with a week already shaped.
+- **FR-017** The coach MUST know the member's training week whenever it answers — the
+  sports they practise, the session that is next, and how consistently they have been
+  training.
+- **FR-018** A planned session whose time has passed with nothing logged MUST read as
+  missed wherever it is shown and MUST still be loggable; missed MUST NOT be stored as
+  an outcome of its own.
 
 ### Key Entities
 
@@ -167,8 +205,8 @@ session templates), **Workout** (a library entry).
 
 ## Success Criteria *(mandatory)*
 
-- **SC-001** After setting slots, the coming two weeks are populated within seconds
-  and stay populated as weeks pass.
+- **SC-001** After setting slots, the coming two weeks are populated within 5 seconds
+  of saving them and stay populated as weeks pass.
 - **SC-002** The next-practice card is correct on both sides of the cut-off for 100%
   of a 14-day fixture.
 - **SC-003** Logging a full gym session of six exercises takes under 90 seconds.

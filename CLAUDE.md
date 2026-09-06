@@ -36,7 +36,9 @@ until the foundation phase makes it real.
   environment variables. Anything an operator might retune is a key in the
   `settings` registry with a zod schema. Anything a member might want different
   is a `user_preferences` field seeded from `settings.defaults.*`. A hard-coded
-  default is a bug.
+  default is a bug. What an operator may *not* edit is the registry entry's
+  `readOnly` flag, never a key prefix: refusing `ops.*` at the endpoint also
+  froze `ops.staleAfterMinutes`, which is exactly the knob an operator retunes.
 - **A scheduled job that stops arriving must be visible.** Every job writes an
   `ops_heartbeats` row; `/health` and the admin overview report it stale after
   15 minutes. A silent 401 between n8n and the gateway once went unnoticed for
@@ -47,7 +49,20 @@ until the foundation phase makes it real.
   Prisma client. `userId` in Mongo is the Postgres uuid as a string.
 - **A context never reads another context's collection.** Cross-context needs
   are a `QueryBus` call or an outbox event. If two slices need the same helper,
-  duplicate it; move it to `shared/` on the third copy.
+  duplicate it; move it to `shared/` on the third copy. A handler that dispatches
+  another context's *command* is the same violation wearing a bus — the write
+  belongs to that context's own consumer of your event.
+- **A capability three phases each credit to another phase is a capability
+  nobody builds.** The pinned `coach` and `planner` conversations were "created
+  in P1" per P1 and P3, and built in P4, and the blueprint put the skeleton in
+  P3 — so nothing created them and the daily touches wrote into a conversation
+  that did not exist. Whenever a phase says a thing already exists, open the
+  phase it names and find the task.
+- **An event with consumers and no producer is dead documentation.** The
+  catalogue listed `profile.ProfileUpdated` and `PreferencesChanged` with their
+  reactions spelled out, and no phase raised them — so a member who changed time
+  zone kept alerts, meetings and sessions on the old wall clock. Both halves of
+  an event, the raise and the handler, land in the same review.
 - **Handlers never import a database driver.** A context declares its repository
   and unit-of-work ports in `domain/`; only `infrastructure/` imports `mongoose`,
   `mongodb` or `@prisma/client`, one adapter per store. Handler specs bind the

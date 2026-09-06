@@ -1,8 +1,8 @@
 # Contract: event catalogue
 
 Events are the only way contexts influence each other. Each is appended to the
-`outbox` inside the producing transaction (Identity: right after its Postgres
-commit) and relayed by the `worker` to in-process handlers/sagas and to n8n
+`outbox` inside the producing transaction (Identity writes `identity_outbox` in the
+same Prisma transaction; the worker forwards it) and relayed by the `worker` to in-process handlers/sagas and to n8n
 webhook subscriptions. Envelope:
 
 ```jsonc
@@ -19,6 +19,7 @@ consumer needs — never whole documents (consumers query their own read side).
 | `identity.UserBanned` / `UserUnbanned` | Identity | `{}` | Notifications → drop unsent alerts / resume; Conversations → close sockets |
 | `identity.UserDeleted` | Identity | `{}` | every Mongo context → delete the user's documents; Notifications → drop alerts |
 | `identity.DeviceRegistered` / `DeviceRemoved` | Identity | `{ deviceId, kind, hasPush }` | Notifications → (re)plan pending alerts for push |
+| `identity.PasswordChanged` | Identity | `{ bySelf }` | Operations → `audit_log`; Operations → clear the seeded-admin warning |
 | `profile.ProfileUpdated` | Profile | `{ changed: ['timezone','allergies',…] }` | Notifications → re-plan alert times when `timezone` changed; Nutrition → regenerate today's meal line when allergies/foods changed; Rhythm → nothing (reads live) |
 | `profile.PreferencesChanged` | Profile | `{ changed: [...] }` | Rhythm → re-evaluate today's claims when times changed; Training → re-materialise when cutoff changed; Reminders → default lead times |
 | `planning.TaskScheduled` | Planning | `{ taskId, dueAt, allDay, priority }` | Notifications → plan alerts (`0m`, and default lead times when timed); Rhythm → if `dueAt` is tomorrow and a draft exists, mark draft stale |
@@ -35,7 +36,7 @@ consumer needs — never whole documents (consumers query their own read side).
 | `rhythm.MorningBriefingSent` | Rhythm | `{ date }` | Notifications → alert `morning`; Conversations → `chat.message` |
 | `rhythm.CheckinRecorded` | Rhythm | `{ date, mood, adhered }` | Conversations → adjust quick questions (mood); Rhythm (self) → streak |
 | `training.SportsChanged` / `SlotsChanged` | Training | `{ sports, slots }` | Training (self) → re-materialise sessions 14 days |
-| `training.SessionScheduled` | Training | `{ sessionId, plannedAt, sport, focus? }` | Notifications → alert (lead time from preferences); Rhythm → include in tomorrow's draft; Knowledge → **if `aiSuggestions`** generate a suggestion for this session; n8n subscribers |
+| `training.SessionScheduled` | Training | `{ sessionId, plannedAt, sport, focus?, suggestionId? }` — `suggestionId` is present when the session came from an accepted suggestion, so Knowledge can record the outcome without guessing | Notifications → alert (lead time from preferences); Rhythm → include in tomorrow's draft; Knowledge → **if `aiSuggestions`** generate a suggestion for this session; n8n subscribers |
 | `training.SessionCompleted` / `SessionCancelled` / `SessionSkipped` | Training | `{ sessionId, at }` | Notifications → drop alerts; Rhythm → today's plan snapshot; Knowledge → mark suggestion outcome |
 | `training.ProgramApplied` | Training | `{ programId, startDate }` | Training (self) → fill sessions; Conversations → coach message |
 | `knowledge.LinkAdded` | Knowledge | `{ linkId, url, kind }` | Knowledge worker → start ingestion pipeline |
