@@ -1,0 +1,20 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import '@botvy/tokens/dist/tokens.css';
+
+/* Bootstrap 5 already uses logical properties, so setting <html dir="rtl">
+   mirrors the panel; only our own additions need care. */
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--botvy-bg, #f6f7f9);
+  color: var(--botvy-ink, #14171a);
+}
+
+.panel-shell {
+  padding: 16px;
+}
+
+.brand {
+  font-weight: 700;
+  margin-block-end: 2px;
+}

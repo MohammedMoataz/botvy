@@ -19,13 +19,19 @@ node_modules/
 dist/
 build/
 .next/
-apps/mobile/build/
-apps/mobile/.dart_tool/
-apps/admin/dist/
+.output/
+.wxt/
+out/
 
-# Flutter
+# Generated contract artefacts are committed; their TS build output is not
+packages/*/dist/
+
+# Flutter / Android
 **/ios/Pods/
 **/android/.gradle/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
 
 # Agent credentials (spec-kit warning: may store auth tokens)
 .claude/settings.local.json
@@ -36,18 +42,21 @@ apps/admin/dist/
 Thumbs.db
 .vscode/*
 !.vscode/settings.json
+**/.idea/
+**/*.iml
 
 # Logs
 *.log
 npm-debug.log*
 
 # Prisma-generated client output
-apps/gateway/generated/
+**/generated/prisma/
+legacy/apps/gateway/generated/
 
 # TS incremental build info
 *.tsbuildinfo
 
-# Volume backups from the decommissioned old stack (large, local-only)
+# Volume backups and dumps (large, local-only)
 backups/
 
 # MCP browser-tool scratch output
@@ -58,7 +67,4 @@ secrets/
 # The Android client config carries an API key. The copy Gradle reads lives at
 # apps/mobile/android/app/ (ignored there too); a stray copy here is a leak.
 /google-services.json
-
-# Flutter/IDE local files
-apps/mobile/.idea/
-apps/mobile/*.iml
+**/android/app/google-services.json

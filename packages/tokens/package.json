@@ -1,0 +1,16 @@
+{
+  "name": "@botvy/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": ["dist", "tokens.json"],
+  "exports": {
+    "./tokens.json": "./tokens.json",
+    "./tokens.css": "./dist/tokens.css",
+    "./tokens.dart": "./dist/tokens.dart",
+    "./dist/*": "./dist/*"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}

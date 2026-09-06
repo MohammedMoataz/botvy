@@ -1,0 +1,60 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "ignorePatterns": [
+    "legacy/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/.wxt/**",
+    "**/.output/**",
+    "packages/contracts/src/**"
+  ],
+  "rules": {
+    "no-console": "off",
+    "typescript/no-explicit-any": "warn"
+  },
+  "overrides": [
+    {
+      "files": [
+        "apps/backend/src/contexts/**/domain/**",
+        "apps/backend/src/contexts/**/features/**",
+        "apps/backend/src/shared/cqrs/**",
+        "apps/backend/src/shared/auth/**",
+        "apps/backend/src/shared/time/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "mongoose",
+                "message": "Constitution IX: a database driver belongs in infrastructure/. Declare a repository or unit-of-work port in domain/ and bind an adapter in the context module."
+              },
+              {
+                "name": "mongodb",
+                "message": "Constitution IX: a database driver belongs in infrastructure/. Declare a repository or unit-of-work port in domain/ and bind an adapter in the context module."
+              },
+              {
+                "name": "@prisma/client",
+                "message": "Constitution IX: a database driver belongs in infrastructure/. Declare a repository or unit-of-work port in domain/ and bind an adapter in the context module."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["mongoose/*", "mongodb/*", "@prisma/client/*"],
+                "message": "Constitution IX: a database driver belongs in infrastructure/, one adapter per store."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

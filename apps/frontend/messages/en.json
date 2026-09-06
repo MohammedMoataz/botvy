@@ -1,0 +1,29 @@
+{
+  "app": {
+    "name": "Botvy",
+    "tagline": "One assistant for your day."
+  },
+  "marketing": {
+    "body": "Botvy keeps your tasks, meetings and reminders in one place, on your phone, in your browser and on the web — and it runs its own model, on your own machine.",
+    "signIn": "Sign in",
+    "docs": "Documentation"
+  },
+  "admin": {
+    "title": "Admin portal"
+  },
+  "login": {
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "pending": "Signing in…",
+    "notYet": "Sign-in arrives in the next phase.",
+    "failed": "Sign-in failed.",
+    "welcome": "Signed in."
+  },
+  "locale": {
+    "label": "Language",
+    "en": "English",
+    "ar": "العربية"
+  }
+}

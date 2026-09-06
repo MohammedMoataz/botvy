@@ -4,12 +4,21 @@
 **/node_modules
 **/dist
 **/build
+**/.next
+**/.output
+**/.wxt
 **/.git
 **/.env
 **/.env.*
 !**/.env.example
+
+# v1 is a read-only reference; it never enters a v2 image
+legacy/
+
 spec-kit/
 specs/
+backups/
 data/
 **/.dart_tool
 **/*.log
+**/*.tsbuildinfo

@@ -1,0 +1,69 @@
+/* Palette comes from @botvy/tokens (seeded from v1's admin CSS). The fallbacks
+   are the same v1 values, so a page still reads correctly if the token build
+   has not run yet. */
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--botvy-bg, #f6f7f9);
+  color: var(--botvy-ink, #14171a);
+  font:
+    14px/1.6 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+a {
+  color: var(--botvy-accent, #2563eb);
+}
+
+.shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 20px;
+}
+
+.panel {
+  background: var(--botvy-panel, #ffffff);
+  border: 1px solid var(--botvy-line, #e3e6ea);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.muted {
+  color: var(--botvy-muted, #6b7280);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field input {
+  width: 100%;
+}
+
+/* Logical properties, so the admin bar mirrors itself under dir="rtl". */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-block-end: 1px solid var(--botvy-line, #e3e6ea);
+  background: var(--botvy-panel, #ffffff);
+}
+
+.topbar .brand {
+  font-weight: 700;
+  margin-inline-end: auto;
+}

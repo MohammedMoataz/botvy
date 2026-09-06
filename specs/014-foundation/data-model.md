@@ -158,7 +158,9 @@ forwarder → Mongo `outbox`; Operations' events start in the Mongo outbox direc
 (bootstrap value for the `n8n` service client) · `AUTOMATION_WEBHOOK_SECRET` ·
 `N8N_URL` · `N8N_API_KEY?` · `OLLAMA_BASE_URL` · `FIREBASE_CREDENTIALS_FILE?` ·
 `MEDIA_SIGNING_SECRET` · `MEDIA_DIR` (/data/media) · `CORS_ORIGINS?` ·
-`ADMIN_EMAIL` · `ADMIN_PASSWORD` · `ALLOW_REGISTRATION` · `LOG_LEVEL`. Compose adds
+`ADMIN_EMAIL` · `ADMIN_PASSWORD` · `LOG_LEVEL`. Whether registration is open is **not**
+an environment variable: it is the registry key `auth.registrationOpen`, so the Owner
+can close it from the portal without a redeploy (P1 reads it). Compose adds
 `POSTGRES_*`, `N8N_*`, `N8N_BIND` (default `127.0.0.1:5679`), `EDGE_PORT`,
 `CADDY_SITE`, `BACKUP_CRON` (default `0 3 * * *`), `TUNNEL_TOKEN?`, `BOTVY_TAG`, and
 passes `INTERNAL_SERVICE_TOKEN` and `AUTOMATION_WEBHOOK_SECRET` through to the n8n
