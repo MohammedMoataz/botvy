@@ -1,22 +1,40 @@
 import type { AggregateRoot } from '../ports/aggregate-root.js';
+import { StaleWriteError } from '../ports/errors.js';
 import { Repository } from '../ports/repository.js';
-import type { InMemoryUnitOfWork } from './in-memory-unit-of-work.js';
+import type { InMemoryParticipant, InMemoryUnitOfWork } from './in-memory-unit-of-work.js';
 
 /**
- * The store a handler spec runs against. It holds aggregates in a Map keyed by
- * `userId:id` — keyed by member, so a spec that forgets to scope a query fails
- * here rather than in production — and hands the events it pulls to the unit of
- * work so the spec can assert on them.
+ * The store a handler spec runs against. Rows are keyed by `userId:id` — keyed
+ * by member, so a spec that forgets to scope a lookup fails here rather than in
+ * production — and the events it pulls go to the unit of work for assertion.
  *
- * It enforces the same optimistic check the store adapters do: saving an
- * aggregate whose `updatedAt` is older than the stored one is a lost update,
- * and a spec should see that as loudly as a member would.
+ * It enlists itself so a rolled-back transaction takes its writes with it, and
+ * it raises the same `StaleWriteError` the store adapters do. Both of those are
+ * promises the repository contract makes on every adapter's behalf; an
+ * in-memory adapter that broke either would let a handler pass its spec and
+ * misbehave against a real database.
  */
-export abstract class InMemoryRepositoryBase<T extends AggregateRoot> extends Repository<T> {
+export abstract class InMemoryRepositoryBase<T extends AggregateRoot>
+  extends Repository<T>
+  implements InMemoryParticipant
+{
   protected readonly store = new Map<string, T>();
+  #snapshot: Map<string, T> | null = null;
 
   constructor(protected readonly uow: InMemoryUnitOfWork) {
     super();
+    this.uow.enlist(this);
+  }
+
+  snapshot(): void {
+    this.#snapshot = new Map(this.store);
+  }
+
+  restore(): void {
+    if (!this.#snapshot) return;
+    this.store.clear();
+    for (const [key, value] of this.#snapshot) this.store.set(key, value);
+    this.#snapshot = null;
   }
 
   protected key(userId: string, id: string): string {
@@ -31,9 +49,7 @@ export abstract class InMemoryRepositoryBase<T extends AggregateRoot> extends Re
     const key = this.key(aggregate.userId, String(aggregate.id));
     const existing = this.store.get(key);
     if (existing && existing.updatedAt > aggregate.updatedAt) {
-      throw new Error(
-        `Refusing a stale write to ${key}: stored ${existing.updatedAt.toISOString()} is newer than ${aggregate.updatedAt.toISOString()}.`,
-      );
+      throw new StaleWriteError(String(aggregate.id));
     }
     this.uow.collect(aggregate.pullEvents());
     this.store.set(key, aggregate);

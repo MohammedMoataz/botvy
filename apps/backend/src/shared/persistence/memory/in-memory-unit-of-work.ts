@@ -3,24 +3,45 @@ import type { DomainEvent } from '../../cqrs/domain-event.js';
 import { UnitOfWork } from '../ports/unit-of-work.js';
 
 /**
- * The unit of work handler specs bind. It runs the work, collects the events
- * the repositories captured, and runs the commit callbacks — enough for a spec
- * to assert "this command raised exactly one event" without a database.
+ * Something whose state has to be undone when a transaction rolls back.
+ * The in-memory repositories enlist themselves.
+ */
+export interface InMemoryParticipant {
+  snapshot(): void;
+  restore(): void;
+}
+
+/**
+ * The unit of work handler specs bind.
+ *
+ * It rolls back for real. That is not politeness: the repository contract holds
+ * every adapter to the same semantics, and an in-memory adapter that kept rows
+ * a failed transaction wrote would let a handler pass its spec and lose data in
+ * production. The suite caught exactly that.
  *
  * A nested `run` joins the outer one, matching the store adapters, so a spec
- * exercising a handler that calls another handler behaves the same way
- * production does.
+ * exercising a handler that calls another behaves the way production does.
  */
 @Injectable()
 export class InMemoryUnitOfWork extends UnitOfWork {
   readonly events: DomainEvent[] = [];
   #depth = 0;
   #commitCallbacks: Array<() => Promise<void>> = [];
+  #participants = new Set<InMemoryParticipant>();
   #rolledBack = false;
+
+  enlist(participant: InMemoryParticipant): void {
+    this.#participants.add(participant);
+  }
 
   async run<R>(work: () => Promise<R>): Promise<R> {
     this.#depth += 1;
     const outermost = this.#depth === 1;
+
+    if (outermost) {
+      for (const participant of this.#participants) participant.snapshot();
+    }
+
     try {
       const result = await work();
       if (outermost) {
@@ -31,8 +52,9 @@ export class InMemoryUnitOfWork extends UnitOfWork {
       return result;
     } catch (error) {
       if (outermost) {
-        // A rollback throws away the events too: an event for a change that did
-        // not commit is exactly the bug the outbox exists to prevent.
+        // Rows and events go back together. An event for a change that did not
+        // commit is the bug the outbox exists to prevent.
+        for (const participant of this.#participants) participant.restore();
         this.#rolledBack = true;
         this.events.length = 0;
         this.#commitCallbacks = [];
