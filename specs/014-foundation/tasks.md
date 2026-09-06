@@ -110,7 +110,7 @@ that number, under 20 minutes; record it here.
 ## Phase 7 — User Story 5: v1 keeps running (P2)
 
 - [X] T080 [US5] Write `legacy/README.md` (its only author — "read-only reference; run with `legacy/infra/docker-compose.yml`", plus the exact v1 run command) and verify `docker compose -f legacy/infra/docker-compose.yml --env-file .env config` renders and `up -d` starts on the v1 ports (5432 shared Postgres — document that v1 and v2 share the Postgres container only if the Owner points both at it; default: v1 stack runs its own `postgres` service as before)
-- [ ] T081 [US5] Root `.gitattributes` / `.prettierignore` / lint ignores exclude `legacy/**` so tooling never touches it (FR-018)
+- [X] T081 [US5] Root `.gitattributes` / `.prettierignore` / lint ignores exclude `legacy/**` so tooling never touches it (FR-018)
 
 ---
 
