@@ -32,7 +32,7 @@ both means two different things (blueprint `T013` is the ping round trip, this f
 ## Phase 2 — Foundational: shared kernel (blocks every story)
 
 - [X] T010 `shared/config`: `env.schema.ts` (zod, all vars in data-model §7), `config.module.ts` (global, fail-fast with the offending key named) — spec: missing `MONGO_URL` throws naming it (FR-002)
-- [ ] T011 [P] `shared/logging`: `nestjs-pino` setup, `request-context.ts` (AsyncLocalStorage: requestId, principal, context, slice), `cqrs-context.interceptor.ts` (sets context/slice from handler metadata) (F-09, FR-008)
+- [X] T011 [P] `shared/logging`: `nestjs-pino` setup, `request-context.ts` (AsyncLocalStorage: requestId, principal, context, slice), `cqrs-context.interceptor.ts` (sets context/slice from handler metadata) (F-09, FR-008)
 - [X] T012 [P] `shared/time`: copy `legacy/apps/gateway/src/common/time.ts` and `legacy/apps/gateway/test/time.spec.ts` unchanged; export `localDate`, `localHhMm`, `formatInTz`, `wallClockToUtc`, `isValidTimezone` (FR-019, XI)
 - [ ] T013 [P] `shared/cqrs`: `command.ts`, `query.ts`, `domain-event.ts` (the blueprint envelope verbatim, `schemaVersion` included — data-model §1), `result.ts`, `ids.ts` (uuidv7 via `uuid`), `idempotency.interceptor.ts` (header `Idempotency-Key`, `idempotency_keys` per data-model §3: `_id` is `<principalId>:<key>`, retention is the collection's 24 h TTL index, not a timer in code) — spec: repeated key returns the first response; the same key from a different principal does not
 - [X] T014 `shared/persistence/ports`: `aggregate-root.ts`, `repository.ts`, `syncable-repository.ts`, `read-repository.ts`, `unit-of-work.ts`, `mapper.ts`, `sync-change.ts` (types) (R-31)

@@ -21,6 +21,13 @@
   },
   "overrides": [
     {
+      "comment": "A Nest module is a class with nothing in it by design — the decorator is the whole declaration. Scoped to module files so an accidentally empty class anywhere else is still caught.",
+      "files": ["**/*.module.ts"],
+      "rules": {
+        "typescript/no-extraneous-class": "off"
+      }
+    },
+    {
       "files": [
         "apps/backend/src/contexts/**/domain/**",
         "apps/backend/src/contexts/**/features/**",
