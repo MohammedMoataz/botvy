@@ -14,10 +14,19 @@ COPY apps/frontend ./apps/frontend
 RUN pnpm --filter @botvy/tokens build && pnpm --filter @botvy/frontend build
 
 FROM node:24-alpine AS runtime
+RUN apk add --no-cache tini
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build /repo/apps/frontend/.next/standalone ./
 COPY --from=build /repo/apps/frontend/.next/static ./apps/frontend/.next/static
 COPY --from=build /repo/apps/frontend/public ./apps/frontend/public
+
+# Non-root, like the backend image. The standalone server writes nothing.
+RUN addgroup -S botvy && adduser -S botvy -G botvy && chown -R botvy:botvy /app
+USER botvy
+
 EXPOSE 3000
+# tini forwards signals, so a stop is a clean shutdown rather than a wait for
+# the runtime to be killed.
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "apps/frontend/server.js"]
