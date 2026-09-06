@@ -38,25 +38,29 @@ export class TokenStore {
   #inFlight: Promise<TokenPair | null> | null = null;
   #listeners = new Set<(tokens: TokenPair | null) => void>();
 
+  // Named `tokenStorage`, not `storage`: WXT auto-imports a bare `storage`
+  // identifier from `wxt/utils/storage`, and it scans linked workspace packages
+  // too — so a parameter called `storage` here breaks the extension's bundle
+  // with an import this file never wrote.
   constructor(
-    private readonly storage: TokenStorage = inMemoryStorage(),
+    private readonly tokenStorage: TokenStorage = inMemoryStorage(),
     private readonly refreshFn: RefreshFn | null = null,
   ) {}
 
   get tokens(): TokenPair | null {
-    return this.storage.read();
+    return this.tokenStorage.read();
   }
 
   get accessToken(): string | null {
-    return this.storage.read()?.accessToken ?? null;
+    return this.tokenStorage.read()?.accessToken ?? null;
   }
 
   get signedIn(): boolean {
-    return this.storage.read() !== null;
+    return this.tokenStorage.read() !== null;
   }
 
   set(tokens: TokenPair | null): void {
-    this.storage.write(tokens);
+    this.tokenStorage.write(tokens);
     for (const listener of this.#listeners) listener(tokens);
   }
 
@@ -77,7 +81,7 @@ export class TokenStore {
   async refresh(): Promise<TokenPair | null> {
     if (this.#inFlight) return this.#inFlight;
 
-    const current = this.storage.read();
+    const current = this.tokenStorage.read();
     if (!current?.refreshToken || !this.refreshFn) return null;
 
     this.#inFlight = this.refreshFn(current.refreshToken)
