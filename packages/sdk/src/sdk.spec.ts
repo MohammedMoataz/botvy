@@ -176,27 +176,33 @@ describe('client', () => {
   });
 });
 
-describe('socket', () => {
-  function fakeSocket(): SocketLike & { handlers: Map<string, (p: unknown) => void>; connects: number } {
-    const handlers = new Map<string, (p: unknown) => void>();
-    return {
-      connected: false,
-      auth: {},
-      connects: 0,
-      handlers,
-      connect() {
-        this.connects += 1;
-      },
-      disconnect() {
-        this.connected = false;
-      },
-      on(event, handler) {
-        handlers.set(event, handler);
-      },
-      emit() {},
-    };
-  }
+type FakeSocket = SocketLike & {
+  handlers: Map<string, (payload: unknown) => void>;
+  connects: number;
+};
 
+/** A socket that records what was registered on it instead of opening one. */
+function fakeSocket(): FakeSocket {
+  const handlers = new Map<string, (payload: unknown) => void>();
+  return {
+    connected: false,
+    auth: {},
+    connects: 0,
+    handlers,
+    connect() {
+      this.connects += 1;
+    },
+    disconnect() {
+      this.connected = false;
+    },
+    on(event, handler) {
+      handlers.set(event, handler);
+    },
+    emit() {},
+  };
+}
+
+describe('socket', () => {
   it('will not connect while signed out', () => {
     const states: string[] = [];
     const client = new SocketClient({
@@ -236,7 +242,7 @@ describe('socket', () => {
   it('refreshes and reconnects when the server says the token expired', async () => {
     const store = new TokenStore(inMemoryStorage(), async () => pair('2'));
     store.set(pair('1'));
-    const sockets: ReturnType<typeof fakeSocket>[] = [];
+    const sockets: FakeSocket[] = [];
 
     const client = new SocketClient({
       tokens: store,
@@ -259,7 +265,7 @@ describe('socket', () => {
   it('stops and reports signed out when the refresh fails', async () => {
     const store = new TokenStore(inMemoryStorage(), async () => null);
     store.set(pair('1'));
-    const sockets: ReturnType<typeof fakeSocket>[] = [];
+    const sockets: FakeSocket[] = [];
 
     const client = new SocketClient({
       tokens: store,
@@ -281,7 +287,7 @@ describe('socket', () => {
   it('keeps its handlers across a reconnect', async () => {
     const store = new TokenStore(inMemoryStorage(), async () => pair('2'));
     store.set(pair('1'));
-    const sockets: ReturnType<typeof fakeSocket>[] = [];
+    const sockets: FakeSocket[] = [];
     const client = new SocketClient({
       tokens: store,
       connect: () => {
