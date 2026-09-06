@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+/**
+ * The phase gate, as a command whose output can be pasted into a report.
+ *
+ * It checks the four things the foundation promises and cannot be trusted to
+ * have kept by inspection: every container healthy, exactly one port published
+ * beyond loopback, both stores answering through /health, and a bootstrap that
+ * is genuinely safe to run twice.
+ *
+ * That last one is why this script exists rather than a checklist. "Idempotent"
+ * is the sort of claim that is true when written and false six months later,
+ * and the only way to know is to run it again and watch nothing change.
+ */
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const run = promisify(execFile);
+const startedAt = Date.now();
+const API = process.env.BOTVY_API_BASE ?? 'http://127.0.0.1';
+
+const results = [];
+const record = (name, ok, detail) => {
+  results.push({ name, ok, detail });
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+};
+
+async function compose(...args) {
+  return run('docker', ['compose', '--env-file', '.env', '-f', 'infra/docker-compose.yml', ...args], {
+    maxBuffer: 32 * 1024 * 1024,
+  });
+}
+
+/** 1. Every container up, and every one with a healthcheck reporting healthy. */
+async function checkContainers() {
+  try {
+    const { stdout } = await compose('ps', '--format', 'json');
+    const services = stdout.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+    if (services.length === 0) return record('containers running', false, 'nothing is up');
+
+    const unwell = services.filter(
+      (s) => s.State !== 'running' || (s.Health && s.Health !== 'healthy'),
+    );
+    record(
+      'containers healthy',
+      unwell.length === 0,
+      unwell.length === 0
+        ? `${services.length} services`
+        : unwell.map((s) => `${s.Service}=${s.Health || s.State}`).join(', '),
+    );
+  } catch (error) {
+    record('containers healthy', false, error.stderr?.trim() || error.message);
+  }
+}
+
+/**
+ * 2. Exactly one publish reaching beyond the host.
+ *
+ * Loopback binds are excluded deliberately: principle V permits "the Docker
+ * network or localhost", and n8n's editor lives on 127.0.0.1 so the Owner can
+ * reach it through an SSH tunnel. Counting those as public would make the rule
+ * unfollowable; ignoring the distinction would make it meaningless.
+ */
+async function checkSinglePublicPort() {
+  try {
+    const { stdout } = await compose('config', '--format', 'json');
+    const config = JSON.parse(stdout);
+    const publishes = [];
+    for (const [service, definition] of Object.entries(config.services ?? {})) {
+      for (const port of definition.ports ?? []) {
+        const hostIp = port.host_ip || '0.0.0.0';
+        if (hostIp !== '127.0.0.1' && hostIp !== '::1') {
+          publishes.push(`${service}:${hostIp}:${port.published}`);
+        }
+      }
+    }
+    record(
+      'exactly one public port',
+      publishes.length === 1,
+      publishes.length === 1 ? publishes[0] : `found ${publishes.length}: ${publishes.join(', ') || 'none'}`,
+    );
+  } catch (error) {
+    record('exactly one public port', false, error.stderr?.trim() || error.message);
+  }
+}
+
+/** 3. Both stores answering, through the API rather than by connecting to them. */
+async function checkHealth() {
+  try {
+    const response = await fetch(`${API}/health`);
+    const report = await response.json();
+    const storesUp = report.postgres === true && report.mongo === true;
+    record(
+      'health reports both stores',
+      storesUp,
+      `status=${report.status} postgres=${report.postgres} mongo=${report.mongo} ollama=${report.ollama} push=${report.pushConfigured}`,
+    );
+
+    const stale = (report.jobs ?? []).filter((job) => job.stale);
+    record(
+      'no stale jobs',
+      stale.length === 0,
+      stale.length === 0 ? `${(report.jobs ?? []).length} jobs fresh` : stale.map((j) => j.job).join(', '),
+    );
+  } catch (error) {
+    record('health reports both stores', false, error.message);
+  }
+}
+
+/** 4. The claim that is only ever true if you actually re-run it. */
+async function checkBootstrapIsRepeatable() {
+  try {
+    const { stdout } = await run('node', ['infra/bootstrap.mjs'], { maxBuffer: 16 * 1024 * 1024 });
+    const created = stdout.split('\n').filter((line) => /\bapplied\b/.test(line) && !/already/.test(line));
+    record(
+      'bootstrap is safe to run again',
+      created.length === 0,
+      created.length === 0 ? 'second run created nothing' : `second run changed things: ${created.join('; ')}`,
+    );
+  } catch (error) {
+    record('bootstrap is safe to run again', false, error.stdout?.trim() || error.message);
+  }
+}
+
+await checkContainers();
+await checkSinglePublicPort();
+await checkHealth();
+await checkBootstrapIsRepeatable();
+
+const elapsedSeconds = Math.round((Date.now() - startedAt) / 1000);
+const failures = results.filter((result) => !result.ok);
+
+console.log('');
+console.log(`${results.length - failures.length}/${results.length} checks passed in ${elapsedSeconds}s`);
+// SC-001 measures the whole bring-up, of which this is the tail. Printed so the
+// number in the phase report is recorded rather than remembered.
+console.log(`elapsed since verify began: ${elapsedSeconds}s`);
+
+process.exit(failures.length === 0 ? 0 : 1);
