@@ -1,0 +1,20 @@
+# v1. Formatting it would produce a large diff in a system nobody is changing,
+# and its own formatting was correct for its own tooling.
+legacy/
+
+node_modules/
+dist/
+build/
+.next/
+.output/
+.wxt/
+coverage/
+
+# Generated: the generator owns the shape.
+pnpm-lock.yaml
+packages/contracts/src/
+packages/tokens/dist/
+**/*.g.dart
+
+# Prettier has no useful opinion about these.
+*.md.tpl
