@@ -1,0 +1,144 @@
+// Identity & Access — the one context on PostgreSQL.
+//
+// This schema declares only what Identity owns. v1's reminders, messages,
+// conversations, coaching_profiles, checkins, workout_records, usage_log,
+// settings and reminder_notifications tables are still in the database and are
+// deliberately absent here: their data belongs to a system that is still
+// running, and v2 reaches none of it. Only `migrate deploy` is ever run against
+// this schema, so an undeclared table is left alone rather than dropped.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  admin
+}
+
+enum UserStatus {
+  active
+  banned
+}
+
+enum DeviceKind {
+  android
+  ios
+  chrome_extension
+  web
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String     @map("password_hash")
+  displayName  String?    @map("display_name")
+  role         Role       @default(user)
+  status       UserStatus @default(active)
+
+  /// Set when the member signs in with Google. Unique so one Google account
+  /// cannot be attached to two members.
+  googleSub String? @unique @map("google_sub")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  /// A tombstone rather than a row that vanishes. Deleting the row would take
+  /// the audit trail's actor with it, and every Mongo context still has the
+  /// member's documents to purge on `identity.UserDeleted`.
+  deletedAt DateTime? @map("deleted_at")
+
+  refreshTokens RefreshToken[]
+  devices       Device[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  /// Every token descended from one sign-in shares a family. Presenting a token
+  /// that was already exchanged means it leaked, and the whole family is
+  /// revoked — one rotation cannot be told from a theft without this.
+  familyId String @map("family_id") @db.Uuid
+
+  /// What this token was exchanged for, so a replay is detectable rather than
+  /// merely refused.
+  replacedBy String? @map("replaced_by")
+
+  /// Which device holds it, so signing out one phone does not sign out the rest.
+  deviceId String? @map("device_id") @db.Uuid
+
+  @@index([userId])
+  @@index([userId, familyId], map: "refresh_tokens_user_family_idx")
+  @@map("refresh_tokens")
+}
+
+model Device {
+  id         String     @id @default(uuid())
+  userId     String     @map("user_id")
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  installId  String     @unique @map("install_id")
+  name       String?
+  platform   String
+  kind       DeviceKind @default(android)
+  fcmToken   String?    @map("fcm_token")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  /// Stamped by the sync endpoint and at sign-in. The alert sweep skips a
+  /// device that has synced since an alert was planned, because that device
+  /// already holds its own local alarm and would otherwise be notified twice.
+  lastSeenAt DateTime? @map("last_seen_at")
+
+  @@index([userId])
+  @@map("devices")
+}
+
+/// A machine caller. n8n today; anything the Owner registers later.
+model ServiceClient {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String    @unique
+  tokenHash  String    @map("token_hash")
+  scopes     String[]  @default([])
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  @@map("service_clients")
+}
+
+/// Identity's events, written in the same transaction as the change that raised
+/// them and carried into the Mongo outbox by the worker's forwarder.
+///
+/// It exists because Identity is the one context on another store: writing to
+/// Mongo after this commit would be at-most-once, and a crash in the gap loses
+/// the event with nothing left to say it was owed.
+///
+/// There is no `context` column and none is needed — every name is
+/// `<context>.<Event>`, so the forwarder splits it on the dot. One source for a
+/// value cannot drift from itself; two columns holding the same fact can.
+model IdentityOutbox {
+  id            String    @id
+  name          String
+  aggregate     Json
+  userId        String?   @map("user_id") @db.Uuid
+  payload       Json
+  schemaVersion Int       @default(1) @map("schema_version")
+  occurredAt    DateTime  @default(now()) @map("occurred_at")
+  forwardedAt   DateTime? @map("forwarded_at")
+
+  @@index([forwardedAt, occurredAt], map: "identity_outbox_pending_idx")
+  @@map("identity_outbox")
+}
