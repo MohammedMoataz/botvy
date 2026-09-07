@@ -31,6 +31,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # A Docker image reference may not contain capitals, and an owner name
+      # freely can. Using `github.repository_owner` verbatim fails the push with
+      # "invalid reference format", which reads like a malformed tag rather than
+      # a capital letter.
+      - name: Lowercase the image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
       - name: Backend image
         uses: docker/build-push-action@v6
         with:
@@ -40,8 +48,8 @@ jobs:
           # Both the tag and `latest`. Compose pins BOTVY_TAG to the exact tag,
           # so `latest` is for a human pulling by hand, never for the deploy.
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/botvy-backend:${{ github.ref_name }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/botvy-backend:latest
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-backend:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -52,8 +60,8 @@ jobs:
           file: apps/frontend/Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/botvy-frontend:${{ github.ref_name }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/botvy-frontend:latest
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-frontend:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

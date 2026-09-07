@@ -11,7 +11,13 @@ RUN pnpm install --frozen-lockfile
 FROM deps AS build
 COPY tsconfig.base.json ./
 COPY apps/frontend ./apps/frontend
-RUN pnpm --filter @botvy/tokens build && pnpm --filter @botvy/frontend build
+# The SDK is built too, not only the tokens. It resolves through its package
+# `exports` to `dist/`, which does not exist in a fresh checkout — so a build
+# that skipped it failed with "Can't resolve @botvy/sdk", which reads like a
+# missing dependency rather than an unbuilt one.
+RUN pnpm --filter @botvy/tokens build \
+ && pnpm --filter @botvy/sdk build \
+ && pnpm --filter @botvy/frontend build
 
 FROM node:24-alpine AS runtime
 RUN apk add --no-cache tini

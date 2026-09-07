@@ -32,7 +32,8 @@ RUN pnpm --filter @botvy/backend exec prisma generate \
 
 # `pnpm deploy` flattens the workspace into a self-contained tree, which is what
 # makes the runtime stage independent of the monorepo layout.
-RUN pnpm --filter @botvy/backend deploy --prod --legacy /out \
+# No `--legacy`: that flag belongs to pnpm 10, and this repository pins 9.15.
+RUN pnpm --filter @botvy/backend deploy --prod /out \
  && cp -r apps/backend/dist /out/dist \
  && cp -r apps/backend/migrations /out/migrations \
  && cp -r apps/backend/src/contexts/identity/infrastructure/prisma /out/prisma
