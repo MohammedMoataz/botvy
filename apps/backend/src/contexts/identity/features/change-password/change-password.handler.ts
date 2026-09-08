@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import { MIN_PASSWORD_LENGTH } from '../../domain/password-rules.js';
 import { UserRepository } from '../../domain/user.repository.js';
 
 export interface ChangePasswordCommand {
@@ -7,6 +8,8 @@ export interface ChangePasswordCommand {
   currentPassword: string;
   newPassword: string;
 }
+
+export { MIN_PASSWORD_LENGTH };
 
 export class CurrentPasswordWrong extends Error {
   constructor() {
@@ -26,11 +29,6 @@ export class NewPasswordUnchanged extends Error {
   }
 }
 
-/**
- * The server-side minimum. The client confirms the password twice; the length
- * rule lives here, because a rule only the client enforces is not a rule.
- */
-export const MIN_PASSWORD_LENGTH = 8;
 
 /**
  * Change your own password.

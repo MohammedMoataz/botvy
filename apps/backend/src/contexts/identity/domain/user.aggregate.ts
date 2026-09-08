@@ -70,12 +70,21 @@ export class User extends AggregateRoot<string> {
    * bootstrap off — the default profile and preferences, the pinned coach and
    * planner conversations, the rhythm state row, the empty athlete profile.
    */
-  static register(state: Omit<UserState, 'deletedAt' | 'lastLoginAt'>): User {
+  static register(
+    state: Omit<UserState, 'deletedAt' | 'lastLoginAt'>,
+    /**
+     * What the member told us while signing up, if anything. It rides on the
+     * event because Profile's bootstrap prefers it over the registry defaults,
+     * and the alternative — Profile asking Identity afterwards — is a query
+     * across a store boundary for a value that was in hand at the time.
+     */
+    supplied: { locale?: string | null; timezone?: string | null } = {},
+  ): User {
     const user = new User({ ...state, lastLoginAt: null, deletedAt: null });
     user.raise('identity.UserRegistered', 'user', {
       email: state.email,
-      locale: null,
-      timezone: null,
+      locale: supplied.locale ?? null,
+      timezone: supplied.timezone ?? null,
     });
     return user;
   }
