@@ -297,7 +297,10 @@ export const SETTINGS_REGISTRY = {
   'ops.lastBackupAt': define({
     schema: z.string().nullable(),
     default: null,
-    description: 'When the last backup was verified. Written by the backup job.',
+    description:
+      'When the last backup was verified. The backup container reports its outcome to ' +
+      '/internal/ops/heartbeat, which stamps ops_heartbeats; the code that also writes ' +
+      'this key lands with the backup verification in specs/025 (T1104).',
     readOnly: true,
   }),
   'ops.adminPasswordIsDefault': define({

@@ -67,7 +67,12 @@ async function bootstrap(): Promise<void> {
     // tunnelled host.
     const document = SwaggerModule.createDocument(
       app,
-      new DocumentBuilder().setTitle('Botvy').setVersion('2.0.0').addBearerAuth().build(),
+      new DocumentBuilder()
+        .setTitle('Botvy')
+        .setVersion('2.0.0')
+        .addBearerAuth()
+        .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Service-Token' }, 'service-token')
+        .build(),
     );
     SwaggerModule.setup('docs', app, document);
   }
@@ -115,6 +120,11 @@ async function generateContracts(): Promise<void> {
       .setDescription('Commands are REST; reads are GraphQL; the live connection is a socket.')
       .setVersion('2.0.0')
       .addBearerAuth()
+      // Machine routes carry a header, not a bearer token. Declaring only the
+      // bearer scheme left the two /internal operations published as though
+      // anyone could call them, and the contracts package is what the other
+      // three surfaces generate their clients from.
+      .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Service-Token' }, 'service-token')
       .build(),
   );
 
