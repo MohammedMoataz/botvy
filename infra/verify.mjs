@@ -12,6 +12,7 @@
  * and the only way to know is to run it again and watch nothing change.
  */
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -24,8 +25,23 @@ const record = (name, ok, detail) => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/**
+ * The same `--env-file` list the documented run uses.
+ *
+ * A host where v1 is still installed keeps the four genuinely conflicting
+ * variables in `.env.v2`, read second so it wins. Reading only `.env` here
+ * would have this script resolve a different DATABASE_URL than the containers
+ * it is checking, which is the sort of difference that makes a green gate mean
+ * nothing.
+ */
+function envFileArgs() {
+  const files = ['.env'];
+  if (existsSync('.env.v2')) files.push('.env.v2');
+  return files.flatMap((file) => ['--env-file', file]);
+}
+
 async function compose(...args) {
-  return run('docker', ['compose', '--env-file', '.env', '-f', 'infra/docker-compose.yml', ...args], {
+  return run('docker', ['compose', ...envFileArgs(), '-f', 'infra/docker-compose.yml', ...args], {
     maxBuffer: 32 * 1024 * 1024,
   });
 }
