@@ -55,10 +55,13 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     DevicesQueryHandler,
     ServiceTokenGuard,
   ],
+  // `UserRepository` and `DeviceRepository` are deliberately *not* exported.
+  // They are Identity's own store access, and exporting them let another
+  // context inject one and read Identity's tables directly — which Operations
+  // did. What leaves this module is the query handler, the credential guard,
+  // and the outbox repository the relay's forwarder needs.
   exports: [
-    UserRepository,
     ServiceClientRepository,
-    DeviceRepository,
     IdentityOutboxRepository,
     DevicesQueryHandler,
     ServiceTokenGuard,

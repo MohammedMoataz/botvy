@@ -15,7 +15,7 @@ describe('devices query', () => {
   beforeEach(() => {
     devices = new InMemoryDeviceRepository();
     users = new InMemoryUserRepository();
-    handler = new DevicesQueryHandler(devices, users);
+    handler = new DevicesQueryHandler(devices, users, { ADMIN_EMAIL: 'admin' } as never);
     devices.rows.push(
       {
         id: 'dev-1',

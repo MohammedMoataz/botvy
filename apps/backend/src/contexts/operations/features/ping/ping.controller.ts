@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { IsUUID } from 'class-validator';
 import { CurrentPrincipal, UsersOnly } from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
@@ -23,6 +24,10 @@ export class PingDto {
  * client to treat it as one.
  */
 @Controller('api/v1/ping')
+// So the generated contract says a credential is required. Without it the
+// operation publishes as open, and the SDK, the phone and the extension all
+// generate their clients from that document.
+@ApiBearerAuth()
 export class PingController {
   constructor(private readonly handler: PingHandler) {}
 

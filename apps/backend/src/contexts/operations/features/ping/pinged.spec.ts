@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
-import { PingedHandler } from './pinged.handler.js';
+import { PINGED_SEEN_LIMIT, PingedHandler } from './pinged.handler.js';
 
 function pinged(eventId: string): DomainEvent {
   return {
@@ -58,12 +58,20 @@ describe('worker ping handler', () => {
     expect(handler.seenCount).toBe(2);
   });
 
-  it('can forget an event, so a long-running worker does not grow for ever', async () => {
+  /**
+   * The set used to be bounded by a `forget()` that nothing but this spec ever
+   * called, so a long-running worker kept every event id it had ever seen. The
+   * cap is what bounds it now; the outbox row is the durable record of
+   * delivery, so starting over only shortens the window in which a repeat is
+   * free.
+   */
+  it('starts the seen set over rather than growing for ever', async () => {
     const handler = new PingedHandler(recordingHeartbeat());
+    for (let i = 0; i < PINGED_SEEN_LIMIT; i += 1) await handler.handle(pinged(`e-${i}`));
+    expect(handler.seenCount).toBe(PINGED_SEEN_LIMIT);
 
-    await handler.handle(pinged('e-1'));
-    handler.forget('e-1');
+    await handler.handle(pinged('one-too-many'));
 
-    expect(handler.seenCount).toBe(0);
+    expect(handler.seenCount).toBe(1);
   });
 });

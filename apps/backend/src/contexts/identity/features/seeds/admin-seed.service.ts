@@ -73,9 +73,14 @@ export class AdminSeedService {
   }
 
   /**
-   * Whether the seeded account still has its seeded password. The portal warns
-   * while this is true, and it is written to `ops.adminPasswordIsDefault` so the
-   * warning survives a page load rather than living in a boot log nobody reads.
+   * Whether the seeded account still has its seeded password.
+   *
+   * P0 only logs it. The registry holds a read-only `ops.adminPasswordIsDefault`
+   * for the portal to read so the warning survives a page load rather than
+   * living in a boot log nobody opens, and the code that writes that key lands
+   * with the portal in `specs/015-identity-profile` (T118). Saying it was
+   * written here, as this comment used to, is how a capability every phase
+   * credits to another phase ends up built by none of them.
    */
   async isStillDefault(email: string, password: string): Promise<boolean> {
     if (password !== DEFAULT_ADMIN_PASSWORD && email !== DEFAULT_ADMIN_EMAIL) return false;
@@ -88,7 +93,8 @@ export class AdminSeedService {
     if (!isDefault) return;
     this.logger.warn(
       `The administrator account ${email} still has its default password. ` +
-        'Change it from the portal (POST /api/v1/auth/password) — this warning repeats every boot until you do.',
+        'The endpoint that changes it (POST /api/v1/auth/password) arrives with sign-in in P1; ' +
+        'until then this warning repeats every boot.',
     );
   }
 }

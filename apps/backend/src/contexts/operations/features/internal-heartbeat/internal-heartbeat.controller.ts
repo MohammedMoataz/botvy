@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { ApiSecurity } from '@nestjs/swagger';
 import { IsBoolean, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Scopes, ServiceOnly } from '../../../../shared/auth/decorators.js';
 import { HeartbeatService } from '../../../../shared/health/heartbeat.service.js';
@@ -29,6 +30,7 @@ export class HeartbeatDto {
 @Controller('internal/ops/heartbeat')
 @ServiceOnly()
 @Scopes('internal:ops')
+@ApiSecurity('service-token')
 export class InternalHeartbeatController {
   constructor(private readonly heartbeats: HeartbeatService) {}
 

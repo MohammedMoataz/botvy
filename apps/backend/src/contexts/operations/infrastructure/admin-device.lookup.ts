@@ -1,8 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DevicesQueryHandler } from '../../identity/features/devices/devices.query.js';
-import { UserRepository } from '../../identity/domain/user.repository.js';
-import { ENV } from '../../../shared/config/config.module.js';
-import type { Env } from '../../../shared/config/env.schema.js';
 import type {
   AdminDeviceLookup,
   DeviceSummary,
@@ -11,23 +8,20 @@ import type {
 export const ADMIN_DEVICE_LOOKUP = Symbol('ADMIN_DEVICE_LOOKUP');
 
 /**
- * Which phones an operations alert reaches. Operations never opens Identity's
- * tables: it asks the DevicesQuery, which is the one door Identity leaves open.
+ * Which phones an operations alert reaches.
  *
- * ponytail: the administrators are the seeded Owner, resolved by login. P1 adds
- * a role listing to the UserRepository and this becomes "every admin".
+ * One dependency, deliberately: Identity's device query and nothing else.
+ * This class used to take Identity's `UserRepository` as well and call
+ * `findByLogin` to find the Owner — a context reaching into another context's
+ * store, under a comment that claimed it did not. Who the administrators are is
+ * Identity's question, so Identity answers it; this is the adapter that binds
+ * the answer to the port Operations declares.
  */
 @Injectable()
 export class SeededAdminDeviceLookup implements AdminDeviceLookup {
-  constructor(
-    @Inject(ENV) private readonly env: Env,
-    private readonly users: UserRepository,
-    private readonly devices: DevicesQueryHandler,
-  ) {}
+  constructor(private readonly devices: DevicesQueryHandler) {}
 
   async adminDevices(): Promise<DeviceSummary[]> {
-    const owner = await this.users.findByLogin(this.env.ADMIN_EMAIL);
-    if (!owner) return [];
-    return this.devices.forAdmins([owner.id]);
+    return this.devices.forAdministrators();
   }
 }

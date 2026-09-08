@@ -1,4 +1,5 @@
 import { Body, Controller, Inject, Post } from '@nestjs/common';
+import { ApiSecurity } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 import { CurrentPrincipal, Scopes, ServiceOnly } from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
@@ -27,6 +28,7 @@ export class InternalAlertDto {
 @Controller('internal/alerts')
 @ServiceOnly()
 @Scopes('internal:alerts')
+@ApiSecurity('service-token')
 export class InternalAlertsController {
   constructor(
     @Inject(ADMIN_DEVICE_LOOKUP) private readonly devices: AdminDeviceLookup,

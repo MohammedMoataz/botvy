@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { ENV } from '../../../../shared/config/config.module.js';
+import type { Env } from '../../../../shared/config/env.schema.js';
 import { DeviceRepository } from '../../domain/device.repository.js';
 import { UserRepository } from '../../domain/user.repository.js';
 
@@ -24,6 +26,7 @@ export class DevicesQueryHandler {
   constructor(
     private readonly devices: DeviceRepository,
     private readonly users: UserRepository,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /** Batched: the sweep asks about many members at once. */
@@ -40,9 +43,19 @@ export class DevicesQueryHandler {
   /**
    * Every administrator's devices. Used by the alert path, which needs to reach
    * whoever runs this installation without knowing who that is.
+   *
+   * Identity resolves who the administrators are, and that is the point: the
+   * caller used to be handed Identity's `UserRepository` and look the Owner up
+   * itself, which is a context reading another context's store with a comment
+   * above it claiming otherwise. Asking here keeps the one door one door.
+   *
+   * ponytail: the administrators are the seeded Owner, resolved by login. P1
+   * adds a role listing and this becomes "every account with the admin role".
    */
-  async forAdmins(adminUserIds: string[]): Promise<DeviceView[]> {
-    return this.forUsers(adminUserIds);
+  async forAdministrators(): Promise<DeviceView[]> {
+    const owner = await this.users.findByLogin(this.env.ADMIN_EMAIL);
+    if (!owner) return [];
+    return this.forUsers([owner.id]);
   }
 
   /** Whether an account exists and may still be acted on. */
