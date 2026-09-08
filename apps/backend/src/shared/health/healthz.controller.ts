@@ -1,4 +1,4 @@
-import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get, Inject, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { Public } from '../auth/decorators.js';
 
 /** How long the relay may go without a loop before the container is unhealthy. */
@@ -21,7 +21,7 @@ export const RELAY_LIVENESS = Symbol('RELAY_LIVENESS');
  */
 @Controller('healthz')
 export class HealthzController {
-  constructor(private readonly relay?: RelayLiveness) {}
+  constructor(@Optional() @Inject(RELAY_LIVENESS) private readonly relay?: RelayLiveness) {}
 
   @Get()
   @Public()

@@ -28,6 +28,9 @@ import { MongoUnitOfWork } from './mongo-unit-of-work.js';
         serverSelectionTimeoutMS: 5_000,
         bufferCommands: false,
         autoIndex: false, // migrate-mongo owns indexes; see constitution IV.
+        // Generation mode has no store to reach; defer the connection so the
+        // module still initialises and the contracts can be written.
+        lazyConnection: Boolean(env.BOTVY_GEN),
       }),
     }),
   ],

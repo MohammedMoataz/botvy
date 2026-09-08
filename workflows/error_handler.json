@@ -1,0 +1,44 @@
+{
+  "name": "Botvy Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e1a10000-0000-4000-8000-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [-200, 0],
+      "notes": "Every Botvy workflow names this one as its error workflow. Import it first so the reference resolves."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOTVY_API_BASE }}/internal/alerts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Service-Token", "value": "={{ $env.BOTVY_INTERNAL_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: $json.workflow?.name || 'unknown', error: ($json.execution?.error?.message || 'no detail') + ' @ ' + ($json.execution?.lastNodeExecuted || 'unknown node'), executionId: String($json.execution?.id || '') }) }}",
+        "options": {}
+      },
+      "id": "e1a10000-0000-4000-8000-000000000002",
+      "name": "Alert The Administrators",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 0],
+      "notes": "The API resolves which devices belong to an administrator (Identity's DevicesQuery) and pushes to them; n8n holds only the service token."
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Alert The Administrators", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { HeartbeatRepository } from '../../contexts/operations/domain/heartbeat.repository.js';
 
 /** What the service needs to reach the admin overview's live tiles. */
@@ -20,7 +20,7 @@ export class HeartbeatService {
 
   constructor(
     private readonly repository: HeartbeatRepository,
-    private readonly nudge?: OpsNudge,
+    @Optional() @Inject(OPS_NUDGE) private readonly nudge?: OpsNudge,
   ) {}
 
   async stamp(job: string, ok: boolean, error?: string, durationMs?: number): Promise<void> {

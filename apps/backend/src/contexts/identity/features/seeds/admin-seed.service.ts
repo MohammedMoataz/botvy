@@ -1,16 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { newId } from '../../../../shared/cqrs/ids.js';
+import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
 import { User } from '../../domain/user.aggregate.js';
 import { UserRepository } from '../../domain/user.repository.js';
+
+export type { PasswordHasher } from '../../domain/password-hasher.js';
 
 /** What ADMIN_EMAIL / ADMIN_PASSWORD fall back to. */
 export const DEFAULT_ADMIN_EMAIL = 'admin';
 export const DEFAULT_ADMIN_PASSWORD = 'admin';
-
-export interface PasswordHasher {
-  hash(plain: string): Promise<string>;
-  verify(hash: string, plain: string): Promise<boolean>;
-}
 
 export type AdminSeedOutcome = 'created' | 'promoted' | 'unchanged';
 
@@ -39,7 +37,7 @@ export class AdminSeedService {
 
   constructor(
     private readonly users: UserRepository,
-    private readonly hasher: PasswordHasher,
+    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
   ) {}
 
   async seed(email: string, password: string): Promise<AdminSeedOutcome> {

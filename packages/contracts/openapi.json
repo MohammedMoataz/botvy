@@ -1,6 +1,93 @@
 {
   "openapi": "3.0.0",
-  "paths": {},
+  "paths": {
+    "/api/v1/ping": {
+      "post": {
+        "operationId": "PingController_ping",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Ping"
+        ]
+      }
+    },
+    "/internal/alerts": {
+      "post": {
+        "operationId": "InternalAlertsController_alert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InternalAlertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalAlerts"
+        ]
+      }
+    },
+    "/internal/ops/heartbeat": {
+      "post": {
+        "operationId": "InternalHeartbeatController_stamp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartbeatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalHeartbeat"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_report",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  },
   "info": {
     "title": "Botvy",
     "description": "Commands are REST; reads are GraphQL; the live connection is a socket.",
@@ -17,6 +104,19 @@
         "type": "http"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "PingDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "InternalAlertDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "HeartbeatDto": {
+        "type": "object",
+        "properties": {}
+      }
+    }
   }
 }

@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC } from './decorators.js';
+import { IS_PUBLIC, REQUIRED_KIND } from './decorators.js';
 import { JwtVerifier, TokenExpiredError } from './jwt.verifier.js';
 
 /**
@@ -32,6 +32,14 @@ export class JwtAuthGuard implements CanActivate {
       context.getClass(),
     ]);
     if (isPublic) return true;
+
+    // A machine route authenticates with a service token, not a JWT; the
+    // ServiceTokenGuard that follows this one owns that check.
+    const requiredKind = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_KIND, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (requiredKind === 'service') return true;
 
     const request = requestOf(context);
     if (!request) throw new UnauthorizedException('no request to authenticate');

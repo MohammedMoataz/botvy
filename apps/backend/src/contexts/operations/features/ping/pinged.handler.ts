@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
-import type { HeartbeatService } from '../../../../shared/health/heartbeat.service.js';
+import { HeartbeatService } from '../../../../shared/health/heartbeat.service.js';
 
 /**
  * The worker's half of the demonstration.
@@ -19,7 +19,7 @@ export class PingedHandler {
   private readonly logger = new Logger(PingedHandler.name);
   readonly #seen = new Set<string>();
 
-  constructor(private readonly heartbeat: Pick<HeartbeatService, 'stamp'>) {}
+  constructor(@Inject(HeartbeatService) private readonly heartbeat: Pick<HeartbeatService, 'stamp'>) {}
 
   async handle(event: DomainEvent): Promise<'stamped' | 'already-seen'> {
     if (this.#seen.has(event.eventId)) {

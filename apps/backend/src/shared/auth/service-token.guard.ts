@@ -1,6 +1,14 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { ServiceClientRepository } from '../../contexts/identity/domain/service-client.repository.js';
+import { REQUIRED_KIND } from './decorators.js';
 
 /**
  * Authenticates a machine caller on `/internal/*`.
@@ -13,10 +21,24 @@ import { ServiceClientRepository } from '../../contexts/identity/domain/service-
  */
 @Injectable()
 export class ServiceTokenGuard implements CanActivate {
-  constructor(private readonly clients: ServiceClientRepository) {}
+  constructor(
+    private readonly clients: ServiceClientRepository,
+    // Registered globally, the guard must know which routes are its business:
+    // only those marked @ServiceOnly(). Without a reflector (a spec calling it
+    // directly) it checks every call, which is what the specs already expect.
+    @Optional() private readonly reflector?: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    if (this.reflector) {
+      const requiredKind = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_KIND, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (requiredKind !== 'service') return true;
+    }
+
     const presented = readServiceToken(request);
 
     if (!presented) {

@@ -68,3 +68,6 @@ secrets/
 # apps/mobile/android/app/ (ignored there too); a stray copy here is a leak.
 /google-services.json
 **/android/app/google-services.json
+
+# phase-pipeline handoff files
+.harness/

@@ -9,6 +9,9 @@ import { PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
+    // Generation mode builds the application to read its decorators and has
+    // no database to reach; connecting would only fail slowly.
+    if (process.env.BOTVY_GEN) return;
     await this.$connect();
   }
 
