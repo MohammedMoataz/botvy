@@ -24,8 +24,24 @@ export interface HealthInputs {
   pushConfigured: boolean;
   heartbeats: Heartbeat[];
   staleAfterMinutes: number;
+  /**
+   * The window for the nightly backup jobs, which is a different question from
+   * the one `staleAfterMinutes` answers.
+   *
+   * One window cannot serve both. The relay tick and the rhythm tick run every
+   * few minutes, so fifteen minutes of silence from either is a fault; the
+   * backup runs once a night, so fifteen minutes of silence is the normal state
+   * for twenty-three of every twenty-four hours. Judging `backup.mongo` by the
+   * minute window turned `/health` permanently degraded from 03:15 onward and
+   * failed the gate's "no stale jobs" check every day — while saying nothing
+   * true about the backup.
+   */
+  backupStaleHours: number;
   now?: Date;
 }
+
+/** Jobs whose silence is measured in hours because they run once a night. */
+const NIGHTLY_PREFIX = 'backup.';
 
 /**
  * Turns the probes into a verdict. A pure function so the branch that decides
@@ -40,6 +56,7 @@ export interface HealthInputs {
 export function assessHealth(inputs: HealthInputs): HealthReport {
   const now = inputs.now ?? new Date();
   const staleAfterMs = inputs.staleAfterMinutes * 60_000;
+  const nightlyAfterMs = inputs.backupStaleHours * 3_600_000;
 
   const jobs: JobStatus[] = inputs.heartbeats
     .map((heartbeat) => ({
@@ -49,7 +66,10 @@ export function assessHealth(inputs: HealthInputs): HealthReport {
       lastError: heartbeat.lastError,
       // A job that has never succeeded is stale, not fresh: "no news" from a job
       // that has never worked is the worst reading to treat as healthy.
-      stale: heartbeat.lastOkAt === null || now.getTime() - heartbeat.lastOkAt.getTime() > staleAfterMs,
+      stale:
+        heartbeat.lastOkAt === null ||
+        now.getTime() - heartbeat.lastOkAt.getTime() >
+          (heartbeat.job.startsWith(NIGHTLY_PREFIX) ? nightlyAfterMs : staleAfterMs),
     }))
     .sort((a, b) => a.job.localeCompare(b.job));
 

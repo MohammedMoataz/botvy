@@ -6,6 +6,7 @@ import { Public } from '../auth/decorators.js';
 import { OllamaClient } from '../llm/ollama.client.js';
 import { PrismaService } from '../persistence/prisma/prisma.service.js';
 import { PushService } from '../push/push.service.js';
+import { definitionOf } from '../settings/settings.registry.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { assessHealth, type HealthReport } from './health.assess.js';
 
@@ -36,19 +37,25 @@ export class HealthController {
   @Get()
   @Public()
   async report(): Promise<HealthReport & { version: string }> {
-    const [postgres, mongo, ollama, heartbeats, staleAfterMinutes] = await Promise.all([
-      this.probe('postgres', () => this.prisma.ping()),
-      this.probe('mongo', async () => {
-        const result = await this.mongo.db?.admin().ping();
-        return result?.ok === 1;
-      }),
-      this.probe('ollama', () => this.ollama.isReachable()),
-      this.heartbeats.listAll().catch((error: Error) => {
-        this.logger.warn(`heartbeats unreadable: ${error.message}`);
-        return [];
-      }),
-      this.settings.get('ops.staleAfterMinutes').catch(() => 15),
-    ]);
+    const [postgres, mongo, ollama, heartbeats, staleAfterMinutes, backupStaleHours] =
+      await Promise.all([
+        this.probe('postgres', () => this.prisma.ping()),
+        this.probe('mongo', async () => {
+          const result = await this.mongo.db?.admin().ping();
+          return result?.ok === 1;
+        }),
+        this.probe('ollama', () => this.ollama.isReachable()),
+        this.heartbeats.listAll().catch((error: Error) => {
+          this.logger.warn(`heartbeats unreadable: ${error.message}`);
+          return [];
+        }),
+        this.setting('ops.staleAfterMinutes'),
+        // The nightly jobs get their own window. `backup.staleHours` has been in
+        // the registry since the phase began with nothing reading it, which is
+        // how a job that runs at 03:00 came to be judged by a fifteen-minute
+        // rule and reported the platform degraded for the rest of every day.
+        this.setting('backup.staleHours'),
+      ]);
 
     return {
       ...assessHealth({
@@ -58,9 +65,30 @@ export class HealthController {
         pushConfigured: this.push.isConfigured(),
         heartbeats,
         staleAfterMinutes,
+        backupStaleHours,
       }),
       version: BOTVY_VERSION,
     };
+  }
+
+  /**
+   * A settings value, falling back to the registry's own default if the store
+   * cannot be read.
+   *
+   * The fallback is the registry entry rather than a number written here. A
+   * literal in this file is a second default that nobody maintains, and it
+   * diverges silently the first time the registry's changes — which is what
+   * principle XII means by "a hard-coded default is a bug".
+   */
+  private async setting<K extends 'ops.staleAfterMinutes' | 'backup.staleHours'>(
+    key: K,
+  ): Promise<number> {
+    try {
+      return (await this.settings.get(key)) as number;
+    } catch (error) {
+      this.logger.warn(`${key} unreadable, using the registry default: ${(error as Error).message}`);
+      return definitionOf(key).default as number;
+    }
   }
 
   private async probe(name: string, check: () => Promise<boolean>): Promise<boolean> {

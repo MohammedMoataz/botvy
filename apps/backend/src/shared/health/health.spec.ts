@@ -25,6 +25,7 @@ const healthy = {
   ollama: true,
   pushConfigured: true,
   staleAfterMinutes: 15,
+  backupStaleHours: 48,
   now: NOW,
 };
 
@@ -37,6 +38,42 @@ describe('assessHealth', () => {
 
     expect(report.status).toBe('ok');
     expect(report.jobs.every((job) => job.stale)).toBe(false);
+  });
+
+  /**
+   * The nightly jobs need their own window, and this is the defect that made
+   * that obvious: judged by the fifteen-minute rule, a backup that ran
+   * successfully at 03:00 reported the platform degraded from 03:15 onward and
+   * failed the gate's "no stale jobs" check every single day.
+   */
+  it('measures a nightly backup in hours, not in the minute window', () => {
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [heartbeat('backup.mongo', 9 * 60), heartbeat('backup.postgres', 9 * 60)],
+    });
+
+    expect(report.jobs.map((job) => job.stale)).toEqual([false, false]);
+    expect(report.status).toBe('ok');
+  });
+
+  it('still calls a backup stale once its own window has passed', () => {
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [heartbeat('backup.mongo', 49 * 60)],
+    });
+
+    expect(report.jobs[0]?.stale).toBe(true);
+    expect(report.status).toBe('degraded');
+  });
+
+  /** The hours window is for the nightly jobs only, not a general relaxation. */
+  it('keeps the minute window for jobs that are not backups', () => {
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [heartbeat('outbox.relay', 20)],
+    });
+
+    expect(report.jobs[0]?.stale).toBe(true);
   });
 
   it('degrades when a store is down, and says which', () => {
