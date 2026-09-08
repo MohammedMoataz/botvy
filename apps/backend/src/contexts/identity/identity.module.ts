@@ -5,6 +5,7 @@ import { DeviceRepository } from './domain/device.repository.js';
 import { IdentityOutboxRepository } from './domain/identity-outbox.repository.js';
 import { PASSWORD_HASHER } from './domain/password-hasher.js';
 import { ServiceClientRepository } from './domain/service-client.repository.js';
+import { RefreshTokenRepository } from './domain/refresh-token.repository.js';
 import { UserRepository } from './domain/user.repository.js';
 import { ChangePasswordHandler } from './features/change-password/change-password.handler.js';
 import { DevicesQueryHandler } from './features/devices/devices.query.js';
@@ -15,6 +16,7 @@ import { ServiceClientSeedService } from './features/seeds/service-client-seed.s
 import {
   PrismaDeviceRepository,
   PrismaIdentityOutboxRepository,
+  PrismaRefreshTokenRepository,
   PrismaServiceClientRepository,
   PrismaUserRepository,
 } from './infrastructure/prisma-identity.repositories.js';
@@ -47,8 +49,14 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     },
     {
       provide: DeviceRepository,
+      inject: [PrismaService, IdentityOutboxRepository],
+      useFactory: (prisma: PrismaService, outbox: IdentityOutboxRepository) =>
+        new PrismaDeviceRepository(prisma, outbox),
+    },
+    {
+      provide: RefreshTokenRepository,
       inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => new PrismaDeviceRepository(prisma),
+      useFactory: (prisma: PrismaService) => new PrismaRefreshTokenRepository(prisma),
     },
     { provide: PASSWORD_HASHER, useClass: ScryptPasswordHasher },
     AdminSeedService,

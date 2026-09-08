@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
 import { hashesMatch } from '../../../shared/auth/service-token.guard.js';
+import { Device as DeviceAggregate } from '../domain/device.aggregate.js';
 import {
   DeviceRepository,
   type Device,
@@ -9,6 +10,11 @@ import {
   IdentityOutboxRepository,
   type PendingIdentityEvent,
 } from '../domain/identity-outbox.repository.js';
+import {
+  RefreshTokenRepository,
+  type IssueRefreshToken,
+} from '../domain/refresh-token.repository.js';
+import type { RefreshTokenRecord } from '../domain/session-chain.js';
 import {
   ServiceClientRepository,
   type ServiceClient,
@@ -94,6 +100,7 @@ export class InMemoryServiceClientRepository extends ServiceClientRepository {
 @Injectable()
 export class InMemoryDeviceRepository extends DeviceRepository {
   readonly rows: Device[] = [];
+  readonly events: DomainEvent[] = [];
 
   async listByUser(userId: string): Promise<Device[]> {
     return this.rows.filter((row) => row.userId === userId);
@@ -101,6 +108,118 @@ export class InMemoryDeviceRepository extends DeviceRepository {
 
   async listByUsers(userIds: string[]): Promise<Device[]> {
     return this.rows.filter((row) => userIds.includes(row.userId));
+  }
+
+  async findById(userId: string, id: string): Promise<DeviceAggregate | null> {
+    const row = this.rows.find((candidate) => candidate.id === id && candidate.userId === userId);
+    return row ? this.#hydrate(row) : null;
+  }
+
+  async findByInstallId(installId: string): Promise<DeviceAggregate | null> {
+    const row = this.rows.find((candidate) => candidate.installId === installId);
+    return row ? this.#hydrate(row) : null;
+  }
+
+  async save(device: DeviceAggregate): Promise<void> {
+    this.events.push(...device.pullEvents());
+    const row: Device = {
+      id: device.id,
+      userId: device.userId,
+      installId: device.installId,
+      kind: device.kind,
+      name: device.name,
+      pushToken: device.pushToken,
+      lastSeenAt: device.lastSeenAt,
+    };
+    const at = this.rows.findIndex((candidate) => candidate.id === device.id);
+    if (at === -1) this.rows.push(row);
+    else this.rows[at] = row;
+  }
+
+  async remove(device: DeviceAggregate): Promise<void> {
+    this.events.push(...device.pullEvents());
+    const at = this.rows.findIndex((candidate) => candidate.id === device.id);
+    if (at !== -1) this.rows.splice(at, 1);
+  }
+
+  // The read model carries no timestamps; the aggregate needs them, and for an
+  // in-memory adapter the created time is only ever compared against itself.
+  #hydrate(row: Device): DeviceAggregate {
+    return DeviceAggregate.rehydrate({
+      ...row,
+      createdAt: row.lastSeenAt ?? new Date(0),
+      updatedAt: row.lastSeenAt ?? new Date(0),
+    });
+  }
+}
+
+/**
+ * The refresh chain, in memory.
+ *
+ * `rotate` marks and inserts in one call because the port says so, and the port
+ * says so because in PostgreSQL it is one transaction — an adapter that split it
+ * would pass a handler spec and lose sessions against a real database.
+ */
+@Injectable()
+export class InMemoryRefreshTokenRepository extends RefreshTokenRepository {
+  readonly rows: RefreshTokenRecord[] = [];
+  #next = 0;
+
+  async findByHash(tokenHash: string): Promise<RefreshTokenRecord | null> {
+    return this.rows.find((row) => row.tokenHash === tokenHash) ?? null;
+  }
+
+  async issue(token: IssueRefreshToken): Promise<RefreshTokenRecord> {
+    this.#next += 1;
+    const row: RefreshTokenRecord = {
+      id: `rt-${this.#next}`,
+      ...token,
+      revokedAt: null,
+      replacedBy: null,
+      createdAt: new Date(),
+    };
+    this.rows.push(row);
+    return row;
+  }
+
+  async rotate(previousId: string, next: IssueRefreshToken): Promise<RefreshTokenRecord> {
+    const issued = await this.issue(next);
+    const previous = this.rows.find((row) => row.id === previousId);
+    if (previous) previous.replacedBy = issued.id;
+    return issued;
+  }
+
+  async revoke(tokenId: string): Promise<boolean> {
+    const row = this.rows.find((candidate) => candidate.id === tokenId);
+    if (!row || row.revokedAt !== null) return false;
+    row.revokedAt = new Date();
+    return true;
+  }
+
+  async revokeFamily(familyId: string): Promise<number> {
+    return this.#revokeWhere((row) => row.familyId === familyId);
+  }
+
+  async revokeAllForUser(userId: string): Promise<number> {
+    return this.#revokeWhere((row) => row.userId === userId);
+  }
+
+  async deleteExpired(before: Date): Promise<number> {
+    const doomed = this.rows.filter((row) => row.expiresAt.getTime() < before.getTime());
+    for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
+    return doomed.length;
+  }
+
+  #revokeWhere(matches: (row: RefreshTokenRecord) => boolean): number {
+    let revoked = 0;
+    const at = new Date();
+    for (const row of this.rows) {
+      if (matches(row) && row.revokedAt === null) {
+        row.revokedAt = at;
+        revoked += 1;
+      }
+    }
+    return revoked;
   }
 }
 

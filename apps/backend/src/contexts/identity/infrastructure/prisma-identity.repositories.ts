@@ -10,7 +10,13 @@ import {
   PrismaUnitOfWork,
   toIdentityOutboxRow,
 } from '../../../shared/persistence/prisma/prisma-unit-of-work.js';
+import { Device as DeviceAggregate } from '../domain/device.aggregate.js';
 import { DeviceRepository, type Device, type DeviceKind } from '../domain/device.repository.js';
+import {
+  RefreshTokenRepository,
+  type IssueRefreshToken,
+} from '../domain/refresh-token.repository.js';
+import type { RefreshTokenRecord } from '../domain/session-chain.js';
 import {
   IdentityOutboxRepository,
   type PendingIdentityEvent,
@@ -133,7 +139,10 @@ export class PrismaServiceClientRepository extends ServiceClientRepository {
 
 @Injectable()
 export class PrismaDeviceRepository extends DeviceRepository {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly outbox: IdentityOutboxRepository,
+  ) {
     super();
   }
 
@@ -148,6 +157,140 @@ export class PrismaDeviceRepository extends DeviceRepository {
       where: { userId: { in: userIds } },
     });
     return rows.map(toDevice);
+  }
+
+  async findById(userId: string, id: string): Promise<DeviceAggregate | null> {
+    const row = await client(this.prisma).device.findFirst({ where: { id, userId } });
+    return row ? toDeviceAggregate(row) : null;
+  }
+
+  async findByInstallId(installId: string): Promise<DeviceAggregate | null> {
+    const row = await client(this.prisma).device.findUnique({ where: { installId } });
+    return row ? toDeviceAggregate(row) : null;
+  }
+
+  async save(device: DeviceAggregate): Promise<void> {
+    const events = device.pullEvents();
+    const data = {
+      name: device.name,
+      kind: device.kind,
+      fcmToken: device.pushToken,
+      lastSeenAt: device.lastSeenAt,
+    };
+
+    await client(this.prisma).device.upsert({
+      where: { id: device.id },
+      create: {
+        id: device.id,
+        userId: device.userId,
+        installId: device.installId,
+        // v1's column, still non-null. `kind` is what this codebase reads; this
+        // keeps the old one populated rather than leaving a NOT NULL to fail.
+        platform: device.kind,
+        createdAt: device.createdAt,
+        ...data,
+      },
+      update: data,
+    });
+
+    await this.outbox.append(events);
+  }
+
+  async remove(device: DeviceAggregate): Promise<void> {
+    const events = device.pullEvents();
+    await client(this.prisma).device.delete({ where: { id: device.id } });
+    await this.outbox.append(events);
+  }
+}
+
+/**
+ * The refresh chain.
+ *
+ * `rotate` is a single transaction, and that is the whole reason it is one
+ * method: marking the old token exchanged without writing its successor signs
+ * the member out, and writing the successor without marking the old one leaves
+ * two live tokens in a family whose entire purpose is that there is only ever
+ * one — which is exactly the state a replay check reads as a theft.
+ */
+@Injectable()
+export class PrismaRefreshTokenRepository extends RefreshTokenRepository {
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
+  async findByHash(tokenHash: string): Promise<RefreshTokenRecord | null> {
+    const row = await client(this.prisma).refreshToken.findFirst({ where: { tokenHash } });
+    return row ? toRefreshRecord(row) : null;
+  }
+
+  async issue(token: IssueRefreshToken): Promise<RefreshTokenRecord> {
+    const row = await client(this.prisma).refreshToken.create({
+      data: {
+        userId: token.userId,
+        familyId: token.familyId,
+        tokenHash: token.tokenHash,
+        expiresAt: token.expiresAt,
+        deviceId: token.deviceId,
+      },
+    });
+    return toRefreshRecord(row);
+  }
+
+  async rotate(previousId: string, next: IssueRefreshToken): Promise<RefreshTokenRecord> {
+    const run = async (tx: PrismaTransaction | PrismaService): Promise<RefreshTokenRecord> => {
+      const issued = await tx.refreshToken.create({
+        data: {
+          userId: next.userId,
+          familyId: next.familyId,
+          tokenHash: next.tokenHash,
+          expiresAt: next.expiresAt,
+          deviceId: next.deviceId,
+        },
+      });
+      await tx.refreshToken.update({
+        where: { id: previousId },
+        data: { replacedBy: issued.id, revokedAt: new Date() },
+      });
+      return toRefreshRecord(issued);
+    };
+
+    // Joins the caller's transaction when there is one, rather than opening a
+    // nested one — Prisma refuses those, and a handler that already has a unit
+    // of work open is the normal case here.
+    const existing = PrismaUnitOfWork.currentTx();
+    if (existing) return run(existing);
+    return this.prisma.$transaction((tx) => run(tx as PrismaTransaction));
+  }
+
+  async revoke(tokenId: string): Promise<boolean> {
+    const result = await client(this.prisma).refreshToken.updateMany({
+      where: { id: tokenId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count > 0;
+  }
+
+  async revokeFamily(familyId: string): Promise<number> {
+    const result = await client(this.prisma).refreshToken.updateMany({
+      where: { familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  async revokeAllForUser(userId: string): Promise<number> {
+    const result = await client(this.prisma).refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  async deleteExpired(before: Date): Promise<number> {
+    const result = await client(this.prisma).refreshToken.deleteMany({
+      where: { expiresAt: { lt: before } },
+    });
+    return result.count;
   }
 }
 
@@ -235,5 +378,31 @@ function toDevice(row: Record<string, unknown>): Device {
     name: (row.name as string | null) ?? null,
     pushToken: (row.fcmToken as string | null) ?? null,
     lastSeenAt: (row.lastSeenAt as Date | null) ?? null,
+  };
+}
+
+function toDeviceAggregate(row: Record<string, unknown>): DeviceAggregate {
+  const view = toDevice(row);
+  const createdAt = (row.createdAt as Date | null) ?? new Date(0);
+  return DeviceAggregate.rehydrate({
+    ...view,
+    createdAt,
+    // The table has no updatedAt of its own; last seen is the closest true
+    // answer, and inventing one would make a synced row look edited.
+    updatedAt: view.lastSeenAt ?? createdAt,
+  });
+}
+
+function toRefreshRecord(row: Record<string, unknown>): RefreshTokenRecord {
+  return {
+    id: String(row.id),
+    userId: String(row.userId),
+    familyId: String(row.familyId),
+    tokenHash: String(row.tokenHash),
+    expiresAt: row.expiresAt as Date,
+    revokedAt: (row.revokedAt as Date | null) ?? null,
+    replacedBy: (row.replacedBy as string | null) ?? null,
+    deviceId: (row.deviceId as string | null) ?? null,
+    createdAt: (row.createdAt as Date | null) ?? new Date(0),
   };
 }

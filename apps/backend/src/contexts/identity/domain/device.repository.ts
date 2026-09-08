@@ -1,3 +1,5 @@
+import type { Device as DeviceAggregate } from './device.aggregate.js';
+
 export type DeviceKind = 'android' | 'ios' | 'chrome_extension' | 'web';
 
 export interface Device {
@@ -11,15 +13,27 @@ export interface Device {
 }
 
 /**
- * Read-only in P0 — registration arrives with P1. It exists this early because
- * the internal-alerts slice already has to reach an administrator's phone, and
- * a Mongo context reaching into Identity's tables to find one is exactly what
- * principle I forbids. P2's notification sweep binds the same query rather than
- * growing a second one.
+ * The device store. Read-only in P0, because internal-alerts already had to
+ * reach an administrator's phone and a Mongo context reaching into Identity's
+ * tables to find one is what principle I forbids. P1 adds the write side.
+ *
+ * `findByInstallId` is not scoped to a user, and that is deliberate: an install
+ * id is unique across the table, so the lookup is how a re-registration is
+ * recognised — including one arriving from an account that has since signed a
+ * different member in on the same handset. The caller decides what to do about
+ * that; the store's job is to find the row.
  */
 export abstract class DeviceRepository {
   abstract listByUser(userId: string): Promise<Device[]>;
 
   /** Batched on purpose: the sweep asks about many members at once. */
   abstract listByUsers(userIds: string[]): Promise<Device[]>;
+
+  abstract findById(userId: string, id: string): Promise<DeviceAggregate | null>;
+
+  abstract findByInstallId(installId: string): Promise<DeviceAggregate | null>;
+
+  abstract save(device: DeviceAggregate): Promise<void>;
+
+  abstract remove(device: DeviceAggregate): Promise<void>;
 }
