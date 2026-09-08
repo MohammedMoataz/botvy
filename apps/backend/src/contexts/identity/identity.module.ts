@@ -6,7 +6,9 @@ import { IdentityOutboxRepository } from './domain/identity-outbox.repository.js
 import { PASSWORD_HASHER } from './domain/password-hasher.js';
 import { ServiceClientRepository } from './domain/service-client.repository.js';
 import { UserRepository } from './domain/user.repository.js';
+import { ChangePasswordHandler } from './features/change-password/change-password.handler.js';
 import { DevicesQueryHandler } from './features/devices/devices.query.js';
+import { SignInHandler } from './features/sign-in/sign-in.handler.js';
 import { AdminSeedService } from './features/seeds/admin-seed.service.js';
 import { IdentityBootstrap } from './features/seeds/identity.bootstrap.js';
 import { ServiceClientSeedService } from './features/seeds/service-client-seed.service.js';
@@ -53,6 +55,8 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     ServiceClientSeedService,
     IdentityBootstrap,
     DevicesQueryHandler,
+    SignInHandler,
+    ChangePasswordHandler,
     ServiceTokenGuard,
   ],
   // `UserRepository` and `DeviceRepository` are deliberately *not* exported.
@@ -64,6 +68,8 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     ServiceClientRepository,
     IdentityOutboxRepository,
     DevicesQueryHandler,
+    SignInHandler,
+    ChangePasswordHandler,
     ServiceTokenGuard,
   ],
 })

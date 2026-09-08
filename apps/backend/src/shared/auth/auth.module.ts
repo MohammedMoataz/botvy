@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
+import { JwtSigner } from './jwt.signer.js';
 import { JwtVerifier } from './jwt.verifier.js';
 
 /**
@@ -23,7 +24,12 @@ import { JwtVerifier } from './jwt.verifier.js';
       inject: [ENV],
       useFactory: (env: Env) => new JwtVerifier(env),
     },
+    {
+      provide: JwtSigner,
+      inject: [ENV],
+      useFactory: (env: Env) => new JwtSigner(env),
+    },
   ],
-  exports: [JwtVerifier],
+  exports: [JwtVerifier, JwtSigner],
 })
 export class AuthModule {}

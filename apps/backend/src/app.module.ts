@@ -4,6 +4,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { InternalAlertsController } from './contexts/operations/features/internal-alerts/internal-alerts.controller.js';
 import { InternalHeartbeatController } from './contexts/operations/features/internal-heartbeat/internal-heartbeat.controller.js';
+import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
 import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { AuthModule } from './shared/auth/auth.module.js';
@@ -44,7 +45,15 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     OperationsModule,
     HealthModule,
   ],
-  controllers: [PingController, InternalAlertsController, InternalHeartbeatController],
+  // Declared here rather than on IdentityModule, because the worker imports
+  // that module too and would otherwise mount the auth routes as well. One
+  // image, two roles: only the backend role has an HTTP surface.
+  controllers: [
+    AuthController,
+    PingController,
+    InternalAlertsController,
+    InternalHeartbeatController,
+  ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useExisting: ServiceTokenGuard },
