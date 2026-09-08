@@ -154,22 +154,54 @@ services:
       start_period: 20s
     networks: [botvy]
 
-  mongodump:
-    image: mongo:8
+  # Both stores, one sidecar.
+  #
+  # Restoring Identity without the Mongo side leaves accounts whose data is
+  # gone, and the other way round leaves data whose accounts are: `userId` in
+  # Mongo is the PostgreSQL uuid and there is no join to rebuild the link from.
+  # A host that dumps only one store is not backed up, so both scripts run here
+  # on one schedule.
+  backups:
+    build:
+      context: .
+      dockerfile: backup/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-backups:${BOTVY_TAG:-local}
     restart: unless-stopped
     environment:
       MONGO_URL: ${MONGO_URL:?set it in .env}
+      DATABASE_URL: ${DATABASE_URL:?set it in .env}
+      # How the job's outcome reaches ops_heartbeats: this container is the one
+      # part of the platform the API does not run, so it reports over HTTP.
+      BOTVY_API_BASE: http://backend:8080
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
     volumes:
-      - ../backups/mongo:/backups
-      - ./backup-mongo.sh:/usr/local/bin/backup-mongo.sh:ro
+      - ../backups:/backups
     entrypoint: ['/bin/bash', '-c']
     command:
       - |
-        echo "$${BACKUP_CRON} /usr/local/bin/backup-mongo.sh" > /etc/cron.d/botvy
-        crontab /etc/cron.d/botvy
-        cron -f
+        set -euo pipefail
+        # cron hands a job almost no environment, so the variables go into the
+        # crontab as assignment lines, which cron reads literally. Dumping the
+        # environment to a file and sourcing it would need every value quoted
+        # correctly, and a password with a space in it would break the job.
+        {
+          echo 'SHELL=/bin/bash'
+          echo 'PATH=/usr/local/bin:/usr/bin:/bin'
+          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_DAYS; do
+            echo "$${name}=$${!name}"
+          done
+          # Redirected to PID 1's stdout, which is this container's log. cron
+          # mails a job's output, there is no mailer here, and without this a
+          # failed backup would leave no trace anywhere at all.
+          echo "$${BACKUP_CRON} root { /usr/local/bin/backup-mongo.sh; /usr/local/bin/backup-postgres.sh; } >/proc/1/fd/1 2>&1"
+        } > /etc/cron.d/botvy-backups
+        chmod 0644 /etc/cron.d/botvy-backups
+        exec cron -f
     depends_on:
+      postgres:
+        condition: service_healthy
       mongo:
         condition: service_healthy
     networks: [botvy]

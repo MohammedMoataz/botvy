@@ -65,6 +65,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Built and published like the others, so a deploy host can `pull` it
+      # rather than needing the repository checked out to build it.
+      - name: Backup sidecar image
+        uses: docker/build-push-action@v6
+        with:
+          context: infra
+          file: infra/backup/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-backups:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-backups:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   artifacts:
     name: app and extension
     runs-on: ubuntu-latest

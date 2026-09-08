@@ -76,10 +76,16 @@ Both stores are dumped nightly to `backups/`, and each archive is read back
 immediately after it is written. A backup nobody has opened is a hope, not a
 backup.
 
-Retention and the staleness warning are settings keys — `backup.retentionDays`
-and `backup.staleHours` — so you can retune them from the portal. When the
-schedule matters, `BACKUP_CRON` is in `.env`, because the job is a container
-rather than the API.
+The `backups` service runs both dump scripts on one schedule. It is a built
+image (`infra/backup/Dockerfile`) rather than `mongo:8` with a command, because
+that image ships neither `cron` nor `pg_dump`.
+
+The staleness warning is a settings key — `backup.staleHours` — so you can
+retune it from the portal. The schedule is `BACKUP_CRON` in `.env`, because the
+job is a container rather than the API. Retention currently lives in **both**
+places: `backup.retentionDays` in the registry and `BACKUP_RETENTION_DAYS` in
+`.env`, because the sidecar has no way to read the registry from outside the
+API. Change them together until a later phase gives it one.
 
 ### Restoring
 
