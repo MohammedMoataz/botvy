@@ -6,7 +6,17 @@
 # which the principle permits, and which `verify.mjs` excludes when it counts
 # public ports.
 
-name: botvy
+# v2 is its own compose project.
+#
+# v1's compose file also declares `name: botvy`, which made the two one
+# project sharing `pg_data` and `n8n_data` — so v2 came up serving v1's live
+# database, and neither stack could run while the other did. The plan had
+# accounts carrying over in that shared store; the Owner chose a clean start
+# instead, which removes the reason to share it at all.
+#
+# Renaming the project namespaces every volume (`botvy-v2_pg_data`), so v1's
+# data is left exactly where it is and remains recoverable.
+name: botvy-v2
 
 x-backend-env: &backend-env
   NODE_ENV: ${NODE_ENV:-production}

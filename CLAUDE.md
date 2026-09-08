@@ -156,7 +156,14 @@ and a second `bootstrap.mjs` run that changes nothing.
 - **A fixture pinned to a real date is a time bomb.** Alert planning drops a lead
   time whose moment has passed, so a fixture dated in the future starts failing
   the day the clock reaches it. Write time fixtures relative to `Date.now()`.
-- **The seeded admin is `admin`/`admin` and the portal is public.** The API
-  creates it when the `ADMIN_EMAIL` account is missing and never resets an
+- **The seeded admin is `ADMIN_EMAIL`/`ADMIN_PASSWORD` and the portal is
+  public.** The API creates it when that account is missing and never resets an
   existing one, so a changed password sticks. It warns on every boot until it is
-  changed, via `POST /api/v1/auth/password`.
+  changed; `POST /api/v1/auth/login` returns a token and
+  `POST /api/v1/auth/password` changes it, and `mustChangePassword` on the
+  sign-in response is how a client knows to insist.
+- **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
+  while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
+  v2 served v1's live database and neither could run beside the other. Keep the
+  names distinct, or a `docker compose up` in one tree recreates the other's
+  containers on the other's data.

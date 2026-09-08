@@ -49,9 +49,21 @@ If it exits non-zero, do not go further — each line names what failed.
 
 The seed creates the account named by `ADMIN_EMAIL` on first boot, with
 `ADMIN_PASSWORD`. It never resets that password afterwards, so one you change
-in the portal survives every restart. While the password is still the default,
-the portal says so on every page and the boot log repeats the warning. Change
-it.
+survives every restart. While the password is still the default, the boot log
+repeats the warning and `mustChangePassword` comes back `true` on every sign-in.
+
+```bash
+# Sign in.
+curl -sX POST "$BOTVY_BASE_URL/api/v1/auth/login"   -H 'content-type: application/json'   -d '{"email":"'"$ADMIN_EMAIL"'","password":"admin"}'
+
+# Change the password. At least 8 characters, and the current one is required
+# even though you are already authenticated.
+curl -sX POST "$BOTVY_BASE_URL/api/v1/auth/password"   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json'   -d '{"currentPassword":"admin","newPassword":"something longer"}'
+```
+
+Registration, Google sign-in and refresh-token rotation arrive in P1. The token
+`login` returns is an access token, so it expires on `JWT_ACCESS_TTL` and there
+is nothing yet to renew it with — sign in again.
 
 Deleting that account brings it back on the next start, because it is a
 *default*. Point `ADMIN_EMAIL` at a different address if that is not what you
