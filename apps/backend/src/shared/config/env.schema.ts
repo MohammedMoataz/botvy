@@ -41,8 +41,13 @@ export const envSchema = z.object({
   MEDIA_DIR: z.string().default('/data/media'),
   CORS_ORIGINS: z.string().optional(),
 
-  // Seeded administrator (the account the Owner first signs in with)
-  ADMIN_EMAIL: z.string().email(),
+  // Seeded administrator (the account the Owner first signs in with).
+  //
+  // A login, not necessarily an email address. The documented default is the
+  // literal `admin`, which v1 seeded and which every setup instruction repeats
+  // — demanding an email here refuses the very value the rest of the project
+  // tells people to use, and the process then will not start at all.
+  ADMIN_EMAIL: z.string().min(1),
   ADMIN_PASSWORD: z.string().min(1),
 
   // Generation mode: write the contract artefacts and exit, rather than serve.

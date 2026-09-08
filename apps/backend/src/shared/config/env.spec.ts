@@ -9,7 +9,7 @@ const complete = {
   INTERNAL_SERVICE_TOKEN: 'internal-token-long-enough',
   AUTOMATION_WEBHOOK_SECRET: 'webhook-secret-long-enough',
   MEDIA_SIGNING_SECRET: 'media-secret-long-enough',
-  ADMIN_EMAIL: 'owner@example.test',
+  ADMIN_EMAIL: 'admin',
   ADMIN_PASSWORD: 'admin',
 } satisfies NodeJS.ProcessEnv;
 
@@ -56,6 +56,23 @@ describe('environment contract', () => {
     expect(() => loadEnv({ ...complete, JWT_ACCESS_SECRET: 'short' })).toThrow(
       /JWT_ACCESS_SECRET/,
     );
+  });
+
+  /**
+   * The documented default is the literal `admin`. Requiring an email address
+   * here refused the value every setup instruction tells people to use, and the
+   * process then would not start at all — which is how the first real boot of
+   * this stack failed.
+   */
+  it('accepts a bare login as the administrator, not only an email', () => {
+    expect(loadEnv({ ...complete, ADMIN_EMAIL: 'admin' }).ADMIN_EMAIL).toBe('admin');
+    expect(loadEnv({ ...complete, ADMIN_EMAIL: 'owner@example.test' }).ADMIN_EMAIL).toBe(
+      'owner@example.test',
+    );
+  });
+
+  it('still refuses an empty administrator login', () => {
+    expect(() => loadEnv({ ...complete, ADMIN_EMAIL: '' })).toThrow(/ADMIN_EMAIL/);
   });
 
   it('reads CORS origins as a list, tolerating spacing', () => {
