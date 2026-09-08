@@ -5,10 +5,33 @@ import type { WebhookFanout, WebhookSubscription } from './webhook-fanout.js';
 
 /** What the relay needs from the store, narrow enough to fake in a spec. */
 export interface RelayStore {
-  /** Undelivered events, oldest first. */
+  /** Undelivered events whose retry time has come, oldest first. */
   drain(limit: number): Promise<DomainEvent[]>;
   markDelivered(eventId: string): Promise<void>;
-  markFailed(eventId: string, error: string, nextAttemptAt: Date | null): Promise<void>;
+  /**
+   * Records the failure and returns how many attempts have now failed,
+   * *including* this one.
+   *
+   * The count comes back because the caller owns the retry ladder: the relay
+   * decides when to try again, the store only remembers. Returning nothing —
+   * which this used to do — left the relay guessing, and it guessed 1 every
+   * time, so every retry was scheduled a minute out and the rest of the ladder
+   * was unreachable.
+   */
+  recordFailure(eventId: string, error: string): Promise<number>;
+  /** When the next attempt is due; `null` parks the event for a person to look at. */
+  scheduleRetry(eventId: string, at: Date | null): Promise<void>;
+  /**
+   * Whether this event has already been delivered.
+   *
+   * Asked before every delivery, because the backlog drain and the change
+   * stream overlap: the drain sends what accumulated during an outage, then the
+   * stream resumes from a token that predates it and yields the same rows
+   * again. Without this, every restart re-delivered its whole downtime window,
+   * and the in-memory idempotency guards on the consuming side are empty at
+   * exactly that moment.
+   */
+  isDelivered(eventId: string): Promise<boolean>;
   loadResumeToken(): Promise<unknown | null>;
   saveResumeToken(token: unknown): Promise<void>;
   /** Yields inserts as they happen, resuming from the token when there is one. */
@@ -92,6 +115,12 @@ export class OutboxRelay {
   /** One event. Returns whether it came through cleanly. */
   async deliver(event: DomainEvent): Promise<boolean> {
     try {
+      // The drain and the stream overlap after a restart, so the same row can
+      // arrive twice within seconds. Delivery is at-least-once by design, but
+      // systematically re-sending a whole downtime window is not the same thing
+      // as tolerating the occasional repeat.
+      if (await this.deps.store.isDelivered(event.eventId)) return true;
+
       // In-process handlers first: they are the platform's own reactions, and a
       // failing webhook must not stop them.
       await this.deps.publish(event);
@@ -101,15 +130,14 @@ export class OutboxRelay {
       const failed = outcomes.filter((outcome) => !outcome.ok);
 
       if (failed.length > 0) {
-        const attempts = 1;
-        const next = nextAttemptAfter(attempts);
         const reason = failed.map((outcome) => `${outcome.url}: ${outcome.error}`).join('; ');
-        await this.deps.store.markFailed(event.eventId, reason, next.at);
-        if (next.parked) {
-          this.logger.error(
-            `${event.name} (${event.eventId}) parked after exhausting the retry ladder: ${reason}`,
-          );
-        }
+        await this.recordAndSchedule(event, reason);
+        // Still `ok`, deliberately. This heartbeat answers "is the relay
+        // looping", and it is — a subscriber nobody can reach is a delivery
+        // problem, and reporting it here would make every n8n hiccup look like
+        // an outage of the platform. An exhausted ladder is logged as an error
+        // by `recordAndSchedule`; a health signal of its own belongs with the
+        // admin overview's ingestion view, not to this counter.
         await this.deps.heartbeat(true);
         return false;
       }
@@ -119,9 +147,22 @@ export class OutboxRelay {
       return true;
     } catch (error) {
       const message = (error as Error).message;
-      await this.deps.store.markFailed(event.eventId, message, nextAttemptAfter(1).at);
+      await this.recordAndSchedule(event, message);
       await this.deps.heartbeat(false, message);
       return false;
+    }
+  }
+
+  /** Counts the failure, then puts the next attempt where the ladder says. */
+  private async recordAndSchedule(event: DomainEvent, reason: string): Promise<void> {
+    const attempts = await this.deps.store.recordFailure(event.eventId, reason);
+    const next = nextAttemptAfter(attempts);
+    await this.deps.store.scheduleRetry(event.eventId, next.at);
+
+    if (next.parked) {
+      this.logger.error(
+        `${event.name} (${event.eventId}) parked after ${attempts} attempts: ${reason}`,
+      );
     }
   }
 }

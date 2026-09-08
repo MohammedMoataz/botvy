@@ -24,6 +24,8 @@ class FakeRelayStore implements RelayStore {
   failed: Array<{ eventId: string; error: string; nextAttemptAt: Date | null }> = [];
   savedTokens: unknown[] = [];
   resumeToken: unknown = null;
+  /** How many attempts each event has already burned, as a real store records. */
+  attempts = new Map<string, number>();
 
   async drain(limit: number): Promise<DomainEvent[]> {
     const batch = this.pending.slice(0, limit);
@@ -33,8 +35,18 @@ class FakeRelayStore implements RelayStore {
   async markDelivered(eventId: string): Promise<void> {
     this.delivered.push(eventId);
   }
-  async markFailed(eventId: string, error: string, nextAttemptAt: Date | null): Promise<void> {
-    this.failed.push({ eventId, error, nextAttemptAt });
+  async recordFailure(eventId: string, error: string): Promise<number> {
+    const attempts = (this.attempts.get(eventId) ?? 0) + 1;
+    this.attempts.set(eventId, attempts);
+    this.failed.push({ eventId, error, nextAttemptAt: null });
+    return attempts;
+  }
+  async scheduleRetry(eventId: string, at: Date | null): Promise<void> {
+    const last = this.failed.findLast((entry) => entry.eventId === eventId);
+    if (last) last.nextAttemptAt = at;
+  }
+  async isDelivered(eventId: string): Promise<boolean> {
+    return this.delivered.includes(eventId);
   }
   async loadResumeToken(): Promise<unknown | null> {
     return this.resumeToken;
@@ -192,6 +204,52 @@ describe('outbox relay', () => {
     await relay.drainBacklog();
 
     expect(relay.lastLoopAt().getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  /**
+   * The ladder was dead code: `deliver` passed a hard-coded attempt count of 1,
+   * so every retry landed a minute out and the five-minute, thirty-minute and
+   * two-hour rungs were unreachable. A subscription that stays broken therefore
+   * never parked and never produced the error a person is supposed to see.
+   */
+  it('walks the backoff ladder as attempts accumulate, and parks at the end', async () => {
+    const refusing: HttpPost = async () => ({ ok: false, status: 500 });
+    const { relay } = relayWith(store, refusing);
+    const failing = event('e1');
+
+    for (let attempt = 0; attempt < 5; attempt += 1) await relay.deliver(failing);
+
+    const gaps = store.failed.map((entry) =>
+      entry.nextAttemptAt === null
+        ? 'parked'
+        : entry.nextAttemptAt.getTime() - Date.now() > 3_500_000
+          ? '2h'
+          : entry.nextAttemptAt.getTime() - Date.now() > 900_000
+            ? '30m'
+            : entry.nextAttemptAt.getTime() - Date.now() > 120_000
+              ? '5m'
+              : '1m',
+    );
+
+    expect(gaps).toEqual(['1m', '5m', '30m', '2h', 'parked']);
+  });
+
+  /**
+   * The drain and the change stream overlap after a restart: the drain sends
+   * what accumulated, then the stream resumes from a token that predates it and
+   * yields the same rows. Without this check every restart re-delivered its
+   * whole downtime window, and the consumers' in-memory guards are empty at
+   * precisely that moment.
+   */
+  it('does not deliver an event twice when the drain and the stream overlap', async () => {
+    store.pending = [event('e1')];
+    store.streamed = [{ event: event('e1'), token: { _data: 'again' } }];
+    const { relay, published } = relayWith(store, deliveringPost);
+
+    await relay.run();
+
+    expect(published.map((e) => e.eventId)).toEqual(['e1']);
+    expect(store.delivered).toEqual(['e1']);
   });
 
   it('delivers nothing for an event no subscription matches, and still marks it done', async () => {

@@ -4,9 +4,18 @@ import { RelayRuntime, type RelayLoop } from './relay.runtime.js';
 /** A relay whose run() the test settles by hand. */
 class ScriptedRelay implements RelayLoop {
   runs = 0;
+  drains = 0;
+  drainThrows: string | null = null;
+  drainReturns = 0;
   #resolve: (() => void) | null = null;
   #reject: ((error: Error) => void) | null = null;
   #last = new Date(0);
+
+  async drainBacklog(): Promise<number> {
+    this.drains += 1;
+    if (this.drainThrows) throw new Error(this.drainThrows);
+    return this.drainReturns;
+  }
 
   run(): Promise<void> {
     this.runs += 1;
@@ -48,6 +57,7 @@ function runtime(relay: ScriptedRelay) {
     heartbeat: async (ok, error) => { beats.push(error ? { ok, error } : { ok }); },
     sleep: async () => {},
     aliveEveryMs: 60_000,
+    retryEveryMs: 60_000,
   });
   return { rt, beats, forwarder };
 }
@@ -95,6 +105,51 @@ describe('RelayRuntime', () => {
     relay.delivered(future);
     expect(rt.lastLoopAt()).toEqual(future);
     await rt.stop();
+  });
+
+  /**
+   * The change stream only yields inserts, so an event deferred to a retry is
+   * invisible to it. `run()` drained once at startup and then blocked, which
+   * meant a webhook that failed a single time waited for the next process
+   * restart — with `/health` reporting nothing wrong the whole time.
+   */
+  it('sweeps for events whose retry has come due', async () => {
+    const relay = new ScriptedRelay();
+    const { rt } = runtime(relay);
+    rt.start();
+    await flush();
+    const afterStartup = relay.drains;
+
+    relay.drainReturns = 2;
+    await rt.retryDue();
+
+    expect(relay.drains).toBe(afterStartup + 1);
+    await rt.stop();
+  });
+
+  /** A timer whose rejection escapes takes the worker down with it. */
+  it('survives a retry sweep that throws', async () => {
+    const relay = new ScriptedRelay();
+    const { rt } = runtime(relay);
+    rt.start();
+    await flush();
+
+    relay.drainThrows = 'mongo went away';
+    await expect(rt.retryDue()).resolves.toBeUndefined();
+    await rt.stop();
+  });
+
+  it('does not sweep once stopped', async () => {
+    const relay = new ScriptedRelay();
+    const { rt } = runtime(relay);
+    rt.start();
+    await flush();
+    await rt.stop();
+    const afterStop = relay.drains;
+
+    await rt.retryDue();
+
+    expect(relay.drains).toBe(afterStop);
   });
 
   it('is a no-op in generation mode', () => {

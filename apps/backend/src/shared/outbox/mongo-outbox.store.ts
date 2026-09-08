@@ -65,11 +65,26 @@ export class MongoOutboxStore implements RelayStore {
     await this.outbox.updateOne({ eventId }, { $set: { deliveredAt: new Date(), lastError: null } });
   }
 
-  async markFailed(eventId: string, error: string, nextAttemptAt: Date | null): Promise<void> {
-    await this.outbox.updateOne(
-      { eventId },
-      { $set: { lastError: error, nextAttemptAt }, $inc: { attempts: 1 } },
-    );
+  async recordFailure(eventId: string, error: string): Promise<number> {
+    // `new: true` so the count that comes back is the one just written. Reading
+    // it afterwards would be a second query racing the first.
+    const row = await this.outbox
+      .findOneAndUpdate({ eventId }, { $set: { lastError: error }, $inc: { attempts: 1 } }, { new: true })
+      .lean<OutboxDoc>()
+      .exec();
+    return row?.attempts ?? 1;
+  }
+
+  async scheduleRetry(eventId: string, at: Date | null): Promise<void> {
+    await this.outbox.updateOne({ eventId }, { $set: { nextAttemptAt: at } });
+  }
+
+  async isDelivered(eventId: string): Promise<boolean> {
+    const row = await this.outbox
+      .findOne({ eventId }, { deliveredAt: 1 })
+      .lean<Pick<OutboxDoc, 'deliveredAt'>>()
+      .exec();
+    return row?.deliveredAt != null;
   }
 
   async loadResumeToken(): Promise<unknown | null> {

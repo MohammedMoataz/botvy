@@ -11,6 +11,8 @@ export interface RelayLoop {
   run(): Promise<void>;
   stop(): void;
   lastLoopAt(): Date;
+  /** Everything waiting whose retry time has come. Returns how many it sent. */
+  drainBacklog(): Promise<number>;
 }
 
 export interface Forwarder {
@@ -27,9 +29,20 @@ export interface RelayRuntimeDeps {
   /** For the specs; production leaves it undefined. */
   sleep?: (ms: number) => Promise<void>;
   aliveEveryMs?: number;
+  retryEveryMs?: number;
 }
 
 export const RELAY_ALIVE_EVERY_MS = 30_000;
+/**
+ * How often to look for events whose retry is due.
+ *
+ * The change stream only yields *inserts*, so a deferred retry is invisible to
+ * it: `run()` drained the backlog once at startup and then blocked forever, and
+ * a webhook that failed a single time waited for the next process restart. The
+ * shortest rung of the ladder is a minute, so checking every minute is the
+ * coarsest interval that can honour it.
+ */
+export const RELAY_RETRY_EVERY_MS = 60_000;
 const RESTART_MIN_MS = 1_000;
 const RESTART_MAX_MS = 30_000;
 const STOP_WAIT_MS = 5_000;
@@ -52,6 +65,7 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
   #running = false;
   #lastAliveAt = new Date(0);
   #timer: NodeJS.Timeout | null = null;
+  #retryTimer: NodeJS.Timeout | null = null;
   #loop: Promise<void> | null = null;
 
   constructor(private readonly deps: RelayRuntimeDeps) {}
@@ -69,6 +83,10 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
     const every = this.deps.aliveEveryMs ?? RELAY_ALIVE_EVERY_MS;
     this.#timer = setInterval(() => void this.tick(), every);
     this.#timer.unref?.();
+
+    const retryEvery = this.deps.retryEveryMs ?? RELAY_RETRY_EVERY_MS;
+    this.#retryTimer = setInterval(() => void this.retryDue(), retryEvery);
+    this.#retryTimer.unref?.();
   }
 
   async onApplicationShutdown(): Promise<void> {
@@ -79,6 +97,8 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
     this.#stopped = true;
     if (this.#timer) clearInterval(this.#timer);
     this.#timer = null;
+    if (this.#retryTimer) clearInterval(this.#retryTimer);
+    this.#retryTimer = null;
     this.deps.forwarder.stop();
     this.deps.relay.stop();
     await this.deps.closeStore();
@@ -95,6 +115,23 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
     if (!this.#running) return;
     this.#lastAliveAt = new Date();
     await this.deps.heartbeat(true);
+  }
+
+  /**
+   * Sends whatever is now due for a retry.
+   *
+   * A failure to drain is logged and swallowed: this is a timer, and an
+   * unhandled rejection from one takes the worker down. The relay's own
+   * heartbeat is what reports the trouble.
+   */
+  async retryDue(): Promise<void> {
+    if (this.#stopped) return;
+    try {
+      const sent = await this.deps.relay.drainBacklog();
+      if (sent > 0) this.logger.log(`retried ${sent} deferred event${sent === 1 ? '' : 's'}`);
+    } catch (error) {
+      this.logger.warn(`retry sweep failed: ${(error as Error).message}`);
+    }
   }
 
   lastLoopAt(): Date {
@@ -116,6 +153,12 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
       try {
         await this.deps.relay.run();
         delay = RESTART_MIN_MS;
+        // A clean return, not an error: a change stream can end rather than
+        // throw when the connection goes. Without a pause here the loop
+        // reopened a stream as fast as the event loop allowed and pinned a core
+        // — a failure that looks like a busy worker rather than a broken one.
+        this.#running = false;
+        if (!this.#stopped) await sleep(RESTART_MIN_MS);
       } catch (error) {
         this.#running = false;
         const message = (error as Error).message;
