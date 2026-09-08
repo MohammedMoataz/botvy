@@ -12,33 +12,25 @@
  * and the only way to know is to run it again and watch nothing change.
  */
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
+import { envFileArgs, loadEnvFiles } from './env.mjs';
+
+// Before anything below reads process.env.
+loadEnvFiles();
 
 const run = promisify(execFile);
 const startedAt = Date.now();
-const API = process.env.BOTVY_API_BASE ?? 'http://127.0.0.1';
+// The edge's published port is an `.env` value, because v1 holds 80 on a host
+// that still has it installed. Defaulting to port 80 here sent both scripts
+// at whatever already answers there - v1's own edge, on this machine - and a
+// /health that answers is indistinguishable from the right /health answering.
+const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
 };
-
-/**
- * The same `--env-file` list the documented run uses.
- *
- * A host where v1 is still installed keeps the four genuinely conflicting
- * variables in `.env.v2`, read second so it wins. Reading only `.env` here
- * would have this script resolve a different DATABASE_URL than the containers
- * it is checking, which is the sort of difference that makes a green gate mean
- * nothing.
- */
-function envFileArgs() {
-  const files = ['.env'];
-  if (existsSync('.env.v2')) files.push('.env.v2');
-  return files.flatMap((file) => ['--env-file', file]);
-}
 
 async function compose(...args) {
   return run('docker', ['compose', ...envFileArgs(), '-f', 'infra/docker-compose.yml', ...args], {
@@ -126,11 +118,20 @@ async function checkHealth() {
 async function checkBootstrapIsRepeatable() {
   try {
     const { stdout } = await run('node', ['infra/bootstrap.mjs'], { maxBuffer: 16 * 1024 * 1024 });
-    const created = stdout.split('\n').filter((line) => /\bapplied\b/.test(line) && !/already/.test(line));
+    // The script counts what it changed and prints the number. Reading the log
+    // for a word instead - which this used to do - meant a step that reworded
+    // its success line would silently turn the check off.
+    const reported = /changes=(\d+)/.exec(stdout);
+    if (!reported) {
+      return record('bootstrap is safe to run again', false, 'the run printed no changes= count');
+    }
+    const changed = Number(reported[1]);
     record(
       'bootstrap is safe to run again',
-      created.length === 0,
-      created.length === 0 ? 'second run created nothing' : `second run changed things: ${created.join('; ')}`,
+      changed === 0,
+      changed === 0
+        ? 'second run changed nothing'
+        : `second run changed ${changed} thing${changed === 1 ? '' : 's'}`,
     );
   } catch (error) {
     record('bootstrap is safe to run again', false, error.stdout?.trim() || error.message);

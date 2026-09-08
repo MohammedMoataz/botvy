@@ -12,19 +12,43 @@
  * system that already has data.
  */
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { envFileArgs, loadEnvFiles } from './env.mjs';
+
+// Before anything below reads process.env.
+loadEnvFiles();
 
 const run = promisify(execFile);
 
-const API = process.env.BOTVY_API_BASE ?? 'http://127.0.0.1';
-const N8N = process.env.N8N_PUBLIC_URL ?? 'http://127.0.0.1:5679';
+// The edge's published port is an `.env` value, because v1 holds 80 on a host
+// that still has it installed. Defaulting to port 80 here sent both scripts
+// at whatever already answers there - v1's own edge, on this machine - and a
+// /health that answers is indistinguishable from the right /health answering.
+const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+// n8n's editor is published on a loopback address that `.env` sets, and this
+// script talks to it from the host. Hard-coding 5679 meant that a host which
+// moved the bind - as one running v1's n8n alongside must - had this script
+// quietly probing v1's n8n instead of v2's.
+const N8N =
+  process.env.N8N_PUBLIC_URL ??
+  `http://${process.env.N8N_BIND ?? '127.0.0.1:5679'}`;
 const INTERNAL_TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? '';
 const WORKFLOW_DIR = process.env.WORKFLOW_DIR ?? 'workflows';
 
 let failed = false;
+
+/**
+ * How many things this run actually changed.
+ *
+ * The gate re-runs the whole script and requires this to be zero, which is the
+ * only way "idempotent" is ever more than a claim. Counting is better than
+ * reading the log for a word: a step that starts phrasing its success
+ * differently would otherwise quietly turn the check off.
+ */
+let changes = 0;
+
 const step = (name) => ({
   ok: (detail = '') => console.log(`  ok    ${name}${detail ? ` — ${detail}` : ''}`),
   skip: (why) => console.log(`  skip  ${name} — ${why}`),
@@ -49,21 +73,6 @@ async function waitFor(name, probe, { attempts = 60, everyMs = 2000 } = {}) {
   }
   s.fail(`still not ready after ${attempts} attempts`);
   return false;
-}
-
-/**
- * The same `--env-file` list the documented run uses.
- *
- * A host where v1 is still installed keeps the four genuinely conflicting
- * variables in `.env.v2`, read second so it wins. Reading only `.env` here
- * would have this script resolve a different DATABASE_URL than the containers
- * it is checking, which is the sort of difference that makes a green gate mean
- * nothing.
- */
-function envFileArgs() {
-  const files = ['.env'];
-  if (existsSync('.env.v2')) files.push('.env.v2');
-  return files.flatMap((file) => ['--env-file', file]);
 }
 
 async function compose(...args) {
@@ -99,7 +108,9 @@ async function migrate() {
     try {
       const { stdout } = await compose(...args);
       // "No pending migrations" on a second run is the whole point.
-      s.ok(stdout.includes('No pending') ? 'already applied' : 'applied');
+      const pending = !stdout.includes('No pending');
+      if (pending) changes += 1;
+      s.ok(pending ? 'applied' : 'already applied');
     } catch (error) {
       s.fail(error.stderr?.trim() || error.message);
     }
@@ -140,6 +151,49 @@ async function verifyServiceClient() {
   }
 }
 
+/** One call against n8n's public API, with the key attached. */
+async function n8n(path, init = {}) {
+  return fetch(`${N8N}/api/v1${path}`, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      'X-N8N-API-KEY': process.env.N8N_API_KEY,
+      ...(init.headers ?? {}),
+    },
+  });
+}
+
+/** Every workflow n8n already holds, by name, following the cursor to the end. */
+async function workflowsByName() {
+  const byName = new Map();
+  let cursor;
+  do {
+    const query = cursor ? `?limit=100&cursor=${encodeURIComponent(cursor)}` : '?limit=100';
+    const response = await n8n(`/workflows${query}`);
+    if (!response.ok) throw new Error(`listing workflows: HTTP ${response.status}`);
+    const page = await response.json();
+    for (const workflow of page.data ?? []) byName.set(workflow.name, workflow);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return byName;
+}
+
+/**
+ * Imports the committed workflows, updating rather than adding.
+ *
+ * `POST /workflows` creates unconditionally — it does not conflict on a name —
+ * so posting on every run would leave a host with a growing pile of identical
+ * "Botvy Ping Echo" workflows, several of them bound to the same webhook path.
+ * The name is the identity here, so the run looks up what is already there and
+ * PUTs onto the match.
+ *
+ * Two things beyond the import itself. An imported workflow arrives inactive,
+ * and an inactive workflow's webhook returns 404 — so the ones that are meant
+ * to listen are activated explicitly. And `settings.errorWorkflow` needs the
+ * handler's server-assigned id, which does not exist until the handler is
+ * imported; error_handler therefore goes first and the rest are stamped with
+ * the id it came back with.
+ */
 async function importWorkflows() {
   const s = step('n8n workflows imported');
   if (!process.env.N8N_API_KEY) return s.skip('N8N_API_KEY not set; import by hand from the editor');
@@ -155,19 +209,68 @@ async function importWorkflows() {
     return s.skip(`no ${WORKFLOW_DIR}/ directory`);
   }
 
+  let existing;
+  try {
+    existing = await workflowsByName();
+  } catch (error) {
+    return s.fail(error.message);
+  }
+
+  let created = 0;
+  let updated = 0;
+  let activated = 0;
+  let errorWorkflowId;
+
   for (const file of files) {
     const body = JSON.parse(await readFile(join(WORKFLOW_DIR, file), 'utf8'));
-    const response = await fetch(`${N8N}/api/v1/workflows`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-N8N-API-KEY': process.env.N8N_API_KEY },
-      body: JSON.stringify(body),
-    });
-    // A workflow that is already there is not an error on a re-run.
-    if (!response.ok && response.status !== 400 && response.status !== 409) {
-      return s.fail(`${file}: HTTP ${response.status}`);
+    const isErrorHandler = file.startsWith('error_handler');
+
+    if (!isErrorHandler && errorWorkflowId) {
+      body.settings = { ...(body.settings ?? {}), errorWorkflow: errorWorkflowId };
+    }
+
+    // n8n rejects a body carrying read-only fields, and a file that has been
+    // exported from the editor rather than hand-written will carry them.
+    const payload = {
+      name: body.name,
+      nodes: body.nodes,
+      connections: body.connections,
+      settings: body.settings ?? {},
+    };
+
+    const match = existing.get(body.name);
+    const response = match
+      ? await n8n(`/workflows/${match.id}`, { method: 'PUT', body: JSON.stringify(payload) })
+      : await n8n('/workflows', { method: 'POST', body: JSON.stringify(payload) });
+
+    if (!response.ok) {
+      return s.fail(`${file}: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`);
+    }
+
+    const saved = await response.json();
+    if (match) {
+      updated += 1;
+    } else {
+      created += 1;
+      changes += 1;
+    }
+    if (isErrorHandler) errorWorkflowId = saved.id;
+
+    // A workflow with a trigger node is meant to be listening. The error
+    // handler is called by n8n itself and needs no activation.
+    const wantsActivation =
+      !isErrorHandler && (body.nodes ?? []).some((node) => /webhook|Trigger/i.test(node.type ?? ''));
+    if (wantsActivation && !saved.active) {
+      const activation = await n8n(`/workflows/${saved.id}/activate`, { method: 'POST' });
+      if (!activation.ok) {
+        return s.fail(`${file}: activate returned HTTP ${activation.status}`);
+      }
+      activated += 1;
+      changes += 1;
     }
   }
-  s.ok(`${files.length} workflow${files.length === 1 ? '' : 's'}`);
+
+  s.ok(`${files.length} file${files.length === 1 ? '' : 's'}: ${created} created, ${updated} updated, ${activated} activated`);
 }
 
 async function reportHealth() {
@@ -196,5 +299,5 @@ if (await waitForStores()) {
   }
 }
 
-console.log(failed ? 'bootstrap finished with failures' : 'bootstrap complete');
+console.log(`${failed ? 'bootstrap finished with failures' : 'bootstrap complete'} — changes=${changes}`);
 process.exit(failed ? 1 : 0);
