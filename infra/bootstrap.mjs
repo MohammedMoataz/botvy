@@ -129,26 +129,62 @@ async function waitForApi() {
  * has no admin sign-in through which the create-service-client command could be
  * called, and writing the table from here would break principle I.
  *
- * Anything but 401 means the credential was recognised. A 400 for a malformed
- * body is a pass — it proves authentication happened before validation.
+ * Run from *inside* the backend container, not from the host. `/internal/*` is
+ * deliberately absent from the Caddyfile — machine routes are not part of the
+ * public surface — so probing through the edge reached the web app instead and
+ * got a 404 back. This step used to treat anything but 401 as a pass, so it
+ * reported "ok HTTP 404" and the gate went green on a credential nobody had
+ * checked: precisely the silent-401-between-n8n-and-the-gateway failure the
+ * project has already been bitten by once.
+ *
+ * The token goes through `-e` rather than into the script text, so it does not
+ * appear in the container's process list.
  */
+const SERVICE_PROBE = `
+  fetch('http://127.0.0.1:8080/internal/alerts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-service-token': process.env.PROBE_TOKEN },
+    body: JSON.stringify({ workflow: 'bootstrap-probe', error: 'verifying the credential' }),
+  })
+    .then((response) => console.log(response.status))
+    .catch((error) => console.log('ERR ' + error.message));
+`;
+
 async function verifyServiceClient() {
   const s = step('n8n service client answers');
-  if (!INTERNAL_TOKEN) return s.skip('INTERNAL_SERVICE_TOKEN not set in this shell');
+  if (!INTERNAL_TOKEN) return s.skip('INTERNAL_SERVICE_TOKEN not set in .env or this shell');
 
+  let answer;
   try {
-    const response = await fetch(`${API}/internal/alerts`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-service-token': INTERNAL_TOKEN },
-      body: JSON.stringify({ workflow: 'bootstrap-probe', error: 'verifying the credential' }),
-    });
-    if (response.status === 401 || response.status === 403) {
-      return s.fail(`credential refused (HTTP ${response.status}); is INTERNAL_SERVICE_TOKEN the one the backend booted with?`);
-    }
-    s.ok(`HTTP ${response.status}`);
+    const { stdout } = await compose(
+      'exec',
+      '-T',
+      '-e',
+      `PROBE_TOKEN=${INTERNAL_TOKEN}`,
+      'backend',
+      'node',
+      '-e',
+      SERVICE_PROBE,
+    );
+    answer = stdout.trim().split('\n').pop()?.trim() ?? '';
   } catch (error) {
-    s.fail(error.message);
+    return s.fail(error.stderr?.trim() || error.message);
   }
+
+  if (answer.startsWith('ERR ')) return s.fail(answer.slice(4));
+
+  const status = Number(answer);
+  if (status === 401 || status === 403) {
+    return s.fail(
+      `credential refused (HTTP ${status}); is INTERNAL_SERVICE_TOKEN the one the backend booted with?`,
+    );
+  }
+  // A 404 is the route missing, not the credential passing, and that distinction
+  // is the whole point of this step.
+  if (status !== 200 && status !== 201) {
+    return s.fail(`HTTP ${answer} from /internal/alerts; expected 200 or 201`);
+  }
+  s.ok(`HTTP ${status}`);
 }
 
 /** One call against n8n's public API, with the key attached. */
@@ -158,7 +194,7 @@ async function n8n(path, init = {}) {
     headers: {
       'content-type': 'application/json',
       'X-N8N-API-KEY': process.env.N8N_API_KEY,
-      ...(init.headers ?? {}),
+      ...init.headers,
     },
   });
 }
@@ -226,7 +262,7 @@ async function importWorkflows() {
     const isErrorHandler = file.startsWith('error_handler');
 
     if (!isErrorHandler && errorWorkflowId) {
-      body.settings = { ...(body.settings ?? {}), errorWorkflow: errorWorkflowId };
+      body.settings = { ...body.settings, errorWorkflow: errorWorkflowId };
     }
 
     // n8n rejects a body carrying read-only fields, and a file that has been
