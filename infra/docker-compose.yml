@@ -119,12 +119,30 @@ services:
     networks: [botvy]
 
   postgres:
-    image: postgres:16-alpine
+    # Debian, not Alpine, and deliberately so: this is the data directory v1
+    # initialised, and v1 ran `postgres:16`. An Alpine build is musl, a Debian
+    # build is glibc, and their text collations are not the same — the server
+    # says so on every connection, and the mismatch is enough to make
+    # CREATE DATABASE fail outright:
+    #
+    #   WARNING:  database "botvy" has no actual collation version, but a version was recorded
+    #   ERROR:  template database "template1" has a collation version, but no
+    #           actual collation version could be determined
+    #
+    # An index built under one collation is not valid under the other, so this
+    # matters well beyond the warning. Identity carries over in this same
+    # database, which is the whole reason the store is shared; the image has to
+    # match the bytes on disk.
+    image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set it in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
       POSTGRES_DB: ${POSTGRES_DB:-botvy}
+      # Read by 001_create_databases.sh, which creates n8n's database on
+      # an empty data directory. Without it that script would create a
+      # database n8n is not configured to open.
+      N8N_DB: ${N8N_DB:-n8n}
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./postgres:/docker-entrypoint-initdb.d:ro
