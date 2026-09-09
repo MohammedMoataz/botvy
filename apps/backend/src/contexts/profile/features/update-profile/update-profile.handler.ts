@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { isValidTimezone } from '../../../../shared/time/time.js';
 import type { BodyMetric } from '../../domain/profile.aggregate.js';
 import { PhotoStore, ProfileRepository } from '../../domain/profile.repository.js';
@@ -49,6 +50,7 @@ export const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as
 @Injectable()
 export class UpdateProfileHandler {
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly profiles: ProfileRepository,
     private readonly photos: PhotoStore,
   ) {}
@@ -77,7 +79,7 @@ export class UpdateProfileHandler {
 
     // A patch that changed nothing is not saved and raises nothing: an idle
     // save from a client should not wake five contexts.
-    if (changed.length > 0) await this.profiles.save(profile);
+    if (changed.length > 0) await this.uow.run(() => this.profiles.save(profile));
     return { changed };
   }
 
@@ -96,7 +98,7 @@ export class UpdateProfileHandler {
     if (!profile) throw new ProfileNotFound();
 
     profile.recordMetric(metric);
-    await this.profiles.save(profile);
+    await this.uow.run(() => this.profiles.save(profile));
   }
 
   /**
@@ -125,12 +127,18 @@ export class UpdateProfileHandler {
     const previous = profile.photoPath;
     const photoPath = await this.photos.put(userId, bytes);
 
-    profile.update({ photoPath });
-    await this.profiles.save(profile);
+    await this.uow.run(async () => {
+      profile.update({ photoPath });
+      await this.profiles.save(profile);
 
-    if (previous && previous !== photoPath) {
-      await this.photos.remove(previous).catch(() => undefined);
-    }
+      // After the commit. The comment above says the old file goes second
+      // because an orphaned file costs disk where the other order costs the
+      // member their photo; a rolled-back transaction is that same argument
+      // with a worse ending, since the row would still point at the old path.
+      if (previous && previous !== photoPath) {
+        this.uow.onCommit(() => this.photos.remove(previous).catch(() => undefined));
+      }
+    });
 
     return { photoPath };
   }

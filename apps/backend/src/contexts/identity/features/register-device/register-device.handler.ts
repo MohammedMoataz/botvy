@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { newId } from '../../../../shared/cqrs/ids.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { Device } from '../../domain/device.aggregate.js';
 import { DeviceRepository, type DeviceKind } from '../../domain/device.repository.js';
 
@@ -40,9 +41,22 @@ export class DeviceNotFound extends Error {
 export class RegisterDeviceHandler {
   private readonly logger = new Logger(RegisterDeviceHandler.name);
 
-  constructor(private readonly devices: DeviceRepository) {}
+  constructor(
+    private readonly uow: UnitOfWork,
+    private readonly devices: DeviceRepository,
+  ) {}
 
   async handle(command: RegisterDeviceCommand, at: Date = new Date()): Promise<RegisteredDevice> {
+    // One transaction for the whole decision. The move branch below removes a
+    // row and creates another, and a crash between them would take a member's
+    // handset off the alert list without putting it back on anybody else's.
+    return this.uow.run(() => this.decide(command, at));
+  }
+
+  private async decide(
+    command: RegisterDeviceCommand,
+    at: Date,
+  ): Promise<RegisteredDevice> {
     const existing = await this.devices.findByInstallId(command.installId);
 
     if (existing && existing.userId === command.userId) {
@@ -85,7 +99,7 @@ export class RegisterDeviceHandler {
     if (!device) return null;
 
     device.seen(at);
-    await this.devices.save(device);
+    await this.uow.run(() => this.devices.save(device));
     return device.id;
   }
 
@@ -96,6 +110,6 @@ export class RegisterDeviceHandler {
     if (!device) throw new DeviceNotFound();
 
     device.remove(at);
-    await this.devices.remove(device);
+    await this.uow.run(() => this.devices.remove(device));
   }
 }

@@ -18,6 +18,10 @@ import {
   RegistrationClosed,
 } from './register.handler.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 const hasher: PasswordHasher = {
   async hash(plain) {
     return `hashed:${plain}`;
@@ -48,9 +52,10 @@ describe('register', () => {
   let handler: RegisterHandler;
 
   beforeEach(() => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     settings = new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter());
-    handler = new RegisterHandler(users, hasher, settings);
+    handler = new RegisterHandler(uow, users, hasher, settings);
   });
 
   it('creates the member and raises the event the other contexts bootstrap from', async () => {
@@ -139,11 +144,13 @@ describe('refresh rotation', () => {
   let userId: string;
 
   beforeEach(async () => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
     handler = new RefreshHandler(tokens, users, new JwtSigner(env), env as never);
 
     const registered = await new RegisterHandler(
+      uow,
       users,
       hasher,
       new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
@@ -230,7 +237,7 @@ describe('refresh rotation', () => {
     const opened = await handler.open(userId, null);
     const account = await users.findById(userId, userId);
     account?.ban('admin-1');
-    if (account) await users.save(account);
+    if (account) await uow.run(() => users.save(account));
 
     const rejected = await handler.handle(opened.refreshToken).catch((error: Error) => error);
 

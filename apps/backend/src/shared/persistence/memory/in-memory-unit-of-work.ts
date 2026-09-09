@@ -34,6 +34,35 @@ export class InMemoryUnitOfWork extends UnitOfWork {
     this.#participants.add(participant);
   }
 
+  /**
+   * Enlist an adapter whose whole state is a handful of Maps and Arrays.
+   *
+   * `InMemoryRepositoryBase` snapshots itself. Identity's adapters predate that
+   * base and keep differently shaped indexes - a Map by id here, an Array of
+   * rows there - so rather than each repeating the same six lines, they hand
+   * their containers over and this does it.
+   */
+  enlistState(...containers: Array<Map<string, unknown> | unknown[]>): void {
+    let saved: Array<Map<string, unknown> | unknown[]> = [];
+    this.enlist({
+      snapshot() {
+        saved = containers.map((c) => (Array.isArray(c) ? [...c] : new Map(c)));
+      },
+      restore() {
+        containers.forEach((container, index) => {
+          const copy = saved[index];
+          if (Array.isArray(container) && Array.isArray(copy)) {
+            container.length = 0;
+            container.push(...copy);
+          } else if (container instanceof Map && copy instanceof Map) {
+            container.clear();
+            for (const [key, value] of copy) container.set(key, value);
+          }
+        });
+      },
+    });
+  }
+
   async run<R>(work: () => Promise<R>): Promise<R> {
     this.#depth += 1;
     const outermost = this.#depth === 1;
@@ -69,8 +98,23 @@ export class InMemoryUnitOfWork extends UnitOfWork {
     this.#commitCallbacks.push(callback);
   }
 
-  /** Called by the in-memory repositories when they save an aggregate. */
+  /**
+   * Called by the in-memory repositories when they save an aggregate.
+   *
+   * It refuses outside a transaction, and that refusal is the point. An
+   * aggregate that raised events has a row *and* an outbox entry to write, and
+   * a handler that saves it without a unit of work makes those two independent
+   * statements - which is at-most-once delivery wearing an outbox. Three
+   * separate reviews found comments claiming "in the same transaction" above
+   * code that opened none; this is the claim made checkable.
+   */
   collect(events: DomainEvent[]): void {
+    if (events.length > 0 && this.#depth === 0) {
+      throw new Error(
+        `${events.length} event(s) were raised outside a unit of work. The aggregate ` +
+          'and its outbox entry have to commit together: wrap the write in uow.run().',
+      );
+    }
     this.events.push(...events);
   }
 

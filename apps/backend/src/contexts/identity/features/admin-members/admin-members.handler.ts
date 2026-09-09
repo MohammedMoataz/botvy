@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Principal, Role } from '../../../../shared/auth/principal.js';
 import { AuditPort } from '../../../operations/domain/audit.port.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { RefreshTokenRepository } from '../../domain/refresh-token.repository.js';
 import { UserRepository } from '../../domain/user.repository.js';
 
@@ -44,6 +45,7 @@ export class AdminMembersHandler {
   private readonly logger = new Logger(AdminMembersHandler.name);
 
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly users: UserRepository,
     private readonly tokens: RefreshTokenRepository,
     private readonly audit: AuditPort,
@@ -66,8 +68,11 @@ export class AdminMembersHandler {
     }
 
     user.setRole(role, actor.id);
-    await this.users.save(user);
+    await this.uow.run(() => this.users.save(user));
 
+    // The audit entry is deliberately outside the transaction: it lives in
+    // MongoDB and the member lives in PostgreSQL, and there is no transaction
+    // spanning both. Constitution I forbids inventing one.
     await this.audit.record({
       actor,
       action: 'admin.setRole',
@@ -103,8 +108,14 @@ export class AdminMembersHandler {
     }
 
     user.ban(actor.id, reason);
-    await this.users.save(user);
-    const sessionsEnded = await this.tokens.revokeAllForUser(userId);
+
+    // The ban and the revocations commit together. They are what makes a ban
+    // take effect now rather than in thirty days, so a crash that committed one
+    // without the other would leave a banned member still refreshing.
+    const sessionsEnded = await this.uow.run(async () => {
+      await this.users.save(user);
+      return this.tokens.revokeAllForUser(userId);
+    });
 
     await this.audit.record({
       actor,
@@ -137,7 +148,7 @@ export class AdminMembersHandler {
     }
 
     user.unban(actor.id);
-    await this.users.save(user);
+    await this.uow.run(() => this.users.save(user));
 
     await this.audit.record({
       actor,

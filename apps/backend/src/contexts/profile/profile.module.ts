@@ -5,6 +5,7 @@ import { ENV } from '../../shared/config/config.module.js';
 import type { Env } from '../../shared/config/env.schema.js';
 import type { OutboxInsert } from '../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../shared/persistence/mongo/mongo-unit-of-work.js';
+import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
 import {
   MODEL_NAMES,
   PreferencesSchema,
@@ -76,18 +77,20 @@ import {
     },
     {
       provide: BootstrapOnRegisteredHandler,
-      inject: [ProfileRepository, PreferencesRepository, SettingsService],
+      inject: [UnitOfWork, ProfileRepository, PreferencesRepository, SettingsService],
       useFactory: (
+        uow: UnitOfWork,
         profiles: ProfileRepository,
         preferences: PreferencesRepository,
         settings: SettingsService,
-      ) => new BootstrapOnRegisteredHandler(profiles, preferences, settings),
+      ) => new BootstrapOnRegisteredHandler(uow, profiles, preferences, settings),
     },
     UpdateProfileHandler,
     UpdatePreferencesHandler,
     ProfileQueryHandler,
     PurgeOnDeletedHandler,
     MongoUnitOfWork,
+    { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
   exports: [
     ProfileRepository,

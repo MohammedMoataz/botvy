@@ -19,6 +19,10 @@ import {
 } from '../change-password/change-password.handler.js';
 import { InvalidCredentials, SignInHandler } from './sign-in.handler.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 /** Reversible and instant. The real cost belongs to the scrypt adapter's spec. */
 const hasher: PasswordHasher = {
   async hash(plain) {
@@ -58,15 +62,17 @@ describe('sign-in', () => {
   let handler: SignInHandler;
 
   beforeEach(() => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
-    devices = new InMemoryDeviceRepository();
+    devices = new InMemoryDeviceRepository(uow);
     handler = new SignInHandler(
+      uow,
       users,
       hasher,
       new JwtSigner(env),
       new RefreshHandler(tokens, users, new JwtSigner(env), env as never),
-      new RegisterDeviceHandler(devices),
+      new RegisterDeviceHandler(uow, devices),
     );
   });
 
@@ -218,9 +224,10 @@ describe('change password', () => {
   let handler: ChangePasswordHandler;
 
   beforeEach(async () => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
-    handler = new ChangePasswordHandler(users, hasher, tokens);
+    handler = new ChangePasswordHandler(uow, users, hasher, tokens);
     await users.save(admin());
   });
 

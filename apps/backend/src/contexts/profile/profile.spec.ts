@@ -26,6 +26,10 @@ import {
   InMemoryProfileRepository,
 } from './infrastructure/in-memory-profile.repositories.js';
 
+import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 const NOW = new Date('2026-09-09T10:00:00.000Z');
 const OWNER = { kind: 'user', id: 'admin-1', role: 'admin' } as const;
 
@@ -53,10 +57,11 @@ describe('bootstrap on registered', () => {
   let handler: BootstrapOnRegisteredHandler;
 
   beforeEach(() => {
-    profiles = new InMemoryProfileRepository();
-    preferences = new InMemoryPreferencesRepository();
+    uow = new InMemoryUnitOfWork();
+    profiles = new InMemoryProfileRepository(uow);
+    preferences = new InMemoryPreferencesRepository(uow);
     settings = new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter());
-    handler = new BootstrapOnRegisteredHandler(profiles, preferences, settings);
+    handler = new BootstrapOnRegisteredHandler(uow, profiles, preferences, settings);
   });
 
   it('creates a profile and preferences from the registry defaults', async () => {
@@ -87,7 +92,7 @@ describe('bootstrap on registered', () => {
     await handler.handle(registered('user-1'));
     const prefs = await preferences.find('user-1');
     prefs?.patch({ morningBriefingTime: '06:30' });
-    if (prefs) await preferences.save(prefs);
+    if (prefs) await uow.run(() => preferences.save(prefs));
 
     await handler.handle(registered('user-1'));
 
@@ -124,7 +129,7 @@ describe('bootstrap on registered', () => {
 
     const first = await preferences.find('user-1');
     first?.patch({ leadTimes: ['15m'] });
-    if (first) await preferences.save(first);
+    if (first) await uow.run(() => preferences.save(first));
 
     expect((await preferences.find('user-2'))?.leadTimes).toEqual(['1h', '0m']);
   });
@@ -152,9 +157,10 @@ describe('update profile', () => {
   let handler: UpdateProfileHandler;
 
   beforeEach(async () => {
-    profiles = new InMemoryProfileRepository();
+    uow = new InMemoryUnitOfWork();
+    profiles = new InMemoryProfileRepository(uow);
     photos = new InMemoryPhotoStore();
-    handler = new UpdateProfileHandler(profiles, photos);
+    handler = new UpdateProfileHandler(uow, profiles, photos);
     await profiles.save(
       Profile.create({
         userId: 'user-1',
@@ -293,10 +299,12 @@ describe('update preferences', () => {
   let handler: UpdatePreferencesHandler;
 
   beforeEach(async () => {
-    preferences = new InMemoryPreferencesRepository();
-    handler = new UpdatePreferencesHandler(preferences);
+    uow = new InMemoryUnitOfWork();
+    preferences = new InMemoryPreferencesRepository(uow);
+    handler = new UpdatePreferencesHandler(uow, preferences);
     await new BootstrapOnRegisteredHandler(
-      new InMemoryProfileRepository(),
+      uow,
+      new InMemoryProfileRepository(uow),
       preferences,
       new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
     ).handle(registered('user-1'));
@@ -383,10 +391,12 @@ describe('profile query', () => {
   let query: ProfileQueryHandler;
 
   beforeEach(async () => {
-    profiles = new InMemoryProfileRepository();
-    preferences = new InMemoryPreferencesRepository();
+    uow = new InMemoryUnitOfWork();
+    profiles = new InMemoryProfileRepository(uow);
+    preferences = new InMemoryPreferencesRepository(uow);
     query = new ProfileQueryHandler(profiles, preferences);
     await new BootstrapOnRegisteredHandler(
+      uow,
       profiles,
       preferences,
       new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
@@ -410,7 +420,7 @@ describe('profile query', () => {
   it('includes them once they are set', async () => {
     const profile = await profiles.find('user-1');
     profile?.update({ displayName: 'Owner', allergies: ['peanuts'] });
-    if (profile) await profiles.save(profile);
+    if (profile) await uow.run(() => profiles.save(profile));
 
     const view = await query.profile('user-1');
 
@@ -433,7 +443,7 @@ describe('profile query', () => {
   it('always spells out allergies in the prompt summary', async () => {
     const profile = await profiles.find('user-1');
     profile?.update({ allergies: ['peanuts', 'shellfish'] });
-    if (profile) await profiles.save(profile);
+    if (profile) await uow.run(() => profiles.save(profile));
 
     expect(await query.summary('user-1')).toContain('Allergies: peanuts, shellfish');
   });
@@ -454,11 +464,13 @@ describe('purge on deleted', () => {
   let handler: PurgeOnDeletedHandler;
 
   beforeEach(async () => {
-    profiles = new InMemoryProfileRepository();
-    preferences = new InMemoryPreferencesRepository();
+    uow = new InMemoryUnitOfWork();
+    profiles = new InMemoryProfileRepository(uow);
+    preferences = new InMemoryPreferencesRepository(uow);
     photos = new InMemoryPhotoStore();
-    handler = new PurgeOnDeletedHandler(profiles, preferences, photos);
+    handler = new PurgeOnDeletedHandler(uow, profiles, preferences, photos);
     await new BootstrapOnRegisteredHandler(
+      uow,
       profiles,
       preferences,
       new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
@@ -481,7 +493,7 @@ describe('purge on deleted', () => {
     const photoPath = await photos.put('user-1', Buffer.from('bytes'));
     const profile = await profiles.find('user-1');
     profile?.update({ photoPath });
-    if (profile) await profiles.save(profile);
+    if (profile) await uow.run(() => profiles.save(profile));
 
     await handler.handle(deleted('user-1'));
 
@@ -497,6 +509,7 @@ describe('purge on deleted', () => {
 
   it('leaves another member alone', async () => {
     await new BootstrapOnRegisteredHandler(
+      uow,
       profiles,
       preferences,
       new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),

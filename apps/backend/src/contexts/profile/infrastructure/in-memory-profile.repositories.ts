@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { InMemoryUnitOfWork } from '../../../shared/persistence/memory/in-memory-unit-of-work.js';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
 import { Preferences, type PreferencesState } from '../domain/preferences.aggregate.js';
 import { Profile, type ProfileState } from '../domain/profile.aggregate.js';
@@ -21,13 +22,18 @@ export class InMemoryProfileRepository extends ProfileRepository {
   readonly rows = new Map<string, ProfileState>();
   readonly events: DomainEvent[] = [];
 
+  constructor(private readonly uow: InMemoryUnitOfWork) {
+    super();
+    this.uow.enlistState(this.rows, this.events);
+  }
+
   async find(userId: string): Promise<Profile | null> {
     const row = this.rows.get(userId);
     return row ? Profile.rehydrate(structuredClone(row)) : null;
   }
 
   async save(profile: Profile): Promise<void> {
-    this.events.push(...profile.pullEvents());
+    this.#raise(profile.pullEvents());
     this.rows.set(profile.userId, {
       userId: profile.userId,
       displayName: profile.displayName,
@@ -48,6 +54,11 @@ export class InMemoryProfileRepository extends ProfileRepository {
   async remove(userId: string): Promise<boolean> {
     return this.rows.delete(userId);
   }
+
+  #raise(events: DomainEvent[]): void {
+    this.uow.collect(events);
+    this.events.push(...events);
+  }
 }
 
 @Injectable()
@@ -55,13 +66,18 @@ export class InMemoryPreferencesRepository extends PreferencesRepository {
   readonly rows = new Map<string, PreferencesState>();
   readonly events: DomainEvent[] = [];
 
+  constructor(private readonly uow: InMemoryUnitOfWork) {
+    super();
+    this.uow.enlistState(this.rows, this.events);
+  }
+
   async find(userId: string): Promise<Preferences | null> {
     const row = this.rows.get(userId);
     return row ? Preferences.rehydrate(structuredClone(row)) : null;
   }
 
   async save(preferences: Preferences): Promise<void> {
-    this.events.push(...preferences.pullEvents());
+    this.#raise(preferences.pullEvents());
     this.rows.set(preferences.userId, {
       userId: preferences.userId,
       planTomorrowTime: preferences.planTomorrowTime,
@@ -82,6 +98,11 @@ export class InMemoryPreferencesRepository extends PreferencesRepository {
 
   async remove(userId: string): Promise<boolean> {
     return this.rows.delete(userId);
+  }
+
+  #raise(events: DomainEvent[]): void {
+    this.uow.collect(events);
+    this.events.push(...events);
   }
 }
 

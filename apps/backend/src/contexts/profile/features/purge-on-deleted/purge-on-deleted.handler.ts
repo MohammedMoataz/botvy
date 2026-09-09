@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
 import {
   PhotoStore,
@@ -26,6 +27,7 @@ export class PurgeOnDeletedHandler {
   private readonly logger = new Logger(PurgeOnDeletedHandler.name);
 
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly profiles: ProfileRepository,
     private readonly preferences: PreferencesRepository,
     private readonly photos: PhotoStore,
@@ -38,15 +40,17 @@ export class PurgeOnDeletedHandler {
       return 'nothing-to-do';
     }
 
-    const profile = await this.profiles.find(userId);
-    const photoPath = profile?.photoPath ?? null;
+    const [profileRemoved, preferencesRemoved] = await this.uow.run(async () => {
+      const profile = await this.profiles.find(userId);
+      const photoPath = profile?.photoPath ?? null;
 
-    const [profileRemoved, preferencesRemoved] = await Promise.all([
-      this.profiles.remove(userId),
-      this.preferences.remove(userId),
-    ]);
+      // After the commit, not inside it. Deleting the file is the one step here
+      // that cannot be rolled back, so it must not happen for a transaction
+      // that then fails - the member would keep their row and lose their photo.
+      if (photoPath) this.uow.onCommit(() => this.photos.remove(photoPath));
 
-    if (photoPath) await this.photos.remove(photoPath);
+      return Promise.all([this.profiles.remove(userId), this.preferences.remove(userId)]);
+    });
 
     if (!profileRemoved && !preferencesRemoved) return 'nothing-to-do';
 

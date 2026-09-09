@@ -25,6 +25,10 @@ import {
   RegistrationClosedForGoogle,
 } from './google-sign-in.handler.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 const NOW = new Date('2026-09-09T10:00:00.000Z');
 
 const hasher: PasswordHasher = {
@@ -87,17 +91,19 @@ describe('google sign-in', () => {
   let handler: GoogleSignInHandler;
 
   beforeEach(() => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
-    devices = new InMemoryDeviceRepository();
+    devices = new InMemoryDeviceRepository(uow);
     google = new FakeGoogle();
     settings = new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter());
     handler = new GoogleSignInHandler(
+      uow,
       users,
       google,
       new JwtSigner(env),
       new RefreshHandler(tokens, users, new JwtSigner(env), env as never),
-      new RegisterDeviceHandler(devices),
+      new RegisterDeviceHandler(uow, devices),
       settings,
       hasher,
     );
@@ -220,9 +226,11 @@ describe('google link', () => {
   let handler: GoogleSignInHandler;
 
   beforeEach(async () => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     google = new FakeGoogle();
     handler = new GoogleSignInHandler(
+      uow,
       users,
       google,
       new JwtSigner(env),
@@ -232,7 +240,7 @@ describe('google link', () => {
         new JwtSigner(env),
         env as never,
       ),
-      new RegisterDeviceHandler(new InMemoryDeviceRepository()),
+      new RegisterDeviceHandler(uow, new InMemoryDeviceRepository(uow)),
       new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
       hasher,
     );

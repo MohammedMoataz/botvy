@@ -19,6 +19,10 @@ import {
   MemberNotFound,
 } from './admin-members.handler.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 const NOW = new Date('2026-09-09T10:00:00.000Z');
 const OWNER = { kind: 'user', id: 'admin-1', role: 'admin' } as const;
 
@@ -46,10 +50,11 @@ describe('admin member actions', () => {
   let handler: AdminMembersHandler;
 
   beforeEach(async () => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
     audit = new InMemoryAuditAdapter();
-    handler = new AdminMembersHandler(users, tokens, audit);
+    handler = new AdminMembersHandler(uow, users, tokens, audit);
 
     await users.save(account('admin-1', { role: 'admin' }));
     await users.save(account('admin-2', { role: 'admin' }));
@@ -161,7 +166,7 @@ describe('admin member actions', () => {
   it('treats a deleted member as gone', async () => {
     const member = await users.findById('member-1', 'member-1');
     member?.softDelete();
-    if (member) await users.save(member);
+    if (member) await uow.run(() => users.save(member));
 
     await expect(handler.setRole(OWNER, 'member-1', 'admin')).rejects.toBeInstanceOf(
       MemberNotFound,
@@ -190,7 +195,8 @@ describe('admin member listing', () => {
   let users: InMemoryUserRepository;
 
   beforeEach(async () => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     await users.save(account('user-a', { email: 'alice@example.test', displayName: 'Alice' }));
     await users.save(account('user-b', { email: 'bob@example.test', status: 'banned' }));
     await users.save(account('user-c', { email: 'carol@example.test', role: 'admin' }));
@@ -216,7 +222,7 @@ describe('admin member listing', () => {
   it('omits deleted members', async () => {
     const member = await users.findById('user-a', 'user-a');
     member?.softDelete();
-    if (member) await users.save(member);
+    if (member) await uow.run(() => users.save(member));
 
     expect((await users.search({ limit: 10 })).members).toHaveLength(2);
   });
@@ -247,6 +253,7 @@ describe('admin service clients', () => {
   let handler: AdminServiceClientsHandler;
 
   beforeEach(() => {
+    uow = new InMemoryUnitOfWork();
     clients = new InMemoryServiceClientRepository();
     audit = new InMemoryAuditAdapter();
     handler = new AdminServiceClientsHandler(clients, audit);

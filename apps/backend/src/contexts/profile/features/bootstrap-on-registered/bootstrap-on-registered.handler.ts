@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import { Preferences } from '../../domain/preferences.aggregate.js';
@@ -36,6 +37,7 @@ export class BootstrapOnRegisteredHandler {
   private readonly logger = new Logger(BootstrapOnRegisteredHandler.name);
 
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly profiles: ProfileRepository,
     private readonly preferences: PreferencesRepository,
     private readonly settings: SettingsService,
@@ -50,13 +52,23 @@ export class BootstrapOnRegisteredHandler {
 
     const payload = (event.payload ?? {}) as UserRegisteredPayload;
 
+    // Both documents and both of their events in one transaction. A crash
+    // between them leaves a member with a profile and no preferences, and the
+    // handler is idempotent on the *pair* being present, so the second delivery
+    // would take the `already-there` exit and never finish the job.
+    return this.uow.run(() => this.create(userId, payload, event.occurredAt));
+  }
+
+  private async create(
+    userId: string,
+    payload: UserRegisteredPayload,
+    at: Date,
+  ): Promise<'created' | 'already-there'> {
     const [existingProfile, existingPreferences] = await Promise.all([
       this.profiles.find(userId),
       this.preferences.find(userId),
     ]);
     if (existingProfile && existingPreferences) return 'already-there';
-
-    const at = event.occurredAt;
 
     if (!existingProfile) {
       const [timezone, locale] = await Promise.all([

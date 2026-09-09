@@ -3,6 +3,8 @@ import { ENV } from '../../shared/config/config.module.js';
 import type { Env } from '../../shared/config/env.schema.js';
 import { ServiceTokenGuard } from '../../shared/auth/service-token.guard.js';
 import { PrismaService } from '../../shared/persistence/prisma/prisma.service.js';
+import { PrismaUnitOfWork } from '../../shared/persistence/prisma/prisma-unit-of-work.js';
+import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
 import { DeviceRepository } from './domain/device.repository.js';
 import { IdentityOutboxRepository } from './domain/identity-outbox.repository.js';
 import { GOOGLE_VERIFIER } from './domain/google-verifier.js';
@@ -44,6 +46,11 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
  */
 @Module({
   providers: [
+    // Identity's transaction. Every handler that writes opens one, so the row
+    // and the `identity_outbox` entry beside it commit together - the hop to
+    // Mongo is at-least-once only because that pair is atomic.
+    PrismaUnitOfWork,
+    { provide: UnitOfWork, useExisting: PrismaUnitOfWork },
     {
       provide: IdentityOutboxRepository,
       inject: [PrismaService],

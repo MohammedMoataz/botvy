@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { newId } from '../../../../shared/cqrs/ids.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import type { DeviceKind } from '../../domain/device.repository.js';
@@ -81,6 +82,7 @@ export class GoogleSignInHandler {
   private readonly logger = new Logger(GoogleSignInHandler.name);
 
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly users: UserRepository,
     @Inject(GOOGLE_VERIFIER) private readonly google: GoogleVerifier,
     private readonly signer: JwtSigner,
@@ -121,9 +123,13 @@ export class GoogleSignInHandler {
       // Neither a password nor a link: an account with nothing to prove
       // ownership with at all. Linking is the only way it can ever be signed
       // into, so link it.
-      existing.linkGoogle(identity.sub);
-      await this.users.save(existing);
-      return this.issue(existing, command);
+      // The link and the session it immediately issues are one write. `issue`
+      // opens its own unit of work, and a nested `run` joins this one.
+      return this.uow.run(async () => {
+        existing.linkGoogle(identity.sub);
+        await this.users.save(existing);
+        return this.issue(existing, command);
+      });
     }
 
     if (!(await this.settings.get('auth.registrationOpen'))) {
@@ -131,7 +137,7 @@ export class GoogleSignInHandler {
     }
 
     const now = new Date();
-    const user = User.register(
+    const registered = User.register(
       {
         id: newId(),
         email: identity.email,
@@ -146,10 +152,14 @@ export class GoogleSignInHandler {
       },
       {},
     );
-    await this.users.save(user);
+
+    const signedIn = await this.uow.run(async () => {
+      await this.users.save(registered);
+      return this.issue(registered, command);
+    });
     this.logger.log(`registered ${identity.email} through Google`);
 
-    return this.issue(user, command);
+    return signedIn;
   }
 
   /**
@@ -168,27 +178,31 @@ export class GoogleSignInHandler {
     if (!(await this.hasher.verify(user.passwordHash, password))) throw new LinkPasswordWrong();
     if (!user.isActive) throw new InvalidCredentials();
 
-    user.linkGoogle(identity.sub);
-    await this.users.save(user);
-
-    return this.issue(user, { idToken, ...(device ? { device } : {}) });
+    return this.uow.run(async () => {
+      user.linkGoogle(identity.sub);
+      await this.users.save(user);
+      return this.issue(user, { idToken, ...(device ? { device } : {}) });
+    });
   }
 
   /** The same tokens and device handling an ordinary sign-in produces. */
   private async issue(user: User, command: GoogleSignInCommand): Promise<SignedIn> {
-    user.recordSignIn();
-    await this.users.save(user);
+    const { deviceId, session } = await this.uow.run(async () => {
+      user.recordSignIn();
+      await this.users.save(user);
 
-    const deviceId = command.device
-      ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
-      : null;
+      const registered = command.device
+        ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
+        : null;
+
+      return { deviceId: registered, session: await this.sessions.open(user.id, registered) };
+    });
 
     const { accessToken, expiresIn } = this.signer.sign({
       sub: user.id,
       role: user.role,
       email: user.email,
     });
-    const session = await this.sessions.open(user.id, deviceId);
 
     return {
       accessToken,

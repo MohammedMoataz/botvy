@@ -3,6 +3,7 @@ import { newId } from '../../../../shared/cqrs/ids.js';
 import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
 import { User } from '../../domain/user.aggregate.js';
 import { UserRepository } from '../../domain/user.repository.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 
 export type { PasswordHasher } from '../../domain/password-hasher.js';
 
@@ -36,6 +37,7 @@ export class AdminSeedService {
   private readonly logger = new Logger(AdminSeedService.name);
 
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
   ) {}
@@ -47,7 +49,7 @@ export class AdminSeedService {
       if (existing.role !== 'admin') {
         existing.role = 'admin';
         existing.updatedAt = new Date();
-        await this.users.save(existing);
+        await this.uow.run(() => this.users.save(existing));
         this.logger.log(`Promoted ${email} to administrator.`);
         return 'promoted';
       }
@@ -67,7 +69,12 @@ export class AdminSeedService {
       createdAt: now,
       updatedAt: now,
     });
-    await this.users.save(user);
+    // The seeded administrator raises `identity.UserRegistered` like anybody
+    // else, and Profile's bootstrap hangs off it. Without the transaction the
+    // row and the event are two statements, so a crash on a first boot would
+    // leave the Owner with an account and no profile - and the seed never runs
+    // again, because it finds the account and takes the no-op exit.
+    await this.uow.run(() => this.users.save(user));
     this.logger.log(`Seeded the administrator account ${email}.`);
     return 'created';
   }

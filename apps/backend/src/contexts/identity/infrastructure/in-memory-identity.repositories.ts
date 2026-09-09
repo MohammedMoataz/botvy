@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
+import type { InMemoryUnitOfWork } from '../../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { hashesMatch } from '../../../shared/auth/service-token.guard.js';
 import { Device as DeviceAggregate } from '../domain/device.aggregate.js';
 import {
@@ -38,6 +39,11 @@ export class InMemoryUserRepository extends UserRepository {
   readonly byId = new Map<string, User>();
   readonly events: DomainEvent[] = [];
 
+  constructor(private readonly uow: InMemoryUnitOfWork) {
+    super();
+    this.uow.enlistState(this.byId, this.events);
+  }
+
   async findById(_userId: string, id: string): Promise<User | null> {
     return this.byId.get(id) ?? null;
   }
@@ -50,13 +56,23 @@ export class InMemoryUserRepository extends UserRepository {
   }
 
   async save(user: User): Promise<void> {
-    this.events.push(...user.pullEvents());
+    this.#raise(user.pullEvents());
     this.byId.set(user.id, user);
   }
 
   async remove(user: User): Promise<void> {
-    this.events.push(...user.pullEvents());
+    this.#raise(user.pullEvents());
     this.byId.delete(user.id);
+  }
+
+  /**
+   * Both lists, deliberately. `events` is what the specs assert on; the unit of
+   * work is what refuses the write when no transaction is open, which is the
+   * check that the Prisma adapter's outbox append is never a second statement.
+   */
+  #raise(events: DomainEvent[]): void {
+    this.uow.collect(events);
+    this.events.push(...events);
   }
 
   async countAll(): Promise<number> {
@@ -166,6 +182,11 @@ export class InMemoryDeviceRepository extends DeviceRepository {
   readonly rows: Device[] = [];
   readonly events: DomainEvent[] = [];
 
+  constructor(private readonly uow: InMemoryUnitOfWork) {
+    super();
+    this.uow.enlistState(this.rows, this.events);
+  }
+
   async listByUser(userId: string): Promise<Device[]> {
     return this.rows.filter((row) => row.userId === userId);
   }
@@ -185,7 +206,7 @@ export class InMemoryDeviceRepository extends DeviceRepository {
   }
 
   async save(device: DeviceAggregate): Promise<void> {
-    this.events.push(...device.pullEvents());
+    this.#raise(device.pullEvents());
     const row: Device = {
       id: device.id,
       userId: device.userId,
@@ -201,9 +222,14 @@ export class InMemoryDeviceRepository extends DeviceRepository {
   }
 
   async remove(device: DeviceAggregate): Promise<void> {
-    this.events.push(...device.pullEvents());
+    this.#raise(device.pullEvents());
     const at = this.rows.findIndex((candidate) => candidate.id === device.id);
     if (at !== -1) this.rows.splice(at, 1);
+  }
+
+  #raise(events: DomainEvent[]): void {
+    this.uow.collect(events);
+    this.events.push(...events);
   }
 
   // The read model carries no timestamps; the aggregate needs them, and for an

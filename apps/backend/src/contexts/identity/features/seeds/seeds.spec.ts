@@ -11,6 +11,10 @@ import {
 } from './admin-seed.service.js';
 import { N8N_CLIENT_NAME, N8N_SCOPES, ServiceClientSeedService } from './service-client-seed.service.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 /** Not argon2: these specs are about the seed's branches, not about hashing. */
 const fakeHasher: PasswordHasher = {
   async hash(plain) {
@@ -26,8 +30,9 @@ describe('admin seed', () => {
   let seed: AdminSeedService;
 
   beforeEach(() => {
-    users = new InMemoryUserRepository();
-    seed = new AdminSeedService(users, fakeHasher);
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
+    seed = new AdminSeedService(uow, users, fakeHasher);
   });
 
   it('creates the account on a fresh install and raises the registration event', async () => {
@@ -56,7 +61,7 @@ describe('admin seed', () => {
     await seed.seed('admin', 'admin');
     const user = (await users.findByLogin('admin'))!;
     user.passwordHash = 'hashed:something-the-owner-chose';
-    await users.save(user);
+    await uow.run(() => users.save(user));
 
     await seed.seed('admin', 'admin');
 
@@ -74,7 +79,7 @@ describe('admin seed', () => {
     await seed.seed('someone@else.test', 'their-password');
     const other = (await users.findByLogin('someone@else.test'))!;
     other.role = 'user';
-    await users.save(other);
+    await uow.run(() => users.save(other));
 
     expect(await seed.seed('someone@else.test', 'ignored')).toBe('promoted');
     expect((await users.findByLogin('someone@else.test'))!.role).toBe('admin');
@@ -86,7 +91,7 @@ describe('admin seed', () => {
 
     const user = (await users.findByLogin('admin'))!;
     user.passwordHash = 'hashed:a-real-password';
-    await users.save(user);
+    await uow.run(() => users.save(user));
 
     expect(await seed.isStillDefault('admin', DEFAULT_ADMIN_PASSWORD)).toBe(false);
   });
@@ -97,6 +102,7 @@ describe('n8n service-client seed', () => {
   let seed: ServiceClientSeedService;
 
   beforeEach(() => {
+    uow = new InMemoryUnitOfWork();
     clients = new InMemoryServiceClientRepository();
     seed = new ServiceClientSeedService(clients);
   });

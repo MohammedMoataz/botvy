@@ -2,7 +2,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable } from '@nestjs/common';
 import type { DomainEvent } from '../../cqrs/domain-event.js';
 import { UnitOfWork } from '../ports/unit-of-work.js';
-import type { PrismaService, PrismaTransaction } from './prisma.service.js';
+// `PrismaService` is imported as a value, not a type: it is a constructor
+// parameter, and `import type` emits no runtime token - Nest then reports
+// 'the argument at index [0] appears to be undefined at runtime' at boot,
+// which tsc cannot see.
+import { PrismaService } from './prisma.service.js';
+import type { PrismaTransaction } from './prisma.service.js';
 
 interface TransactionScope {
   tx: PrismaTransaction;

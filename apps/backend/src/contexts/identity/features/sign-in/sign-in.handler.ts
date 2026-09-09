@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import type { DeviceKind } from '../../domain/device.repository.js';
 import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
 import { UserRepository } from '../../domain/user.repository.js';
@@ -64,6 +65,7 @@ export class SignInHandler {
   private readonly logger = new Logger(SignInHandler.name);
 
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     private readonly signer: JwtSigner,
@@ -87,22 +89,34 @@ export class SignInHandler {
       throw new InvalidCredentials();
     }
 
-    user.recordSignIn();
-    await this.users.save(user);
+    // One transaction for the three writes a sign-in makes: the login stamp,
+    // the device, and the refresh family that names it. Both inner handlers
+    // open their own unit of work, and a nested `run` joins this one rather
+    // than opening a second, so `DeviceRegistered` and the family cannot end up
+    // on the opposite side of a crash from the row they belong to.
+    //
+    // The password comparison above stays outside it, deliberately: scrypt is
+    // slow enough to threaten Prisma's transaction timeout, and every failed
+    // sign-in would otherwise open a transaction only to roll it back.
+    const { deviceId, session } = await this.uow.run(async () => {
+      user.recordSignIn();
+      await this.users.save(user);
 
-    // The device before the session, so the refresh family can name it. A
-    // family with no device is what the portal gets; a family bound to one is
-    // what makes "sign out this phone" mean something narrower than "sign out".
-    const deviceId = command.device
-      ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
-      : null;
+      // The device before the session, so the refresh family can name it. A
+      // family with no device is what the portal gets; a family bound to one is
+      // what makes "sign out this phone" narrower than "sign out".
+      const registered = command.device
+        ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
+        : null;
+
+      return { deviceId: registered, session: await this.sessions.open(user.id, registered) };
+    });
 
     const { accessToken, expiresIn } = this.signer.sign({
       sub: user.id,
       role: user.role,
       email: user.email,
     });
-    const session = await this.sessions.open(user.id, deviceId);
 
     return {
       accessToken,

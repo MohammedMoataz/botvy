@@ -7,14 +7,19 @@ import {
 } from '../../infrastructure/in-memory-identity.repositories.js';
 import { DevicesQueryHandler } from './devices.query.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 describe('devices query', () => {
   let devices: InMemoryDeviceRepository;
   let users: InMemoryUserRepository;
   let handler: DevicesQueryHandler;
 
   beforeEach(() => {
-    devices = new InMemoryDeviceRepository();
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    devices = new InMemoryDeviceRepository(uow);
+    users = new InMemoryUserRepository(uow);
     handler = new DevicesQueryHandler(devices, users, { ADMIN_EMAIL: 'admin' } as never);
     devices.rows.push(
       {
@@ -88,7 +93,7 @@ describe('devices query', () => {
       createdAt: now,
       updatedAt: now,
     });
-    await users.save(active);
+    await uow.run(() => users.save(active));
 
     expect(await handler.isActive(active.id)).toBe(true);
     expect(await handler.isActive('nobody')).toBe(false);
@@ -107,7 +112,7 @@ describe('devices query', () => {
       createdAt: now,
       updatedAt: now,
     });
-    await users.save(banned);
+    await uow.run(() => users.save(banned));
 
     expect(await handler.isActive(banned.id)).toBe(false);
   });

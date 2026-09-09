@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import {
   definitionOf,
   isSettingKey,
@@ -48,7 +49,10 @@ export class UnknownPreference extends Error {
  */
 @Injectable()
 export class UpdatePreferencesHandler {
-  constructor(private readonly preferences: PreferencesRepository) {}
+  constructor(
+    private readonly uow: UnitOfWork,
+    private readonly preferences: PreferencesRepository,
+  ) {}
 
   async handle(
     userId: string,
@@ -83,7 +87,7 @@ export class UpdatePreferencesHandler {
     if (!current) throw new PreferencesNotFound();
 
     const changed = current.patch(validated);
-    if (changed.length > 0) await this.preferences.save(current);
+    if (changed.length > 0) await this.uow.run(() => this.preferences.save(current));
 
     return { changed };
   }

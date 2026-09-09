@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '../../../../shared/cqrs/ids.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password-rules.js';
@@ -63,6 +64,7 @@ export class EmailAlreadyRegistered extends Error {
 @Injectable()
 export class RegisterHandler {
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     private readonly settings: SettingsService,
@@ -75,25 +77,33 @@ export class RegisterHandler {
     if (command.password.length < MIN_PASSWORD_LENGTH) throw new PasswordTooShort();
 
     const email = command.email.trim().toLowerCase();
-    if (await this.users.findByLogin(email)) throw new EmailAlreadyRegistered();
 
-    const now = new Date();
-    const user = User.register(
-      {
-        id: newId(),
-        email,
-        displayName: command.displayName?.trim() || null,
-        passwordHash: await this.hasher.hash(command.password),
-        googleSub: null,
-        role: 'user',
-        status: 'active',
-        createdAt: now,
-        updatedAt: now,
-      },
-      { locale: command.locale ?? null, timezone: command.timezone ?? null },
-    );
+    // Before the transaction: scrypt takes long enough to matter against
+    // Prisma's interactive-transaction timeout, and holding a transaction open
+    // across it would serialise sign-ups behind each other's key derivation.
+    const passwordHash = await this.hasher.hash(command.password);
 
-    await this.users.save(user);
-    return { userId: user.id, email: user.email };
+    return this.uow.run(async () => {
+      if (await this.users.findByLogin(email)) throw new EmailAlreadyRegistered();
+
+      const now = new Date();
+      const user = User.register(
+        {
+          id: newId(),
+          email,
+          displayName: command.displayName?.trim() || null,
+          passwordHash,
+          googleSub: null,
+          role: 'user',
+          status: 'active',
+          createdAt: now,
+          updatedAt: now,
+        },
+        { locale: command.locale ?? null, timezone: command.timezone ?? null },
+      );
+
+      await this.users.save(user);
+      return { userId: user.id, email: user.email };
+    });
   }
 }

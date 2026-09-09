@@ -15,6 +15,10 @@ import { LogoutHandler } from '../logout/logout.handler.js';
 import { hashRefreshToken } from '../refresh/refresh.handler.js';
 import { DeviceNotFound, RegisterDeviceHandler } from './register-device.handler.js';
 
+import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
+
+let uow: InMemoryUnitOfWork;
+
 const NOW = new Date('2026-09-09T10:00:00.000Z');
 
 const hasher: PasswordHasher = {
@@ -46,8 +50,9 @@ describe('register device', () => {
   let handler: RegisterDeviceHandler;
 
   beforeEach(() => {
-    devices = new InMemoryDeviceRepository();
-    handler = new RegisterDeviceHandler(devices);
+    uow = new InMemoryUnitOfWork();
+    devices = new InMemoryDeviceRepository(uow);
+    handler = new RegisterDeviceHandler(uow, devices);
   });
 
   const android = { userId: 'user-1', installId: 'install-1', kind: 'android' } as const;
@@ -140,6 +145,7 @@ describe('logout', () => {
   let handler: LogoutHandler;
 
   beforeEach(() => {
+    uow = new InMemoryUnitOfWork();
     tokens = new InMemoryRefreshTokenRepository();
     handler = new LogoutHandler(tokens);
   });
@@ -190,9 +196,10 @@ describe('delete account', () => {
   let handler: DeleteAccountHandler;
 
   beforeEach(async () => {
-    users = new InMemoryUserRepository();
+    uow = new InMemoryUnitOfWork();
+    users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
-    handler = new DeleteAccountHandler(users, hasher, tokens);
+    handler = new DeleteAccountHandler(uow, users, hasher, tokens);
     await users.save(member());
   });
 

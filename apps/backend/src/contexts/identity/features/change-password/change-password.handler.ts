@@ -3,6 +3,7 @@ import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hash
 import { RefreshTokenRepository } from '../../domain/refresh-token.repository.js';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password-rules.js';
 import { UserRepository } from '../../domain/user.repository.js';
+import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 
 export interface ChangePasswordCommand {
   userId: string;
@@ -45,6 +46,7 @@ export class NewPasswordUnchanged extends Error {
 @Injectable()
 export class ChangePasswordHandler {
   constructor(
+    private readonly uow: UnitOfWork,
     private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     private readonly tokens: RefreshTokenRepository,
@@ -60,16 +62,24 @@ export class ChangePasswordHandler {
     if (command.newPassword.length < MIN_PASSWORD_LENGTH) throw new NewPasswordTooShort();
     if (command.newPassword === command.currentPassword) throw new NewPasswordUnchanged();
 
-    user.passwordHash = await this.hasher.hash(command.newPassword);
-    user.recordPasswordChanged(true);
-    await this.users.save(user);
+    // Hashed outside the transaction, for the same reason as `register`.
+    const nextHash = await this.hasher.hash(command.newPassword);
 
-    // Every session, including this caller's. The point of changing a password
-    // is that access obtained with the old one ends — and a member who changes
-    // it because they think someone else has it would otherwise leave that
-    // someone signed in for another thirty days.
-    const sessionsEnded = await this.tokens.revokeAllForUser(user.id);
+    return this.uow.run(async () => {
+      user.passwordHash = nextHash;
+      user.recordPasswordChanged(true);
+      await this.users.save(user);
 
-    return { changed: true, sessionsEnded };
+      // Every session, including this caller's. The point of changing a
+      // password is that access obtained with the old one ends, and a member
+      // who changes it because they think someone else has it would otherwise
+      // leave that someone signed in for another thirty days.
+      //
+      // In the same transaction as the new hash: a crash between the two would
+      // otherwise leave the old sessions alive against the new password.
+      const sessionsEnded = await this.tokens.revokeAllForUser(user.id);
+
+      return { changed: true, sessionsEnded };
+    });
   }
 }
