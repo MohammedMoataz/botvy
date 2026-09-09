@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { IdentityOutboxRepository } from '../../contexts/identity/domain/identity-outbox.repository.js';
 import { IdentityModule } from '../../contexts/identity/identity.module.js';
+import { AdminPasswordFlagHandler } from '../../contexts/operations/features/admin-password-flag/admin-password-flag.handler.js';
 import { PingedHandler } from '../../contexts/operations/features/ping/pinged.handler.js';
 import { OperationsModule } from '../../contexts/operations/operations.module.js';
 import { ENV } from '../config/config.module.js';
@@ -60,12 +61,20 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     },
     {
       provide: OutboxRelay,
-      inject: [MongoOutboxStore, WebhookFanout, SettingsService, PingedHandler, HeartbeatService],
+      inject: [
+        MongoOutboxStore,
+        WebhookFanout,
+        SettingsService,
+        PingedHandler,
+        AdminPasswordFlagHandler,
+        HeartbeatService,
+      ],
       useFactory: (
         store: MongoOutboxStore,
         fanout: WebhookFanout,
         settings: SettingsService,
         pinged: PingedHandler,
+        passwordFlag: AdminPasswordFlagHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -83,6 +92,11 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(String((event.payload as { key?: string })?.key ?? ''));
+                return;
+              // Identity raises it, Operations owns the key. The event is how
+              // the two meet without either opening the other's store.
+              case 'identity.PasswordChanged':
+                await passwordFlag.onPasswordChanged(event);
                 return;
               default:
                 return;

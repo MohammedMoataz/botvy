@@ -26,6 +26,7 @@ const healthy = {
   pushConfigured: true,
   staleAfterMinutes: 15,
   backupStaleHours: 48,
+  defaultAdminPassword: false,
   now: NOW,
 };
 
@@ -64,6 +65,22 @@ describe('assessHealth', () => {
 
     expect(report.jobs[0]?.stale).toBe(true);
     expect(report.status).toBe('degraded');
+  });
+
+  /**
+   * A published default password is homework, not a fault. Degrading the
+   * platform for it would make `/health` red on a working installation and
+   * teach an Owner to ignore the colour.
+   */
+  it('reports the default administrator password without degrading anything', () => {
+    const report = assessHealth({
+      ...healthy,
+      defaultAdminPassword: true,
+      heartbeats: [heartbeat('outbox.relay', 1)],
+    });
+
+    expect(report.defaultAdminPassword).toBe(true);
+    expect(report.status).toBe('ok');
   });
 
   /** The hours window is for the nightly jobs only, not a general relaxation. */

@@ -47,6 +47,8 @@ export interface HealthReport {
   mongo: boolean;
   ollama: boolean;
   pushConfigured: boolean;
+  /** The seeded administrator still has its published default password. */
+  defaultAdminPassword: boolean;
   jobs: Array<{ job: string; lastOkAt: string | null; lastError: string | null; stale: boolean }>;
   version: string;
 }

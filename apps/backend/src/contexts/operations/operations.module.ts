@@ -25,6 +25,7 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { AuditPort } from './domain/audit.port.js';
 import { HeartbeatRepository } from './domain/heartbeat.repository.js';
 import { PingRepository } from './domain/ping.aggregate.js';
+import { AdminPasswordFlagHandler } from './features/admin-password-flag/admin-password-flag.handler.js';
 import { PingHandler } from './features/ping/ping.handler.js';
 import { PingedHandler } from './features/ping/pinged.handler.js';
 import { ADMIN_DEVICE_LOOKUP, SeededAdminDeviceLookup } from './infrastructure/admin-device.lookup.js';
@@ -112,6 +113,7 @@ type AnyModel = Model<Record<string, unknown>>;
     SettingsService,
     PingHandler,
     PingedHandler,
+    AdminPasswordFlagHandler,
   ],
   exports: [
     UnitOfWork,
@@ -125,6 +127,7 @@ type AnyModel = Model<Record<string, unknown>>;
     ADMIN_DEVICE_LOOKUP,
     PingHandler,
     PingedHandler,
+    AdminPasswordFlagHandler,
     MongooseModule,
   ],
 })

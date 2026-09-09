@@ -56,11 +56,17 @@ function OverviewPage() {
   return (
     <main className="shell">
       {/*
-        The default-password warning. It is the first thing on the page because
-        the seeded login is documented in SETUP.md — an installation still using
-        it is one anybody who read the docs can sign in to.
+        The default-password warning, first on the page: the seeded login is
+        documented in SETUP.md, so an installation still using it is one anybody
+        who read the docs can sign into.
+
+        Read from `/health`, not from the sign-in response. The response only
+        knows what password *this* session was opened with, so it says nothing
+        after a reload and nothing at all to an administrator who signed in with
+        a password they had already changed. The registry key is the durable
+        answer, and it survives a page load.
       */}
-      {auth.mustChangePassword && (
+      {health?.defaultAdminPassword && (
         <Message severity="warn" text={t('defaultPassword')} style={{ marginBottom: 16 }} />
       )}
 

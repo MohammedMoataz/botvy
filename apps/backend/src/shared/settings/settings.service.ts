@@ -112,6 +112,44 @@ export class SettingsService {
     return parsed.data;
   }
 
+  /**
+   * A write the platform makes about itself, not one an operator asked for.
+   *
+   * `readOnly` on a registry entry means "an operator may not edit this" — it
+   * has never meant "nothing may write it". The two keys that carry the flag,
+   * `ops.lastBackupAt` and `ops.adminPasswordIsDefault`, are *observations*:
+   * facts the system discovers and the portal reads. Without this door they
+   * would be entries that describe a state nobody can record.
+   *
+   * The audit row still gets written, and names the system rather than a
+   * person. An unattributed change to a setting is exactly what an Owner wants
+   * to be able to rule out.
+   *
+   * It validates against the schema like any other write. A system that
+   * bypassed validation would be the one caller able to put a value in the
+   * store that every reader then chokes on.
+   */
+  async setSystem<K extends SettingKey>(key: K, value: SettingValue<K>): Promise<void> {
+    const definition = definitionOf(key);
+    const parsed = definition.schema.safeParse(value);
+    if (!parsed.success) {
+      throw new InvalidSettingError(
+        key,
+        parsed.error.issues.map((issue) => issue.message).join('; '),
+      );
+    }
+
+    const current = await this.store.get(key);
+    // Nothing to do, and nothing to record. This runs at every boot, and an
+    // audit row per restart would bury the changes that mattered.
+    if (current && deepEquals(current.value, parsed.data)) return;
+
+    await this.store.set(key, parsed.data, SYSTEM_ACTOR.id);
+    this.#cache.set(key, { value: parsed.data, readAt: Date.now() });
+    await this.events?.publish('operations.SettingChanged', { key });
+    await this.recordAttempt(SYSTEM_ACTOR, key, parsed.data, 'applied_by_system');
+  }
+
   /** The read side of the patch: the registry with whatever is currently set. */
   async describe(): Promise<
     Array<{ key: string; value: unknown; default: unknown; description: string; readOnly: boolean }>
@@ -153,4 +191,35 @@ export class SettingsService {
       meta: detail === undefined ? { outcome, value } : { outcome, value, detail },
     });
   }
+}
+
+/**
+ * Who the audit row names for a write the platform made itself.
+ *
+ * A service principal, because that is what it is: no member asked for it. The
+ * id is stable so the trail can be filtered on it.
+ */
+export const SYSTEM_ACTOR = {
+  kind: 'service',
+  id: 'system',
+  name: 'botvy',
+  scopes: [],
+} as const satisfies Principal;
+
+/** Two settings values are the same value. `!==` on an array is always true. */
+function deepEquals(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => deepEquals(item, b[index]));
+  }
+  if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
+    const left = a as Record<string, unknown>;
+    const right = b as Record<string, unknown>;
+    const keys = Object.keys(left);
+    return (
+      keys.length === Object.keys(right).length &&
+      keys.every((key) => deepEquals(left[key], right[key]))
+    );
+  }
+  return false;
 }

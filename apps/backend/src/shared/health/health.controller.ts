@@ -37,7 +37,15 @@ export class HealthController {
   @Get()
   @Public()
   async report(): Promise<HealthReport & { version: string }> {
-    const [postgres, mongo, ollama, heartbeats, staleAfterMinutes, backupStaleHours] =
+    const [
+      postgres,
+      mongo,
+      ollama,
+      heartbeats,
+      staleAfterMinutes,
+      backupStaleHours,
+      defaultAdminPassword,
+    ] =
       await Promise.all([
         this.probe('postgres', () => this.prisma.ping()),
         this.probe('mongo', async () => {
@@ -55,6 +63,10 @@ export class HealthController {
         // how a job that runs at 03:00 came to be judged by a fifteen-minute
         // rule and reported the platform degraded for the rest of every day.
         this.setting('backup.staleHours'),
+        // Written by the system at boot and cleared by identity.PasswordChanged.
+        // Read here rather than recomputed: only Identity can answer the
+        // question, and /health must not reach into another context to ask it.
+        this.flag('ops.adminPasswordIsDefault'),
       ]);
 
     return {
@@ -66,6 +78,7 @@ export class HealthController {
         heartbeats,
         staleAfterMinutes,
         backupStaleHours,
+        defaultAdminPassword,
       }),
       version: BOTVY_VERSION,
     };
@@ -88,6 +101,22 @@ export class HealthController {
     } catch (error) {
       this.logger.warn(`${key} unreadable, using the registry default: ${(error as Error).message}`);
       return definitionOf(key).default as number;
+    }
+  }
+
+  /**
+   * A boolean settings value, defaulting to the registry entry.
+   *
+   * The registry's default for `ops.adminPasswordIsDefault` is `true`, which is
+   * the safe direction: an unreadable store shows the warning rather than
+   * hiding it.
+   */
+  private async flag(key: 'ops.adminPasswordIsDefault'): Promise<boolean> {
+    try {
+      return await this.settings.get(key);
+    } catch (error) {
+      this.logger.warn(`${key} unreadable, assuming the warning applies: ${(error as Error).message}`);
+      return definitionOf(key).default as boolean;
     }
   }
 

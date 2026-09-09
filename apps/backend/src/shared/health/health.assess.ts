@@ -14,6 +14,16 @@ export interface HealthReport {
   mongo: boolean;
   ollama: boolean;
   pushConfigured: boolean;
+  /**
+   * Whether the seeded administrator still has its published default password.
+   *
+   * Reported here rather than only on the sign-in response, because the portal
+   * needs it on every page load and not just in the seconds after a login —
+   * and because an Owner checking `/health` from a terminal should be able to
+   * see it too. It does not degrade the platform: nothing is broken, somebody
+   * has homework.
+   */
+  defaultAdminPassword: boolean;
   jobs: JobStatus[];
 }
 
@@ -23,6 +33,7 @@ export interface HealthInputs {
   ollama: boolean;
   pushConfigured: boolean;
   heartbeats: Heartbeat[];
+  defaultAdminPassword: boolean;
   staleAfterMinutes: number;
   /**
    * The window for the nightly backup jobs, which is a different question from
@@ -83,6 +94,7 @@ export function assessHealth(inputs: HealthInputs): HealthReport {
     mongo: inputs.mongo,
     ollama: inputs.ollama,
     pushConfigured: inputs.pushConfigured,
+    defaultAdminPassword: inputs.defaultAdminPassword,
     jobs,
   };
 }

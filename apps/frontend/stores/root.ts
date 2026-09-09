@@ -117,8 +117,15 @@ export class AuthStore {
     return this.member?.role === 'admin';
   }
 
-  /** True while the seeded password is still in use, so the banner can insist. */
-  get mustChangePassword(): boolean {
+  /**
+   * Whether *this session* was opened with the seeded password.
+   *
+   * Not what the overview banner reads — that comes from `/health`, because
+   * this only knows about the password the current sign-in used and says
+   * nothing after a reload. It is here for the immediate case: telling somebody
+   * who just signed in with `admin` to change it, before they navigate.
+   */
+  get signedInWithDefaultPassword(): boolean {
     return this.member?.mustChangePassword === true;
   }
 
