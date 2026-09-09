@@ -24,7 +24,7 @@ series whose numbers mean something else; nothing here refers to it by id.
 - [X] T114 [P] [US2] `features/logout/` (revoke one row), `features/change-password/` (current required, revoke all families, raise `identity.PasswordChanged{bySelf}` — catalogued in `events.md`, consumed by Operations to clear the seeded-admin warning); spec: wrong current password refused, every other family gone, event raised
 - [X] T115 [P] [US3] `features/register-device/` (idempotent on `installId`, sets `kind`, stamps `lastSeenAt`, raises `identity.DeviceRegistered{deviceId, kind, hasPush}`), `features/remove-device/` (raises `identity.DeviceRemoved`), query `my-devices`; spec: the same `installId` twice leaves one row with the later `lastSeenAt` and raises the event once; removing another member's device → 404
 - [X] T116 [US2] `features/delete-account/` — soft-delete the user, revoke tokens, raise `identity.UserDeleted`; spec: the account can no longer sign in, every refresh family is revoked, the event carries the `userId` the Mongo contexts purge on
-- [ ] T117 [P] Extend the `me` query shipped by P0 (role, status, `deviceCount`) and add admin `admin-users` (search, status filter, cursor)
+- [X] T117 [P] Extend the `me` query shipped by P0 (role, status, `deviceCount`) and add admin `admin-users` (search, status filter, cursor)
 - [ ] T118 [US2] Extend P0's `admin-seed.service.ts`: at every boot, if the `ADMIN_EMAIL` account's password still verifies against the shipped default, log a warning and set `ops.adminPasswordIsDefault`; `Health.defaultAdminPassword` reads it and `identity.PasswordChanged` clears it; spec: a seeded admin whose password was changed is never reset and the flag stays false across a restart
 
 ## Phase 3 — Profile context (US4, US5)
@@ -40,9 +40,9 @@ series whose numbers mean something else; nothing here refers to it by id.
 
 ## Phase 4 — Admin (US6)
 
-- [ ] T130 [P] [US6] `contexts/identity/features/admin-set-role/`, `admin-ban/`, `admin-unban/` — each records the action through Operations' `AuditPort` (port and `audit_log` schema from P0; Identity never opens the collection) and raises its `identity.*` event; `admin-ban/` also revokes every refresh family the member holds, so a live session dies on its next request rather than at expiry; spec: a banned member's second device is refused within one request, an `audit_log` row names the acting admin, unban does not restore the revoked families
-- [ ] T131 [P] [US6] `admin-create-service-client/` (secret returned once, hashed at rest), `admin-revoke-service-client/` — both through the same `AuditPort`; spec: the secret is absent from the second read of the client, a revoked client's token is refused, both actions leave an `audit_log` row
-- [ ] T132 [P] [US6] `identity.UserBanned` handler in Notifications is deferred to P2; here the event is raised and asserted in a spec
+- [X] T130 [P] [US6] `contexts/identity/features/admin-set-role/`, `admin-ban/`, `admin-unban/` — each records the action through Operations' `AuditPort` (port and `audit_log` schema from P0; Identity never opens the collection) and raises its `identity.*` event; `admin-ban/` also revokes every refresh family the member holds, so a live session dies on its next request rather than at expiry; spec: a banned member's second device is refused within one request, an `audit_log` row names the acting admin, unban does not restore the revoked families
+- [X] T131 [P] [US6] `admin-create-service-client/` (secret returned once, hashed at rest), `admin-revoke-service-client/` — both through the same `AuditPort`; spec: the secret is absent from the second read of the client, a revoked client's token is refused, both actions leave an `audit_log` row
+- [X] T132 [P] [US6] `identity.UserBanned` handler in Notifications is deferred to P2; here the event is raised and asserted in a spec
 
 ## Phase 5 — Clients
 
