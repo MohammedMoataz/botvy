@@ -38,6 +38,19 @@ RUN pnpm --filter @botvy/backend deploy --prod /out \
  && cp -r apps/backend/migrations /out/migrations \
  && cp -r apps/backend/src/contexts/identity/infrastructure/prisma /out/prisma
 
+# Generated *again*, inside /out, and this is not belt-and-braces.
+#
+# `prisma generate` writes its client into the `@prisma/client` package in the
+# pnpm store, and `pnpm deploy` builds /out a fresh pruned `node_modules` that
+# does not carry it - so the runtime image shipped the stub whose only job is to
+# throw `@prisma/client did not initialize yet`. The application could not
+# construct `PrismaService`, so it could not start, in either role.
+#
+# It was invisible for two phases because nothing had ever booted this image:
+# unit tests never build one, and the gate that would have caught it was the
+# thing waiting on a working image. The first boot found it in eight seconds.
+RUN cd /out && node_modules/.bin/prisma generate --schema prisma/schema.prisma
+
 # ---------------------------------------------------------------- runtime
 FROM node:24-alpine AS runtime
 RUN apk add --no-cache tini
