@@ -1,6 +1,6 @@
 # What I need from you — Identity & Profile (P1)
 
-Seven items. Three are decisions only you can make, three are credentials or
+Eight items. Four are decisions only you can make, three are credentials or
 commands I cannot run, and two are heads-ups — one of which you should read
 first (C0).
 
@@ -104,6 +104,34 @@ building it once for both is cheaper than twice.
 
 ---
 
+### A4. The clients still read over REST. When do they move to GraphQL?
+
+The read edge exists now — nine queries at `/graphql`, generated into
+`packages/contracts/schema.graphql`. Nothing calls it. All four surfaces read
+through the REST `GET`s that P0 and P1 shipped, because those are what they were
+built against.
+
+Both edges are thin adapters over the *same* query handlers, so there is no
+duplicated logic and no risk of the two disagreeing about an answer. What is
+duplicated is the transport, and that is the part I do not want to leave
+undecided: constitution X says reads are GraphQL, and two read paths with one
+blessed is the kind of thing that quietly becomes permanent.
+
+| Option | What happens | Cost |
+|---|---|---|
+| **migrate in P2** | P2 already adds tasks, labels and reminders to every surface. Their reads land on GraphQL from the start, and P1's move with them — one pass over four clients instead of two | a day inside a phase that is touching those files anyway |
+| **migrate now** | A pass over the SDK, the portal, the extension and the phone before 016 starts, with nothing new to show for it | a day, and P1's gate has not run yet |
+| **keep both** | REST reads stay supported. Constitution X gets an amendment saying so, because an unmet principle is worse than an honest one | an hour, plus the amendment |
+
+My recommendation is **migrate in P2**. The reads that phase adds are the bulk
+of what the phone actually shows, and doing P1's four queries alongside them
+costs almost nothing extra; doing it now costs the same day and moves nothing
+forward.
+
+**Your answer:** → _(migrate in P2 / migrate now / keep both)_
+
+---
+
 ## B. Things only you can do
 
 ### B1. `corepack enable`, from an administrator PowerShell — still open
@@ -155,6 +183,12 @@ with six exploitable or user-visible HIGH findings.
 The full list, including what is still open, is in
 [`review-findings.md`](review-findings.md). Two of the open ones are the
 decisions above.
+
+Since then two more are fixed, and both were capabilities P0 marked done and did
+not build: **there was no GraphQL edge and no socket gateway at all** — so every
+client connected to a path that answered nothing — and **no handler wrote its
+domain events in the same transaction as the row**, which the repositories'
+own comments all claimed they did. Eleven of twenty-six now fixed.
 
 The part worth your attention: all three criticals were invisible to 483
 passing tests, because nothing in the repository ever assembled the application.
