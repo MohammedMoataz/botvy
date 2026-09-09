@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
+import { ProfileModule } from './contexts/profile/profile.module.js';
 import { ConfigModule } from './shared/config/config.module.js';
 import { HealthzController } from './shared/health/healthz.controller.js';
 import { OutboxModule } from './shared/outbox/outbox.module.js';
@@ -29,6 +30,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     IdentityModule,
     OutboxModule,
     OperationsModule,
+    ProfileModule,
     RelayModule,
   ],
   controllers: [HealthzController],

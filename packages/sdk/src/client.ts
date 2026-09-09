@@ -50,11 +50,32 @@ export class BotvyClient {
    * the idempotency key exists to make safe rather than something to rely on.
    */
   async command<T>(path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
+    return this.rest<T>('POST', path, body, idempotencyKey);
+  }
+
+  /**
+   * One REST call, with the 401-refresh-retry every path needs.
+   *
+   * `command` is POST sugar over this. The other verbs exist because P1's
+   * routes use them — a role patch is a PATCH, a device removal a DELETE — and
+   * because reads are REST until the GraphQL edge is wired: `/auth/devices` and
+   * `/admin/users` have nowhere else to be answered from yet. When those move
+   * to GraphQL the callers change and this method stays.
+   *
+   * Never retries more than once, and never on anything but a 401. A retry
+   * loop on a command is how one action becomes three.
+   */
+  async rest<T>(
+    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    path: string,
+    body?: unknown,
+    idempotencyKey?: string,
+  ): Promise<T> {
     const send = async (): Promise<Response> =>
       this.fetchImpl(`${this.baseUrl}/api/v1${path}`, {
-        method: 'POST',
+        method,
         headers: {
-          'content-type': 'application/json',
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
           ...this.authHeader(),
           ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
         },
@@ -68,6 +89,34 @@ export class BotvyClient {
       if (refreshed) response = await send();
     }
 
+    return this.unwrap<T>(response, path);
+  }
+
+  /**
+   * A multipart upload — the photo, today.
+   *
+   * Separate from `rest` because the body must not be JSON-encoded and the
+   * `content-type` must be left for the runtime to set: writing it by hand
+   * omits the multipart boundary, and the request then fails in a way that
+   * looks like a server problem.
+   */
+  async upload<T>(
+    method: 'POST' | 'PATCH',
+    path: string,
+    form: FormData,
+  ): Promise<T> {
+    const send = async (): Promise<Response> =>
+      this.fetchImpl(`${this.baseUrl}/api/v1${path}`, {
+        method,
+        headers: this.authHeader(),
+        body: form,
+      });
+
+    let response = await send();
+    if (response.status === 401 && this.options.tokens) {
+      const refreshed = await this.options.tokens.refresh();
+      if (refreshed) response = await send();
+    }
     return this.unwrap<T>(response, path);
   }
 

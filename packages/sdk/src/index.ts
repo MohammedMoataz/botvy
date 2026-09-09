@@ -16,6 +16,25 @@ export {
   type TokenStorage,
 } from './tokens.js';
 export { SocketClient, type SocketOptions, type SocketState } from './socket.js';
+export {
+  AuthStore,
+  EmailTaken,
+  GoogleLinkRequired,
+  RegistrationClosed,
+  type DeviceDescriptor,
+  type DeviceKind,
+  type DeviceView,
+  type Role,
+  type SignedInMember,
+  type SignedOutReason,
+} from './auth-store.js';
+export {
+  ProfileStore,
+  type BodyMetric,
+  type PreferencesView,
+  type ProfilePatch,
+  type ProfileView,
+} from './profile-store.js';
 
 /** Options the typed client is constructed with. */
 export interface BotvyClientOptions {

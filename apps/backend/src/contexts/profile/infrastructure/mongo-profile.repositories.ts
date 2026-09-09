@@ -9,12 +9,12 @@ import { Preferences, type PreferencesState } from '../domain/preferences.aggreg
 import { Profile, type ProfileState } from '../domain/profile.aggregate.js';
 import { PreferencesRepository, ProfileRepository } from '../domain/profile.repository.js';
 
-interface ProfileDoc extends ProfileState {
+export interface ProfileDoc extends ProfileState {
   _id: string;
   schemaVersion: number;
 }
 
-interface PreferencesDoc extends PreferencesState {
+export interface PreferencesDoc extends PreferencesState {
   _id: string;
   schemaVersion: number;
 }

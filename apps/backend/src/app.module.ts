@@ -8,6 +8,8 @@ import { AdminController } from './contexts/identity/features/admin-members/admi
 import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
 import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
+import { ProfileModule } from './contexts/profile/profile.module.js';
+import { ProfileController } from './contexts/profile/features/update-profile/profile.controller.js';
 import { AuthModule } from './shared/auth/auth.module.js';
 import { JwtAuthGuard } from './shared/auth/jwt-auth.guard.js';
 import { KindGuard } from './shared/auth/kind.guard.js';
@@ -44,6 +46,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     IdentityModule,
     OutboxModule,
     OperationsModule,
+    ProfileModule,
     HealthModule,
   ],
   // Declared here rather than on IdentityModule, because the worker imports
@@ -52,6 +55,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
   controllers: [
     AuthController,
     AdminController,
+    ProfileController,
     PingController,
     InternalAlertsController,
     InternalHeartbeatController,
