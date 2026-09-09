@@ -48,9 +48,14 @@ ENV BOTVY_ROLE=backend
 
 COPY --from=build /out ./
 
-# Non-root. The media volume is the only thing it writes.
+# Non-root, and /app is deliberately *not* chowned: `chown -R` over it rewrote
+# every file into a second layer, roughly doubling the image and costing minutes
+# on every build. The application only reads its own code, and root-owned
+# world-readable files are what it needs for that - not being able to modify its
+# own dist is a small bonus rather than a cost. The media volume is the only
+# thing it writes.
 RUN addgroup -S botvy && adduser -S botvy -G botvy \
- && mkdir -p /data/media && chown -R botvy:botvy /data/media /app
+ && mkdir -p /data/media && chown botvy:botvy /data/media
 USER botvy
 
 EXPOSE 8080 8081

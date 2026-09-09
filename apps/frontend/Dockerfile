@@ -28,7 +28,7 @@ COPY --from=build /repo/apps/frontend/.next/static ./apps/frontend/.next/static
 COPY --from=build /repo/apps/frontend/public ./apps/frontend/public
 
 # Non-root, like the backend image. The standalone server writes nothing.
-RUN addgroup -S botvy && adduser -S botvy -G botvy && chown -R botvy:botvy /app
+RUN addgroup -S botvy && adduser -S botvy -G botvy
 USER botvy
 
 EXPOSE 3000
