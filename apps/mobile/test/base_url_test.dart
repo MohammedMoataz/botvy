@@ -1,4 +1,4 @@
-import 'package:botvy/src/api/api_client.dart';
+import 'package:botvy/core/api/api_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Where a fresh install points before anyone opens Settings.
@@ -9,10 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// flutter test --dart-define=BOTVY_BASE_URL=https://example.test
 /// ```
 ///
-/// which is exactly how a release build passes the live tunnel hostname in.
-/// `infra/release-mobile.mjs` does both, so the check runs against the same
-/// value the APK is about to carry.
-const _injected = String.fromEnvironment('BOTVY_BASE_URL');
+/// which is exactly how a release build passes the live tunnel hostname in, so
+/// the check runs against the same value the APK is about to carry.
+const String _injected = String.fromEnvironment('BOTVY_BASE_URL');
 
 void main() {
   test('is a usable absolute http(s) URL', () {
@@ -35,11 +34,16 @@ void main() {
   });
 
   test('uses the injected value when the build supplies one', () {
-    if (_injected.isEmpty) {
-      // Nothing to assert, and skipping loudly beats passing quietly: run this
-      // file with --dart-define to exercise the path a release takes.
-      return;
-    }
+    if (_injected.isEmpty) return; // nothing to assert on this run
     expect(kDefaultBaseUrl, _injected);
+  });
+
+  test('normalises a URL the user typed with trailing slashes', () {
+    // The REST prefix and the socket path are both appended to this, so one
+    // stray slash becomes `//api/v1` on every single call.
+    expect(
+      ApiClient.normaliseBaseUrl('  https://botvy.example//  '),
+      'https://botvy.example',
+    );
   });
 }

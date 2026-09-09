@@ -2,10 +2,22 @@
   "name": "botvy",
   "private": true,
   "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "dev:gateway": "pnpm --filter @botvy/gateway dev",
+    "dev:backend": "pnpm --filter @botvy/backend dev",
+    "dev:worker": "pnpm --filter @botvy/backend dev:worker",
+    "dev:frontend": "pnpm --filter @botvy/frontend dev",
+    "dev:extension": "pnpm --filter @botvy/extension dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint"
+    "lint": "oxlint --config oxlint.json",
+    "gen:contracts": "pnpm --filter @botvy/backend gen:contracts && pnpm --filter @botvy/contracts generate"
+  },
+  "devDependencies": {
+    "oxlint": "^0.15.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
   }
 }

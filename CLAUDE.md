@@ -10,16 +10,24 @@ Read those before proposing structure, technology or shell commands.
 `specs/001`–`012` record what v1 built and why; `specs/013-platform-v2-blueprint`
 is the whole-platform plan for v2, and each implementation phase (`014` onward)
 is its own spec-kit feature on its own branch. `.specify/memory/constitution.md`
-(v2.0.0) holds the twelve rules every change is held to — the API is the only
+(v2.1.1) holds the twelve rules every change is held to — the API is the only
 writer to either store and each bounded context owns its own; n8n holds one
 credential and no data; migrations only go forward; one public port; three
 principal kinds; bounded contexts talk through events; commands (REST), queries
 (GraphQL) and streams (WebSocket) stay separate; times belong to the user;
 secrets in env, operator knobs in `settings`, member knobs in preferences.
 
-Setup, the environment contract and the verification steps for v1 live in
-`SETUP.md`; v2's target loop is `specs/013-platform-v2-blueprint/quickstart.md`
-until the foundation phase makes it real.
+`SETUP.md` is v2's: prerequisites, the environment contract, the run, the
+verification gate, backups **and the restore for both stores**. v1's own guide
+moved with it to `legacy/SETUP.md`.
+
+The foundation phase has landed, so the layout in the blueprint is the layout on
+disk: `apps/{backend,frontend,extension,mobile}`, `packages/{contracts,sdk,tokens}`,
+`infra/` and `workflows/`. v1 lives whole under `legacy/` and is read-only — the
+root tsconfig, oxlint, Prettier and `.gitattributes` all exclude it, and nothing
+in the v2 tree imports from it. `infra/verify.mjs` is the phase gate as a command:
+containers healthy, exactly one non-loopback published port, both stores answering,
+and a second `bootstrap.mjs` run that changes nothing.
 
 ## Things that are easy to get wrong here
 
@@ -51,7 +59,14 @@ until the foundation phase makes it real.
   are a `QueryBus` call or an outbox event. If two slices need the same helper,
   duplicate it; move it to `shared/` on the third copy. A handler that dispatches
   another context's *command* is the same violation wearing a bus — the write
-  belongs to that context's own consumer of your event.
+  belongs to that context's own consumer of your event. Enforced now:
+  `no-restricted-imports` refuses a cross-context relative import from any
+  `domain/` or `features/` file. `infrastructure/` is the one layer allowed to
+  know another context exists, because binding a local port to somebody else's
+  query is its job — `admin-device.lookup.ts` and `admin-password.probe.ts` are
+  the pattern to copy. Reaching for another context's *feature service* is a
+  violation even in the permitted direction; a `*.query.ts` handler is the
+  published surface.
 - **A capability three phases each credit to another phase is a capability
   nobody builds.** The pinned `coach` and `planner` conversations were "created
   in P1" per P1 and P3, and built in P4, and the blueprint put the skeleton in
@@ -63,6 +78,13 @@ until the foundation phase makes it real.
   reactions spelled out, and no phase raised them — so a member who changed time
   zone kept alerts, meetings and sessions on the old wall clock. Both halves of
   an event, the raise and the handler, land in the same review.
+- **oxlint ignores `patterns` when `paths` is also present.** The driver-import
+  rule was written with both, so its `mongoose/*` and `@prisma/client/*` half
+  never ran and a deep import was refused by nothing for two phases. Everything
+  in `no-restricted-imports` is a `patterns` group now — a bare specifier
+  matches there too — and every change to that rule is probed by writing a file
+  that should fail and checking it does. A lint rule nobody has seen fire is a
+  comment.
 - **Handlers never import a database driver.** A context declares its repository
   and unit-of-work ports in `domain/`; only `infrastructure/` imports `mongoose`,
   `mongodb` or `@prisma/client`, one adapter per store. Handler specs bind the
@@ -148,7 +170,14 @@ until the foundation phase makes it real.
 - **A fixture pinned to a real date is a time bomb.** Alert planning drops a lead
   time whose moment has passed, so a fixture dated in the future starts failing
   the day the clock reaches it. Write time fixtures relative to `Date.now()`.
-- **The seeded admin is `admin`/`admin` and the portal is public.** The API
-  creates it when the `ADMIN_EMAIL` account is missing and never resets an
+- **The seeded admin is `ADMIN_EMAIL`/`ADMIN_PASSWORD` and the portal is
+  public.** The API creates it when that account is missing and never resets an
   existing one, so a changed password sticks. It warns on every boot until it is
-  changed, via `POST /api/v1/auth/password`.
+  changed; `POST /api/v1/auth/login` returns a token and
+  `POST /api/v1/auth/password` changes it, and `mustChangePassword` on the
+  sign-in response is how a client knows to insist.
+- **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
+  while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
+  v2 served v1's live database and neither could run beside the other. Keep the
+  names distinct, or a `docker compose up` in one tree recreates the other's
+  containers on the other's data.

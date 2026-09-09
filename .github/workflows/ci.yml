@@ -2,90 +2,153 @@ name: CI
 
 on:
   push:
-    branches: [master]
-    tags: ['v*']
+    branches: [main]
   pull_request:
 
-jobs:
-  gateway:
-    name: Gateway — build & test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # No `version:` here on purpose. The action errors out with
-      # ERR_PNPM_BAD_PM_VERSION if a version is given both here and in the
-      # root package.json's "packageManager" field, even when the two agree.
-      # packageManager (pnpm@9.15.0) is the single source of truth.
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @botvy/gateway exec prisma generate
-      - run: pnpm --filter @botvy/gateway exec nest build
-      - run: pnpm --filter @botvy/gateway exec vitest run
+# One file, five independent jobs.
+#
+# The blueprint listed separate workflow files per surface. The requirement is a
+# job per surface, not a file per surface: five jobs in one file give the same
+# "one surface red, the others still report" guarantee with less to keep in
+# step. Every job carries a timeout, so a run that stops finishing fails the
+# build rather than being noticed afterwards.
 
-  admin:
-    name: Admin portal — typecheck & build
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      # A replica set of one. The outbox needs transactions and change streams,
+      # and both require a set, so a plain mongod would pass tests that then
+      # fail in production.
+      mongo:
+        image: mongo:8
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: botvy
+          POSTGRES_PASSWORD: botvy
+          POSTGRES_DB: botvy
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      # See the note in the gateway job: version comes from packageManager.
+      # No `version:` here on purpose: the action errors with
+      # ERR_PNPM_BAD_PM_VERSION when a version is given both here and in the
+      # root package.json's packageManager field, even when the two agree.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @botvy/admin exec tsc --noEmit
-      - run: pnpm --filter @botvy/admin exec vite build
+      - name: Initiate the replica set
+        run: |
+          docker exec $(docker ps -qf ancestor=mongo:8) mongosh --quiet --eval \
+            'try { rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]}) } catch (e) { if (!String(e).includes("already initialized")) throw e }'
+      - run: pnpm lint
+      - run: pnpm --filter @botvy/backend exec tsc --noEmit -p tsconfig.json
+      - run: pnpm --filter @botvy/backend build
+      - name: Test
+        run: pnpm --filter @botvy/backend test
+        env:
+          # Named, so the store-backed halves of the repository contract run
+          # here rather than skipping. A contract test that quietly stops
+          # exercising the real driver still reports green.
+          DATABASE_URL: postgresql://botvy:botvy@localhost:5432/botvy
+          MONGO_URL: mongodb://localhost:27017/botvy_test?replicaSet=rs0&directConnection=true
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @botvy/tokens build
+      - run: pnpm --filter @botvy/frontend build
+
+  extension:
+    name: extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @botvy/tokens build
+      - run: pnpm --filter @botvy/extension build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: apps/extension/.output/*
+          if-no-files-found: warn
+
+  packages:
+    name: packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @botvy/tokens build
+      - run: pnpm --filter @botvy/sdk test
 
   mobile:
-    name: Mobile — analyze & test
+    name: mobile
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      # This is the first place the Flutter code is actually compiled: no
-      # Flutter SDK is installed on the development machine, so everything
-      # under apps/mobile is unverified until this job runs.
-      - run: flutter pub get
+          cache: true
+      - name: Resolve dependencies
         working-directory: apps/mobile
-      - run: flutter analyze
+        run: flutter pub get
+      - name: Generate the drift database
         working-directory: apps/mobile
-      - run: flutter test
+        run: dart run build_runner build --delete-conflicting-outputs
+      - name: Analyse
         working-directory: apps/mobile
-
-  image:
-    name: Publish gateway image
-    needs: [gateway, admin]
-    # Opt-in, not just tag-gated. Publishing needs DOCKERHUB_USERNAME and
-    # DOCKERHUB_TOKEN; without them docker/login-action fails with "Username
-    # and password required" and every release tag shows a red X for a step
-    # nobody asked for. Secrets can't be tested in a job-level `if`, so this
-    # keys off a repository variable instead:
-    #   Settings -> Secrets and variables -> Actions -> Variables
-    #   PUBLISH_IMAGE = true      (then add the two secrets)
-    if: startsWith(github.ref, 'refs/tags/v') && vars.PUBLISH_IMAGE == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+        run: flutter analyze
+      - name: Test
+        working-directory: apps/mobile
+        # The migration ladder harness lives here. A schema bump without its
+        # branch bricks every existing install, so this is the test that has to
+        # fail in CI rather than on someone's phone.
+        run: flutter test
+      - name: Build the debug APK
+        working-directory: apps/mobile
+        run: flutter build apk --debug --flavor dev
+      - uses: actions/upload-artifact@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/metadata-action@v5
-        id: meta
-        with:
-          images: ${{ secrets.DOCKERHUB_USERNAME }}/botvy-gateway
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/gateway/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          name: apk-debug
+          path: apps/mobile/build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: warn

@@ -1,0 +1,135 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "ignorePatterns": [
+    "legacy/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/.next/**",
+    "**/.wxt/**",
+    "**/.output/**",
+    "packages/contracts/src/**"
+  ],
+  "rules": {
+    "no-console": "off",
+    "typescript/no-explicit-any": "warn"
+  },
+  "overrides": [
+    {
+      "comment": "A Nest module is a class with nothing in it by design \u2014 the decorator is the whole declaration. Scoped to module files so an accidentally empty class anywhere else is still caught.",
+      "files": [
+        "**/*.module.ts"
+      ],
+      "rules": {
+        "typescript/no-extraneous-class": "off"
+      }
+    },
+    {
+      "comment": "Constitution IX, the driver half. Expressed entirely as `patterns` and with no `paths` key, and that is load-bearing: oxlint ignores `patterns` outright when `paths` is also present, so the `mongoose/*` and `@prisma/client/*` half of this rule had been inert since P0 - only the bare specifiers were ever checked. A deep import was refused by nothing. `patterns` matches a bare specifier as well, so one key does both. Probed after every change to it.",
+      "files": [
+        "apps/backend/src/contexts/**/domain/**",
+        "apps/backend/src/contexts/**/features/**",
+        "apps/backend/src/shared/cqrs/**",
+        "apps/backend/src/shared/auth/**",
+        "apps/backend/src/shared/time/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "mongoose",
+                  "mongoose/**",
+                  "mongodb",
+                  "mongodb/**",
+                  "@prisma/client",
+                  "@prisma/client/**"
+                ],
+                "message": "Constitution IX: a database driver belongs in infrastructure/. Declare a repository or unit-of-work port in domain/ and bind an adapter in the context module, one per store."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "comment": "A context's domain/ and features/ may not reach into another context, and still may not import a driver. Both are repeated here rather than left to the override above, because two overrides setting the same rule may replace rather than merge, and a config change that silently switched the driver rule off would be worse than the gap it closed. This is the rule that was missing when Identity imported Operations' AuditPort while OperationsModule imported IdentityModule back: the graph stopped resolving in both roles and nothing but a boot failure said why. infrastructure/ is deliberately absent from the file list - an adapter binding a local port to another context is the sanctioned seam, and admin-device.lookup.ts and admin-password.probe.ts are exactly that.",
+      "files": [
+        "apps/backend/src/contexts/*/domain/**",
+        "apps/backend/src/contexts/*/features/**"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "mongoose",
+                  "mongoose/**",
+                  "mongodb",
+                  "mongodb/**",
+                  "@prisma/client",
+                  "@prisma/client/**"
+                ],
+                "message": "Constitution IX: a database driver belongs in infrastructure/. Declare a repository or unit-of-work port in domain/ and bind an adapter in the context module, one per store."
+              },
+              {
+                "group": [
+                  "../../identity",
+                  "../../identity/**",
+                  "../../../identity",
+                  "../../../identity/**",
+                  "../../../../identity",
+                  "../../../../identity/**",
+                  "../../../contexts/identity",
+                  "../../../contexts/identity/**",
+                  "../../../../contexts/identity",
+                  "../../../../contexts/identity/**",
+                  "../../../../../contexts/identity",
+                  "../../../../../contexts/identity/**",
+                  "../../operations",
+                  "../../operations/**",
+                  "../../../operations",
+                  "../../../operations/**",
+                  "../../../../operations",
+                  "../../../../operations/**",
+                  "../../../contexts/operations",
+                  "../../../contexts/operations/**",
+                  "../../../../contexts/operations",
+                  "../../../../contexts/operations/**",
+                  "../../../../../contexts/operations",
+                  "../../../../../contexts/operations/**",
+                  "../../profile",
+                  "../../profile/**",
+                  "../../../profile",
+                  "../../../profile/**",
+                  "../../../../profile",
+                  "../../../../profile/**",
+                  "../../../contexts/profile",
+                  "../../../contexts/profile/**",
+                  "../../../../contexts/profile",
+                  "../../../../contexts/profile/**",
+                  "../../../../../contexts/profile",
+                  "../../../../../contexts/profile/**"
+                ],
+                "message": "Constitution IX: a context may not import another context. Cross-context needs go through a QueryBus call, an outbox event, or a port declared here and bound to an adapter in this context's own infrastructure/ - the one layer allowed to know another context exists. A helper three contexts want belongs in shared/."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

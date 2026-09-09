@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "operations.SettingChanged",
+  "description": "Payload of operations.SettingChanged. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "key"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@botvy/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./openapi.json": "./openapi.json",
+    "./schema.graphql": "./schema.graphql"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs"
+  },
+  "devDependencies": {
+    "@graphql-codegen/typescript": "^4.1.2",
+    "graphql": "^16.10.0",
+    "openapi-typescript": "^7.5.0",
+    "typescript": "^5.7.2"
+  }
+}

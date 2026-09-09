@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase config: a live key, never committed. See app/build.gradle.kts.
+google-services.json

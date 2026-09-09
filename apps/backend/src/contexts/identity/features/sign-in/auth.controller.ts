@@ -1,0 +1,391 @@
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  ForbiddenException,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { CurrentPrincipal, Public, UsersOnly } from '../../../../shared/auth/decorators.js';
+import type { Principal } from '../../../../shared/auth/principal.js';
+import { GoogleTokenInvalid } from '../../domain/google-verifier.js';
+import {
+  ChangePasswordHandler,
+  CurrentPasswordWrong,
+  MIN_PASSWORD_LENGTH,
+  NewPasswordTooShort,
+  NewPasswordUnchanged,
+} from '../change-password/change-password.handler.js';
+import {
+  RefreshHandler,
+  RefreshRejected,
+  type IssuedSession,
+} from '../refresh/refresh.handler.js';
+import {
+  EmailAlreadyRegistered,
+  PasswordTooShort,
+  PasswordsDoNotMatch,
+  RegisterHandler,
+  RegistrationClosed,
+  type Registered,
+} from '../register/register.handler.js';
+import { DeleteAccountHandler, PasswordRequired } from '../delete-account/delete-account.handler.js';
+import { LogoutHandler } from '../logout/logout.handler.js';
+import {
+  DeviceNotFound,
+  RegisterDeviceHandler,
+} from '../register-device/register-device.handler.js';
+import { DevicesQueryHandler } from '../devices/devices.query.js';
+import {
+  GoogleSignInHandler,
+  LinkPasswordWrong,
+  LinkRequired,
+  RegistrationClosedForGoogle,
+} from '../google-sign-in/google-sign-in.handler.js';
+import { InvalidCredentials, SignInHandler, type SignedIn } from './sign-in.handler.js';
+
+export class RegisterDto {
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(MIN_PASSWORD_LENGTH)
+  password!: string;
+
+  // Checked against `password` in the handler, not here. A class-validator rule
+  // cannot see a sibling field without a custom decorator, and the rule belongs
+  // with the others anyway.
+  @IsString()
+  passwordConfirm!: string;
+
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  locale?: string;
+
+  @IsOptional()
+  @IsString()
+  timezone?: string;
+}
+
+export class RefreshDto {
+  @IsString()
+  refreshToken!: string;
+}
+
+/** What a client says about its own installation. */
+export class DeviceDto {
+  @IsString()
+  installId!: string;
+
+  @IsIn(['android', 'ios', 'chrome_extension', 'web'])
+  kind!: 'android' | 'ios' | 'chrome_extension' | 'web';
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  pushToken?: string;
+}
+
+export class SignInDto {
+  /**
+   * A login, not necessarily an email address.
+   *
+   * `@IsEmail()` here rejected the documented default — the literal `admin`,
+   * which `SETUP.md`, `CLAUDE.md` and the seed itself all specify — with a 400
+   * before the handler ran. The handler's own `findByLogin` accepts a bare
+   * username, which is why its spec passed: it calls the handler directly and
+   * never sees the pipe.
+   *
+   * This is the second half of a fix already made once. `env.schema.ts`
+   * relaxed `ADMIN_EMAIL` for exactly this reason and the DTO was missed —
+   * one root cause, two places, and only one of them corrected.
+   */
+  @IsString()
+  @MinLength(1)
+  email!: string;
+
+  // No length rule on the way in. An existing password shorter than today's
+  // minimum still has to be able to sign in, precisely so its owner can reach
+  // the endpoint below and replace it.
+  @IsString()
+  password!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeviceDto)
+  device?: DeviceDto;
+}
+
+export class GoogleSignInDto {
+  @IsString()
+  idToken!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeviceDto)
+  device?: DeviceDto;
+}
+
+export class GoogleLinkDto extends GoogleSignInDto {
+  @IsString()
+  password!: string;
+}
+
+export class DeleteAccountDto {
+  @IsOptional()
+  @IsString()
+  password?: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(MIN_PASSWORD_LENGTH)
+  newPassword!: string;
+}
+
+/**
+ * The credential surface: register, sign in, refresh, change your password.
+ *
+ * Sign-in and password change landed together in P0, because the administrator
+ * seed had been warning on every boot that the Owner should change the default
+ * password at an endpoint that did not exist and could not have been reached.
+ * P1 adds registration and refresh around them.
+ *
+ * Google sign-in and account deletion are still ahead. Each failure mode gets
+ * its own status rather than one flat 400 — a closed registration, a taken
+ * email and a mistyped confirmation are three different things for a client to
+ * show a person.
+ */
+@Controller('api/v1/auth')
+export class AuthController {
+  constructor(
+    private readonly signIn: SignInHandler,
+    private readonly changePassword: ChangePasswordHandler,
+    private readonly registerMember: RegisterHandler,
+    private readonly refreshSession: RefreshHandler,
+    private readonly logoutSession: LogoutHandler,
+    private readonly devices: RegisterDeviceHandler,
+    private readonly deviceList: DevicesQueryHandler,
+    private readonly deleteAccount: DeleteAccountHandler,
+    private readonly googleSignIn: GoogleSignInHandler,
+  ) {}
+
+  @Post('register')
+  @Public()
+  async register(@Body() body: RegisterDto): Promise<Registered> {
+    try {
+      return await this.registerMember.handle(body);
+    } catch (error) {
+      // Each of these is a different thing for a client to show, so each gets
+      // its own status rather than one flat 400.
+      if (error instanceof RegistrationClosed) throw new ForbiddenException(error.message);
+      if (error instanceof EmailAlreadyRegistered) throw new ConflictException(error.message);
+      if (error instanceof PasswordsDoNotMatch || error instanceof PasswordTooShort) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Post('login')
+  @Public()
+  @HttpCode(200)
+  async login(@Body() body: SignInDto): Promise<SignedIn> {
+    try {
+      return await this.signIn.handle(body);
+    } catch (error) {
+      if (error instanceof InvalidCredentials) throw new UnauthorizedException(error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Public, because the access token it replaces has by definition expired. The
+   * refresh token is the credential here, and it is checked against the store
+   * rather than verified as a signature.
+   */
+  @Post('refresh')
+  @Public()
+  @HttpCode(200)
+  async refresh(@Body() body: RefreshDto): Promise<IssuedSession> {
+    try {
+      return await this.refreshSession.handle(body.refreshToken);
+    } catch (error) {
+      if (error instanceof RefreshRejected) {
+        // The code matters to the client: `token_expired` means sign in again,
+        // and `session_replay` means the session was ended on purpose and
+        // something is wrong. Flattening both to 401 loses that.
+        throw new UnauthorizedException({ code: error.code, message: error.message });
+      }
+      throw error;
+    }
+  }
+
+  @Post('password')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(200)
+  async password(
+    @Body() body: ChangePasswordDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ changed: true }> {
+    try {
+      return await this.changePassword.handle({ userId: principal.id, ...body });
+    } catch (error) {
+      // The current password being wrong is a 401, not a 400: it is a failed
+      // credential check, and a client that treats it as a validation error
+      // shows the member the wrong message.
+      if (error instanceof CurrentPasswordWrong) throw new UnauthorizedException(error.message);
+      if (error instanceof NewPasswordTooShort || error instanceof NewPasswordUnchanged) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Signs out one session, not the account. The refresh token is the thing
+   * being revoked, so it is what the request carries.
+   */
+  @Post('logout')
+  @Public()
+  @HttpCode(200)
+  async logout(@Body() body: RefreshDto): Promise<{ signedOut: boolean }> {
+    return this.logoutSession.handle(body.refreshToken);
+  }
+
+  @Post('logout/all')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(200)
+  async logoutEverywhere(
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ sessionsEnded: number }> {
+    return this.logoutSession.everywhere(principal.id);
+  }
+
+  /**
+   * Registering a device is idempotent on `installId`, so a client that cannot
+   * tell whether its last attempt arrived simply sends it again.
+   */
+  @Post('devices')
+  @UsersOnly()
+  @ApiBearerAuth()
+  async registerDevice(
+    @Body() body: DeviceDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ deviceId: string; created: boolean }> {
+    return this.devices.handle({ userId: principal.id, ...body });
+  }
+
+// GET /auth/devices was here. It is a read, and constitution X puts reads on GraphQL:
+  // `myDevices` at /graphql answers it. Removed rather than left beside the
+  // resolver, because two paths to one answer is the drift this rewrite exists
+  // to remove - and the REST one leaked every device's push token to the browser.
+
+  
+  @Delete('devices/:id')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(204)
+  async removeDevice(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<void> {
+    try {
+      await this.devices.remove(principal.id, id);
+    } catch (error) {
+      // Another member's device is a 404, not a 403: whether it exists is not
+      // this caller's business to learn.
+      if (error instanceof DeviceNotFound) throw new NotFoundException(error.message);
+      throw error;
+    }
+  }
+
+  @Post('delete-account')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(200)
+  async remove(
+    @Body() body: DeleteAccountDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ deleted: true }> {
+    try {
+      return await this.deleteAccount.handle({ userId: principal.id, ...body });
+    } catch (error) {
+      if (error instanceof PasswordRequired) throw new UnauthorizedException(error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Google sign-in, which is also Google registration.
+   *
+   * A 409 here is not a dead end: `link_required` means the address already has
+   * a password account, and `POST /auth/google/link` finishes the job with that
+   * password. Refusing without saying so is what makes people create a second
+   * account with a typo in the address.
+   */
+  @Post('google')
+  @Public()
+  @HttpCode(200)
+  async google(@Body() body: GoogleSignInDto): Promise<SignedIn> {
+    try {
+      return await this.googleSignIn.handle(body);
+    } catch (error) {
+      if (error instanceof LinkRequired) {
+        throw new ConflictException({ code: error.code, email: error.email, message: error.message });
+      }
+      if (error instanceof RegistrationClosedForGoogle) {
+        throw new ForbiddenException(error.message);
+      }
+      if (error instanceof GoogleTokenInvalid || error instanceof InvalidCredentials) {
+        throw new UnauthorizedException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Post('google/link')
+  @Public()
+  @HttpCode(200)
+  async googleLink(@Body() body: GoogleLinkDto): Promise<SignedIn> {
+    try {
+      return await this.googleSignIn.link(body.idToken, body.password, body.device);
+    } catch (error) {
+      if (
+        error instanceof LinkPasswordWrong ||
+        error instanceof GoogleTokenInvalid ||
+        error instanceof InvalidCredentials
+      ) {
+        throw new UnauthorizedException(error.message);
+      }
+      throw error;
+    }
+  }
+}

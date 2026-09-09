@@ -1,70 +1,47 @@
 # Botvy
 
-Self-hosted, multi-user AI assistant platform. Runs entirely on your own
-hardware: your data, your workflow engine, your language model.
+A self-hosted life-coaching assistant. It helps one household of members live the
+life they say they want: it keeps their tasks and reminders, plans tomorrow with
+them each evening and hands it back each morning, tracks their training and meals,
+reads the articles and videos they save, and talks all of it through in a chat that
+runs on a model on the owner's own machine. Nothing leaves the host.
 
-- **Gateway** (NestJS) — owns all data: auth, chat, reminders, coaching, the
-  admin API, and the one `/sync` route the app reconciles through
-- **Admin portal** (React + Vite) — users, devices, usage, configuration
-- **Mobile app** (Flutter) — named chats, reminders, coaching and history,
-  holding the user's whole account in its own SQLite store so it all works
-  offline
-- **n8n** — scheduler and workflow engine, calls the gateway's API only
-- **Ollama** — local LLM (`qwen2.5:3b-instruct`), OpenAI-compatible, no cloud
-  provider
+## Where things are
 
-## Prerequisites
+| Path | What |
+|---|---|
+| `apps/backend` | NestJS. One codebase, two roles: `backend` serves the edge, `worker` relays events and runs jobs. |
+| `apps/frontend` | Next.js. The public site and the admin portal in one app. |
+| `apps/extension` | Chrome side panel for tasks and meetings from a computer. |
+| `apps/mobile` | Flutter. The member's phone, local-first and offline-capable. |
+| `packages/contracts` | The API surface, generated once and consumed everywhere. |
+| `packages/sdk` | Typed client, socket client and shared stores for the web surfaces. |
+| `packages/tokens` | One palette and type scale, emitted as CSS variables and a Dart theme. |
+| `infra` | Compose stack, the Caddy edge, bootstrap and the verification gate. |
+| `workflows` | n8n workflows, committed as JSON. Git is the source of truth, not the running instance. |
+| `specs` | Every feature, specified before it was built. Start at `specs/013-platform-v2-blueprint`. |
+| `legacy` | Botvy v1, moved here whole and left running until v2 reaches parity. Read-only. |
 
-- Docker Desktop
-- [Ollama](https://ollama.com/download) installed natively (native, not in
-  Docker — it needs direct GPU access), with `qwen2.5:3b-instruct` pulled —
-  or whatever `OLLAMA_CHAT_MODEL` names; the gateway never pulls for you
-- Optional: a Cloudflare domain + tunnel token for public access
-- Optional: a Firebase project for push notifications
+## Getting started
 
-## Quick start
+`SETUP.md` is the whole story: prerequisites, the environment contract, how to bring
+the stack up, how to verify it and how to restore it. The short version:
 
-```powershell
-cp infra/.env.example .env     # then fill in the values it documents
-docker compose --env-file .env -f infra/docker-compose.yml up -d
-node infra/bootstrap.mjs       # migrations, n8n owner + API key, workflow import
+```bash
+cp infra/.env.example .env      # then fill it in
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+node infra/bootstrap.mjs
+node infra/verify.mjs
 ```
 
-`bootstrap.mjs` is idempotent and exists because those steps have a
-non-obvious required order: n8n rejects every API call until an owner
-account exists, an API key's raw value is returned exactly once, and the
-error-handler workflow must be imported before anything referencing it or
-n8n silently drops the reference.
+## How this repository is built
 
-Then see `infra/docs/ollama-setup.md` for the host-level Ollama
-configuration (the `OLLAMA_HOST` binding and firewall rule that let
-containers reach it), and `infra/docs/tunnel-setup.md` for public access.
+Every change starts as a specification. `.specify/memory/constitution.md` holds the
+rules each one is held to — the API is the only writer to either store, each bounded
+context owns its own, migrations only go forward, one public port, times belong to
+the member, and nothing ships without its verification run and recorded output.
+`CLAUDE.md` records what is easy to get wrong here, in the words of the bugs that
+taught it.
 
-The gateway serves its API on `127.0.0.1:8080` and its OpenAPI docs at
-`/docs`. n8n's editor is on `127.0.0.1:5679` and is deliberately never
-exposed publicly.
-
-## Development
-
-```powershell
-npx pnpm@latest install                                  # a global pnpm install fails with EPERM here
-npx pnpm@latest --filter @botvy/gateway exec nest build
-npx pnpm@latest --filter @botvy/gateway exec vitest run
-```
-
-## Project conventions
-
-Read `.specify/memory/constitution.md` first — eight binding principles,
-the important ones being: the gateway is the only process that touches the
-database, n8n never does; all inference is local; migrations are
-forward-only; only the gateway is ever publicly reachable; and nothing is
-called done without running its check and showing the output.
-
-Features are developed with [spec-kit](https://github.com/github/spec-kit):
-each one gets a `specs/<nnn>-<name>/` directory with a `spec.md` saying what
-was built and why, and a `tasks.md` carrying its verification evidence. (The
-first two also have a `plan.md`; the practice since then has been to fold the
-plan into the spec rather than keep a third file in step.)
-
-The newest spec describes the current shape of the system — start there rather
-than at 001.
+v1 lives in `legacy/` and runs from `legacy/infra/docker-compose.yml`. It is a
+reference until it is explicitly decommissioned; nothing in the v2 tree imports it.

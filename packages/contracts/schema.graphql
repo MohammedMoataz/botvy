@@ -1,0 +1,139 @@
+type BodyMetric {
+  bodyFatPct: Float
+  heightCm: Float
+  note: String
+  recordedAt: DateTime!
+  weightKg: Float
+}
+
+"""An instant in time, serialised as an ISO 8601 string in UTC."""
+scalar DateTime
+
+type Device {
+  hasPush: Boolean!
+  id: ID!
+  kind: DeviceKind!
+  lastSeenAt: DateTime
+}
+
+enum DeviceKind {
+  android
+  chrome_extension
+  ios
+  web
+}
+
+"""
+Arbitrary JSON, used for a settings value and an audit entry’s metadata.
+"""
+scalar JSON
+
+type Preferences {
+  aiSuggestions: Boolean!
+  checkinEnabled: Boolean!
+  endOfDayTime: String!
+  leadTimes: [String!]!
+  mealMode: String!
+  meetingDurationMin: Int!
+  morningBriefingTime: String!
+  nextPracticeCutoff: String!
+  planTomorrowTime: String!
+  quietHours: QuietHours
+  userId: ID!
+  weekStartsOn: String!
+}
+
+type Profile {
+  allergies: [String!]
+  bmi: Float
+  bodyMetrics: [BodyMetric!]!
+  displayName: String
+  foodDislikes: [String!]
+  foodLikes: [String!]
+  latestHeightCm: Float
+  latestWeightKg: Float
+  locale: String!
+  onboardingCompletedAt: DateTime
+  photoUrl: String
+  symptoms: [String!]
+  timezone: String!
+  userId: ID!
+}
+
+type Query {
+  """The caller's body metric history."""
+  bodyMetrics(last: Int = 30): [BodyMetric!]!
+
+  """A member's devices. Administrators only."""
+  devicesOf(userId: ID!): [Device!]!
+
+  """The authenticated member."""
+  me: User!
+
+  """The caller's own registered devices."""
+  myDevices: [Device!]!
+
+  """The caller's own preferences."""
+  preferences: Preferences!
+
+  """The caller's own profile."""
+  profile: Profile!
+
+  """Registered machine callers. Administrators only."""
+  serviceClients: [ServiceClient!]!
+
+  """The settings registry. Administrators only."""
+  settings: [Setting!]!
+
+  """Every member. Administrators only."""
+  users(after: String, first: Int = 50, role: Role, search: String, status: UserStatus): UserConnection!
+}
+
+type QuietHours {
+  from: String!
+  to: String!
+}
+
+enum Role {
+  admin
+  user
+}
+
+type ServiceClient {
+  createdAt: DateTime!
+  id: ID!
+  lastUsedAt: DateTime
+  name: String!
+  revokedAt: DateTime
+  scopes: [String!]!
+}
+
+type Setting {
+  defaultValue: JSON
+  description: String!
+  key: String!
+  readOnly: Boolean!
+  value: JSON
+}
+
+type User {
+  createdAt: DateTime!
+  deviceCount: Int!
+  displayName: String
+  email: String!
+  id: ID!
+  lastLoginAt: DateTime
+  role: Role!
+  status: UserStatus!
+}
+
+type UserConnection {
+  endCursor: String
+  hasNextPage: Boolean!
+  nodes: [User!]!
+}
+
+enum UserStatus {
+  active
+  banned
+}

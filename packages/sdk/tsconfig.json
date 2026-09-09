@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+
+    // This package runs in a browser and a Chrome extension, so it is typed
+    // against the browser. `fetch`, `Response`, `FormData` and `Blob` come from
+    // the DOM lib rather than from `@types/node`.
+    "lib": ["ES2023", "DOM"],
+
+    // And `types: []` keeps `@types/node` out entirely. Without it, Node's
+    // `undici-types` also declares `Response` and `fetch`, and the two
+    // definitions differ by a method — so a `Response` built here would not
+    // satisfy the `typeof fetch` resolved over there, which is a confusing way
+    // to be told the package is being typed for the wrong runtime.
+    //
+    // It also enforces this package's own promise: no Node built-ins. An
+    // accidental `import { readFile } from 'node:fs'` stops compiling rather
+    // than shipping to a browser and failing there.
+    "types": []
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}

@@ -1,0 +1,70 @@
+﻿name: botvy
+description: Botvy mobile client for the self-hosted assistant gateway.
+publish_to: 'none'
+# versionName+versionCode. Bump the build number on EVERY release build:
+# Android compares versionCode, so two APKs sharing it can silently fail to
+# replace each other and leave an old build installed.
+version: 0.7.0+10
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management (locked decision).
+  flutter_riverpod: ^2.6.1
+
+  # HTTP + SSE streaming (locked decision).
+  dio: ^5.7.0
+
+  # JWT + base-URL persistence (locked decision). Also used for the server
+  # base URL so we don't need a second storage package for one string.
+  flutter_secure_storage: ^9.2.2
+
+  # Push. firebase_core is a hard peer of firebase_messaging. Used for
+  # server-initiated messages only -- reminders fire from the device itself.
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+
+  # On-device notifications. The whole point of the local-first design: a
+  # reminder must fire with no network, no server and no Google reachability.
+  flutter_local_notifications: ^19.4.0
+  # zonedSchedule needs a TZDateTime, and flutter_timezone gives us the IANA
+  # name of the zone the handset is actually in.
+  timezone: ^0.10.1
+  flutter_timezone: ^4.1.1
+
+  # Offline cache + outbox. drift over raw sqflite for typed queries and a
+  # migration mechanism we would otherwise hand-roll.
+  drift: ^2.28.0
+  drift_flutter: ^0.2.7
+
+  # Knowing the moment the network comes back is what triggers a flush.
+  connectivity_plus: ^6.1.0
+
+  # Client-generated ids: what makes a retried create or chat flush a no-op.
+  uuid: ^4.5.1
+
+  # Dates in the user's own locale and timezone, replacing a hand-rolled
+  # English-only formatter.
+  intl: ^0.20.2
+
+  # The model already answers in markdown; without a renderer the user reads
+  # the asterisks and hashes. `_plus` is the maintained continuation of the
+  # discontinued flutter_markdown, and keeps the imageBuilder/onTapLink hooks.
+  flutter_markdown_plus: ^1.0.3
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  drift_dev: ^2.28.0
+  build_runner: ^2.4.13
+  # The migration test hand-builds a v1-shaped database before drift opens it.
+  sqlite3: ^2.4.6
+
+flutter:
+  uses-material-design: true

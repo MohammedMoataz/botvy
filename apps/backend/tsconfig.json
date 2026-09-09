@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The base sets `bundler` resolution for the browser surfaces. The backend is
+    // a Node runtime, so it resolves the way Node does.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "outDir": "./dist",
+    // rootDir is set only in tsconfig.build.json. Here the program also covers
+    // test/ and scripts/, which sit outside src/ — and rootDir would reject
+    // them even though this config never emits anything.
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    // Nest's DI reads parameter types at runtime.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    // Decorator metadata needs the emitted class, so this cannot be on here.
+    "isolatedModules": false,
+
+    "strictPropertyInitialization": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*", "test/**/*", "scripts/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

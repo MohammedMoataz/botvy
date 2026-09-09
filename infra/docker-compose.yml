@@ -1,189 +1,294 @@
-# The old reference stack at E:\Software\automation\botvy also used the
-# compose project name "botvy", which made Compose treat its containers as
-# this stack's services and replace them. That stack is being decommissioned,
-# so this project reclaims the name — but never run `up` here while any
-# container from the old stack still exists.
-name: botvy
-
-# Botvy stack: Postgres (app data + n8n's own database), n8n, the NestJS
-# gateway (the ONLY service the tunnel exposes — constitution: Single
-# Public Surface), and cloudflared behind the optional "tunnel" profile.
+# The whole platform. One published port, everything else on the Docker network.
 #
-# Runs alongside the old reference stack (E:\Software\automation\botvy),
-# which keeps using host port 5678 for its own n8n — this stack uses 5679
-# to avoid collision (constitution: Development Workflow / parallel run).
+# Principle V is the shape of this file: `caddy` is the only service with a
+# `ports:` entry reaching beyond loopback. n8n binds to 127.0.0.1 so the Owner
+# can reach its editor through an SSH tunnel without it being on the internet —
+# which the principle permits, and which `verify.mjs` excludes when it counts
+# public ports.
+
+# v2 is its own compose project.
+#
+# v1's compose file also declares `name: botvy`, which made the two one
+# project sharing `pg_data` and `n8n_data` — so v2 came up serving v1's live
+# database, and neither stack could run while the other did. The plan had
+# accounts carrying over in that shared store; the Owner chose a clean start
+# instead, which removes the reason to share it at all.
+#
+# Renaming the project namespaces every volume (`botvy-v2_pg_data`), so v1's
+# data is left exactly where it is and remains recoverable.
+name: botvy-v2
+
+x-backend-env: &backend-env
+  NODE_ENV: ${NODE_ENV:-production}
+  DATABASE_URL: ${DATABASE_URL:?set it in .env}
+  MONGO_URL: ${MONGO_URL:?set it in .env}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set it in .env}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set it in .env}
+  JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+  JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+  INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
+  AUTOMATION_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:?set it in .env}
+  MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:?set it in .env}
+  MEDIA_DIR: /data/media
+  N8N_URL: http://n8n:5678
+  N8N_API_KEY: ${N8N_API_KEY:-}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+  CORS_ORIGINS: ${CORS_ORIGINS:-}
+  GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
 
 services:
+  # The only service publishing beyond loopback.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '${EDGE_PORT:-80}:80'
+    environment:
+      # A bare ":80" serves plain HTTP behind the tunnel, which terminates TLS.
+      # Set it to a hostname to have Caddy get its own certificate instead.
+      CADDY_SITE: ${CADDY_SITE:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks: [botvy]
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: apps/frontend/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-frontend:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      # Same-origin through Caddy; the browser never learns the backend's name.
+      NEXT_PUBLIC_API_BASE: ''
+    networks: [botvy]
+
+  backend:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-backend:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      BOTVY_ROLE: backend
+      PORT: 8080
+    volumes:
+      - media:/data/media
+      - ${FIREBASE_CREDENTIALS_DIR:-./secrets}:/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [botvy]
+
+  # Same image, different role. The worker has no HTTP edge beyond /healthz.
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/backend/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-backend:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      BOTVY_ROLE: worker
+      WORKER_PORT: 8081
+    volumes:
+      - media:/data/media
+      - ${FIREBASE_CREDENTIALS_DIR:-./secrets}:/secrets:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      # Marking the worker healthy on process start would hide a dead relay,
+      # which is the one thing this container exists to run.
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8081/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
+    networks: [botvy]
+
   postgres:
+    # Debian, not Alpine, and deliberately so: this is the data directory v1
+    # initialised, and v1 ran `postgres:16`. An Alpine build is musl, a Debian
+    # build is glibc, and their text collations are not the same — the server
+    # says so on every connection, and the mismatch is enough to make
+    # CREATE DATABASE fail outright:
+    #
+    #   WARNING:  database "botvy" has no actual collation version, but a version was recorded
+    #   ERROR:  template database "template1" has a collation version, but no
+    #           actual collation version could be determined
+    #
+    # An index built under one collation is not valid under the other, so this
+    # matters well beyond the warning. Identity carries over in this same
+    # database, which is the whole reason the store is shared; the image has to
+    # match the bytes on disk.
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER not set}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD not set}
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB not set}
-    ports:
-      - "127.0.0.1:5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:?set it in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-botvy}
+      # Read by 001_create_databases.sh, which creates n8n's database on
+      # an empty data directory. Without it that script would create a
+      # database n8n is not configured to open.
+      N8N_DB: ${N8N_DB:-n8n}
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./init-postgres:/docker-entrypoint-initdb.d:ro
+      - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-botvy}']
       interval: 5s
-      timeout: 3s
-      retries: 10
+      timeout: 5s
+      retries: 20
+    networks: [botvy]
+
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    # A replica set of one. Not optional: transactions and change streams both
+    # need one, and the outbox needs both.
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo/init-replica.sh:/scripts/init-replica.sh:ro
+    healthcheck:
+      # Initiates the set on first boot and is a plain status read afterwards,
+      # so the healthcheck is also the thing that makes the set exist.
+      test: ['CMD', 'bash', '/scripts/init-replica.sh']
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    networks: [botvy]
+
+  # Both stores, one sidecar.
+  #
+  # Restoring Identity without the Mongo side leaves accounts whose data is
+  # gone, and the other way round leaves data whose accounts are: `userId` in
+  # Mongo is the PostgreSQL uuid and there is no join to rebuild the link from.
+  # A host that dumps only one store is not backed up, so both scripts run here
+  # on one schedule.
+  backups:
+    build:
+      context: .
+      dockerfile: backup/Dockerfile
+    image: ghcr.io/${GITHUB_OWNER:-botvy}/botvy-backups:${BOTVY_TAG:-local}
+    restart: unless-stopped
+    environment:
+      MONGO_URL: ${MONGO_URL:?set it in .env}
+      DATABASE_URL: ${DATABASE_URL:?set it in .env}
+      # How the job's outcome reaches ops_heartbeats: this container is the one
+      # part of the platform the API does not run, so it reports over HTTP.
+      BOTVY_API_BASE: http://backend:8080
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+    volumes:
+      - ../backups:/backups
+    entrypoint: ['/bin/bash', '-c']
+    command:
+      - |
+        set -euo pipefail
+        # cron hands a job almost no environment, so the variables go into the
+        # crontab as assignment lines, which cron reads literally. Dumping the
+        # environment to a file and sourcing it would need every value quoted
+        # correctly, and a password with a space in it would break the job.
+        {
+          echo 'SHELL=/bin/bash'
+          echo 'PATH=/usr/local/bin:/usr/bin:/bin'
+          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_DAYS; do
+            echo "$${name}=$${!name}"
+          done
+          # Redirected to PID 1's stdout, which is this container's log. cron
+          # mails a job's output, there is no mailer here, and without this a
+          # failed backup would leave no trace anywhere at all.
+          echo "$${BACKUP_CRON} root { /usr/local/bin/backup-mongo.sh; /usr/local/bin/backup-postgres.sh; } >/proc/1/fd/1 2>&1"
+        } > /etc/cron.d/botvy-backups
+        chmod 0644 /etc/cron.d/botvy-backups
+        exec cron -f
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks: [botvy]
 
   n8n:
-    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:?N8N_VERSION not set}
+    image: n8nio/n8n:latest
     restart: unless-stopped
+    # Loopback only. Principle V permits localhost; the Owner reaches the editor
+    # through an SSH tunnel. Settable, or removable entirely on a host where
+    # v1's n8n already holds this port.
+    ports:
+      - '${N8N_BIND:-127.0.0.1:5679}:5678'
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_PORT: 5432
-      DB_POSTGRESDB_DATABASE: n8n
-      DB_POSTGRESDB_USER: ${POSTGRES_USER:?POSTGRES_USER not set}
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD not set}
-      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY not set}
-      N8N_HOST: localhost
-      N8N_PORT: "5678"
-      N8N_PROTOCOL: http
-      WEBHOOK_URL: http://localhost:5679/
-      GENERIC_TIMEZONE: ${TZ:?TZ not set}
-      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
-      EXECUTIONS_DATA_MAX_AGE: "336"
-      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "10000"
-      # Read by the workflows' HTTP nodes as {{ $env.INTERNAL_SERVICE_TOKEN }}
-      # to authenticate against the gateway's /internal/* endpoints. This is
-      # the ONLY credential n8n holds.
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN not set}
-    ports:
-      # host 5679, not 5678 — see file header
-      - "127.0.0.1:5679:5678"
+      DB_POSTGRESDB_DATABASE: ${N8N_DB:-n8n}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:?set it in .env}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Africa/Cairo}
+      N8N_DIAGNOSTICS_ENABLED: 'false'
+      # Both secrets come from the same .env the API reads, as environment.
+      # Never a second credential stored in n8n's own database, so principle
+      # II's "one credential and no data" still reads true.
+      BOTVY_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
+      BOTVY_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:?set it in .env}
+      BOTVY_API_BASE: http://backend:8080
     volumes:
       - n8n_data:/home/node/.n8n
     depends_on:
       postgres:
         condition: service_healthy
-
-  # Metasearch front-end. Deliberately has no published port: only the gateway
-  # talks to it, and the whole point is that the phone never contacts a search
-  # engine directly. Configuration lives in ./searxng/settings.yml, which must
-  # enable the JSON format the gateway reads.
-  searxng:
-    image: searxng/searxng:latest
-    restart: unless-stopped
-    environment:
-      SEARXNG_BASE_URL: http://searxng:8080/
-      # Docker-internal traffic all arrives from one address; the bot limiter
-      # reads that as a flood and starts answering 429.
-      SEARXNG_LIMITER: "false"
-      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET not set}
-    volumes:
-      - ./searxng:/etc/searxng:ro
-      - searxng_data:/var/cache/searxng
-
-  gateway:
-    build:
-      context: ..
-      dockerfile: apps/gateway/Dockerfile
-    restart: unless-stopped
-    environment:
-      # Inside the compose network Postgres is reachable by service name;
-      # Ollama runs natively on the host, so it needs host.docker.internal.
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_CONTAINER:-http://host.docker.internal:11434/v1}
-      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:?OLLAMA_CHAT_MODEL not set}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET not set}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET not set}
-      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
-      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
-      LLM_REQUEST_TIMEOUT_MS: ${LLM_REQUEST_TIMEOUT_MS:-120000}
-      CHAT_RATE_LIMIT_PER_MIN: ${CHAT_RATE_LIMIT_PER_MIN:-20}
-      CHAT_DAILY_QUOTA_TOKENS: ${CHAT_DAILY_QUOTA_TOKENS:-50000}
-      # "false" closes self-registration on a publicly exposed instance.
-      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
-      # Required by the gateway's config schema — without it the process
-      # exits at startup on a zod "Required" error. Same shared secret n8n
-      # presents on /internal/*; both sides must read the same value.
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN not set}
-      # Minted by bootstrap.mjs. The admin portal's Workflows page is empty
-      # without it. N8N_URL is deliberately NOT passed: the container default
-      # (http://n8n:5678) is the in-network address, whereas .env holds the
-      # host-side one (localhost:5679) that bootstrap.mjs needs.
-      N8N_API_KEY: ${N8N_API_KEY:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-}
-      # Like N8N_URL, the in-network address is the container default; .env
-      # holds a host-side one only when the gateway runs outside compose.
-      SEARXNG_URL: http://searxng:8080
-      # Signs the /media image URLs. Empty leaves images as plain links.
-      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-}
-      OLLAMA_THINKING: ${OLLAMA_THINKING:-false}
-      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
-      # Must be a path *inside* the container (/run/secrets/<file>.json — see
-      # the bind mount below), NOT a host path. Empty disables push and Google
-      # Sign-in, which the gateway degrades to. Set but unreadable is a boot
-      # failure: a host path here once disabled every notification silently.
-      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
-      PORT: "8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      # The service-account JSON has to be visible INSIDE the container, so
-      # FIREBASE_CREDENTIALS_FILE alone is not enough. A directory is mounted
-      # rather than the file itself because a single-file bind needs a source
-      # that always exists, and push has to stay optional: the default points
-      # at a directory already in the repo, which is harmless because
-      # FIREBASE_CREDENTIALS_FILE is then empty and push simply stays off.
-      # Set FIREBASE_CREDENTIALS_DIR to the directory holding the key, and
-      # FIREBASE_CREDENTIALS_FILE to /run/secrets/<that file's name>.
-      - "${FIREBASE_CREDENTIALS_DIR:-./init-postgres}:/run/secrets:ro"
-    ports:
-      # Loopback by default. Set GATEWAY_BIND=0.0.0.0 to reach the gateway
-      # from another device on your LAN — a phone running the app, say, which
-      # cannot use 127.0.0.1 and for which the emulator's 10.0.2.2 alias means
-      # nothing. Binding wider puts the API on your local network, so pair it
-      # with ALLOW_REGISTRATION=false once your own account exists.
-      - "${GATEWAY_BIND:-127.0.0.1}:8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Quick tunnel: a free public URL with no Cloudflare account and no domain.
-  # The hostname is random and CHANGES EVERY RESTART — that rotation is what
-  # forced the old stack to run a watchdog. Fine for testing from a phone;
-  # use the named tunnel below once a domain exists.
-  #
-  #   docker compose --profile quick up -d
-  #   node infra/tunnel-url.mjs      # prints the current hostname
-  #
-  # This makes the gateway reachable by anyone holding the URL. Set
-  # ALLOW_REGISTRATION=false in .env before exposing it: that closes both
-  # /auth/register and first-time Google sign-ins (existing users are
-  # unaffected). The admin API is read-only (no mutating routes). You can
-  # also just run this profile while testing and bring it down afterwards:
-  #
-  #   docker compose --env-file .env -f infra/docker-compose.yml --profile quick down
-  cloudflared-quick:
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    profiles: ["quick"]
-    command: tunnel --no-autoupdate --url http://gateway:8080
-    depends_on:
-      - gateway
+    networks: [botvy]
 
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    profiles: ["tunnel"]
-    command: tunnel run
-    environment:
-      # :- not :? — compose interpolates every service's env at parse time
-      # even when gated by a profile that isn't active, so a required var
-      # here would break `docker compose up -d` for the default profile.
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    profiles: [tunnel]
+    # Not `${TUNNEL_TOKEN:?}`, even though it is required to run this service.
+    # A required variable is interpolated by `compose config` regardless of
+    # profile, so demanding it here would make the verification gate — which
+    # reads `config` to count published ports — fail on every host that does not
+    # use a tunnel. cloudflared refuses an empty token loudly enough.
+    command: ['tunnel', '--no-autoupdate', 'run', '--token', '${TUNNEL_TOKEN:-}']
     depends_on:
-      - gateway
+      caddy:
+        condition: service_started
+    networks: [botvy]
+
+networks:
+  botvy:
+    driver: bridge
 
 volumes:
   pg_data:
+  mongo_data:
   n8n_data:
-  searxng_data:
+  media:
+  caddy_data:
+  caddy_config:

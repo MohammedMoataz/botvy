@@ -1,0 +1,189 @@
+# The old reference stack at E:\Software\automation\botvy also used the
+# compose project name "botvy", which made Compose treat its containers as
+# this stack's services and replace them. That stack is being decommissioned,
+# so this project reclaims the name — but never run `up` here while any
+# container from the old stack still exists.
+name: botvy
+
+# Botvy stack: Postgres (app data + n8n's own database), n8n, the NestJS
+# gateway (the ONLY service the tunnel exposes — constitution: Single
+# Public Surface), and cloudflared behind the optional "tunnel" profile.
+#
+# Runs alongside the old reference stack (E:\Software\automation\botvy),
+# which keeps using host port 5678 for its own n8n — this stack uses 5679
+# to avoid collision (constitution: Development Workflow / parallel run).
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER not set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD not set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB not set}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init-postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION:?N8N_VERSION not set}
+    restart: unless-stopped
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: ${POSTGRES_USER:?POSTGRES_USER not set}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD not set}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY not set}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5679/
+      GENERIC_TIMEZONE: ${TZ:?TZ not set}
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      EXECUTIONS_DATA_MAX_AGE: "336"
+      EXECUTIONS_DATA_PRUNE_MAX_COUNT: "10000"
+      # Read by the workflows' HTTP nodes as {{ $env.INTERNAL_SERVICE_TOKEN }}
+      # to authenticate against the gateway's /internal/* endpoints. This is
+      # the ONLY credential n8n holds.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN not set}
+    ports:
+      # host 5679, not 5678 — see file header
+      - "127.0.0.1:5679:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Metasearch front-end. Deliberately has no published port: only the gateway
+  # talks to it, and the whole point is that the phone never contacts a search
+  # engine directly. Configuration lives in ./searxng/settings.yml, which must
+  # enable the JSON format the gateway reads.
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      # Docker-internal traffic all arrives from one address; the bot limiter
+      # reads that as a flood and starts answering 429.
+      SEARXNG_LIMITER: "false"
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET not set}
+    volumes:
+      - ./searxng:/etc/searxng:ro
+      - searxng_data:/var/cache/searxng
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: apps/gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Inside the compose network Postgres is reachable by service name;
+      # Ollama runs natively on the host, so it needs host.docker.internal.
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_CONTAINER:-http://host.docker.internal:11434/v1}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:?OLLAMA_CHAT_MODEL not set}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET not set}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET not set}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-30d}
+      LLM_REQUEST_TIMEOUT_MS: ${LLM_REQUEST_TIMEOUT_MS:-120000}
+      CHAT_RATE_LIMIT_PER_MIN: ${CHAT_RATE_LIMIT_PER_MIN:-20}
+      CHAT_DAILY_QUOTA_TOKENS: ${CHAT_DAILY_QUOTA_TOKENS:-50000}
+      # "false" closes self-registration on a publicly exposed instance.
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      # Required by the gateway's config schema — without it the process
+      # exits at startup on a zod "Required" error. Same shared secret n8n
+      # presents on /internal/*; both sides must read the same value.
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?INTERNAL_SERVICE_TOKEN not set}
+      # Minted by bootstrap.mjs. The admin portal's Workflows page is empty
+      # without it. N8N_URL is deliberately NOT passed: the container default
+      # (http://n8n:5678) is the in-network address, whereas .env holds the
+      # host-side one (localhost:5679) that bootstrap.mjs needs.
+      N8N_API_KEY: ${N8N_API_KEY:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # Like N8N_URL, the in-network address is the container default; .env
+      # holds a host-side one only when the gateway runs outside compose.
+      SEARXNG_URL: http://searxng:8080
+      # Signs the /media image URLs. Empty leaves images as plain links.
+      MEDIA_SIGNING_SECRET: ${MEDIA_SIGNING_SECRET:-}
+      OLLAMA_THINKING: ${OLLAMA_THINKING:-false}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+      # Must be a path *inside* the container (/run/secrets/<file>.json — see
+      # the bind mount below), NOT a host path. Empty disables push and Google
+      # Sign-in, which the gateway degrades to. Set but unreadable is a boot
+      # failure: a host path here once disabled every notification silently.
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      PORT: "8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # The service-account JSON has to be visible INSIDE the container, so
+      # FIREBASE_CREDENTIALS_FILE alone is not enough. A directory is mounted
+      # rather than the file itself because a single-file bind needs a source
+      # that always exists, and push has to stay optional: the default points
+      # at a directory already in the repo, which is harmless because
+      # FIREBASE_CREDENTIALS_FILE is then empty and push simply stays off.
+      # Set FIREBASE_CREDENTIALS_DIR to the directory holding the key, and
+      # FIREBASE_CREDENTIALS_FILE to /run/secrets/<that file's name>.
+      - "${FIREBASE_CREDENTIALS_DIR:-./init-postgres}:/run/secrets:ro"
+    ports:
+      # Loopback by default. Set GATEWAY_BIND=0.0.0.0 to reach the gateway
+      # from another device on your LAN — a phone running the app, say, which
+      # cannot use 127.0.0.1 and for which the emulator's 10.0.2.2 alias means
+      # nothing. Binding wider puts the API on your local network, so pair it
+      # with ALLOW_REGISTRATION=false once your own account exists.
+      - "${GATEWAY_BIND:-127.0.0.1}:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Quick tunnel: a free public URL with no Cloudflare account and no domain.
+  # The hostname is random and CHANGES EVERY RESTART — that rotation is what
+  # forced the old stack to run a watchdog. Fine for testing from a phone;
+  # use the named tunnel below once a domain exists.
+  #
+  #   docker compose --profile quick up -d
+  #   node infra/tunnel-url.mjs      # prints the current hostname
+  #
+  # This makes the gateway reachable by anyone holding the URL. Set
+  # ALLOW_REGISTRATION=false in .env before exposing it: that closes both
+  # /auth/register and first-time Google sign-ins (existing users are
+  # unaffected). The admin API is read-only (no mutating routes). You can
+  # also just run this profile while testing and bring it down afterwards:
+  #
+  #   docker compose --env-file .env -f infra/docker-compose.yml --profile quick down
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["quick"]
+    command: tunnel --no-autoupdate --url http://gateway:8080
+    depends_on:
+      - gateway
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel run
+    environment:
+      # :- not :? — compose interpolates every service's env at parse time
+      # even when gated by a profile that isn't active, so a required var
+      # here would break `docker compose up -d` for the default profile.
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - gateway
+
+volumes:
+  pg_data:
+  n8n_data:
+  searxng_data:

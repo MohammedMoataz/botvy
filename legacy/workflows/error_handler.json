@@ -1,0 +1,49 @@
+{
+  "name": "Botvy Error Handler",
+  "id": "BotvyErrorHandler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e1a10000-0000-4000-8000-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [-200, 0],
+      "notes": "Referenced as settings.errorWorkflow by every other botvy workflow. Import this one FIRST - n8n silently drops an errorWorkflow setting whose id does not resolve."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://gateway:8080/internal/alerts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Service-Token",
+              "value": "={{ $env.INTERNAL_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: $json.workflow?.name || 'unknown', error: ($json.execution?.error?.message || 'no detail') + ' @ ' + ($json.execution?.lastNodeExecuted || 'unknown node') }) }}",
+        "options": {}
+      },
+      "id": "e1a10000-0000-4000-8000-000000000002",
+      "name": "Push Alert To Admins",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [40, 0],
+      "notes": "The gateway resolves which users are admins and pushes to their devices."
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Push Alert To Admins", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "botvy" }]
+}

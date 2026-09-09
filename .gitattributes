@@ -1,0 +1,22 @@
+# v1 is a read-only reference. Marking it as vendored keeps it out of language
+# statistics and collapses it in diffs, which is what it deserves: nobody is
+# reviewing changes to it, because there are not going to be any.
+legacy/** linguist-vendored
+
+# Normalise line endings for text, so a Windows checkout does not produce a
+# whole-file diff for everyone else.
+* text=auto eol=lf
+
+# Binary, and never worth a diff.
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
+*.apk binary
+*.jar binary
+*.keystore binary
+
+# Generated and noisy in review.
+pnpm-lock.yaml linguist-generated
+*.g.dart linguist-generated
+packages/contracts/src/** linguist-generated

@@ -1,739 +1,186 @@
-# botvy — setup
+# Setting up Botvy v2
 
-Everything needed to run botvy on this machine or a new one.
+Everything needed to bring the platform up on one machine, verify it is
+actually working, and get it back after something goes wrong.
 
-- [Part 1 — Running it on a fresh machine](#part-1--running-it-on-a-fresh-machine)
-- [Part 2 — The four things only you can do](#part-2--the-four-things-only-you-can-do)
-  - [Deferred: rotate the exposed Firebase key](#deferred-rotate-the-exposed-firebase-service-account-key)
-- [Part 3 — Operating it day to day](#part-3--operating-it-day-to-day)
-- [Part 4 — Troubleshooting things that have actually happened](#part-4--troubleshooting-things-that-have-actually-happened)
+v1 is still here, under `legacy/`, and still runs. Its own guide is
+`legacy/SETUP.md`.
 
----
-
-## Part 1 — Running it on a fresh machine
-
-### Prerequisites
-
-| Requirement | Why | Notes |
-|---|---|---|
-| **Docker Desktop** | Runs Postgres, n8n, and the gateway | Put its disk image on a drive with room — it grows. Settings → Resources → Disk image location |
-| **Ollama**, installed natively | The local LLM. Native, not in Docker, because it needs direct GPU access | <https://ollama.com/download> |
-| **An NVIDIA GPU** | Inference runs on it via CUDA, or via Vulkan on older drivers — see Part 2 | ~8 GB VRAM is comfortable; 4 GB works with a 4B model |
-| **Node.js 24 + pnpm** | Only for development and the bootstrap script | `npx pnpm@latest` works without a global install |
-| **Flutter SDK** | Only to build the mobile app | <https://docs.flutter.dev/get-started/install/windows> |
-| A domain on Cloudflare | Only for access away from home | Optional |
-| A Firebase project | Only for push notifications | Optional, free |
-
-### Steps
-
-**1. Clone and configure**
-
-```powershell
-git clone <your-repo> botvy
-cd botvy
-cp infra/.env.example .env
-```
-
-Open `.env` and fill in every blank. Generate the secrets — do not reuse the
-examples:
-
-```powershell
-# Run four times, once per secret
--join ((48..57)+(65..90)+(97..122) | Get-Random -Count 32 | % {[char]$_})
-```
-
-| Variable | What it is |
-|---|---|
-| `POSTGRES_PASSWORD` | Database password. Generate one |
-| `N8N_ENCRYPTION_KEY` | Encrypts n8n's stored credentials. **Back this up** — losing it makes them unrecoverable |
-| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | Sign login tokens. Must differ from each other |
-| `INTERNAL_SERVICE_TOKEN` | The only credential n8n holds, for calling `/internal/*` |
-| `N8N_OWNER_EMAIL` / `N8N_OWNER_PASSWORD` | The n8n account bootstrap creates |
-| `TZ` | n8n's own clock. User-facing times come from each user's profile timezone, not this |
-| `DATABASE_URL` | Use the `POSTGRES_PASSWORD` you generated |
-
-Leave `TUNNEL_TOKEN`, `BOTVY_PUBLIC_HOSTNAME`, `FIREBASE_CREDENTIALS_DIR`,
-`FIREBASE_CREDENTIALS_FILE`, and `N8N_API_KEY` empty. The first four are
-optional; the last is minted by bootstrap.
-
-Everything tunable at runtime — nightly check-in and program times, default
-reminder lead times, sweep batch size, notification wording — lives in the
-`settings` table and is editable from the admin portal's **Config** page. Only
-secrets and connection details are environment variables.
-
-**2. Set up Ollama** — see `infra/docs/ollama-setup.md` for detail. In short:
-
-```powershell
-[Environment]::SetEnvironmentVariable('OLLAMA_HOST','0.0.0.0:11434','User')
-[Environment]::SetEnvironmentVariable('OLLAMA_KEEP_ALIVE','-1','User')
-# restart Ollama from the tray, then:
-ollama pull qwen2.5:3b-instruct
-```
-
-Pull whatever `OLLAMA_CHAT_MODEL` in your `.env` names — the two have to agree,
-and the gateway does not pull for you. See *The model* below for why this one.
-
-`OLLAMA_HOST=0.0.0.0` is **required** — Ollama's default binds to loopback
-only, which Docker containers cannot reach. That is the single most common
-setup failure.
-
-Then lock it down, since binding to `0.0.0.0` alone would expose it. **Needs
-an elevated PowerShell:**
-
-```powershell
-New-NetFirewallRule -DisplayName "Botvy-Ollama-DockerWSL" -Direction Inbound `
-  -Protocol TCP -LocalPort 11434 -Action Allow `
-  -RemoteAddress 172.16.0.0/12,127.0.0.1 -Profile Any
-```
-
-**3. Start the stack and bootstrap it**
-
-```powershell
-docker compose --env-file .env -f infra/docker-compose.yml up -d
-node infra/bootstrap.mjs
-```
-
-`bootstrap.mjs` applies the database migrations, creates the n8n owner
-account, mints an n8n API key and writes it to `.env`, and imports the
-workflows. It is idempotent, so re-run it freely.
-
-It exists because the order matters in ways that are not obvious: n8n
-rejects every API call until an owner exists; an API key's raw value is
-returned exactly once; and the error-handler workflow must be imported
-before anything referencing it, or n8n silently drops the reference.
-
-**4. Log in as the admin**
-
-The gateway seeds one on first boot, so there is nothing to do here:
+## What you need first
 
 | | |
 |---|---|
-| Username | `admin` |
-| Password | `admin` |
+| **Docker** | Compose v2. On Linux or WSL2 for a machine that runs unattended; Docker Desktop is fine for development. |
+| **Node 24** | Only for the developer loop and the two scripts in `infra/`. The containers carry their own. |
+| **pnpm 9.15** | `corepack enable` is enough — the version is pinned in `package.json`. |
+| **Ollama** | Host-native, with the models named in the settings registry pulled. It stays outside Docker so it can reach the GPU. |
+| **Flutter** | Only to build the phone app. |
 
-> **Change it.** The admin portal is served by the gateway, which is the one
-> thing in this stack that is deliberately public — so anyone who finds your
-> hostname can try `admin`/`admin` and get the user list, every device, and the
-> settings. The gateway says so in its log on every boot until you do.
+A tunnel is optional. Without one the platform is reachable on the LAN; with
+one it is reachable from anywhere, still through the single published port.
 
-Either set it before the first boot:
-
-```
-ADMIN_EMAIL=you@example.com
-ADMIN_PASSWORD=something-only-you-know
-```
-
-or change it afterwards:
-
-```powershell
-$t = (curl -s -X POST http://localhost:8080/auth/login -H "Content-Type: application/json" `
-  -d '{\"email\":\"admin\",\"password\":\"admin\"}' | ConvertFrom-Json).accessToken
-
-curl -X POST http://localhost:8080/auth/password -H "Content-Type: application/json" `
-  -H "Authorization: Bearer $t" `
-  -d '{\"currentPassword\":\"admin\",\"newPassword\":\"something-only-you-know\"}'
-```
-
-Changing it signs every other session out, and it sticks: the seeder only ever
-*creates* the account, never resets its password. A new password must be at
-least 8 characters, so there is no route back to the shipped default short of
-deleting the account — which does bring it back on the next boot, because it is
-a default.
-
-`ADMIN_EMAIL` is matched literally and does not have to be an email, which is
-why `admin` works as a username. Registration still requires a real address.
-
-**5. Check it worked**
-
-```powershell
-curl http://localhost:8080/health     # expect database:true, ollama:true
-```
-
-Then open <http://localhost:8080/admin> and log in. Overview should show
-live counts; Workflows should list three workflows, imported but inactive.
-Turn them on when you want them firing.
-
-### On Linux instead of Windows
-
-The steps above are the same in substance; four of them differ in mechanics.
-Everything below was done on Ubuntu 24.04 without root, so it also covers the
-case where you cannot `sudo apt install`.
-
-**Secrets.** The PowerShell generator becomes:
+## Bringing it up
 
 ```bash
-tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40; echo
+cp infra/.env.example .env
+# Fill in every value marked REQUIRED. For the secrets:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+node infra/bootstrap.mjs
+node infra/verify.mjs
 ```
 
-`bootstrap.mjs` parses `.env` literally — it does **not** expand `${...}` — so
-write the real password into `DATABASE_URL` rather than interpolating
-`POSTGRES_PASSWORD` into it.
+`bootstrap.mjs` waits for the stores, applies both sets of migrations, checks
+that the machine credential answers, and imports the workflows. It is safe to
+run again — and `verify.mjs` proves that by running it a second time and
+requiring that nothing changed.
 
-**Ollama.** There is no tray app. Recent releases ship a `.tar.zst`, not the
-`.tgz` the older docs assume, and it unpacks anywhere — no root needed:
+`verify.mjs` is the gate. It checks four things and prints the elapsed time:
+
+- every container healthy,
+- **exactly one port published beyond loopback**, which is Caddy,
+- both stores answering through `/health`,
+- and that second bootstrap run changing nothing.
+
+If it exits non-zero, do not go further — each line names what failed.
+
+### Signing in
+
+The seed creates the account named by `ADMIN_EMAIL` on first boot, with
+`ADMIN_PASSWORD`. It never resets that password afterwards, so one you change
+survives every restart. While the password is still the default, the boot log
+repeats the warning and `mustChangePassword` comes back `true` on every sign-in.
 
 ```bash
-curl -fL -o ollama.tar.zst \
-  https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst
-mkdir -p ~/opt/ollama && tar --use-compress-program=unzstd -xf ollama.tar.zst -C ~/opt/ollama
-ln -sf ~/opt/ollama/bin/ollama ~/.local/bin/ollama
+# Sign in.
+curl -sX POST "$BOTVY_BASE_URL/api/v1/auth/login"   -H 'content-type: application/json'   -d '{"email":"'"$ADMIN_EMAIL"'","password":"admin"}'
+
+# Change the password. At least 8 characters, and the current one is required
+# even though you are already authenticated.
+curl -sX POST "$BOTVY_BASE_URL/api/v1/auth/password"   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json'   -d '{"currentPassword":"admin","newPassword":"something longer"}'
 ```
 
-`OLLAMA_HOST` and `OLLAMA_KEEP_ALIVE` belong in a service unit rather than a
-user environment variable — install `infra/ollama.service`, which documents
-both and the one-time `loginctl enable-linger` that makes it start at boot.
-Then `ollama pull qwen2.5:3b-instruct`, or whatever `OLLAMA_CHAT_MODEL` names.
+Registration, Google sign-in and refresh-token rotation arrive in P1. The token
+`login` returns is an access token, so it expires on `JWT_ACCESS_TTL` and there
+is nothing yet to renew it with — sign in again.
 
-The Windows firewall rule has no direct equivalent. Binding to `0.0.0.0` puts
-Ollama on your LAN, so restrict it to the Docker bridge and loopback:
+Deleting that account brings it back on the next start, because it is a
+*default*. Point `ADMIN_EMAIL` at a different address if that is not what you
+want.
 
-```bash
-# Use this stack's actual bridge subnet rather than a guess — Docker's pool is
-# configurable, and 172.16.0.0/12 is far wider than the one network involved.
-SUBNET=$(docker network inspect botvy_default \
-  -f '{{(index .IPAM.Config 0).Subnet}}')
-sudo ufw allow from "$SUBNET" to any port 11434 proto tcp
-sudo ufw deny 11434/tcp
-```
+## Three kinds of configuration
 
-Re-check that subnet if you ever `docker compose down` the stack: removing and
-recreating the network can hand it a different one.
+Knowing which is which saves a redeploy:
 
-**Reaching the host from a container.** `host.docker.internal` is not built in
-on Linux the way it is on Docker Desktop; it works here only because the
-gateway service declares `extra_hosts: ["host.docker.internal:host-gateway"]`.
-Do not remove that line. Verify it end to end with:
-
-```bash
-docker exec botvy-gateway-1 node -e \
-  "fetch('http://host.docker.internal:11434/api/tags').then(r=>r.text()).then(console.log)"
-```
-
-**The Flutter toolchain**, if you have no root, is three tarballs into `~/opt`:
-the Flutter SDK, a JDK 17 (Temurin — the Gradle config pins Java 17), and the
-Android command-line tools unpacked to `~/opt/android-sdk/cmdline-tools/latest`.
-Then:
-
-```bash
-export JAVA_HOME=~/opt/jdk17 ANDROID_HOME=~/opt/android-sdk
-export PATH=~/opt/flutter/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$JAVA_HOME/bin:$PATH
-yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses
-sdkmanager --sdk_root=$ANDROID_HOME "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-flutter config --android-sdk ~/opt/android-sdk --jdk-dir ~/opt/jdk17
-```
-
-`flutter doctor` will still fail the **Linux desktop** toolchain (clang, CMake,
-ninja, GTK). That is expected and irrelevant — this app targets Android.
-
-One wrinkle in the `flutter create` step: it writes a boilerplate
-`test/widget_test.dart` referencing a `MyApp` class this project does not have
-(the real one is `BotvyApp`), which then fails `flutter analyze`. Delete that
-one generated file; the project's own tests live beside it.
-
-### Verifying a fresh install
-
-| Check | Expected |
-|---|---|
-| `curl http://localhost:8080/health` | `status: ok`, `push: true`, and `sweepStale: false` within a few minutes of starting |
-| `curl http://localhost:11434/api/ps` | after one query, the loaded model is the one `OLLAMA_CHAT_MODEL` names, and `size_vram` equals `size` — anything less is running on the CPU, see Part 2 |
-| `docker compose ps` | postgres healthy; n8n, searxng and gateway up |
-| `/admin` in a browser | login works; Overview shows live numbers and a running reminder sweep |
-| n8n editor at `:5679` | reachable **only** from the machine itself |
-| `node test/intent-fixture.mjs` (in `apps/gateway`) | 23/23, and the footer names the model it used — run it after changing the model or the intent prompt |
-| `vitest run` (in `apps/gateway`) and `flutter test` (in `apps/mobile`) | 248 and 129 as of v0.5.0 |
-| `POST /sync` with an empty body | `full: true` and a `now` cursor — the app's whole conversation with the gateway goes through this one route |
-
-`sweepStale: true` means the scheduled jobs are not reaching the gateway.
-Check that n8n actually has the shared secret — `docker exec botvy-n8n-1
-printenv INTERNAL_SERVICE_TOKEN` — and recreate the container if it is empty;
-one that predates the setting keeps its old environment forever.
-
-### The model
-
-**Currently `qwen2.5:3b-instruct`**, and it must be pulled by hand — the gateway
-never pulls. Confirm what is actually loaded with
-`curl http://localhost:11434/api/ps`: `size_vram` should equal `size`.
-
-`OLLAMA_CHAT_MODEL` must fit entirely in VRAM. Two settings go with it:
-`OLLAMA_THINKING` is true only for a reasoning model like qwen3 (qwen2.5
-rejects the field and every call fails, which is why it is `false` here), and
-`OLLAMA_NUM_CTX` pins the context window. Do not give the intent call and the
-chat call different windows — Ollama keys a loaded model by context size, so
-two values make it reload on every single turn. That cost 39 seconds to the
-first token; one value costs 3.
-
-The switch away from `qwen3:4b` is the subject of Part 2's measurements below
-and of `specs/007-search-and-rendering/`: on a 4 GB card qwen3:4b spilled about
-half of itself to the CPU, and a model that fits beats a cleverer one that does
-not. Those sections describe what was measured at the time and still name
-qwen3:4b for that reason; the value to install is the one above.
-
-### Chats
-
-Each user has many named chats, and one of them is special. The chat whose
-`client_id` is `coaching` is where the evening check-in and the daily program
-are written, and it is the only chat the gateway refuses to delete or archive —
-the nightly cycle has to have somewhere visible to speak. The database enforces
-one per user; there is no flag to keep in step.
-
-Three consequences worth knowing:
-
-- **A reply only counts as the check-in inside that chat.** The classifier
-  matches whole words, `rest` and `not` among them, so before this the sentence
-  "does this need rest time?" typed anywhere at 22:00 recorded a missed day.
-  Answering in another chat now leaves the check-in open for the real answer.
-- **A message that names no chat goes to Coaching.** That covers a phone still
-  on an older build and anything queued before the upgrade.
-- **It is a track, so anything unrelated is moved out of it.** A message there
-  is classified first; unless the intent is `coaching` — training, food, weight,
-  sleep, the programme, or an answer to the check-in — it is answered in a new
-  chat of its own, and the app opens that. The move happens *before* the message
-  is stored, so the track never holds it. A turn that stays gets
-  `prompts/coaching.md` rather than the general assistant's prompt.
-- **The coach knows the body it is coaching.** Weight, height, a BMI computed
-  in code rather than by the model, goal, experience, training days, gym time,
-  liked and disliked foods, and allergies all go into the prompt — and into
-  `search.md` too, so a searched answer about protein or a training split is
-  answered for *this* person rather than repeating whatever figure a result
-  quotes. An allergy is stated as a prohibition, not a preference. Fields that
-  have not been filled in are left out entirely rather than sent as "unknown",
-  which otherwise has the model asking for them again mid-answer.
-
-**Emptying a chat** is `cleared: true` on a pushed conversation. The messages
-are deleted for real and the conversation records `clearedUpToMessageId`, which
-is how the clearing reaches other devices — a message has no tombstone and is
-pulled by `id > lastMessageId`, so a hard delete alone is invisible to a phone
-that already has it. It works on the coaching chat, and it is the only way to
-empty the one chat that cannot be deleted.
-
-Deleting a chat deletes its messages immediately and leaves a tombstone, purged
-by the sweep on `reminders.tombstoneDays` like a reminder's. Chat titles are
-never written by the gateway: an empty title means unnamed and the app shows the
-first message instead, which is what keeps a rename from racing an auto-title.
-
-### Reminder states, and undo
-
-A reminder is one of four things, and only three of them are stored. `active`,
-`done` and `cancelled` are the status column; **overdue** is derived — an active
-reminder whose moment has passed — and is deliberately not a status, because
-nothing writes a row when the clock moves past it.
-
-Deleting is soft and **does not touch the status**, which is what lets the
-Deleted view say whether a reminder was completed, cancelled or never dealt with.
-`GET /reminders?deleted=true` lists them, and there are three ways back out:
-
-| Action | Route | What it does |
+| Kind | Lives in | Changed by |
 |---|---|---|
-| Restore | `POST /reminders/:id/restore` | Back exactly as it was, re-armed only if it can still ring |
-| Reactivate | `POST /reminders/:id/reactivate` | Back as **active** whatever it was, with an optional new `remindAt` |
-| Purge | `DELETE /reminders/:id/purge` | Gone for good. Refused unless it is already a tombstone |
+| Secrets, connection details | `.env` | editing the file and restarting |
+| Anything an operator retunes | the settings registry | the admin portal, no restart |
+| Anything a member wants different | their preferences | the member, in the app |
 
-`DELETE /reminders/deleted/all` empties the list. Over `/sync` the same three
-are `deleted: false`, `deleted: false` with a status, and `purged: true` — a
-purge has to go through the push, because a row deleted only on the phone comes
-straight back on the next full snapshot, which still carries the server's
-tombstone.
+If you find yourself wanting to add a tunable to `.env`, it probably belongs in
+the registry. A value that needs a deploy to change is a value nobody changes.
 
-Restoring re-plans pings only for a reminder that can still ring; a completed or
-long-past one comes back silent, because a ping for a moment in the past would
-fire at once. Untouched, they age out on `reminders.tombstoneDays`, so the undo
-list bounds itself and needs no setting of its own.
+## Backups, and getting your data back
 
-### What lives on the phone
+Both stores are dumped nightly to `backups/`, and each archive is read back
+immediately after it is written. A backup nobody has opened is a hope, not a
+backup.
 
-The app keeps the user's whole account in its own SQLite database — reminders,
-chat, coaching settings, check-ins and past programs — and reconciles it with
-Postgres through one `POST /sync`. Practical consequences:
+The `backups` service runs both dump scripts on one schedule. It is a built
+image (`infra/backup/Dockerfile`) rather than `mongo:8` with a command, because
+that image ships neither `cron` nor `pg_dump`.
 
-- **Everything the app shows works with no connection**, including Settings and
-  the History screen. Edits queue and go up on the next round trip.
-- **Deleted reminders are soft-deleted.** A hard delete cannot appear in a sync
-  delta, so a deletion made in the admin portal would never reach a phone. Rows
-  are really removed by the sweep after `reminders.tombstoneDays` (default 30,
-  in the `settings` table).
-- **A phone offline longer than that horizon gets a full snapshot** rather than
-  a delta, because the tombstones that would have told it about deletions have
-  been purged.
-- Concurrent edits resolve newest-wins, and the loser is replaced on the phone
-  rather than dropped silently.
+The staleness warning is a settings key — `backup.staleHours` — so you can
+retune it from the portal. The schedule is `BACKUP_CRON` in `.env`, because the
+job is a container rather than the API. Retention currently lives in **both**
+places: `backup.retentionDays` in the registry and `BACKUP_RETENTION_DAYS` in
+`.env`, because the sidecar has no way to read the registry from outside the
+API. Change them together until a later phase gives it one.
 
-One thing that follows from this and is easy to forget: an allergy the user
-edits offline does not protect them until it syncs, because the gateway
-withholds unsafe plans based on its own copy.
+### Restoring
 
-### Web search
+Restore **both** stores from the same night. `userId` in MongoDB is the
+PostgreSQL uuid and there is no join to rebuild the link from, so restoring one
+alone leaves accounts whose data is gone, or data whose accounts are.
 
-Search runs through a local SearXNG that nothing but the gateway can reach.
-`infra/searxng/settings.yml` restricts it to a handful of engines: the default
-set waits for the slowest, and its image half is mostly icon libraries. Several
-general engines are listed on purpose — a single home IP collects a CAPTCHA
-from DuckDuckGo and a rate-limit from Brave soon enough, and one working engine
-is enough to answer. If every engine is throttled the assistant simply replies
-without searching, which is why an outage looks like an ordinary conversation
-rather than an error.
+```bash
+# Stop everything that writes, so nothing is half-restored.
+docker compose --env-file .env -f infra/docker-compose.yml stop backend worker
 
----
+# Identity.
+docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres \
+  pg_restore --clean --if-exists --dbname "$DATABASE_URL" < backups/identity-<STAMP>.dump
 
-## Part 2 — The four things only you can do
+# Everything else.
+docker compose --env-file .env -f infra/docker-compose.yml exec -T mongo \
+  mongorestore --uri "$MONGO_URL" --archive --gzip --drop < backups/botvy-<STAMP>.archive.gz
 
-### 1. Ollama on an older NVIDIA driver — use Vulkan, not CUDA
-
-> **This was misdiagnosed for a long time as "the driver is too old and
-> everything falls back to slow CPU".** Both halves were wrong, and the fix
-> needs no driver update and no admin rights. The measurements below are
-> from this machine (driver `556.12`, CUDA `12.5`, GTX 1050 4 GB).
-
-**There is no CPU fallback.** On the default path Ollama's CUDA runner dies
-and the request returns **HTTP 500**:
-
-```
-llama-server process has terminated: exit status 0xc0000409
-CUDA error: the provided PTX was compiled with an unsupported toolchain.
+docker compose --env-file .env -f infra/docker-compose.yml start backend worker
+node infra/verify.mjs
 ```
 
-The runner *is* built for this card (`ARCHS` includes `610` = sm_61). It
-crashes inside `ggml_cuda_kernel_can_use_pdl` — Programmatic Dependent
-Launch, an sm_90+ feature. Merely querying those kernels makes the driver
-JIT their PTX, and a CUDA 12.5 driver cannot read PTX from the newer
-toolchain Ollama was built with. **A smaller model does not help** — 1.7b
-crashes identically.
+Try this before you need it. A restore procedure that has never been run is a
+document, not a capability.
 
-**The fix: make Ollama use its Vulkan backend instead.** It already ships
-one; CUDA simply claims the device first and then dies.
+### Restoring onto a different machine
 
-```powershell
-[Environment]::SetEnvironmentVariable('CUDA_VISIBLE_DEVICES','-1','User')
-# restart Ollama from the tray, then confirm the GPU is really in use:
-curl http://localhost:11434/api/ps    # size_vram must be > 0
-```
+The dumps carry no host names, but several things around them do: the tunnel
+hostname, `CADDY_SITE`, `CORS_ORIGINS`, and the address baked into any phone
+build. Update `.env` first, then restore.
 
-With that set, the GTX 1050 runs under Vulkan with the model in VRAM
-(`size_vram` ≈ 2.6 GB for qwen3:4b; ≈ 2.3 GB for the qwen2.5:3b-instruct in use
-now).
+## Releasing and deploying
 
-**The larger lesson: the GPU was never the main cost.** qwen3 is a reasoning
-model, and an unbounded thinking phase dominated every extraction:
+Push a tag beginning with `v` and CI builds both images, the release APK and
+the extension zip, then deploys if `DEPLOY_HOST` is configured. Without it the
+deploy step is skipped rather than failed, so a clone can cut a release without
+owning a host.
 
-| Same extraction, same model, same GPU | Wall clock |
-|---|---|
-| thinking on (the old code path) | **528 s**, and the answer was wrong |
-| `think: false` | **5 s** |
-
-`extract()` therefore calls Ollama's **native** `/api/chat` rather than the
-`/v1` OpenAI shim, because `think` exists only there, and caps the reply with
-`num_predict`. With qwen3:4b that brought "remind me to call mom tomorrow at
-5pm" down to about **20 seconds** end to end.
-
-Model choice, measured on that same prompt: `qwen3:1.7b` answered in ~7 s but
-put the reminder on the wrong **day**; `qwen3:4b` took ~20 s warm and got it
-right.
-
-> **Superseded.** Everything above is the state before v0.2.0. The 4 GB card
-> could not hold qwen3:4b at a useful context — about half of it spilled to the
-> CPU — so the model is now `qwen2.5:3b-instruct`, fully resident, with
-> `OLLAMA_THINKING=false` because qwen2.5 rejects the field outright. First
-> token is ~2.8 s. The measurements are kept because the reasoning behind them
-> is still how to choose a model here: it has to fit. See
-> `specs/007-search-and-rendering/`.
-
-A newer driver would still be worth installing — it would restore the CUDA
-path, which is faster than Vulkan — but it is an optimisation now, not a
-prerequisite.
-
-### 2. Firebase — push notifications
-
-Reminders fire from the phone itself, scheduled locally, so they work with no
-network and no Firebase at all. Push covers what the device cannot schedule
-for itself: the evening check-in, the nightly program, a reminder created on
-another device, and silent nudges telling the app to re-sync.
-
-1. Create a project at <https://console.firebase.google.com>
-2. Add an Android app using the package name from `apps/mobile`
-3. Download `google-services.json` → `apps/mobile/android/app/`
-4. Project settings → Service accounts → generate a private key
-5. Save it into `secrets/` and set **both** halves in `.env`:
-
-```ini
-# The host directory holding the key; mounted read-only at /run/secrets
-FIREBASE_CREDENTIALS_DIR=./../secrets
-# The path INSIDE the container
-FIREBASE_CREDENTIALS_FILE=/run/secrets/firebase-admin.json
-```
-
-A host path (`E:\...`) in `FIREBASE_CREDENTIALS_FILE` does not exist inside
-the container. That mistake used to disable every notification silently; the
-gateway now refuses to boot instead. Leave both empty to run without push.
-
-iOS additionally needs a paid Apple Developer account, for both APNs and
-device distribution.
-
-Needs an interactive Google sign-in, which is why it is yours.
-
-#### Deferred: rotate the exposed Firebase service-account key
-
-> **The key currently at `secrets/firebase-admin.json` is compromised and has
-> not been rotated.** This is a deliberate deferral, not an oversight — the
-> instance is demo/dev only and the first release was the priority. It stays
-> open until one of the triggers below fires.
-
-The key (key id ending **`c3a2a5`**) was pasted into a chat transcript. A
-Firebase service-account key grants full admin on the `bot-vy` project:
-every Firestore document, read and write, and the ability to mint auth
-tokens for any user. It was never committed — `secrets/` is gitignored, and
-`.env` references the file by path only (`FIREBASE_CREDENTIALS_FILE`) — so
-the exposure is the transcript, nothing in the repo.
-
-**Rotation is mandatory, not optional, before any of these:**
-
-| Trigger |
-|---|
-| Before the instance is reachable from the public internet |
-| Before any real user data exists |
-| Before the repository or project is shared with anyone else |
-
-Whichever comes first. Until then it is an accepted risk.
-
-**How to rotate** — five minutes, and nothing else in the project changes:
-
-1. Google Cloud Console → IAM & Admin → Service Accounts
-2. Open the `firebase-adminsdk-*` account → **Keys**
-3. Delete the key whose id ends `c3a2a5`
-4. **Add key → Create new key → JSON**
-5. Save it over `E:\Work\botvy\secrets\firebase-admin.json`
-
-No other change is needed — `.env` already points at that path.
-
-### 3. Cloudflare tunnel — access away from home
-
-Only needed to reach botvy off your own network. Detail in
-`infra/docs/tunnel-setup.md`.
-
-```powershell
-cloudflared tunnel login            # opens a browser — hence yours
-cloudflared tunnel create botvy
-# In Zero Trust → Networks → Tunnels → botvy → Public Hostname:
-#   route your hostname to http://gateway:8080
-```
-
-Then in `.env`:
+The running version is one line in `.env`:
 
 ```
-TUNNEL_TOKEN=...
-BOTVY_PUBLIC_HOSTNAME=botvy.yourdomain.com
+BOTVY_TAG=v2.0.0
 ```
 
-```powershell
-docker compose --env-file .env -f infra/docker-compose.yml --profile tunnel up -d
+**Rolling back** is re-pinning the previous tag and pulling — images are
+immutable, so the old one is still in the registry:
+
+```bash
+sed -i 's/^BOTVY_TAG=.*/BOTVY_TAG=v1.9.0/' .env
+docker compose --env-file .env -f infra/docker-compose.yml pull
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
-The tunnel exposes **only** the gateway. Postgres, n8n, and Ollama stay
-bound to localhost — that is a project principle, not a default. Do not add
-hostnames routing to them.
+That rolls back the *code*. It does not roll back the database: migrations only
+go forward, by design, so a release whose migration you cannot live with is a
+restore-from-backup, not a rollback. Which is why the restore above is worth
+rehearsing.
 
-### 4. Build the mobile app
+## When something is wrong
 
-```powershell
-cd apps\mobile
-flutter pub get
-dart run build_runner build   # drift's generated database code
-flutter analyze
-flutter test
-flutter build apk --release
-```
+`GET /health` is the first place to look. It reports both stores, the model
+server, whether push is configured, and every scheduled job with the time it
+last succeeded. A job that has gone quiet longer than `ops.staleAfterMinutes`
+is marked stale and the whole status degrades — that is the platform telling
+you something stopped arriving, which is the failure that otherwise goes
+unnoticed for days.
 
-`build_runner` is only needed after changing `lib/src/db/database.dart`; the
-generated `database.g.dart` is otherwise stable.
+A few readings worth recognising:
 
-**For a release, build through the script instead of the last line**, so the
-APK carries the gateway you actually deployed:
+- **`pushConfigured: false` and `status: ok`** — no Firebase credentials. That
+  is a working system without notifications, not a broken one.
+- **The process refusing to start, naming a credentials file** — the file is
+  set but unreadable. Naming it is a declared intent to have push, so the
+  process stops rather than starting silently unable to notify anyone.
+- **`outbox.relay` stale** — the worker is not delivering. Events are safe in
+  the outbox and will be delivered when it comes back; nothing is lost.
+- **`ollama` false** — the model server is unreachable. Chat and extraction
+  stop; reminders, plans and sync carry on.
 
-```powershell
-node infra\build-mobile.mjs                        # ask the running tunnel
-node infra\build-mobile.mjs https://botvy.example  # or name it
-node infra\build-mobile.mjs --check                # print it, build nothing
-```
+## Where things are
 
-It validates the URL, runs the base-URL test with the same value the APK will
-carry, then builds with `--dart-define=BOTVY_BASE_URL=...`.
-
-This is only the **first-run default**: the app stores whatever the user sets in
-Settings, so a build with a stale URL is corrected on the device rather than
-needing a new APK. Which is just as well on a quick tunnel, whose hostname
-changes on every restart — bake one in only for a named tunnel, and the script
-warns when you do it anyway.
-
-On first launch the app asks for notification permission and, on Android 12,
-for permission to schedule exact alarms. Both are needed for a reminder to
-land at the minute it was set for — without the second, Android may delay it
-by a few minutes, and Settings says so rather than leaving it a mystery.
-
-Server address: the Android emulator reaches the host at
-`http://10.0.2.2:8080`. A physical phone needs your machine's LAN IP, and
-the gateway reachable on it. Both are editable in the app's Settings screen.
-
-#### Checking that reminders really fire
-
-```powershell
-adb shell dumpsys alarm | Select-String botvy   # a pending RTC_WAKEUP per ping
-```
-
-The honest test is airplane mode: turn it on, create a reminder two minutes
-out, and wait. It should fire with no connection — the phone scheduled it
-itself. Turn the network back on and the reminder appears server-side, with
-no duplicate push.
-
----
-
-## Part 3 — Operating it day to day
-
-```powershell
-docker compose --env-file .env -f infra/docker-compose.yml up -d    # start
-docker compose --env-file .env -f infra/docker-compose.yml down     # stop
-docker compose --env-file .env -f infra/docker-compose.yml logs -f gateway
-```
-
-| Surface | Address | Exposure |
-|---|---|---|
-| Admin portal | <http://localhost:8080/admin> | Public via the tunnel, if configured |
-| API docs | <http://localhost:8080/docs> | Same |
-| n8n editor | <http://localhost:5679> | **This machine only, by design** |
-| Postgres | `localhost:5432` | This machine only |
-
-### Backups
-
-Two things matter, and neither is in Docker by accident:
-
-```powershell
-# The database — users, reminders, chats and their messages, coaching history
-docker exec botvy-postgres-1 pg_dump -U botvy botvy > backup-botvy.sql
-```
-
-And `N8N_ENCRYPTION_KEY` from `.env`. Without it, a restored n8n cannot
-decrypt its stored credentials. Keep it somewhere other than the machine.
-
-Workflow definitions live in `workflows/*.json` in the repo, so they are
-already version-controlled — `bootstrap.mjs` re-imports them anywhere.
-
-### Changing the schema
-
-Migrations are forward-only. Never edit one that has been committed; add a
-new one.
-
-```powershell
-cd apps\gateway
-npx prisma migrate dev --name what_changed
-```
-
-The phone has a schema too, and it is the one that breaks silently. Drift's
-default `onUpgrade` throws, so any change to `apps/mobile/lib/src/db/database.dart`
-means bumping `schemaVersion` **and** extending the `MigrationStrategy` in the
-same file. An install that already has data fails to open otherwise, taking
-every unsent reminder and queued message with it. `test/migration_test.dart`
-builds an old-shaped database and asserts the upgrade preserves them; add a
-case to it rather than trusting the change.
-
-### Moving to another machine
-
-1. Push the repo; clone it on the new machine
-2. Follow Part 1
-3. Restore the database if you want the history:
-   `docker exec -i botvy-postgres-1 psql -U botvy botvy < backup-botvy.sql`
-4. Carry `N8N_ENCRYPTION_KEY` across if you want n8n's saved credentials
-
-Nothing is pinned to this machine. The one thing to re-do by hand is the
-Ollama host-level setup, since it lives outside Docker.
-
----
-
-## Part 4 — Troubleshooting things that have actually happened
-
-Every entry below was hit during development, not imagined.
-
-**Containers cannot reach Ollama.** Its default binds to loopback only. Set
-`OLLAMA_HOST=0.0.0.0:11434` and restart it. Verify from inside a container:
-
-```powershell
-docker run --rm curlimages/curl -s http://host.docker.internal:11434/api/tags
-```
-
-**Everything is slow, or model calls never return.** Check `size_vram` in
-`curl http://localhost:11434/api/ps`. Zero means CPU — see Part 2.
-
-**`docker ps` hangs while `docker context ls` answers instantly.** The
-daemon is wedged, not the CLI. `wsl --shutdown`, then relaunch Docker
-Desktop. This happened repeatedly here; low disk on the drive holding
-Docker's disk image makes it worse.
-
-**A workflow's error handling silently does nothing.** n8n assigns its own
-ids on import, so a hardcoded `errorWorkflow` id never resolves — and n8n
-reports it only in its log, only when a failure needs the handler.
-`import.mjs` rewrites the reference to the real id; use it rather than
-importing through the UI.
-
-**Structured extraction always falls back to plain chat.** The model call is
-timing out. `LLM_REQUEST_TIMEOUT_MS` defaults to 300000; a shorter value
-silently degrades every extraction. The real fix is a working GPU.
-
-**Admin portal shows CORS errors.** Only happens running the SPA on Vite's
-own port in development. Add that origin to `CORS_ORIGINS`. In production
-the gateway serves the SPA itself, so it is same-origin and `CORS_ORIGINS`
-should be empty.
-
-**n8n's API returns 401 to everything.** No owner account exists yet. Run
-`bootstrap.mjs`.
-
-**A `/sync` push is rejected as stale when it obviously is not, but only from
-a script on this machine.** The Docker VM's clock drifts ahead of the host —
-measured at ~6 seconds here. The app is unaffected, because it sends the
-server's own timestamp as its conflict base and that path never looks at a
-clock. A hand-written test client that omits `baseUpdatedAt` falls through to
-the comparison and loses. Check it with:
-
-```powershell
-"host: " + [DateTime]::UtcNow.ToString('o'); docker exec botvy-gateway-1 date -u -Ins
-```
-
-**A port is already taken.** This machine ran an older botvy whose n8n used
-5678, so this stack uses **5679**. Check for a stale process:
-`Get-NetTCPConnection -LocalPort 8080 -State Listen`.
-
-**Docker image builds appear to hang.** They were re-downloading ~600
-packages with no cache; one sat at 373/605 for 15 minutes. A BuildKit cache
-mount on the pnpm store now fixes that, but the first build is still slow.
-
-**`npm error code ECOMPROMISED` / `Lock compromised` from npx.** An earlier
-`npx` run was killed while installing (a timeout, Ctrl-C, a closed
-terminal). npx takes a `concurrency.lock` in its cache before unpacking and
-only releases it on a clean exit, so a killed run leaves the lock behind
-forever and every later run of that same package fails.
-
-Confirm by looking for a zero-byte lock and a half-unpacked staging folder:
-
-```powershell
-Get-ChildItem "$(npm config get cache)\_npx" -Recurse -Filter concurrency.lock
-```
-
-A directory containing `concurrency.lock` but no `package.json` — often with
-a dot-prefixed folder like `.archiver-BKPZk49p` inside `node_modules` — is an
-interrupted install. Delete that one directory:
-
-```powershell
-Remove-Item "$(npm config get cache)\_npx\<hash>" -Recurse -Force
-```
-
-`npm cache clean --force` also works but throws away every cached package.
-The real prevention is simply not interrupting `npx` while it installs a
-large package; firebase-tools takes a while.
-
----
-
-## The old Telegram assistant
-
-Decommissioned. Its data is backed up at `E:\Work\botvy\backups\`:
-
-- `old-n8n_data.tgz` — the old workflows and credentials
-- `old-sqlite_data.tgz` — `assistant.sqlite`: reminders, profiles, check-ins
-
-Both were verified restorable before anything was removed. Nothing has been
-migrated into the new system; that is a separate exercise if you want the
-history.
+`README.md` has the map of the repository. The rules every change is held to
+are in `.specify/memory/constitution.md`, and `CLAUDE.md` records the things
+that are easy to get wrong here — each one written in the words of the bug that
+taught it.

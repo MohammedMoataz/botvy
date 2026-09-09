@@ -1,137 +1,73 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:go_router/go_router.dart';
 
-import 'src/api/api_client.dart';
-import 'src/app_providers.dart';
-import 'src/features/auth/auth_controller.dart';
-import 'src/features/auth/auth_screens.dart';
-import 'src/features/chat/chat_screen.dart';
-import 'src/features/chat/conversations_controller.dart';
-import 'src/features/reminders/reminders_screen.dart';
-
-/// Lets a tapped notification open a screen from outside the widget tree.
-final navigatorKey = GlobalKey<NavigatorState>();
+import 'app/di.dart';
+import 'app/l10n/app_localizations.dart';
+import 'app/router.dart';
+import 'app/theme.dart';
+import 'core/api/api_client.dart';
+import 'core/notifications/local_notifications.dart';
+import 'features/auth/application/auth_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Read persisted state once, up front, so the rest of the app can treat the
-  // base URL and the signed-in flag as plain synchronous values -- no async
-  // providers, no login-screen flash for a returning user.
-  final store = TokenStore(kSecureStorage);
-  final baseUrl = await store.readBaseUrl();
-  final signedIn = (await store.readRefresh()) != null;
-  final email = await store.readEmail();
+  // Read the persisted server URL once, up front, so the rest of the app can
+  // treat it as a plain synchronous value.
+  final baseUrl =
+      await TokenStore(const SecureSecretStore(kSecureStorage)).readBaseUrl();
+  await configureDependencies(baseUrl: baseUrl);
 
-  runApp(ProviderScope(
-    overrides: [
-      initialBaseUrlProvider.overrideWithValue(baseUrl),
-      initialAuthProvider.overrideWithValue(
-        AuthState(signedIn: signedIn, email: email),
-      ),
-    ],
-    child: const BotvyApp(),
-  ));
+  // Notifications are set up regardless of sign-in state: a scheduled alarm
+  // must still be delivered and tappable on a cold start.
+  await sl<NotificationScheduler>().init();
+
+  // Before the first frame. The router redirects on the session, so deciding
+  // it afterwards is what makes a returning member watch the sign-in form
+  // appear and vanish.
+  await sl<AuthCubit>().restore();
+
+  runApp(BotvyApp(router: buildRouter(sl<AuthCubit>())));
 }
 
 class BotvyApp extends StatelessWidget {
-  const BotvyApp({super.key});
+  const BotvyApp({super.key, required this.router});
+
+  final GoRouter router;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Botvy',
-      navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
+    // The one place the cubit reaches the widget tree.
+    //
+    // `.value`, not a builder: it is a singleton from the container, already
+    // restored before the first frame, and letting BlocProvider construct one
+    // would give the screens a different instance from the one the router's
+    // redirect reads — so a sign-in would update one and navigate on the other.
+    return BlocProvider<AuthCubit>.value(
+      value: sl<AuthCubit>(),
+      child: MaterialApp.router(
+        title: 'Botvy',
+        debugShowCheckedModeBanner: false,
+        routerConfig: router,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        // The direction follows the locale, and is stated rather than inherited:
+        // Arabic reads right to left and every screen below here has to agree,
+        // including the ones a plugin or a dialog inserts.
+        builder: (context, child) => Directionality(
+          textDirection: AppLocalizations.of(context).textDirection,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: Colors.indigo,
-      ),
-      home: const _Root(),
     );
-  }
-}
-
-class _Root extends ConsumerStatefulWidget {
-  const _Root();
-
-  @override
-  ConsumerState<_Root> createState() => _RootState();
-}
-
-class _RootState extends ConsumerState<_Root> with WidgetsBindingObserver {
-  bool _started = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    // Notifications are set up regardless of sign-in state: a scheduled alarm
-    // must still be delivered and tappable on a cold start.
-    ref.read(notificationSchedulerProvider).init(onTap: _openFromNotification);
-  }
-
-  /// Push registration and syncing need a bearer token, so they begin only
-  /// once there is a session, and stop when it ends.
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  /// Coming back to the app is the moment a user would notice stale data, and
-  /// nothing else covers it — connectivity may never have changed and a push
-  /// nudge may never have arrived.
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _started) {
-      ref.read(syncServiceProvider).kick();
-    }
-  }
-
-  void _syncSession(bool signedIn) {
-    if (signedIn && !_started) {
-      _started = true;
-      final scheduler = ref.read(notificationSchedulerProvider);
-      scheduler.requestPermissions();
-      ref.read(pushServiceProvider).start();
-      ref.read(syncServiceProvider)
-        ..watchConnectivity()
-        ..kick();
-    } else if (!signedIn && _started) {
-      _started = false;
-    }
-  }
-
-  void _openFromNotification(String payload) {
-    // A check-in or a program: both are written into the coaching chat, so the
-    // tap should land on the message rather than on a reminder list.
-    if (payload.contains('checkin') || payload.contains('program')) {
-      _openCoachingChat();
-      return;
-    }
-    if (!payload.contains('reminder')) return;
-    navigatorKey.currentState?.push(
-      MaterialPageRoute<void>(builder: (_) => const RemindersScreen()),
-    );
-  }
-
-  Future<void> _openCoachingChat() async {
-    final chat = await ref.read(databaseProvider).coachingConversation();
-    if (chat == null) return; // not synced yet; the chat list will have it soon
-    ref.read(activeConversationProvider.notifier).select(chat.id);
-    navigatorKey.currentState?.popUntil((route) => route.isFirst);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final signedIn = ref.watch(authControllerProvider.select((s) => s.signedIn));
-    _syncSession(signedIn);
-    return signedIn ? const ChatScreen() : const LoginScreen();
   }
 }
