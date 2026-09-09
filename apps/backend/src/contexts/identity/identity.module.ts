@@ -1,14 +1,18 @@
 import { Module } from '@nestjs/common';
+import { ENV } from '../../shared/config/config.module.js';
+import type { Env } from '../../shared/config/env.schema.js';
 import { ServiceTokenGuard } from '../../shared/auth/service-token.guard.js';
 import { PrismaService } from '../../shared/persistence/prisma/prisma.service.js';
 import { DeviceRepository } from './domain/device.repository.js';
 import { IdentityOutboxRepository } from './domain/identity-outbox.repository.js';
+import { GOOGLE_VERIFIER } from './domain/google-verifier.js';
 import { PASSWORD_HASHER } from './domain/password-hasher.js';
 import { ServiceClientRepository } from './domain/service-client.repository.js';
 import { RefreshTokenRepository } from './domain/refresh-token.repository.js';
 import { UserRepository } from './domain/user.repository.js';
 import { ChangePasswordHandler } from './features/change-password/change-password.handler.js';
 import { DeleteAccountHandler } from './features/delete-account/delete-account.handler.js';
+import { GoogleSignInHandler } from './features/google-sign-in/google-sign-in.handler.js';
 import { LogoutHandler } from './features/logout/logout.handler.js';
 import { RegisterDeviceHandler } from './features/register-device/register-device.handler.js';
 import { RefreshHandler } from './features/refresh/refresh.handler.js';
@@ -25,6 +29,7 @@ import {
   PrismaServiceClientRepository,
   PrismaUserRepository,
 } from './infrastructure/prisma-identity.repositories.js';
+import { GoogleIdTokenVerifier } from './infrastructure/google-id-token.verifier.js';
 import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js';
 
 /**
@@ -64,6 +69,11 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
       useFactory: (prisma: PrismaService) => new PrismaRefreshTokenRepository(prisma),
     },
     { provide: PASSWORD_HASHER, useClass: ScryptPasswordHasher },
+    {
+      provide: GOOGLE_VERIFIER,
+      inject: [ENV],
+      useFactory: (env: Env) => new GoogleIdTokenVerifier(env),
+    },
     AdminSeedService,
     ServiceClientSeedService,
     IdentityBootstrap,
@@ -75,6 +85,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     RegisterDeviceHandler,
     LogoutHandler,
     DeleteAccountHandler,
+    GoogleSignInHandler,
     ServiceTokenGuard,
   ],
   // `UserRepository` and `DeviceRepository` are deliberately *not* exported.
@@ -93,6 +104,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     RegisterDeviceHandler,
     LogoutHandler,
     DeleteAccountHandler,
+    GoogleSignInHandler,
     ServiceTokenGuard,
   ],
 })

@@ -1,0 +1,182 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
+import { newId } from '../../../../shared/cqrs/ids.js';
+import { SettingsService } from '../../../../shared/settings/settings.service.js';
+import type { DeviceKind } from '../../domain/device.repository.js';
+import { GOOGLE_VERIFIER, type GoogleVerifier } from '../../domain/google-verifier.js';
+import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import { User } from '../../domain/user.aggregate.js';
+import { UserRepository } from '../../domain/user.repository.js';
+import { RefreshHandler } from '../refresh/refresh.handler.js';
+import { RegisterDeviceHandler } from '../register-device/register-device.handler.js';
+import { InvalidCredentials, type SignedIn } from '../sign-in/sign-in.handler.js';
+
+export interface GoogleSignInCommand {
+  idToken: string;
+  device?: {
+    installId: string;
+    kind: DeviceKind;
+    name?: string | null;
+    pushToken?: string | null;
+  };
+}
+
+export class RegistrationClosedForGoogle extends Error {
+  constructor() {
+    super('registration is closed on this installation');
+  }
+}
+
+/**
+ * A Google address that already has a password-backed account here.
+ *
+ * Not an error and not a sign-in: linking the two needs proof that the person
+ * holding the Google identity also holds the account, and the only proof
+ * available is the password. Signing them in regardless would let anyone who
+ * controls an address take over the account that used it.
+ */
+export class LinkRequired extends Error {
+  readonly code = 'link_required';
+  constructor(readonly email: string) {
+    super('an account with that email already exists; sign in with your password to link it');
+  }
+}
+
+export class LinkPasswordWrong extends Error {
+  constructor() {
+    super('email or password is incorrect');
+  }
+}
+
+/**
+ * Sign in — or register — with Google.
+ *
+ * Three cases, and the third is the one worth being careful about:
+ *
+ * 1. The subject is already linked → sign in.
+ * 2. Nothing matches → create the account, if registration is open.
+ * 3. The *email* matches an account with a password and no Google link →
+ *    refuse with `link_required`, and let the member complete it by supplying
+ *    that password.
+ *
+ * A new account created this way has no password at all, which is deliberate:
+ * inventing one nobody knows would leave the member unable to change it, and
+ * asking them to choose one during a Google flow defeats the point of the flow.
+ */
+@Injectable()
+export class GoogleSignInHandler {
+  private readonly logger = new Logger(GoogleSignInHandler.name);
+
+  constructor(
+    private readonly users: UserRepository,
+    @Inject(GOOGLE_VERIFIER) private readonly google: GoogleVerifier,
+    private readonly signer: JwtSigner,
+    private readonly sessions: RefreshHandler,
+    private readonly deviceRegistry: RegisterDeviceHandler,
+    private readonly settings: SettingsService,
+    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+  ) {}
+
+  async handle(command: GoogleSignInCommand): Promise<SignedIn> {
+    const identity = await this.google.verify(command.idToken);
+
+    const existing = await this.users.findByLogin(identity.email);
+
+    if (existing?.googleSub === identity.sub) {
+      if (!existing.isActive) throw new InvalidCredentials();
+      return this.issue(existing, command);
+    }
+
+    if (existing) {
+      // The address is taken by a password account. Refuse, and say how to
+      // finish — an unhelpful 409 here is what makes people create a second
+      // account with a typo in the address.
+      if (existing.passwordHash) throw new LinkRequired(identity.email);
+
+      // No password and no Google link: an account created some other way that
+      // has nothing to prove ownership with. Linking is the only way it can
+      // ever be signed into, so link it.
+      existing.linkGoogle(identity.sub);
+      await this.users.save(existing);
+      return this.issue(existing, command);
+    }
+
+    if (!(await this.settings.get('auth.registrationOpen'))) {
+      throw new RegistrationClosedForGoogle();
+    }
+
+    const now = new Date();
+    const user = User.register(
+      {
+        id: newId(),
+        email: identity.email,
+        displayName: identity.displayName,
+        // No password. See the note above the class.
+        passwordHash: null,
+        googleSub: identity.sub,
+        role: 'user',
+        status: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {},
+    );
+    await this.users.save(user);
+    this.logger.log(`registered ${identity.email} through Google`);
+
+    return this.issue(user, command);
+  }
+
+  /**
+   * Completes case 3: the member proves they hold the password account, and the
+   * Google identity is attached to it.
+   */
+  async link(
+    idToken: string,
+    password: string,
+    device?: GoogleSignInCommand['device'],
+  ): Promise<SignedIn> {
+    const identity = await this.google.verify(idToken);
+    const user = await this.users.findByLogin(identity.email);
+
+    if (!user?.passwordHash) throw new LinkPasswordWrong();
+    if (!(await this.hasher.verify(user.passwordHash, password))) throw new LinkPasswordWrong();
+    if (!user.isActive) throw new InvalidCredentials();
+
+    user.linkGoogle(identity.sub);
+    await this.users.save(user);
+
+    return this.issue(user, { idToken, ...(device ? { device } : {}) });
+  }
+
+  /** The same tokens and device handling an ordinary sign-in produces. */
+  private async issue(user: User, command: GoogleSignInCommand): Promise<SignedIn> {
+    user.recordSignIn();
+    await this.users.save(user);
+
+    const deviceId = command.device
+      ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
+      : null;
+
+    const { accessToken, expiresIn } = this.signer.sign({
+      sub: user.id,
+      role: user.role,
+      email: user.email,
+    });
+    const session = await this.sessions.open(user.id, deviceId);
+
+    return {
+      accessToken,
+      expiresIn,
+      refreshToken: session.refreshToken,
+      refreshExpiresAt: session.refreshExpiresAt,
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      deviceId,
+      // A Google account has no password to still be the default one, and one
+      // shorter than the minimum cannot have been set through this codebase.
+      mustChangePassword: false,
+    };
+  }
+}

@@ -31,6 +31,18 @@ export const envSchema = z.object({
   AUTOMATION_WEBHOOK_SECRET: z.string().min(16),
   MEDIA_SIGNING_SECRET: z.string().min(16),
 
+  /**
+   * The OAuth client ids a Google id token may be addressed to, comma
+   * separated. Each surface has its own — Android, iOS, the web app and the
+   * extension are four — and a token minted for any of them came from this
+   * installation.
+   *
+   * Optional: unset means Google sign-in is refused rather than broken. It is a
+   * connection detail rather than an operator knob, so it belongs here and not
+   * in the settings registry.
+   */
+  GOOGLE_CLIENT_IDS: z.string().optional(),
+
   // Neighbours
   N8N_URL: z.string().url().default('http://n8n:5678'),
   N8N_API_KEY: z.string().optional(),

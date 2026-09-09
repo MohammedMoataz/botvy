@@ -24,6 +24,7 @@ import {
 import { Type } from 'class-transformer';
 import { CurrentPrincipal, Public, UsersOnly } from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
+import { GoogleTokenInvalid } from '../../domain/google-verifier.js';
 import {
   ChangePasswordHandler,
   CurrentPasswordWrong,
@@ -51,6 +52,12 @@ import {
   RegisterDeviceHandler,
 } from '../register-device/register-device.handler.js';
 import { DevicesQueryHandler } from '../devices/devices.query.js';
+import {
+  GoogleSignInHandler,
+  LinkPasswordWrong,
+  LinkRequired,
+  RegistrationClosedForGoogle,
+} from '../google-sign-in/google-sign-in.handler.js';
 import { InvalidCredentials, SignInHandler, type SignedIn } from './sign-in.handler.js';
 
 export class RegisterDto {
@@ -118,6 +125,21 @@ export class SignInDto {
   device?: DeviceDto;
 }
 
+export class GoogleSignInDto {
+  @IsString()
+  idToken!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeviceDto)
+  device?: DeviceDto;
+}
+
+export class GoogleLinkDto extends GoogleSignInDto {
+  @IsString()
+  password!: string;
+}
+
 export class DeleteAccountDto {
   @IsOptional()
   @IsString()
@@ -157,6 +179,7 @@ export class AuthController {
     private readonly devices: RegisterDeviceHandler,
     private readonly deviceList: DevicesQueryHandler,
     private readonly deleteAccount: DeleteAccountHandler,
+    private readonly googleSignIn: GoogleSignInHandler,
   ) {}
 
   @Post('register')
@@ -304,6 +327,52 @@ export class AuthController {
       return await this.deleteAccount.handle({ userId: principal.id, ...body });
     } catch (error) {
       if (error instanceof PasswordRequired) throw new UnauthorizedException(error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Google sign-in, which is also Google registration.
+   *
+   * A 409 here is not a dead end: `link_required` means the address already has
+   * a password account, and `POST /auth/google/link` finishes the job with that
+   * password. Refusing without saying so is what makes people create a second
+   * account with a typo in the address.
+   */
+  @Post('google')
+  @Public()
+  @HttpCode(200)
+  async google(@Body() body: GoogleSignInDto): Promise<SignedIn> {
+    try {
+      return await this.googleSignIn.handle(body);
+    } catch (error) {
+      if (error instanceof LinkRequired) {
+        throw new ConflictException({ code: error.code, email: error.email, message: error.message });
+      }
+      if (error instanceof RegistrationClosedForGoogle) {
+        throw new ForbiddenException(error.message);
+      }
+      if (error instanceof GoogleTokenInvalid || error instanceof InvalidCredentials) {
+        throw new UnauthorizedException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  @Post('google/link')
+  @Public()
+  @HttpCode(200)
+  async googleLink(@Body() body: GoogleLinkDto): Promise<SignedIn> {
+    try {
+      return await this.googleSignIn.link(body.idToken, body.password, body.device);
+    } catch (error) {
+      if (
+        error instanceof LinkPasswordWrong ||
+        error instanceof GoogleTokenInvalid ||
+        error instanceof InvalidCredentials
+      ) {
+        throw new UnauthorizedException(error.message);
+      }
       throw error;
     }
   }
