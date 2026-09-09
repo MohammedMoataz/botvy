@@ -21,10 +21,12 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'login.password': 'Password',
     'login.submit': 'Sign in',
     'login.pending': 'Signing in…',
-    'login.notYet': 'Sign-in arrives in the next phase.',
-    'login.failed': 'Sign-in failed.',
-    'login.welcome': 'Signed in.',
+    'login.invalid': 'Email or password is incorrect.',
+    'login.replay': 'That session was ended for security. Sign in again.',
+    'login.failed': 'Sign-in failed. Check that Botvy is reachable.',
+    'login.welcome': 'Signed in as {name}.',
     'login.signOut': 'Sign out',
+    'panel.soon': 'Today’s tasks and meetings arrive with the working panel.',
     'locale.label': 'Language',
     'locale.en': 'English',
     'locale.ar': 'العربية',
@@ -37,10 +39,12 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'login.password': 'كلمة المرور',
     'login.submit': 'تسجيل الدخول',
     'login.pending': 'جارٍ تسجيل الدخول…',
-    'login.notYet': 'تسجيل الدخول يصل في المرحلة القادمة.',
-    'login.failed': 'تعذّر تسجيل الدخول.',
-    'login.welcome': 'تم تسجيل الدخول.',
+    'login.invalid': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+    'login.replay': 'تم إنهاء تلك الجلسة لأسباب أمنية. سجّل الدخول من جديد.',
+    'login.failed': 'تعذّر تسجيل الدخول. تأكد من إمكانية الوصول إلى بوتفي.',
+    'login.welcome': 'تم تسجيل الدخول بصفة {name}.',
     'login.signOut': 'تسجيل الخروج',
+    'panel.soon': 'مهام اليوم والاجتماعات تصل مع لوحة العمل.',
     'locale.label': 'اللغة',
     'locale.en': 'English',
     'locale.ar': 'العربية',
@@ -75,6 +79,25 @@ export function applyDirection(locale: Locale): void {
   document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
 }
 
-export function translate(locale: Locale, key: string): string {
-  return catalogues[locale][key] ?? catalogues.en[key] ?? key;
+/**
+ * Looks a key up, falling back to English and then to the key itself.
+ *
+ * `params` fills `{placeholders}`. Without it a string like
+ * `Signed in as {name}.` renders the braces to the member, which is the kind of
+ * thing that ships because nobody signed in while looking at the panel.
+ */
+export function translate(
+  locale: Locale,
+  key: string,
+  params?: Record<string, string | number>,
+): string {
+  const template = catalogues[locale][key] ?? catalogues.en[key] ?? key;
+  if (!params) return template;
+
+  return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    // An unreplaced placeholder is left as-is rather than blanked: seeing
+    // `{count}` in the panel tells you which key is wrong, where an empty gap
+    // tells you nothing.
+    name in params ? String(params[name]) : whole,
+  );
 }

@@ -44,8 +44,12 @@ export const App = observer(function App() {
       {store.isAuthenticated ? (
         <div>
           <div className="alert alert-success py-2">
-            {store.t('login.welcome')}
+            {store.t('login.welcome', { name: store.displayName })}
           </div>
+          {/* The working panel — today's tasks and meetings — arrives with P9.
+              Said plainly, because a signed-in panel with nothing on it reads
+              as a failure rather than as a phase boundary. */}
+          <p className="text-muted small">{store.t('panel.soon')}</p>
           <button
             className="btn btn-outline-secondary btn-sm"
             onClick={() => void store.logout()}
@@ -97,15 +101,23 @@ export const App = observer(function App() {
               : store.t('login.submit')}
           </button>
 
-          {/* No endpoint until P1: a 404 is expected, and must not look broken. */}
-          {store.status === 'unavailable' && (
-            <div className="alert alert-info py-2 mt-3 mb-0">
-              {store.t('login.notYet')}
+          {/* One message for a wrong password and an unknown address alike:
+              the API answers the same way for both, deliberately. */}
+          {store.failure === 'invalid_credentials' && (
+            <div className="alert alert-danger py-2 mt-3 mb-0">
+              {store.t('login.invalid')}
             </div>
           )}
-          {store.status === 'error' && (
+          {/* The session was ended on purpose — most likely the refresh token
+              was replayed. Not a typo, and not worth hunting for one. */}
+          {store.failure === 'session_replay' && (
+            <div className="alert alert-warning py-2 mt-3 mb-0">
+              {store.t('login.replay')}
+            </div>
+          )}
+          {store.failure === 'unknown' && (
             <div className="alert alert-danger py-2 mt-3 mb-0">
-              {store.t('login.failed')} {store.error}
+              {store.t('login.failed')}
             </div>
           )}
         </form>
