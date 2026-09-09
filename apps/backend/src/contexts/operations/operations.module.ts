@@ -26,6 +26,7 @@ import { AuditPort } from './domain/audit.port.js';
 import { HeartbeatRepository } from './domain/heartbeat.repository.js';
 import { PingRepository } from './domain/ping.aggregate.js';
 import { AdminPasswordFlagHandler } from './features/admin-password-flag/admin-password-flag.handler.js';
+import { OperationsBootstrap } from './features/admin-password-flag/operations.bootstrap.js';
 import { PingHandler } from './features/ping/ping.handler.js';
 import { PingedHandler } from './features/ping/pinged.handler.js';
 import { ADMIN_DEVICE_LOOKUP, SeededAdminDeviceLookup } from './infrastructure/admin-device.lookup.js';
@@ -64,42 +65,6 @@ type AnyModel = Model<Record<string, unknown>>;
         new MongoPingRepository(ping, outbox),
     },
     {
-      provide: HeartbeatRepository,
-      inject: [getModelToken(MODEL_NAMES.heartbeat)],
-      useFactory: (model: AnyModel) => new MongoHeartbeatRepository(model),
-    },
-    {
-      provide: AuditPort,
-      inject: [getModelToken(MODEL_NAMES.auditLog)],
-      useFactory: (model: AnyModel) => new MongoAuditAdapter(model),
-    },
-    {
-      provide: SettingsStore,
-      inject: [getModelToken(MODEL_NAMES.setting)],
-      useFactory: (model: AnyModel) => new MongoSettingsStore(model),
-    },
-    {
-      // A changed setting is an event like any other: through the outbox, so
-      // the other role's cache learns about it the same way n8n would.
-      provide: SETTINGS_EVENT_SINK,
-      inject: [OutboxWriter],
-      useFactory: (writer: OutboxWriter): SettingsEventSink => ({
-        publish: (name, payload) =>
-          writer.append([
-            {
-              eventId: newId(),
-              name,
-              context: contextOf(name),
-              aggregate: { type: 'setting', id: String((payload as { key?: string })?.key ?? '') },
-              userId: null,
-              occurredAt: new Date(),
-              payload,
-              schemaVersion: EVENT_SCHEMA_VERSION,
-            },
-          ]),
-      }),
-    },
-    {
       provide: PushService,
       inject: [ENV],
       useFactory: (env: Env) => {
@@ -109,20 +74,18 @@ type AnyModel = Model<Record<string, unknown>>;
       },
     },
     { provide: ADMIN_DEVICE_LOOKUP, useClass: SeededAdminDeviceLookup },
-    HeartbeatService,
-    SettingsService,
     PingHandler,
     PingedHandler,
     AdminPasswordFlagHandler,
+    OperationsBootstrap,
   ],
+  // The shared-kernel services are no longer re-exported: `PlatformModule` is
+  // global, so a context that needs `SettingsService` or `AuditPort` gets it
+  // without naming anybody. Re-exporting them here is what made this module
+  // look like the only way to reach them, and then made Identity import it.
   exports: [
     UnitOfWork,
     PingRepository,
-    HeartbeatRepository,
-    AuditPort,
-    SettingsStore,
-    SettingsService,
-    HeartbeatService,
     PushService,
     ADMIN_DEVICE_LOOKUP,
     PingHandler,

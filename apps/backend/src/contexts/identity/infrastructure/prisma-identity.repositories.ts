@@ -288,8 +288,28 @@ export class PrismaRefreshTokenRepository extends RefreshTokenRepository {
     return toRefreshRecord(row);
   }
 
-  async rotate(previousId: string, next: IssueRefreshToken): Promise<RefreshTokenRecord> {
-    const run = async (tx: PrismaTransaction | PrismaService): Promise<RefreshTokenRecord> => {
+  async rotate(
+    previousId: string,
+    next: IssueRefreshToken,
+  ): Promise<RefreshTokenRecord | null> {
+    const run = async (
+      tx: PrismaTransaction | PrismaService,
+    ): Promise<RefreshTokenRecord | null> => {
+      // Claim first, and conditionally. `updateMany` with the predicate in the
+      // `where` is one atomic statement: whoever's UPDATE lands first sets
+      // `revokedAt`, and the loser's `count` is 0 because the row no longer
+      // matches. A plain `update` by id has no predicate and cannot lose,
+      // which is how two refreshes both succeeded.
+      //
+      // A transaction alone does not help. PostgreSQL's default Read
+      // Committed lets both readers see the same pre-image, and a blind write
+      // is a blind write inside a transaction too.
+      const claimed = await tx.refreshToken.updateMany({
+        where: { id: previousId, revokedAt: null, replacedBy: null },
+        data: { revokedAt: new Date() },
+      });
+      if (claimed.count === 0) return null;
+
       const issued = await tx.refreshToken.create({
         data: {
           userId: next.userId,
@@ -299,9 +319,11 @@ export class PrismaRefreshTokenRepository extends RefreshTokenRepository {
           deviceId: next.deviceId,
         },
       });
+      // Now that the successor exists, record which one it was. The claim
+      // above is what made the exchange exclusive; this is bookkeeping.
       await tx.refreshToken.update({
         where: { id: previousId },
-        data: { replacedBy: issued.id, revokedAt: new Date() },
+        data: { replacedBy: issued.id },
       });
       return toRefreshRecord(issued);
     };

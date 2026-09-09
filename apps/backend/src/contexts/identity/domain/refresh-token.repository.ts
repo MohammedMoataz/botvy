@@ -23,11 +23,26 @@ export abstract class RefreshTokenRepository {
   /** A fresh family — a new sign-in. */
   abstract issue(token: IssueRefreshToken): Promise<RefreshTokenRecord>;
 
-  /** Marks `previousId` exchanged and writes its successor, atomically. */
+  /**
+   * Claims `previousId`, then writes its successor — and returns `null` when
+   * the claim failed because somebody else got there first.
+   *
+   * The claim is the whole contract. Reading a row, judging it live, and then
+   * writing it unconditionally is a check-then-act race: two concurrent
+   * refreshes both read `replacedBy: null`, both decide to rotate, and both
+   * blind-write the old row. The result is two live tokens in a family whose
+   * entire purpose is that there is only ever one — and the replay detection
+   * that family exists for is then dead for good, which is exactly what a
+   * stolen token needs.
+   *
+   * `null` is not an error. It means this exchange lost the race, and the
+   * caller must treat it as a replay: it cannot tell a lost race from a theft,
+   * and neither can anybody else.
+   */
   abstract rotate(
     previousId: string,
     next: IssueRefreshToken,
-  ): Promise<RefreshTokenRecord>;
+  ): Promise<RefreshTokenRecord | null>;
 
   /** One token, on sign-out. Returns whether there was anything to revoke. */
   abstract revoke(tokenId: string): Promise<boolean>;

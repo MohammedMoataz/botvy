@@ -4,8 +4,11 @@ import type { Model } from 'mongoose';
 import { IdentityOutboxRepository } from '../../contexts/identity/domain/identity-outbox.repository.js';
 import { IdentityModule } from '../../contexts/identity/identity.module.js';
 import { AdminPasswordFlagHandler } from '../../contexts/operations/features/admin-password-flag/admin-password-flag.handler.js';
+import { BootstrapOnRegisteredHandler } from '../../contexts/profile/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
+import { PurgeOnDeletedHandler } from '../../contexts/profile/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PingedHandler } from '../../contexts/operations/features/ping/pinged.handler.js';
 import { OperationsModule } from '../../contexts/operations/operations.module.js';
+import { ProfileModule } from '../../contexts/profile/profile.module.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
 import type { DomainEvent } from '../cqrs/domain-event.js';
@@ -34,7 +37,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
  * row per handler until a phase shows it should become one.
  */
 @Module({
-  imports: [OutboxModule, IdentityModule, OperationsModule],
+  imports: [OutboxModule, IdentityModule, OperationsModule, ProfileModule],
   providers: [
     {
       provide: MongoOutboxStore,
@@ -67,6 +70,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         SettingsService,
         PingedHandler,
         AdminPasswordFlagHandler,
+        BootstrapOnRegisteredHandler,
+        PurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -75,6 +80,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         settings: SettingsService,
         pinged: PingedHandler,
         passwordFlag: AdminPasswordFlagHandler,
+        profileBootstrap: BootstrapOnRegisteredHandler,
+        profilePurge: PurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -85,10 +92,33 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               ...sub,
               enabled: sub.enabled ?? false,
             })),
+          /**
+           * Where a domain event reaches an in-process handler.
+           *
+           * An explicit table rather than `@EventsHandler` discovery, and the
+           * price of that is this: a handler that is provided but not named
+           * here is never called, and nothing fails — it simply does not
+           * happen. `bootstrap-on-registered` and `purge-on-deleted` were both
+           * in exactly that state, so every account created got no profile and
+           * every deleted one left its photo on the volume.
+           *
+           * The `default` is deliberate: most events exist for n8n, which the
+           * fanout above already handled. But adding a handler means adding a
+           * case, and the spec below is what remembers that.
+           */
           publish: async (event: DomainEvent) => {
             switch (event.name) {
               case 'operations.Pinged':
                 await pinged.handle(event);
+                return;
+              // Profile reacts to Identity. Two stores, so no transaction can
+              // span them — the event is the only way across, and it is why
+              // both handlers are idempotent on re-delivery.
+              case 'identity.UserRegistered':
+                await profileBootstrap.handle(event);
+                return;
+              case 'identity.UserDeleted':
+                await profilePurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(String((event.payload as { key?: string })?.key ?? ''));

@@ -246,10 +246,22 @@ export class InMemoryRefreshTokenRepository extends RefreshTokenRepository {
     return row;
   }
 
-  async rotate(previousId: string, next: IssueRefreshToken): Promise<RefreshTokenRecord> {
-    const issued = await this.issue(next);
+  async rotate(
+    previousId: string,
+    next: IssueRefreshToken,
+  ): Promise<RefreshTokenRecord | null> {
     const previous = this.rows.find((row) => row.id === previousId);
-    if (previous) previous.replacedBy = issued.id;
+    // The same claim the Prisma adapter makes. An in-memory adapter that
+    // rotated unconditionally would let a handler spec pass while the real
+    // store handed out two live tokens — which is the whole reason the
+    // contract test exists.
+    if (!previous || previous.revokedAt !== null || previous.replacedBy !== null) {
+      return null;
+    }
+    previous.revokedAt = new Date();
+
+    const issued = await this.issue(next);
+    previous.replacedBy = issued.id;
     return issued;
   }
 

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from './shared/auth/auth.module.js';
+import { PlatformModule } from './shared/platform/platform.module.js';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
@@ -23,6 +25,8 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
  */
 @Module({
   imports: [
+    AuthModule,
+    PlatformModule,
     ConfigModule,
     CqrsModule.forRoot(),
     PrismaModule,

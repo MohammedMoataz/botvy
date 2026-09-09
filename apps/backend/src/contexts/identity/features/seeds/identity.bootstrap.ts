@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ENV } from '../../../../shared/config/config.module.js';
 import type { Env } from '../../../../shared/config/env.schema.js';
-import { AdminPasswordFlagHandler } from '../../../operations/features/admin-password-flag/admin-password-flag.handler.js';
 import { AdminSeedService } from './admin-seed.service.js';
 import { ServiceClientSeedService } from './service-client-seed.service.js';
 
@@ -22,7 +21,6 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     @Inject(ENV) private readonly env: Env,
     private readonly admin: AdminSeedService,
     private readonly serviceClients: ServiceClientSeedService,
-    private readonly passwordFlag: AdminPasswordFlagHandler,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -36,9 +34,10 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
       this.env.ADMIN_PASSWORD,
     );
     this.admin.warnIfDefault(this.env.ADMIN_EMAIL, stillDefault);
-    // Recorded as well as logged. A boot log is not a warning anybody sees, and
-    // the portal has to be able to say this on every page load.
-    await this.passwordFlag.record(stillDefault);
+    // Recorded in the registry too, so the portal can say it on every page
+    // load rather than only in the seconds after a restart — by Operations,
+    // which owns that key. `OperationsBootstrap` runs straight after this one,
+    // because its module imports this one.
 
     const client = await this.serviceClients.seed(this.env.INTERNAL_SERVICE_TOKEN);
     this.logger.log(`service client seed: ${client}`);

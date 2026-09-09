@@ -100,6 +100,11 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
   // did. What leaves this module is the query handler, the credential guard,
   // and the outbox repository the relay's forwarder needs.
   exports: [
+    // Operations' bootstrap asks this whether the seeded password is still the
+    // default, because only Identity can answer — and Operations owns the
+    // registry key that records it. Exporting the seed service is how that
+    // question crosses the boundary in the permitted direction.
+    AdminSeedService,
     ServiceClientRepository,
     IdentityOutboxRepository,
     DevicesQueryHandler,

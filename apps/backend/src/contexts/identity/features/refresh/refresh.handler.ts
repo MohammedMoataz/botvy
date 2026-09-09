@@ -96,13 +96,29 @@ export class RefreshHandler {
 
     const next = mintRefreshToken();
     const expiresAt = refreshExpiry(this.env.JWT_REFRESH_TTL);
-    await this.tokens.rotate(verdict.record.id, {
+    const rotated = await this.tokens.rotate(verdict.record.id, {
       userId: user.id,
       familyId: verdict.record.familyId,
       tokenHash: next.hash,
       expiresAt,
       deviceId: verdict.record.deviceId,
     });
+
+    // The claim failed, so this token was exchanged between the read above and
+    // the write. Indistinguishable from a replay from here — and treated as
+    // one, because the alternative is deciding that a race is probably
+    // innocent, which is precisely the assumption a thief relies on.
+    if (!rotated) {
+      const revoked = await this.tokens.revokeFamily(verdict.record.familyId);
+      this.logger.warn(
+        `refresh raced on family ${verdict.record.familyId} for user ` +
+          `${verdict.record.userId}; revoked ${revoked} token(s)`,
+      );
+      throw new RefreshRejected(
+        'session_replay',
+        'that refresh token was already used; the session has been ended',
+      );
+    }
 
     const { accessToken, expiresIn } = this.signer.sign({
       sub: user.id,

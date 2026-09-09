@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PlatformModule } from './shared/platform/platform.module.js';
 import { APP_GUARD } from '@nestjs/core';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
@@ -38,6 +39,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
  */
 @Module({
   imports: [
+    PlatformModule,
     ConfigModule,
     AuthModule,
     CqrsModule.forRoot(),
