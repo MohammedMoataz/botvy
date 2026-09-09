@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Where a fresh install looks for the gateway, before anyone opens Settings.
@@ -42,15 +43,93 @@ class TokenPair {
   final String refreshToken;
 }
 
+/// A sign-in, which is more than a token pair.
+///
+/// [mustChangePassword] is true while the account still holds the seeded
+/// default. Reported rather than enforced: refusing to continue would leave
+/// somebody with no way to reach the screen that fixes it.
+class Session {
+  const Session({
+    required this.tokens,
+    required this.userId,
+    required this.email,
+    required this.role,
+    required this.deviceId,
+    required this.mustChangePassword,
+  });
+
+  factory Session.fromJson(Map<String, dynamic> json) => Session(
+    tokens: TokenPair.fromJson(json),
+    userId: json['userId'] as String,
+    email: json['email'] as String,
+    role: json['role'] as String? ?? 'user',
+    deviceId: json['deviceId'] as String?,
+    mustChangePassword: json['mustChangePassword'] as bool? ?? false,
+  );
+
+  final TokenPair tokens;
+  final String userId;
+  final String email;
+  final String role;
+  final String? deviceId;
+  final bool mustChangePassword;
+}
+
+/// The three operations [TokenStore] needs from a keystore.
+///
+/// A port, and the reason is concrete rather than architectural: a test cannot
+/// use `flutter_secure_storage` — it needs a platform channel — and subclassing
+/// it instead breaks on every major version, because the option types in its
+/// method signatures get renamed (`IOSOptions` became `AppleOptions` in 11).
+/// Three methods that will never change are a better seam than six named
+/// parameters that do.
+abstract interface class SecretStore {
+  Future<String?> read(String key);
+  Future<void> write(String key, String value);
+  Future<void> delete(String key);
+}
+
+/// The real one.
+class SecureSecretStore implements SecretStore {
+  const SecureSecretStore(this._storage);
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> write(String key, String value) =>
+      _storage.write(key: key, value: value);
+
+  @override
+  Future<void> delete(String key) => _storage.delete(key: key);
+}
+
+/// In memory, for tests. Here rather than in the test file so every test that
+/// needs one shares the same behaviour.
+class InMemorySecretStore implements SecretStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<void> write(String key, String value) async => values[key] = value;
+
+  @override
+  Future<void> delete(String key) async => values.remove(key);
+}
+
 /// JWTs, the signed-in email, and the server URL.
 ///
-/// The base URL is not a secret, but it is one short string and
-/// flutter_secure_storage is already here — adding a second storage package
-/// for it would be a whole extra dependency for no gain.
+/// The base URL is not a secret, but it is one short string and the keystore is
+/// already here — adding a second storage package for it would be a whole
+/// extra dependency for no gain.
 class TokenStore {
   TokenStore(this._storage);
 
-  final FlutterSecureStorage _storage;
+  final SecretStore _storage;
 
   static const String _kAccess = 'access_token';
   static const String _kRefresh = 'refresh_token';
@@ -60,37 +139,42 @@ class TokenStore {
   String? _accessCache;
 
   Future<String?> readAccess() async =>
-      _accessCache ??= await _storage.read(key: _kAccess);
+      _accessCache ??= await _storage.read(_kAccess);
 
-  Future<String?> readRefresh() => _storage.read(key: _kRefresh);
+  Future<String?> readRefresh() => _storage.read(_kRefresh);
 
-  Future<String?> readEmail() => _storage.read(key: _kEmail);
+  Future<String?> readEmail() => _storage.read(_kEmail);
 
   Future<String> readBaseUrl() async =>
-      (await _storage.read(key: _kBaseUrl)) ?? kDefaultBaseUrl;
+      (await _storage.read(_kBaseUrl)) ?? kDefaultBaseUrl;
 
   Future<void> writeBaseUrl(String url) =>
-      _storage.write(key: _kBaseUrl, value: url);
+      _storage.write(_kBaseUrl, url);
 
   Future<void> saveTokens(TokenPair pair, {String? email}) async {
     _accessCache = pair.accessToken;
-    await _storage.write(key: _kAccess, value: pair.accessToken);
-    await _storage.write(key: _kRefresh, value: pair.refreshToken);
-    if (email != null) await _storage.write(key: _kEmail, value: email);
+    await _storage.write(_kAccess, pair.accessToken);
+    await _storage.write(_kRefresh, pair.refreshToken);
+    if (email != null) await _storage.write(_kEmail, email);
   }
 
   Future<void> clearTokens() async {
     _accessCache = null;
-    await _storage.delete(key: _kAccess);
-    await _storage.delete(key: _kRefresh);
-    await _storage.delete(key: _kEmail);
+    await _storage.delete(_kAccess);
+    await _storage.delete(_kRefresh);
+    await _storage.delete(_kEmail);
     // base URL deliberately survives logout.
   }
 }
 
 /// Thrown for anything the UI should show the user verbatim.
 class ApiException implements Exception {
-  ApiException(this.message, {this.statusCode, this.isOffline = false});
+  ApiException(
+    this.message, {
+    this.statusCode,
+    this.isOffline = false,
+    this.linkEmail,
+  });
 
   final String message;
   final int? statusCode;
@@ -98,6 +182,14 @@ class ApiException implements Exception {
   /// The gateway could not be reached at all. Callers queue instead of
   /// failing: no connection is a normal state for this app, not an error.
   final bool isOffline;
+
+  /// Set when a Google sign-in collided with a password account.
+  ///
+  /// Carried rather than folded into the message, because the caller has
+  /// something to *do* with it: ask for that account's password and finish the
+  /// link. A member who is only told "already exists" registers again with a
+  /// typo in the address.
+  final String? linkEmail;
 
   @override
   String toString() => message;
@@ -207,43 +299,191 @@ class ApiClient {
 
   // -- auth ------------------------------------------------------------------
 
-  Future<TokenPair> login(String email, String password) async {
+  /// Signs in, and registers this handset in the same call.
+  ///
+  /// The device rides along rather than being a second request: the server
+  /// binds the refresh family to it, and a phone that signed in and then failed
+  /// to register would hold a session bound to nothing — so signing this device
+  /// out later would sign out all of them.
+  Future<Session> login(
+    String email,
+    String password, {
+    Map<String, dynamic>? device,
+  }) async {
     final res = await _guard(
       () => dio.post<dynamic>(
         '/auth/login',
-        data: {'email': email, 'password': password},
+        data: {
+          'email': email,
+          'password': password,
+          if (device != null) 'device': device,
+        },
       ),
     );
-    final pair = TokenPair.fromJson(Map<String, dynamic>.from(res.data as Map));
-    await tokens.saveTokens(pair, email: email);
-    return pair;
+    final session = Session.fromJson(
+      Map<String, dynamic>.from(res.data as Map),
+    );
+    await tokens.saveTokens(session.tokens, email: session.email);
+    return session;
   }
 
-  Future<void> logout() => tokens.clearTokens();
-
-  // -- devices ---------------------------------------------------------------
-
-  /// Registers this device for push and refreshes its last-seen time, which is
-  /// what tells the server this phone already holds the upcoming alarms.
-  Future<void> registerDevice({
-    required String installId,
-    required String platform,
-    String? fcmToken,
+  /// Creates an account. The confirmation is checked on the server too — the
+  /// client's own check is for the person who mistyped.
+  Future<void> register({
+    required String email,
+    required String password,
+    required String passwordConfirm,
+    String? displayName,
+    String? locale,
+    String? timezone,
   }) async {
     await _guard(
       () => dio.post<dynamic>(
-        '/devices',
+        '/auth/register',
         data: {
-          'installId': installId,
-          'platform': platform,
-          if (fcmToken != null) 'fcmToken': fcmToken,
+          'email': email,
+          'password': password,
+          'passwordConfirm': passwordConfirm,
+          if (displayName != null && displayName.isNotEmpty)
+            'displayName': displayName,
+          if (locale != null) 'locale': locale,
+          if (timezone != null) 'timezone': timezone,
         },
       ),
     );
   }
 
-  Future<void> unregisterDevice(String installId) async {
-    await _guard(() => dio.delete<dynamic>('/devices/$installId'));
+  /// Google sign-in. A 409 carrying `link_required` means the address already
+  /// has a password account; [linkGoogle] finishes with that password.
+  Future<Session> google(String idToken, {Map<String, dynamic>? device}) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '/auth/google',
+        data: {'idToken': idToken, if (device != null) 'device': device},
+      ),
+    );
+    final session = Session.fromJson(
+      Map<String, dynamic>.from(res.data as Map),
+    );
+    await tokens.saveTokens(session.tokens, email: session.email);
+    return session;
+  }
+
+  Future<Session> linkGoogle(
+    String idToken,
+    String password, {
+    Map<String, dynamic>? device,
+  }) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '/auth/google/link',
+        data: {
+          'idToken': idToken,
+          'password': password,
+          if (device != null) 'device': device,
+        },
+      ),
+    );
+    final session = Session.fromJson(
+      Map<String, dynamic>.from(res.data as Map),
+    );
+    await tokens.saveTokens(session.tokens, email: session.email);
+    return session;
+  }
+
+  /// Ends this session on the server as well as locally.
+  ///
+  /// The local clear happens whichever way the request goes: somebody who
+  /// pressed sign-out on a train must not be left looking at their own data.
+  Future<void> logout() async {
+    final refresh = await tokens.readRefresh();
+    if (refresh != null) {
+      try {
+        await dio.post<dynamic>(
+          '/auth/logout',
+          data: {'refreshToken': refresh},
+        );
+      } on DioException {
+        // Nothing to do about it, and the token expires on its own.
+      }
+    }
+    await tokens.clearTokens();
+  }
+
+  // -- devices ---------------------------------------------------------------
+
+  /// Registers this device for push and refreshes its last-seen time, which is
+  /// what tells the server this phone already holds the upcoming alarms.
+  /// `/auth/devices` with `kind`, not v1's `/devices` with `platform`: the
+  /// route moved under auth and the field was renamed, because `kind` is a
+  /// closed set the server branches on — `chrome_extension` gets no push at
+  /// all — where `platform` was a free string nobody could rely on.
+  Future<String> registerDevice({
+    required String installId,
+    required String kind,
+    String? name,
+    String? pushToken,
+  }) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '/auth/devices',
+        data: {
+          'installId': installId,
+          'kind': kind,
+          if (name != null) 'name': name,
+          if (pushToken != null) 'pushToken': pushToken,
+        },
+      ),
+    );
+    return Map<String, dynamic>.from(res.data as Map)['deviceId'] as String;
+  }
+
+  Future<List<Map<String, dynamic>>> devices() async {
+    final res = await _guard(() => dio.get<dynamic>('/auth/devices'));
+    return (res.data as List)
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList();
+  }
+
+  Future<void> unregisterDevice(String deviceId) async {
+    await _guard(() => dio.delete<dynamic>('/auth/devices/$deviceId'));
+  }
+
+  // -- profile ---------------------------------------------------------------
+
+  Future<Map<String, dynamic>> profile() async {
+    final res = await _guard(() => dio.get<dynamic>('/profile'));
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> preferences() async {
+    final res = await _guard(() => dio.get<dynamic>('/preferences'));
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// Returns the stored profile, not the patch: the server trims the name and
+  /// lower-cases the tag lists, so echoing the request back locally would show
+  /// `Peanuts` where the server holds `peanuts` — and the next save would then
+  /// look like a change when it is not.
+  Future<Map<String, dynamic>> patchProfile(Map<String, dynamic> patch) async {
+    final res = await _guard(() => dio.patch<dynamic>('/profile', data: patch));
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> recordMetric(Map<String, dynamic> metric) async {
+    final res = await _guard(
+      () => dio.post<dynamic>('/profile/metrics', data: metric),
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  Future<Map<String, dynamic>> patchPreferences(
+    Map<String, dynamic> patch,
+  ) async {
+    await _guard(() => dio.patch<dynamic>('/preferences', data: patch));
+    // Re-read rather than assume: a patch answers with the fields that changed
+    // and the screen wants the whole record.
+    return preferences();
   }
 
   // -- health ----------------------------------------------------------------
@@ -271,6 +511,15 @@ class ApiClient {
     final status = e.response?.statusCode;
     final data = e.response?.data;
     if (data is Map) {
+      // The link conflict first: it is the one 409 with a next step attached,
+      // and reading it as a generic message would lose the address.
+      if (data['code'] == 'link_required') {
+        return ApiException(
+          'That address already has a password. Sign in with it to link them.',
+          statusCode: status,
+          linkEmail: data['email'] as String?,
+        );
+      }
       final reason = data['reason'] ?? data['message'];
       if (reason is String) return ApiException(reason, statusCode: status);
       if (reason is List && reason.isNotEmpty) {
@@ -297,5 +546,23 @@ class ApiClient {
       );
     }
     return ApiException(e.message ?? 'Request failed.', statusCode: status);
+  }
+}
+
+/// The server's `kind`, which is a closed set and not a platform name.
+///
+/// `TargetPlatform.iOS.name` is `iOS`, and the API expects `ios` — a mismatch
+/// the server would refuse with a validation error that reads like a bug in
+/// the request rather than a case difference. Anything that is neither phone
+/// platform is `web`, which is what a desktop Flutter build honestly is from
+/// the server's point of view: a session with no push.
+String deviceKind() {
+  switch (defaultTargetPlatform) {
+    case TargetPlatform.android:
+      return 'android';
+    case TargetPlatform.iOS:
+      return 'ios';
+    default:
+      return 'web';
   }
 }

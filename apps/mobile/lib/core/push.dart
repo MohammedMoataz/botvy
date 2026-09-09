@@ -75,11 +75,14 @@ class PushService {
   Future<void> _register(String token) async {
     try {
       await _db.setValue(DbKeys.fcmToken, token);
-      await _api.registerDevice(
+      final deviceId = await _api.registerDevice(
         installId: await stableInstallId(_db),
-        platform: defaultTargetPlatform.name,
-        fcmToken: token,
+        kind: deviceKind(),
+        pushToken: token,
       );
+      // Remembered because removing a device is addressed by the server's id,
+      // not by the install id. Without this, signing out could only guess.
+      await _db.setValue(DbKeys.deviceId, deviceId);
     } catch (e) {
       // Nothing is lost: every sync re-registers, so a failure here is
       // corrected on the next pass.
@@ -91,7 +94,10 @@ class PushService {
   Future<void> unregister() async {
     _started = false;
     try {
-      await _api.unregisterDevice(await stableInstallId(_db));
+      final deviceId = await _db.getValue(DbKeys.deviceId);
+      // Nothing to remove if this install never completed a registration.
+      if (deviceId != null) await _api.unregisterDevice(deviceId);
+      await _db.setValue(DbKeys.deviceId, '');
     } catch (e) {
       debugPrint('Device unregistration failed: $e');
     }

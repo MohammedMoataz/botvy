@@ -63,6 +63,68 @@ class KeyValues extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+/// The member's own facts, mirrored locally.
+///
+/// One row, keyed by `userId`. It is a *mirror*, not a source: the server owns
+/// it, this device shows it, and P2's sync loop is what reconciles them. Which
+/// is why it carries no [SyncColumns] — there is nothing to push from here yet,
+/// and adding the columns before a slice pushes them would be five columns of
+/// speculation in a table every later migration has to step over.
+class Profiles extends Table {
+  TextColumn get userId => text()();
+  TextColumn get displayName => text().nullable()();
+  TextColumn get photoPath => text().nullable()();
+  TextColumn get timezone => text()();
+  TextColumn get locale => text()();
+
+  /// The metric history, as the JSON the API sent.
+  ///
+  /// Stored whole rather than as a table of its own: it is read together,
+  /// never queried across members, and the server caps it. A `body_metrics`
+  /// table would be a join for a list that is always shown in full.
+  TextColumn get metricsJson => text().withDefault(const Constant('[]'))();
+
+  /// Four string lists, each stored as JSON for the same reason.
+  TextColumn get foodLikesJson => text().withDefault(const Constant('[]'))();
+  TextColumn get foodDislikesJson => text().withDefault(const Constant('[]'))();
+  TextColumn get allergiesJson => text().withDefault(const Constant('[]'))();
+  TextColumn get symptomsJson => text().withDefault(const Constant('[]'))();
+
+  DateTimeColumn get onboardingCompletedAt => dateTime().nullable()();
+
+  /// When this mirror was last filled from the server. Not the profile's own
+  /// updatedAt — this is about the copy, not the original.
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userId};
+}
+
+/// The knobs the member may turn, mirrored locally.
+///
+/// Kept as its own table rather than columns on [Profiles] because it is its
+/// own aggregate on the server, with its own event and its own consumers — and
+/// because the preferences screen writes it without touching the profile.
+class UserPreferences extends Table {
+  TextColumn get userId => text()();
+  TextColumn get planTomorrowTime => text()();
+  TextColumn get endOfDayTime => text()();
+  TextColumn get morningBriefingTime => text()();
+  TextColumn get nextPracticeCutoff => text()();
+  TextColumn get leadTimesJson => text().withDefault(const Constant('[]'))();
+  TextColumn get quietFrom => text()();
+  TextColumn get quietTo => text()();
+  TextColumn get weekStartsOn => text()();
+  BoolColumn get checkinEnabled => boolean()();
+  IntColumn get meetingDurationMin => integer()();
+  TextColumn get mealMode => text()();
+  BoolColumn get aiSuggestions => boolean()();
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userId};
+}
+
 /// Thrown when the ladder is asked for a step it has no branch for.
 ///
 /// drift's own default `onUpgrade` throws too, which is the right behaviour and
@@ -82,7 +144,7 @@ class MigrationLadderError extends Error {
       'in AppDatabase.migration, in the same change.';
 }
 
-@DriftDatabase(tables: [KeyValues])
+@DriftDatabase(tables: [KeyValues, Profiles, UserPreferences])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'botvy_v2'));
 
@@ -90,7 +152,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,11 +172,24 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
     },
     onUpgrade: (m, from, to) async {
-      // One version so far, so there is nothing to step through yet. Every
-      // later bump adds its own `if (from < N)` branch HERE and raises
-      // schemaVersion in the same change; test/migration_ladder_test.dart
-      // gains one case per bump.
-      throw MigrationLadderError(from, to);
+      // Every bump adds its own guarded branch HERE and raises schemaVersion
+      // in the same change; test/migration_ladder_test.dart gains one case per
+      // bump. A forgotten branch falls through to the throw at the bottom,
+      // which is a loud CI failure rather than an install that will not open.
+
+      // 1 -> 2: the profile and preferences mirrors.
+      //
+      // The guard is `from >= 1 && from < 2`, not `from < 2`. `createTable`
+      // builds a table from *today's* definition, so an install created at
+      // version 2 or later already has these — running it again fails with
+      // "table already exists" on every upgrade from a version that had them.
+      if (from >= 1 && from < 2) {
+        await m.createTable(profiles);
+        await m.createTable(userPreferences);
+      }
+
+      // Anything the ladder above did not cover.
+      if (from < 1 || from > schemaVersion) throw MigrationLadderError(from, to);
     },
   );
 
@@ -134,6 +209,16 @@ class AppDatabase extends _$AppDatabase {
 abstract final class DbKeys {
   static const String installId = 'installId';
   static const String fcmToken = 'fcmToken';
+
+  /// The server's own id for this device, learned when it registers.
+  ///
+  /// Kept because removing a device is addressed by that id rather than by the
+  /// install id — the two are deliberately different, and the install id is
+  /// the one the phone mints while this one only the server can supply.
+  static const String deviceId = 'deviceId';
+
+  /// The signed-in member, so the mirrors can be read before a request.
+  static const String userId = 'userId';
 }
 
 /// This install's id, minted once and kept forever.

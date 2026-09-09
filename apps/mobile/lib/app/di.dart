@@ -6,6 +6,8 @@ import '../core/api/socket_client.dart';
 import '../core/db/database.dart';
 import '../core/notifications/local_notifications.dart';
 import '../core/push.dart';
+import '../features/auth/application/auth_cubit.dart';
+import '../features/profile/data/profile_mirror.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -17,7 +19,8 @@ final GetIt sl = GetIt.instance;
 Future<void> configureDependencies({required String baseUrl}) async {
   sl
     ..registerSingleton<FlutterSecureStorage>(kSecureStorage)
-    ..registerSingleton<TokenStore>(TokenStore(sl<FlutterSecureStorage>()))
+    ..registerSingleton<SecretStore>(SecureSecretStore(sl<FlutterSecureStorage>()))
+    ..registerSingleton<TokenStore>(TokenStore(sl<SecretStore>()))
     ..registerSingleton<AppDatabase>(AppDatabase())
     ..registerSingleton<ApiClient>(
       ApiClient(sl<TokenStore>(), baseUrl: baseUrl),
@@ -32,5 +35,22 @@ Future<void> configureDependencies({required String baseUrl}) async {
         sl<AppDatabase>(),
         sl<NotificationScheduler>(),
       ),
+    )
+    ..registerSingleton<ProfileMirror>(
+      ProfileMirror(sl<ApiClient>(), sl<AppDatabase>()),
+    )
+    // A singleton, not a factory: the router reads its state to decide where
+    // to send somebody, and a second instance would answer differently.
+    ..registerSingleton<AuthCubit>(
+      AuthCubit(sl<ApiClient>(), sl<AppDatabase>(), sl<ProfileMirror>()),
     );
+
+  // The API client discovers a dead session from inside an interceptor, where
+  // it has no way to reach the cubit. Wired here, once, rather than passed
+  // through three constructors that do not otherwise care.
+  sl<ApiClient>().onAuthLost = () {
+    // ignore: discarded_futures — fire-and-forget by design: the interceptor
+    // must not wait for the UI to catch up before returning the 401.
+    sl<AuthCubit>().onSessionLost();
+  };
 }

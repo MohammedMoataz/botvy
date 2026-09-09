@@ -13,7 +13,7 @@ Future<void> main() async {
 
   // Read the persisted server URL once, up front, so the rest of the app can
   // treat it as a plain synchronous value.
-  final baseUrl = await TokenStore(kSecureStorage).readBaseUrl();
+  final baseUrl = await TokenStore(const SecureSecretStore(kSecureStorage)).readBaseUrl();
   await configureDependencies(baseUrl: baseUrl);
 
   // Notifications are set up regardless of sign-in state: a scheduled alarm
