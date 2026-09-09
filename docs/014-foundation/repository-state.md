@@ -6,12 +6,12 @@ Where the branch stands: commits, tests, what is pushed, and one incident worth 
 
 ---
 
-- Branch `014-foundation`, **51 commits** ahead of the pre-phase master.
+- Branch `014-foundation`, **51 commits** ahead of the pre-phase default branch.
 - Every commit gated on `oxlint` clean, `tsc --noEmit` clean, and the suite green.
 - **240 tests** (222 backend, 18 SDK) plus 7 Flutter tests including both
   migration-ladder assertions.
 - Nothing pushed to any remote.
-- `master` still points at the remediation commit `0b195ba`; the foundation work
+- `main` (renamed from `master` on 10 September) carries the foundation work; the pre-phase tip was `0b195ba`, and
   is all on its own branch, so merging it is your call.
 
 One incident worth knowing: my commit helper corrupted

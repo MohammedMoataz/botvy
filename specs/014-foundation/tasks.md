@@ -149,5 +149,5 @@ row.
 2. `pnpm -r lint && pnpm -r test` green; `cd apps/mobile && flutter analyze && flutter test` green.
 3. Spine: `E2E=1` `spine.e2e.spec.ts` → 20 pings, 20 executions, none late; a repeated `clientId` and a replayed `X-Botvy-Event-Id` each add none (SC-004); worker restart → delivery; `/health` shows `outbox.relay` and `ping` fresh; stopping the worker for 16 minutes → `degraded` naming `outbox.relay`.
 4. CI green on the PR, every job inside its 15-minute timeout (SC-003); tag `v2.0.0-alpha.0` produces images, APK, extension zip; deploy skipped (no secrets).
-5. `docker compose -f legacy/infra/docker-compose.yml config` valid; v1 untouched (`git diff --stat master -- legacy/` shows only the move).
+5. `docker compose -f legacy/infra/docker-compose.yml config` valid; v1 untouched (`git diff --stat main -- legacy/` shows only the move).
 6. The Phase 4 fresh-clone timing recorded and under 20 minutes (SC-002).
