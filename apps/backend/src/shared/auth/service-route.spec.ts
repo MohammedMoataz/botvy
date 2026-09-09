@@ -33,6 +33,9 @@ class NoClients extends ServiceClientRepository {
   async upsert(_c: ServiceClientUpsert): Promise<ServiceClient> { throw new Error('unused'); }
   async verifyToken(): Promise<ServiceClient | null> { this.calls += 1; return null; }
   async touch(): Promise<void> {}
+  // Present because the port declares them; not exercised here.
+  async listAll(): Promise<ServiceClient[]> { return []; }
+  async revoke(): Promise<boolean> { return false; }
 }
 
 describe('guards on a service route', () => {

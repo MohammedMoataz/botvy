@@ -37,4 +37,14 @@ export abstract class ServiceClientRepository {
   abstract verifyToken(presentedTokenHash: string): Promise<ServiceClient | null>;
 
   abstract touch(id: string, at: Date): Promise<void>;
+
+  /** Every client, for the portal's listing. Never carries the token hash. */
+  abstract listAll(): Promise<ServiceClient[]>;
+
+  /**
+   * Revokes rather than deletes. A deleted row loses the audit trail's target
+   * and makes "which client was that?" unanswerable six months later; a revoked
+   * one is refused by the guard and still nameable.
+   */
+  abstract revoke(id: string): Promise<boolean>;
 }

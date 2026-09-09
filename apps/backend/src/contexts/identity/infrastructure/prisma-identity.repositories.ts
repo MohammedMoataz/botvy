@@ -27,7 +27,12 @@ import {
   type ServiceClientUpsert,
 } from '../domain/service-client.repository.js';
 import { User, type UserState } from '../domain/user.aggregate.js';
-import { UserRepository } from '../domain/user.repository.js';
+import {
+  UserRepository,
+  type MemberPage,
+  type MemberSearch,
+  type MemberSummary,
+} from '../domain/user.repository.js';
 
 /** The transaction if one is in force, otherwise the base client. */
 function client(prisma: PrismaService): PrismaTransaction | PrismaService {
@@ -87,6 +92,40 @@ export class PrismaUserRepository extends UserRepository {
   async countAll(): Promise<number> {
     return client(this.prisma).user.count();
   }
+
+  async countAdminsExcept(userId: string): Promise<number> {
+    return client(this.prisma).user.count({
+      where: { role: 'admin', status: 'active', deletedAt: null, id: { not: userId } },
+    });
+  }
+
+  async search(criteria: MemberSearch): Promise<MemberPage> {
+    const where: Record<string, unknown> = { deletedAt: null };
+    if (criteria.status) where.status = criteria.status;
+    if (criteria.role) where.role = criteria.role;
+    if (criteria.query) {
+      where.OR = [
+        { email: { contains: criteria.query, mode: 'insensitive' } },
+        { displayName: { contains: criteria.query, mode: 'insensitive' } },
+      ];
+    }
+    if (criteria.cursor) where.id = { lt: criteria.cursor };
+
+    // One extra row, to learn whether there is another page without counting
+    // the whole table.
+    const rows = await client(this.prisma).user.findMany({
+      where,
+      orderBy: { id: 'desc' },
+      take: criteria.limit + 1,
+      include: { _count: { select: { devices: true } } },
+    });
+
+    const page = rows.slice(0, criteria.limit);
+    return {
+      members: page.map(toMemberSummary),
+      nextCursor: rows.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
+    };
+  }
 }
 
 @Injectable()
@@ -134,6 +173,19 @@ export class PrismaServiceClientRepository extends ServiceClientRepository {
       where: { id },
       data: { lastUsedAt: at },
     });
+  }
+
+  async listAll(): Promise<ServiceClient[]> {
+    const rows = await client(this.prisma).serviceClient.findMany({ orderBy: { name: 'asc' } });
+    return rows.map(toServiceClient);
+  }
+
+  async revoke(id: string): Promise<boolean> {
+    const result = await client(this.prisma).serviceClient.updateMany({
+      where: { id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count > 0;
   }
 }
 
@@ -378,6 +430,19 @@ function toDevice(row: Record<string, unknown>): Device {
     name: (row.name as string | null) ?? null,
     pushToken: (row.fcmToken as string | null) ?? null,
     lastSeenAt: (row.lastSeenAt as Date | null) ?? null,
+  };
+}
+
+function toMemberSummary(row: Record<string, unknown>): MemberSummary {
+  return {
+    id: String(row.id),
+    email: String(row.email),
+    displayName: (row.displayName as string | null) ?? null,
+    role: row.role === 'admin' ? 'admin' : 'user',
+    status: row.status === 'banned' ? 'banned' : 'active',
+    createdAt: row.createdAt as Date,
+    lastLoginAt: (row.lastLoginAt as Date | null) ?? null,
+    deviceCount: ((row._count as { devices?: number } | undefined)?.devices) ?? 0,
   };
 }
 

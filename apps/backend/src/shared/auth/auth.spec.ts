@@ -55,6 +55,13 @@ class StubServiceClients extends ServiceClientRepository {
     return this.client && hashesMatch(presentedHash, this.storedHash) ? this.client : null;
   }
   async touch(): Promise<void> {}
+  // Present because the port declares them; not exercised here.
+  async listAll(): Promise<ServiceClient[]> {
+    return this.client ? [this.client] : [];
+  }
+  async revoke(): Promise<boolean> {
+    return false;
+  }
 }
 
 const n8nClient: ServiceClient = {

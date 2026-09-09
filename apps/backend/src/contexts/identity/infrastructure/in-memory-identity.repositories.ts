@@ -20,7 +20,11 @@ import {
   type ServiceClient,
   type ServiceClientUpsert,
 } from '../domain/service-client.repository.js';
-import { UserRepository } from '../domain/user.repository.js';
+import {
+  UserRepository,
+  type MemberPage,
+  type MemberSearch,
+} from '../domain/user.repository.js';
 import type { User } from '../domain/user.aggregate.js';
 
 /**
@@ -58,6 +62,47 @@ export class InMemoryUserRepository extends UserRepository {
   async countAll(): Promise<number> {
     return this.byId.size;
   }
+
+  async countAdminsExcept(userId: string): Promise<number> {
+    let count = 0;
+    for (const user of this.byId.values()) {
+      if (user.id !== userId && user.role === 'admin' && user.isActive) count += 1;
+    }
+    return count;
+  }
+
+  async search(criteria: MemberSearch): Promise<MemberPage> {
+    const needle = criteria.query?.toLowerCase();
+    const matched = [...this.byId.values()]
+      .filter((user) => user.deletedAt === null)
+      .filter((user) => !criteria.status || user.status === criteria.status)
+      .filter((user) => !criteria.role || user.role === criteria.role)
+      .filter(
+        (user) =>
+          !needle ||
+          user.email.toLowerCase().includes(needle) ||
+          (user.displayName ?? '').toLowerCase().includes(needle),
+      )
+      // Descending by id, matching the Prisma adapter — the cursor only means
+      // anything if both order the same way.
+      .sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
+      .filter((user) => !criteria.cursor || user.id < criteria.cursor);
+
+    const page = matched.slice(0, criteria.limit);
+    return {
+      members: page.map((user) => ({
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role,
+        status: user.status,
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
+        deviceCount: 0,
+      })),
+      nextCursor: matched.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
+    };
+  }
 }
 
 @Injectable()
@@ -85,6 +130,11 @@ export class InMemoryServiceClientRepository extends ServiceClientRepository {
 
   async verifyToken(presentedTokenHash: string): Promise<ServiceClient | null> {
     for (const row of this.byName.values()) {
+      // Revoked clients are skipped, exactly as the Prisma adapter's `where`
+      // does. Without this the two adapters disagree about whether a revoked
+      // token still works, and a spec would pass against one and lie about the
+      // other.
+      if (row.revokedAt !== null) continue;
       if (hashesMatch(presentedTokenHash, row.tokenHash)) return row;
     }
     return null;
@@ -94,6 +144,20 @@ export class InMemoryServiceClientRepository extends ServiceClientRepository {
     for (const row of this.byName.values()) {
       if (row.id === id) row.lastUsedAt = at;
     }
+  }
+
+  async listAll(): Promise<ServiceClient[]> {
+    return [...this.byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async revoke(id: string): Promise<boolean> {
+    for (const row of this.byName.values()) {
+      if (row.id === id && row.revokedAt === null) {
+        row.revokedAt = new Date();
+        return true;
+      }
+    }
+    return false;
   }
 }
 

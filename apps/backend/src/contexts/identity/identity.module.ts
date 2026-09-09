@@ -10,6 +10,9 @@ import { PASSWORD_HASHER } from './domain/password-hasher.js';
 import { ServiceClientRepository } from './domain/service-client.repository.js';
 import { RefreshTokenRepository } from './domain/refresh-token.repository.js';
 import { UserRepository } from './domain/user.repository.js';
+import { AdminMembersHandler } from './features/admin-members/admin-members.handler.js';
+import { MembersQueryHandler } from './features/admin-members/members.query.js';
+import { AdminServiceClientsHandler } from './features/admin-service-clients/admin-service-clients.handler.js';
 import { ChangePasswordHandler } from './features/change-password/change-password.handler.js';
 import { DeleteAccountHandler } from './features/delete-account/delete-account.handler.js';
 import { GoogleSignInHandler } from './features/google-sign-in/google-sign-in.handler.js';
@@ -86,6 +89,9 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     LogoutHandler,
     DeleteAccountHandler,
     GoogleSignInHandler,
+    AdminMembersHandler,
+    MembersQueryHandler,
+    AdminServiceClientsHandler,
     ServiceTokenGuard,
   ],
   // `UserRepository` and `DeviceRepository` are deliberately *not* exported.
@@ -105,6 +111,9 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     LogoutHandler,
     DeleteAccountHandler,
     GoogleSignInHandler,
+    AdminMembersHandler,
+    MembersQueryHandler,
+    AdminServiceClientsHandler,
     ServiceTokenGuard,
   ],
 })

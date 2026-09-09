@@ -4,6 +4,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { InternalAlertsController } from './contexts/operations/features/internal-alerts/internal-alerts.controller.js';
 import { InternalHeartbeatController } from './contexts/operations/features/internal-heartbeat/internal-heartbeat.controller.js';
+import { AdminController } from './contexts/identity/features/admin-members/admin.controller.js';
 import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
 import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
@@ -50,6 +51,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
   // image, two roles: only the backend role has an HTTP surface.
   controllers: [
     AuthController,
+    AdminController,
     PingController,
     InternalAlertsController,
     InternalHeartbeatController,
