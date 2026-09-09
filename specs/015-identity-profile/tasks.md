@@ -57,7 +57,7 @@ series whose numbers mean something else; nothing here refers to it by id.
 
 ## Phase 6 — Polish and gate
 
-- [ ] T151 [P] `migrate-mongo` script for the `profiles` / `user_preferences` indexes; no Prisma migration — P0's `20260905120000_v2_identity` already carries every Identity column this phase writes
+- [X] T151 [P] `migrate-mongo` script for the `profiles` / `user_preferences` indexes; no Prisma migration — P0's `20260905120000_v2_identity` already carries every Identity column this phase writes
 - [ ] T152 [P] Arabic strings for auth, profile and preferences **(strings done)**; RTL screenshots attached to the gate — the strings landed with the screens and en/ar parity is checked programmatically (74 keys, no getter without a string, no string without a reader); the screenshots need a running device, so they wait with the gate
 - [ ] T153 Record gate evidence here; open `016-tasks-labels-reminders`
 
