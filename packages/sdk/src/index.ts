@@ -29,6 +29,15 @@ export {
   type SignedOutReason,
 } from './auth-store.js';
 export {
+  AdminStore,
+  type HealthReport,
+  type MemberFilter,
+  type MemberPage,
+  type MemberSummary,
+  type ServiceClientSummary,
+  type SettingEntry,
+} from './admin-store.js';
+export {
   ProfileStore,
   type BodyMetric,
   type PreferencesView,

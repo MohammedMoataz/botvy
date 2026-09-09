@@ -9,7 +9,11 @@
     "docs": "Documentation"
   },
   "admin": {
-    "title": "Admin portal"
+    "title": "Admin portal",
+    "notAdmin": "This account is not an administrator. Ask the Owner for the admin role.",
+    "overview": "Overview",
+    "users": "Members",
+    "serviceClients": "Service clients"
   },
   "login": {
     "title": "Sign in",
@@ -17,13 +21,74 @@
     "password": "Password",
     "submit": "Sign in",
     "pending": "Signing in…",
-    "notYet": "Sign-in arrives in the next phase.",
-    "failed": "Sign-in failed.",
-    "welcome": "Signed in."
+    "invalid": "Email or password is incorrect.",
+    "replay": "That session was ended for security. Sign in again.",
+    "failed": "Sign-in failed. Please try again."
   },
   "locale": {
     "label": "Language",
     "en": "English",
     "ar": "العربية"
+  },
+  "overview": {
+    "title": "Overview",
+    "loading": "Loading…",
+    "health": "Health",
+    "statusOk": "Healthy",
+    "statusDegraded": "Degraded",
+    "pushOn": "Push configured",
+    "pushOff": "Push not configured",
+    "noJobsYet": "No scheduled job has reported in yet. The relay stamps its first heartbeat within 30 seconds of the worker starting.",
+    "neverRan": "never succeeded",
+    "defaultPassword": "This installation still uses the seeded administrator password. Change it — the default is published in the setup guide.",
+    "registration": "Registration",
+    "registrationExplain": "Whether new members may create their own accounts. Takes effect on the next attempt; no redeploy.",
+    "registrationOpen": "Open",
+    "registrationClosed": "Closed",
+    "you": "Signed in as",
+    "signOut": "Sign out"
+  },
+  "users": {
+    "title": "Members",
+    "searchPlaceholder": "Search email or name",
+    "search": "Search",
+    "anyStatus": "Any status",
+    "email": "Email",
+    "name": "Name",
+    "role": "Role",
+    "roleUser": "Member",
+    "roleAdmin": "Administrator",
+    "status": "Status",
+    "active": "Active",
+    "banned": "Banned",
+    "devices": "Devices",
+    "lastSeen": "Last sign-in",
+    "never": "Never",
+    "actions": "Actions",
+    "ban": "Ban",
+    "unban": "Unban",
+    "unbanned": "Unbanned. They will need to sign in again — the ban ended their sessions.",
+    "none": "No members match.",
+    "loadMore": "Load more",
+    "banResult": "Banned. {count, plural, =0 {No active sessions were ended} one {One session was ended} other {# sessions were ended}}."
+  },
+  "serviceClients": {
+    "title": "Service clients",
+    "explain": "Machine callers. n8n holds one; anything else you integrate needs its own. Each secret is shown once and stored only as a hash.",
+    "create": "Create a client",
+    "createButton": "Create",
+    "name": "Name",
+    "scopes": "Scopes",
+    "status": "Status",
+    "active": "Active",
+    "revoked": "Revoked",
+    "lastUsed": "Last used",
+    "never": "Never",
+    "actions": "Actions",
+    "revoke": "Revoke",
+    "none": "No service clients yet.",
+    "secretTitle": "Secret for {name}",
+    "secretWarning": "Copy this now. It is stored as a hash and cannot be shown again — if it is lost, revoke this client and create another.",
+    "secretDone": "I have copied it"
   }
 }
