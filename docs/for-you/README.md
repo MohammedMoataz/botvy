@@ -29,6 +29,6 @@ re-opens them by accident.
 
 | # | What | Why it is still here |
 |---|---|---|
-| [D1](do-1-free-disk-space.md) | Free disk space | You answered "partly", and it worked: `D:` went 4.6 → 22.8 GB and **Docker starts now.** What remains is running the two gates, which I can do — the file stays so you can see how much headroom is left |
+| [D1](do-1-free-disk-space.md) | 🔴 **Restart Docker Desktop from the tray** | Your headroom fix worked and the daemon started. Then recreating two containers wedged it, and I made it worse by killing `com.docker.build`. Docker Desktop now reports itself running with no engine behind it, and its own CLI cannot recover. A tray restart fixes it; both gates run the moment it does |
 | [D3](do-3-rotate-firebase-key.md) | Rotate the Firebase key | You answered "later". A committed credential is still live; tracked as `T1113` in `specs/025-hardening-release` |
 | — | Open a pull request | **The branch is pushed.** But `ci.yml` triggers on `push: [master]` and on `pull_request`, so a branch push runs nothing. One command gets CI onto this work for the first time: `gh pr create --base master --head 015-identity-profile`. Yours to make, since a PR is public on your repo |
