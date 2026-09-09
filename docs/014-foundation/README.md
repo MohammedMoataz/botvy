@@ -8,7 +8,7 @@ One file per question, so you can read the one you care about and skip the rest.
 
 | File | Answers |
 |---|---|
-| [inputs-needed.md](inputs-needed.md) | **What do you need from me?** Nine items, each with a line to write your answer on. Start here. |
+| [answered-inputs.md](answered-inputs.md) | What you already decided here, and what it cost |
 | [defects-found-by-running.md](defects-found-by-running.md) | What was broken, and how it was found |
 | [auth-in-p0.md](auth-in-p0.md) | Sign-in and password change — why they landed here, and what P1 still owes |
 | [changes-to-existing.md](changes-to-existing.md) | What changed in things I already had |
@@ -31,6 +31,10 @@ was written, an n8n that had never reached a database, a Postgres image serving
 a data directory it could not read the collations of, a relay whose retry ladder
 was unreachable dead code.
 
-The one item that needs a decision rather than a fix is in `inputs-needed.md`
-under **A1**: v1 and v2 share one PostgreSQL volume, and v2 is serving your live
-v1 database right now.
+That last decision — v1 and v2 sharing one PostgreSQL volume — is answered:
+you chose a clean start, and v2 is its own compose project now with v1's data
+untouched. See [answered-inputs.md](answered-inputs.md).
+
+**Anything still waiting on you has moved to [`../for-you/`](../for-you/)**, one
+file per item with a box to answer in. Things to read rather than answer are in
+[`../to-review/`](../to-review/).

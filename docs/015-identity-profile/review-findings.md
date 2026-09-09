@@ -154,7 +154,9 @@ one.
 
 ## Needs your decision
 
-Both are in [`inputs-needed.md`](inputs-needed.md) with options and costs.
+Both are in [`../for-you/`](../for-you/) with options and costs:
+[A3](../for-you/decide-3-ban-window.md) and
+[A2](../for-you/decide-2-rate-limiting.md).
 
 **5b. A banned or deleted member keeps API access until their access token
 expires** — up to 15 minutes. `JwtAuthGuard` verifies the signature and nothing

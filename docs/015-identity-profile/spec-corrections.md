@@ -15,7 +15,7 @@ facts, foods, allergies and training days out of v1's `coaching_profiles` table
 for every member without a `profiles` document.
 
 There is nothing to copy. The Owner chose a clean start
-(`docs/014-foundation/inputs-needed.md`, A1), so v2 runs as its own compose
+(`docs/014-foundation/answered-inputs.md`, A1), so v2 runs as its own compose
 project on its own volumes and cannot see v1's PostgreSQL at all. Every member
 registers again, and `bootstrap-on-registered` (T122) gives them the registry
 defaults — which is the path the task described as the fallback anyway.
