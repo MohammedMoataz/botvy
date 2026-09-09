@@ -33,11 +33,21 @@ re-opens them by accident.
 
 ---
 
-## Still open — two, plus the roadmap register
+## ✅ All twelve answered
+
+D1 and D3 both came back on 10 September and their files are gone.
+
+- **D1** — you restarted Docker from the tray. The engine came back and both
+  gates ran: **P1 13/13**, **P0 4/5**, the fifth being I1 below.
+- **D3** — you rotated the Firebase service-account key. `secrets/firebase-admin.json`
+  now carries key id `…424ead`; the exposed `…c3a2a5` is no longer the live key.
+  **One thing left to confirm:** adding a key does not revoke the old one, so
+  the exposed key stays valid until it is *deleted* in the console. See
+  [I21](inputs-016-to-025.md#i21--rotate-the-firebase-key-for-real).
+
+## Still open — the roadmap register
 
 | # | What | Why it is still here |
 |---|---|---|
-| ~~D1~~ | ✅ **Done** — you restarted Docker from the tray | The engine came back and both gates ran: **P1 13/13**, **P0 4/5**, the fifth being I1 below. `do-1-free-disk-space.md` can be deleted |
-| [D3](do-3-rotate-firebase-key.md) | Rotate the Firebase key | You answered "later". A committed credential is still live; tracked as `T1113` in `specs/025-hardening-release` |
 | [I1–I25 + G](inputs-016-to-025.md) | Inputs for P2–P11 (n8n key, `google-services.json`, Ollama models, keystore, Google Sign-In, …) | Nothing is blocked today. The n8n API key (I1) is the one carried over from P0 and it is the last failing check in `node infra/verify.mjs` |
 | — | Open a pull request | **The work is merged into `main` already**, so this is only about getting CI to run on a phase branch for the first time — `ci.yml` triggers on `push: [main]` and on `pull_request`, so a plain branch push runs nothing. When 016 has commits: `gh pr create --base main --head 016-tasks-labels-reminders`. Yours to make, since a PR is public on your repo |

@@ -562,34 +562,43 @@ choice.
 ## I21 — Rotate the Firebase key, for real
 
 ```
-ROTATED:  (currently: "later")
+NEW KEY IN PLACE:   yes — verified, id ends 424ead (10 September)
+OLD KEY DELETED:    (yes / no)  ← the half that matters
 ```
 
-You answered **later** on 9 September and that was reasonable while this is a dev
-instance. **P11 is where it stops being optional** — T1105 is "rotate the
-known-compromised Firebase key" and the release gate does not pass around it.
+**Half done, and the remaining half is the one that closes the hole.**
 
-The key with id ending **`c3a2a5`** was committed to this repository and appeared
-in a chat transcript. It is still live. A Firebase service-account key grants
+You replaced the key on 10 September. `secrets/firebase-admin.json` now carries
+`private_key_id` ending **`424ead`**, same project (`bot-vy`), same service
+account (`firebase-adminsdk-fbsvc@bot-vy.iam.gserviceaccount.com`). Push keeps
+working; nothing in `.env` needed changing.
+
+What I cannot see from here is the console, so I cannot tell whether the old key
+was *deleted* or merely superseded. **A Google service-account key stays valid
+until it is deleted** — creating a new one does not revoke the old. If the row
+whose id ends `c3a2a5` is still listed under Keys, that credential still grants
 full admin over the project: all data, and the ability to mint an auth token for
-any user.
+any user. It was committed to this repository and appeared in a chat transcript,
+so it must be assumed to be in someone else's hands.
 
-**👉 Do this:**
+**👉 If you have not already, do just step 3:**
 
 1. <https://console.cloud.google.com/iam-admin/serviceaccounts> → the project →
    the `firebase-adminsdk-*` account → **Keys**.
 2. **Add key** → JSON → download. Save it as `secrets/firebase-admin.json`
    (replacing the current file; the directory is gitignored).
-3. **Then delete the old key** — the row whose id ends `c3a2a5`. This is the
-   step that matters. Adding a new key only keeps push working; it does not
-   close the old one, and the old one stays valid until deleted.
-4. `docker compose restart backend worker`.
+3. **Delete the old key** — the row whose id ends **`c3a2a5`**. Google asks to
+   confirm; it is safe, because the process is already running on `424ead`.
+4. `docker compose restart backend worker` — only if you have not restarted
+   since swapping the file. The credentials are read at boot, so a container
+   that came up before the swap is still holding the old key in memory.
 
 `FIREBASE_CREDENTIALS_FILE=/secrets/firebase-admin.json` already points at the
-right path, so no `.env` change.
+right path, so no `.env` change — which is exactly why the swap needed no
+deploy, and also why nothing in the running system announced it.
 
-Sooner than P11 if any of these become true: the repository goes public, anyone
-else gets a clone, or real member data lands in the project.
+Once `c3a2a5` is gone, T1105's rotation clause is satisfied ahead of P11 and
+this item closes for good.
 
 ## I22 — The release signing keystore
 
