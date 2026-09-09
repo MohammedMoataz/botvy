@@ -59,11 +59,15 @@ Work this phase does not contain, stated plainly so no later phase assumes it ex
 
 ## Measured, not estimated
 
-The `chown -R botvy:botvy /app` both runtime images ran turned out to cost more
-than the minutes it spent: removing it took the backend image from **1.24 GB to
-173 MB**. It was rewriting every file of the build output into a second layer,
-so the image carried two copies of `/out` — one root-owned, one botvy-owned.
-Neither application writes its own code, so the chown bought nothing at all.
+The `chown -R botvy:botvy /app` both runtime images ran cost more than the
+minutes it spent: removing it took the backend image from **1.24 GB to 904 MB**.
+It was rewriting every file of the build output into a second layer, so the
+image carried two copies of `/out` — one root-owned, one botvy-owned. Neither
+application writes its own code, so the chown bought nothing at all.
+
+(I first reported 173 MB. That reading was taken while the image was still
+unpacking and was wrong; 904 MB is the settled size, with the Prisma client and
+its query engines included. A third off, not seven eighths.)
 
 ## Deferred by the Owner, on the record
 
