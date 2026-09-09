@@ -47,18 +47,18 @@ series whose numbers mean something else; nothing here refers to it by id.
 ## Phase 5 — Clients
 
 - [X] T150 `pnpm gen:contracts` regenerated; `packages/sdk` gains `AuthStore.register/login/google/refresh/logout` and `ProfileStore` — first in this phase, because the admin portal and the extension are only wiring on top of it
-- [ ] T140 [P] Mobile `features/auth`: sign-in, register (confirm field, inline mismatch), Google button (`google_sign_in` 7 `initialize()` + `authenticate()`), `AuthCubit` + secure storage, `go_router` redirect, sign-out; on a successful sign-in, pull `profile` and `preferences` into the drift mirror before routing to the first screen (sync arrives in P2, so this phase fetches them itself); spec: a signed-in cubit on a fresh install has both rows locally
-- [ ] T141 [P] Mobile `features/profile`: photo picker + cropper, name, time zone (device-detected, editable), language, body metrics with history list, foods and allergies chip editors
-- [ ] T142 [P] Mobile `features/preferences`: every default with the right control, quiet hours, week start; writes through the REST command and the local mirror
-- [ ] T143 Mobile drift `schemaVersion` 1 → 2: `profile` and `preferences` tables with a guarded `from >= 1 && from < 2` branch and a ladder test that opens a v1-shaped file (the install id stays a `key_values` row — no device table until something reads one)
+- [X] T140 [P] Mobile `features/auth`: sign-in, register (confirm field, inline mismatch), Google button (`google_sign_in` 7 `initialize()` + `authenticate()`), `AuthCubit` + secure storage, `go_router` redirect, sign-out; on a successful sign-in, pull `profile` and `preferences` into the drift mirror before routing to the first screen (sync arrives in P2, so this phase fetches them itself); spec: a signed-in cubit on a fresh install has both rows locally
+- [X] T141 [P] Mobile `features/profile`: photo picker + cropper, name, time zone (device-detected, editable), language, body metrics with history list, foods and allergies chip editors
+- [X] T142 [P] Mobile `features/preferences`: every default with the right control, quiet hours, week start; writes through the REST command and the local mirror
+- [X] T143 Mobile drift `schemaVersion` 1 → 2: `profile` and `preferences` tables with a guarded `from >= 1 && from < 2` branch and a ladder test that opens a v1-shaped file (the install id stays a `key_values` row — no device table until something reads one)
 - [X] T144 [P] Frontend: real login (email/password + Google), Users table (search, role menu, ban switch), Devices, Service clients (secret dialog shown once), and on Overview the default-password warning driven by `Health.defaultAdminPassword` plus the registration-open switch writing `auth.registrationOpen` through `PATCH /admin/settings/:key`
 - [X] T145 [P] Extension: sign-in view wired to `AuthStore`, Google through `chrome.identity.launchWebAuthFlow`, tokens in `chrome.storage.local`; once signed in the panel shows the member's name and a sign-out button — the working side panel arrives with P9
-- [ ] T146 [P] Mobile `features/onboarding`: step registry (feature modules contribute steps), first-run walkthrough — name + optional photo, time zone detected and confirmable, language, preview of the three daily times — skippable and resumable from Settings; finishing writes `onboardingCompletedAt` through `PATCH /profile`, and the walkthrough never runs again once it is set; cubit spec: skipping leaves defaults intact
+- [X] T146 [P] Mobile `features/onboarding`: step registry (feature modules contribute steps), first-run walkthrough — name + optional photo, time zone detected and confirmable, language, preview of the three daily times — skippable and resumable from Settings; finishing writes `onboardingCompletedAt` through `PATCH /profile`, and the walkthrough never runs again once it is set; cubit spec: skipping leaves defaults intact
 
 ## Phase 6 — Polish and gate
 
 - [ ] T151 [P] `migrate-mongo` script for the `profiles` / `user_preferences` indexes; no Prisma migration — P0's `20260905120000_v2_identity` already carries every Identity column this phase writes
-- [ ] T152 [P] Arabic strings for auth, profile and preferences; RTL screenshots attached to the gate
+- [ ] T152 [P] Arabic strings for auth, profile and preferences **(strings done)**; RTL screenshots attached to the gate — the strings landed with the screens and en/ar parity is checked programmatically (74 keys, no getter without a string, no string without a reader); the screenshots need a running device, so they wait with the gate
 - [ ] T153 Record gate evidence here; open `016-tasks-labels-reminders`
 
 ## Dependencies
