@@ -31,6 +31,19 @@ class AppLocalizations {
   String _t(String key) =>
       _strings[locale.languageCode]?[key] ?? _strings['en']![key] ?? key;
 
+  /// A string with values substituted for `{name}` placeholders.
+  ///
+  /// Substitution rather than concatenation, because the pieces do not come in
+  /// the same order in both languages - and a sentence assembled by `+` reads
+  /// backwards in one of them.
+  String _f(String key, Map<String, String> values) {
+    var out = _t(key);
+    for (final entry in values.entries) {
+      out = out.replaceAll('{${entry.key}}', entry.value);
+    }
+    return out;
+  }
+
   String get appTitle => _t('appTitle');
   String get signInTitle => _t('signInTitle');
   String get email => _t('email');
@@ -101,6 +114,23 @@ class AppLocalizations {
   String get aiSuggestions => _t('aiSuggestions');
   String get leadTimes => _t('leadTimes');
   String get leadTimesHelp => _t('leadTimesHelp');
+
+  // -- the gateway -----------------------------------------------------------
+  String get serverTitle => _t('serverTitle');
+  String get serverSettings => _t('serverSettings');
+  String get serverExplain => _t('serverExplain');
+  String get testConnection => _t('testConnection');
+  String get serverSaved => _t('serverSaved');
+  String get serverUrlRequired => _t('serverUrlRequired');
+  String get serverUrlInvalid => _t('serverUrlInvalid');
+  String get serverUrlNeedsScheme => _t('serverUrlNeedsScheme');
+  String get serverUrlNoPath => _t('serverUrlNoPath');
+  String get serverNotBotvy => _t('serverNotBotvy');
+  String get serverUnreachable => _t('serverUnreachable');
+  String serverReachable(String version) =>
+      _f('serverReachable', {'version': version});
+  String serverDegraded(String version) =>
+      _f('serverDegraded', {'version': version});
 
   // -- onboarding ------------------------------------------------------------
   String get welcomeTitle => _t('welcomeTitle');
@@ -195,6 +225,23 @@ class AppLocalizations {
       'next': 'Next',
       'finish': 'Finish',
       'resumeOnboarding': 'Finish setting up',
+      'serverTitle': 'Server',
+      'serverSettings': 'Server settings',
+      'serverExplain':
+          'Botvy runs on your own machine. Enter the address it is served from '
+          'and test it before signing in.',
+      'testConnection': 'Test connection',
+      'serverSaved': 'Saved. Sign in to continue.',
+      'serverUrlRequired': 'Enter the address your server is served from.',
+      'serverUrlInvalid': 'That is not an address this app can reach.',
+      'serverUrlNeedsScheme': 'Start with http:// or https://',
+      'serverUrlNoPath': 'Enter the address only, with no path after it.',
+      'serverNotBotvy': 'Something answered, but it is not a Botvy server.',
+      'serverUnreachable': 'Nothing answered at that address.',
+      'serverReachable': 'Connected to Botvy {version}.',
+      'serverDegraded':
+          'Connected to Botvy {version}, but it reports a problem. You can '
+          'still sign in.',
     },
     'ar': {
       'appTitle': 'بوتفي',
@@ -273,6 +320,23 @@ class AppLocalizations {
       'next': 'التالي',
       'finish': 'إنهاء',
       'resumeOnboarding': 'أكمل الإعداد',
+      'serverTitle': 'الخادم',
+      'serverSettings': 'إعدادات الخادم',
+      'serverExplain':
+          'يعمل بوتفي على جهازك الخاص. أدخل العنوان الذي يُقدَّم منه واختبره '
+          'قبل تسجيل الدخول.',
+      'testConnection': 'اختبار الاتصال',
+      'serverSaved': 'تم الحفظ. سجّل الدخول للمتابعة.',
+      'serverUrlRequired': 'أدخل العنوان الذي يُقدَّم منه الخادم.',
+      'serverUrlInvalid': 'هذا ليس عنوانًا يمكن للتطبيق الوصول إليه.',
+      'serverUrlNeedsScheme': 'ابدأ بـ http:// أو https://',
+      'serverUrlNoPath': 'أدخل العنوان فقط، دون أي مسار بعده.',
+      'serverNotBotvy': 'استجاب شيء ما، لكنه ليس خادم بوتفي.',
+      'serverUnreachable': 'لم يستجب شيء على هذا العنوان.',
+      'serverReachable': 'تم الاتصال ببوتفي {version}.',
+      'serverDegraded':
+          'تم الاتصال ببوتفي {version}، لكنه يبلّغ عن مشكلة. لا يزال بإمكانك '
+          'تسجيل الدخول.',
     },
   };
 }

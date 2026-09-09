@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/l10n/app_localizations.dart';
+import '../../../app/router.dart';
 import '../../../core/notifications/local_notifications.dart' show deviceTimezone;
 import '../application/auth_cubit.dart';
 
@@ -191,6 +193,18 @@ class _SignInPageState extends State<SignInPage> {
                         const SizedBox(height: 16),
                         _Failure(message: _describe(t, state.failure!)),
                       ],
+
+                      const SizedBox(height: 24),
+                      // On the sign-in screen because this is where a wrong
+                      // address shows up, and it shows up as a failed sign-in
+                      // that looks exactly like a wrong password. A member who
+                      // cannot get in needs to be able to check the address
+                      // from here, not from behind a session they cannot open.
+                      TextButton.icon(
+                        onPressed: () => context.push(Routes.server),
+                        icon: const Icon(Icons.dns_outlined, size: 18),
+                        label: Text(t.serverSettings),
+                      ),
                     ],
                   ),
                 ),

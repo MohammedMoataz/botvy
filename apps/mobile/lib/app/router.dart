@@ -8,12 +8,17 @@ import '../features/auth/presentation/sign_in_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/preferences/presentation/preferences_page.dart';
 import '../features/profile/presentation/profile_page.dart';
+import '../features/settings/presentation/server_page.dart';
 
 abstract final class Routes {
   static const String signIn = '/sign-in';
   static const String onboarding = '/welcome';
   static const String profile = '/profile';
   static const String preferences = '/preferences';
+
+  /// Where the gateway's address is set. Reachable signed out, deliberately —
+  /// see the redirect below.
+  static const String server = '/server';
 }
 
 /// Re-runs the redirect whenever the session changes.
@@ -52,6 +57,12 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     // a returning member before `restore()` has answered.
     if (session.phase == AuthPhase.unknown) return null;
 
+    // The one screen that is not behind the session, and it has to be: until
+    // the gateway's address is right, the sign-in request is going somewhere
+    // that cannot answer it. A settings screen locked behind signing in would
+    // be locked behind the thing it exists to fix.
+    if (state.matchedLocation == Routes.server) return null;
+
     final atSignIn = state.matchedLocation == Routes.signIn;
 
     if (!session.isSignedIn) return atSignIn ? null : Routes.signIn;
@@ -87,6 +98,10 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     GoRoute(
       path: Routes.preferences,
       builder: (context, state) => const PreferencesPage(),
+    ),
+    GoRoute(
+      path: Routes.server,
+      builder: (context, state) => const ServerPage(),
     ),
   ],
 );

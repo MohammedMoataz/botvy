@@ -2,7 +2,7 @@
 
 Identity & Profile (P1) and Foundation (P0), reviewed in a fresh context before
 phase 016 begins. Twenty-six findings. This file records all of them, what state
-each is in, and which ones need a decision from the Owner. Eleven are fixed.
+each is in, and which ones need a decision from the Owner. Thirteen are fixed.
 
 The review's own headline is worth repeating: **the two most severe defects were
 invisible to all 483 passing tests**, because nothing in the repository ever
@@ -103,6 +103,42 @@ immediately, and `app.module.spec.ts` found the next one: `PrismaUnitOfWork`
 imported `PrismaService` with `import type`, which emits no runtime token, so
 Nest reported index [0] undefined at boot while tsc stayed green.
 
+**11. Identity imported Operations' `AuditPort` directly**, and no rule
+refused it. `AuditPort` moves to `shared/audit/` — four consumers in three
+contexts is well past the constitution's own "move it on the third copy" — with
+the Mongo adapter and the `audit_log` collection staying where they were.
+`OperationsBootstrap` was also importing Identity's `AdminSeedService`: the
+permitted direction reaching for the wrong thing, since a feature service is
+private to its context. Identity publishes `AdminCredentialsQueryHandler` now,
+and Operations binds a port to it in its own `infrastructure/`, which is where
+`SeededAdminDeviceLookup` already does the same job.
+
+Then the rule: `no-restricted-imports` refuses a cross-context relative import
+from any `domain/` or `features/` file, at every depth it can be spelled.
+`infrastructure/` is deliberately exempt — it is the sanctioned seam.
+
+Writing it found that **the driver half of that rule had never run**. oxlint
+ignores `patterns` outright when `paths` is also present, and the config had
+both — so `mongoose/*`, `mongodb/*` and `@prisma/client/*` were checked by
+nothing since P0, and a handler could import `mongodb/lib/db.js` freely. This
+review had probed that rule and found it live, because it probed a bare
+`import 'mongoose'`, which `paths` does catch. Both halves are probed now.
+
+**15. Mobile had no way to set the gateway URL.** `readBaseUrl`, `writeBaseUrl`,
+the `origin` setter and the `BOTVY_BASE_URL` build define were all written, and
+nothing let a person change the value — so every real handset ran against
+`http://10.0.2.2:8080`, the Android emulator's loopback to its own host. A
+self-hosted platform whose premise is your own hostname could not be pointed at
+one without building a new APK. There was even a translated `serverUrl` string,
+used nowhere.
+
+There is a screen now, reachable from the sign-in page and exempt from the
+session redirect — a settings screen behind sign-in would be behind the thing it
+exists to fix. It tests before it saves, against public `GET /health`, and tells
+three outcomes apart: nothing answered, something answered that is not this
+application, and connected with a version. Saving updates the live client and
+drops the socket, not only secure storage.
+
 ### And the guard against the recurrence
 
 `app.module.spec.ts` compiles both roles' dependency graphs. It found a fourth
@@ -139,11 +175,6 @@ guessing against a portal whose administrator login is published.
 
 These are recorded rather than fixed, in rough order of how much they matter.
 
-**11. Identity still imports Operations' `AuditPort` directly**, and the
-`no-restricted-imports` rule covers driver packages only, not cross-context
-relative imports. The boot failure is fixed but the rule that would have caught
-it is not written.
-
 **14. Both generated-type re-exports are still commented out** with
 `CONTRACTS_GENERATED = false`, so `packages/sdk` is hand-written and nothing
 enforces agreement — which is the root cause of findings 6, 9, 15 and 17. The
@@ -152,8 +183,7 @@ regenerated, and `schema.graphql` now exists at all. Turning the flag on means
 generating clients from them, which changes four surfaces and wants its own
 task.
 
-**15–20, 22–25.** Mobile has no way to set the gateway URL, so a real phone
-cannot reach the backend; onboarding "Skip" is a redirect trap; the ladder's
+**16–20, 22–25.** Onboarding "Skip" is a redirect trap; the ladder's
 catch-all cannot catch a forgotten step at the *next* bump; the Socket.IO wire
 shapes still disagree between the three clients, though the server side of them
 now exists and the SDK's `connect_error` reading is fixed; event payloads

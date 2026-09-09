@@ -100,6 +100,15 @@ class _ProfilePageState extends State<ProfilePage> {
             tooltip: t.preferencesTitle,
             onPressed: () => context.push(Routes.preferences),
           ),
+          // Also reachable from the sign-in screen, which is where it matters
+          // most. Here too, because an address that worked can stop working -
+          // a tunnel hostname changes, a machine moves - and by then the
+          // member is signed in and would otherwise have to sign out to fix it.
+          IconButton(
+            icon: const Icon(Icons.dns_outlined),
+            tooltip: t.serverSettings,
+            onPressed: () => context.push(Routes.server),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: t.signOut,

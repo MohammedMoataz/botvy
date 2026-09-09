@@ -24,6 +24,42 @@ const String kDefaultBaseUrl = String.fromEnvironment(
 /// is `/ws`, both off the same origin.
 const String kApiPrefix = '/api/v1';
 
+/// Why a URL the member typed cannot be used. The screen turns each of these
+/// into a sentence in their language; the client does not know their language.
+enum UrlProblem { empty, notAUrl, scheme, hasPath }
+
+/// What answered at a URL, or did not.
+class GatewayProbe {
+  const GatewayProbe.reachable({required this.version, required this.degraded})
+    : outcome = ProbeOutcome.reachable;
+
+  /// Nothing answered: wrong host, wrong port, no network, tunnel down.
+  const GatewayProbe.unreachable()
+    : outcome = ProbeOutcome.unreachable,
+      version = null,
+      degraded = false;
+
+  /// Something answered, but it was not this application. Told apart from
+  /// unreachable on purpose: it means the URL is *nearly* right, which is a
+  /// different thing to go and check.
+  const GatewayProbe.notBotvy()
+    : outcome = ProbeOutcome.notBotvy,
+      version = null,
+      degraded = false;
+
+  final ProbeOutcome outcome;
+  final String? version;
+
+  /// The gateway answered and reported itself degraded. Saved anyway: a
+  /// degraded platform is still the right address, and refusing to save would
+  /// leave the member unable to point the app anywhere while it recovers.
+  final bool degraded;
+
+  bool get ok => outcome == ProbeOutcome.reachable;
+}
+
+enum ProbeOutcome { reachable, unreachable, notBotvy }
+
 /// Shared instance so `main()` can read persisted state before the container
 /// exists without standing up a throwaway one.
 // flutter_secure_storage 10 removed `encryptedSharedPreferences`: encrypted
@@ -271,6 +307,91 @@ class ApiClient {
       u = u.substring(0, u.length - 1);
     }
     return u;
+  }
+
+  /// Why a typed URL cannot be used, or null when it can.
+  ///
+  /// Not a regular expression. What Dio actually needs is a scheme it can dial
+  /// and a host to dial it at, and `Uri.parse` answers both — where a pattern
+  /// permissive enough for `https://192.168.1.7:8080` and a Cloudflare
+  /// hostname either lets `my.host` through, which fails later as a mangled
+  /// relative path, or rejects something legitimate.
+  static UrlProblem? validateBaseUrl(String url) {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return UrlProblem.empty;
+
+    // Checked on the trimmed string, not the normalised one: normalising
+    // strips every trailing slash, which turns a bare `http://` into `http:`
+    // and would report a missing scheme for the one input that has nothing but
+    // a scheme.
+    //
+    // The scheme is checked textually and first, before anything is parsed.
+    // A person typing an address leaves it off far more often than they get
+    // anything else wrong, and `Uri` is no help in spotting that: it puts
+    // `botvy.example.com` entirely in `path` with an empty `host`, and
+    // `tryParse('192.168.1.7:8080')` returns null outright, because a scheme
+    // may not begin with a digit. Both would be reported as "not an address"
+    // when the fix is one prefix.
+    //
+    // Missing and unusable are the same problem here, deliberately: they
+    // produce the same sentence, and that sentence is the whole fix.
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      return UrlProblem.scheme;
+    }
+
+    final uri = Uri.tryParse(normaliseBaseUrl(trimmed));
+    if (uri == null || uri.host.isEmpty) return UrlProblem.notAUrl;
+
+    // A path would be appended to by `/api/v1` and `/ws` and break both. The
+    // edge serves the whole platform from one origin, so there is nothing a
+    // path here could usefully mean.
+    if (uri.path.isNotEmpty) return UrlProblem.hasPath;
+
+    return null;
+  }
+
+  /// Whether a gateway answers at [url], asked before anything is saved.
+  ///
+  /// `GET /health` and not a sign-in attempt: it is public, it needs no
+  /// credentials, and it is the one endpoint that can tell "this is a Botvy
+  /// gateway" from "this is a web server that returned a page". Without it the
+  /// only way to discover a wrong URL is a failed sign-in, which looks exactly
+  /// like a wrong password.
+  ///
+  /// A bare Dio, on the given origin rather than this client's: the point is
+  /// to check a URL the member has not committed to yet.
+  static Future<GatewayProbe> probeGateway(String url) async {
+    if (validateBaseUrl(url) != null) return const GatewayProbe.unreachable();
+
+    try {
+      final res = await Dio(
+        BaseOptions(
+          baseUrl: normaliseBaseUrl(url),
+          connectTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 8),
+          // Read rather than thrown, so a 404 from some other server is
+          // reported as "not a gateway" instead of as a network failure.
+          validateStatus: (_) => true,
+        ),
+      ).get<dynamic>('/health');
+
+      final body = res.data;
+      if (res.statusCode != 200 || body is! Map) {
+        return const GatewayProbe.notBotvy();
+      }
+      final version = body['version'];
+      // `status` and `version` together are what only this application
+      // answers with. A reverse proxy's own health page has neither.
+      if (body['status'] is! String || version is! String) {
+        return const GatewayProbe.notBotvy();
+      }
+      return GatewayProbe.reachable(
+        version: version,
+        degraded: body['status'] != 'ok',
+      );
+    } on DioException {
+      return const GatewayProbe.unreachable();
+    }
   }
 
   /// Rotates the token pair. Uses a bare Dio so a 401 on the refresh call
