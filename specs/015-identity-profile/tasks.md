@@ -25,7 +25,7 @@ series whose numbers mean something else; nothing here refers to it by id.
 - [X] T115 [P] [US3] `features/register-device/` (idempotent on `installId`, sets `kind`, stamps `lastSeenAt`, raises `identity.DeviceRegistered{deviceId, kind, hasPush}`), `features/remove-device/` (raises `identity.DeviceRemoved`), query `my-devices`; spec: the same `installId` twice leaves one row with the later `lastSeenAt` and raises the event once; removing another member's device → 404
 - [X] T116 [US2] `features/delete-account/` — soft-delete the user, revoke tokens, raise `identity.UserDeleted`; spec: the account can no longer sign in, every refresh family is revoked, the event carries the `userId` the Mongo contexts purge on
 - [X] T117 [P] Extend the `me` query shipped by P0 (role, status, `deviceCount`) and add admin `admin-users` (search, status filter, cursor)
-- [ ] T118 [US2] Extend P0's `admin-seed.service.ts`: at every boot, if the `ADMIN_EMAIL` account's password still verifies against the shipped default, log a warning and set `ops.adminPasswordIsDefault`; `Health.defaultAdminPassword` reads it and `identity.PasswordChanged` clears it; spec: a seeded admin whose password was changed is never reset and the flag stays false across a restart
+- [X] T118 [US2] Extend P0's `admin-seed.service.ts`: at every boot, if the `ADMIN_EMAIL` account's password still verifies against the shipped default, log a warning and set `ops.adminPasswordIsDefault`; `Health.defaultAdminPassword` reads it and `identity.PasswordChanged` clears it; spec: a seeded admin whose password was changed is never reset and the flag stays false across a restart
 
 ## Phase 3 — Profile context (US4, US5)
 
