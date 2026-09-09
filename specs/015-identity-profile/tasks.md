@@ -46,7 +46,7 @@ series whose numbers mean something else; nothing here refers to it by id.
 
 ## Phase 5 — Clients
 
-- [ ] T150 `pnpm gen:contracts` regenerated; `packages/sdk` gains `AuthStore.register/login/google/refresh/logout` and `ProfileStore` — first in this phase, because the admin portal and the extension are only wiring on top of it
+- [X] T150 `pnpm gen:contracts` regenerated; `packages/sdk` gains `AuthStore.register/login/google/refresh/logout` and `ProfileStore` — first in this phase, because the admin portal and the extension are only wiring on top of it
 - [ ] T140 [P] Mobile `features/auth`: sign-in, register (confirm field, inline mismatch), Google button (`google_sign_in` 7 `initialize()` + `authenticate()`), `AuthCubit` + secure storage, `go_router` redirect, sign-out; on a successful sign-in, pull `profile` and `preferences` into the drift mirror before routing to the first screen (sync arrives in P2, so this phase fetches them itself); spec: a signed-in cubit on a fresh install has both rows locally
 - [ ] T141 [P] Mobile `features/profile`: photo picker + cropper, name, time zone (device-detected, editable), language, body metrics with history list, foods and allergies chip editors
 - [ ] T142 [P] Mobile `features/preferences`: every default with the right control, quiet hours, week start; writes through the REST command and the local mirror
