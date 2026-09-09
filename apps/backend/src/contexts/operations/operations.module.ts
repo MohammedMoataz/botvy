@@ -3,11 +3,7 @@ import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { ENV } from '../../shared/config/config.module.js';
 import type { Env } from '../../shared/config/env.schema.js';
-import { EVENT_SCHEMA_VERSION, contextOf } from '../../shared/cqrs/domain-event.js';
-import { newId } from '../../shared/cqrs/ids.js';
-import { HeartbeatService } from '../../shared/health/heartbeat.service.js';
 import { OutboxModule } from '../../shared/outbox/outbox.module.js';
-import { OutboxWriter } from '../../shared/outbox/outbox-writer.js';
 import type { OutboxInsert } from '../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../shared/persistence/mongo/mongo-unit-of-work.js';
 import {
@@ -19,25 +15,14 @@ import {
 } from '../../shared/persistence/mongo/schemas.js';
 import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
 import { PushService } from '../../shared/push/push.service.js';
-import { SETTINGS_EVENT_SINK, SettingsService, type SettingsEventSink } from '../../shared/settings/settings.service.js';
-import { SettingsStore } from '../../shared/settings/settings.store.js';
 import { IdentityModule } from '../identity/identity.module.js';
-import { AuditPort } from './domain/audit.port.js';
-import { HeartbeatRepository } from './domain/heartbeat.repository.js';
 import { PingRepository } from './domain/ping.aggregate.js';
 import { AdminPasswordFlagHandler } from './features/admin-password-flag/admin-password-flag.handler.js';
 import { OperationsBootstrap } from './features/admin-password-flag/operations.bootstrap.js';
 import { PingHandler } from './features/ping/ping.handler.js';
 import { PingedHandler } from './features/ping/pinged.handler.js';
 import { ADMIN_DEVICE_LOOKUP, SeededAdminDeviceLookup } from './infrastructure/admin-device.lookup.js';
-import {
-  MongoAuditAdapter,
-  MongoHeartbeatRepository,
-  MongoSettingsStore,
-} from './infrastructure/mongo-operations.adapters.js';
 import { MongoPingRepository, type PingDoc } from './infrastructure/mongo-ping.repository.js';
-
-type AnyModel = Model<Record<string, unknown>>;
 
 /**
  * Operations: settings, heartbeats, the audit trail and the demonstration

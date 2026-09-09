@@ -6,8 +6,10 @@ import {
   HttpCode,
   NotFoundException,
   Patch,
+
   Post,
   Res,
+  StreamableFile,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -233,18 +235,25 @@ export class ProfileController {
   async photo(
     @CurrentPrincipal() principal: Principal,
     @Res({ passthrough: true }) response: { setHeader(name: string, value: string): void },
-  ): Promise<Buffer> {
+  ): Promise<StreamableFile> {
     const view = await this.queries.profile(principal.id);
     if (!view?.photoPath) throw new NotFoundException('no photo');
 
     const bytes = await this.photos.read(view.photoPath);
     if (!bytes) throw new NotFoundException('no photo');
 
-    response.setHeader('content-type', 'image/webp');
     // Immutable because the name carries a content hash: a replaced photo has a
     // different path, so this copy can never become the wrong one.
     response.setHeader('cache-control', 'private, max-age=31536000, immutable');
-    return bytes;
+
+    // `StreamableFile`, not the Buffer.
+    //
+    // Nest's Express adapter ends with `isObject(body) ? res.json(body) :
+    // res.send(String(body))`, and a Buffer *is* an object — so returning one
+    // served `{"type":"Buffer","data":[82,73,70,70,…]}` under an `image/webp`
+    // header, and every surface got a broken image. No handler spec could see
+    // it: a spec receives the Buffer and asserts on the bytes.
+    return new StreamableFile(bytes, { type: 'image/webp' });
   }
 
   @Get('preferences')

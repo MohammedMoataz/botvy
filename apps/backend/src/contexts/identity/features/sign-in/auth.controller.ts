@@ -110,7 +110,21 @@ export class DeviceDto {
 }
 
 export class SignInDto {
-  @IsEmail()
+  /**
+   * A login, not necessarily an email address.
+   *
+   * `@IsEmail()` here rejected the documented default — the literal `admin`,
+   * which `SETUP.md`, `CLAUDE.md` and the seed itself all specify — with a 400
+   * before the handler ran. The handler's own `findByLogin` accepts a bare
+   * username, which is why its spec passed: it calls the handler directly and
+   * never sees the pipe.
+   *
+   * This is the second half of a fix already made once. `env.schema.ts`
+   * relaxed `ADMIN_EMAIL` for exactly this reason and the DTO was missed —
+   * one root cause, two places, and only one of them corrected.
+   */
+  @IsString()
+  @MinLength(1)
   email!: string;
 
   // No length rule on the way in. An existing password shorter than today's

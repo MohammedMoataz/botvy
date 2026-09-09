@@ -42,6 +42,19 @@ export class LinkRequired extends Error {
   }
 }
 
+/**
+ * The address belongs to an account bound to another Google identity.
+ *
+ * Distinct from `LinkRequired`, because there is nothing the caller can do to
+ * finish: that one has a password to supply, and this one does not.
+ */
+export class GoogleAccountMismatch extends Error {
+  readonly code = 'google_account_mismatch';
+  constructor(readonly email: string) {
+    super('that address belongs to an account linked to a different Google identity');
+  }
+}
+
 export class LinkPasswordWrong extends Error {
   constructor() {
     super('email or password is incorrect');
@@ -93,9 +106,21 @@ export class GoogleSignInHandler {
       // account with a typo in the address.
       if (existing.passwordHash) throw new LinkRequired(identity.email);
 
-      // No password and no Google link: an account created some other way that
-      // has nothing to prove ownership with. Linking is the only way it can
-      // ever be signed into, so link it.
+      // The address is taken by an account already bound to a *different*
+      // Google subject. Refused outright, and this is the important one: the
+      // branch below used to run here and silently rebind the account, so a
+      // second subject presenting a verified token for the same address took
+      // it over. A deleted-and-recreated Workspace address is a new `sub` on
+      // an old address, which is all it takes.
+      //
+      // There is no link path out of this either, because a Google-registered
+      // account has no password to prove ownership with — so the honest answer
+      // is that this address cannot be signed into by this identity.
+      if (existing.googleSub) throw new GoogleAccountMismatch(identity.email);
+
+      // Neither a password nor a link: an account with nothing to prove
+      // ownership with at all. Linking is the only way it can ever be signed
+      // into, so link it.
       existing.linkGoogle(identity.sub);
       await this.users.save(existing);
       return this.issue(existing, command);

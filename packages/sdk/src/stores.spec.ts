@@ -72,6 +72,23 @@ function build(api: FakeApi) {
   return { tokens, client, auth };
 }
 
+/**
+ * The wiring the frontend and the extension both use.
+ *
+ * One store, whose `refreshFn` reaches the auth store through a closure — the
+ * cycle broken exactly as `stores/root.ts` and `lib/store.ts` break it. Tests
+ * that build two stores cannot see the re-entrant path at all.
+ */
+function buildWired(api: FakeApi) {
+  let auth: AuthStore;
+  const tokens = new TokenStore(inMemoryStorage(), (refreshToken) =>
+    auth.refreshFn(refreshToken),
+  );
+  const client = new BotvyClient({ baseUrl: '', tokens, fetchImpl: api.fetch });
+  auth = new AuthStore(client, tokens);
+  return { tokens, client, auth };
+}
+
 describe('AuthStore', () => {
   let api: FakeApi;
 
@@ -195,20 +212,62 @@ describe('AuthStore', () => {
    * store out too, or the tokens are gone while the UI still believes somebody
    * is logged in.
    */
+  /**
+   * Wired the way the surfaces actually wire it: **one** token store, whose
+   * `refreshFn` is the auth store's, and whose client is the same client the
+   * auth store refreshes through.
+   *
+   * The previous version of this test built two stores — the one handed to the
+   * client had no `refreshFn` — so the re-entrant path never ran and it passed
+   * against a client that deadlocked in production. The comment claimed the
+   * opposite. Sharing one store is the whole test.
+   */
   it('signs out when a refresh is refused, and says why', async () => {
     api.on('POST', '/auth/login', { body: session });
     api.on('POST', '/auth/refresh', { status: 401, body: { code: 'session_replay' } });
-    const tokens = new TokenStore(inMemoryStorage());
-    const client = new BotvyClient({ baseUrl: '', tokens, fetchImpl: api.fetch });
-    const auth = new AuthStore(client, tokens);
-    // Wired the way the surfaces wire it.
-    const wired = new TokenStore(inMemoryStorage(), auth.refreshFn);
-    await auth.login('member@example.test', 'a-password');
-    wired.set({ accessToken: 'access-1', refreshToken: 'refresh-1' });
 
-    expect(await wired.refresh()).toBeNull();
+    const { auth, tokens } = buildWired(api);
+    await auth.login('member@example.test', 'a-password');
+
+    expect(await tokens.refresh()).toBeNull();
     expect(auth.signedIn).toBe(false);
     expect(auth.lastSignOutReason).toBe('session_replay');
+  });
+
+  /**
+   * The deadlock itself, asserted by a timeout rather than by reasoning.
+   *
+   * A 401 from `/auth/refresh` used to trigger a refresh, which returned the
+   * in-flight promise that was waiting on that very response. Nothing settled,
+   * `#inFlight` stayed poisoned, and every later request hung too — silently,
+   * which is why it survived review.
+   */
+  it('does not hang when the refresh itself is refused', async () => {
+    api.on('POST', '/auth/login', { body: session });
+    api.on('POST', '/auth/refresh', { status: 401, body: { code: 'token_expired' } });
+
+    const { auth, tokens } = buildWired(api);
+    await auth.login('member@example.test', 'a-password');
+
+    const settled = await Promise.race([
+      tokens.refresh().then(() => 'settled' as const),
+      new Promise<'hung'>((resolve) => setTimeout(() => resolve('hung'), 250)),
+    ]);
+
+    expect(settled).toBe('settled');
+  });
+
+  /** And the store is usable afterwards, rather than poisoned for good. */
+  it('leaves the token store working after a refused refresh', async () => {
+    api.on('POST', '/auth/login', { body: session });
+    api.on('POST', '/auth/refresh', { status: 401, body: { code: 'token_expired' } });
+
+    const { auth, tokens } = buildWired(api);
+    await auth.login('member@example.test', 'a-password');
+    await tokens.refresh();
+
+    expect(tokens.refreshing).toBe(false);
+    expect(await tokens.refresh()).toBeNull();
   });
 
   it('returns the rotated pair when a refresh succeeds', async () => {

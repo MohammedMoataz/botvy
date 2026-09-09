@@ -126,6 +126,16 @@ export class AdminMembersHandler {
   async unban(actor: Principal, userId: string): Promise<{ userId: string }> {
     const user = await this.mustFind(actor, 'admin.unban', userId);
 
+    // The self-check `ban` and `setRole` both had and this did not — which
+    // turned privilege *retention* into privilege *escalation*. A banned
+    // administrator still holds a valid access token for up to its TTL, and
+    // without this they could un-ban themselves with it and then ban whoever
+    // banned them.
+    if (actor.id === userId) {
+      await this.refuse(actor, 'admin.unban', userId, 'self_unban');
+      throw new CannotActOnSelf('unban');
+    }
+
     user.unban(actor.id);
     await this.users.save(user);
 

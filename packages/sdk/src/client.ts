@@ -8,6 +8,26 @@ export interface ClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+/**
+ * The one path that must never trigger a refresh.
+ *
+ * `AuthStore.refreshFn` performs the exchange *through this client*, so a 401
+ * from `/auth/refresh` used to call `tokens.refresh()` — which returns the
+ * in-flight promise, which is the very call still waiting on this response.
+ * Circular await: `.finally` never ran, `#inFlight` stayed poisoned, and every
+ * later request hung too. No error, no sign-out, no banner — the portal and
+ * the side panel simply stopped.
+ *
+ * A refused refresh is the *normal* case (an expired token, a replay, a
+ * deleted account), so this was not an edge.
+ *
+ * The mobile client avoids the same trap by refreshing through a bare Dio and
+ * says so; this is the SDK's version of that guard.
+ */
+function isRefreshPath(path: string): boolean {
+  return path === '/auth/refresh' || path.startsWith('/auth/refresh?');
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -84,7 +104,7 @@ export class BotvyClient {
 
     let response = await send();
 
-    if (response.status === 401 && this.options.tokens) {
+    if (response.status === 401 && this.options.tokens && !isRefreshPath(path)) {
       const refreshed = await this.options.tokens.refresh();
       if (refreshed) response = await send();
     }
@@ -113,7 +133,7 @@ export class BotvyClient {
       });
 
     let response = await send();
-    if (response.status === 401 && this.options.tokens) {
+    if (response.status === 401 && this.options.tokens && !isRefreshPath(path)) {
       const refreshed = await this.options.tokens.refresh();
       if (refreshed) response = await send();
     }
@@ -135,6 +155,9 @@ export class BotvyClient {
       if (refreshed) response = await send();
     }
 
+    // No refresh-path guard here: this posts to `/graphql`, which the refresh
+    // exchange never uses. If a GraphQL mutation ever performs the exchange,
+    // it needs the same guard `rest` has.
     const payload = (await response.json()) as { data?: T; errors?: Array<{ message: string }> };
     if (payload.errors?.length) {
       throw new ApiError(response.status, payload.errors, payload.errors[0]!.message);
@@ -148,9 +171,16 @@ export class BotvyClient {
   }
 
   private async unwrap<T>(response: Response, path: string): Promise<T> {
-    if (response.status === 404) throw new NotAvailableYetError(path);
     if (!response.ok) {
       const body = await response.json().catch(() => null);
+      // A 404 that carries a message is the server saying "this thing is not
+      // here" — no such profile, no photo, no such device. Only a *bodiless*
+      // 404 means the route itself does not exist. Treating both the same told
+      // an Owner that `/admin/service-clients/foo` "is not available in this
+      // build yet" when they revoked a client twice.
+      if (response.status === 404 && !(body as { message?: string } | null)?.message) {
+        throw new NotAvailableYetError(path);
+      }
       throw new ApiError(
         response.status,
         body,

@@ -10,6 +10,7 @@ import { AuthController } from './contexts/identity/features/sign-in/auth.contro
 import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
+import { SettingsController } from './contexts/operations/features/patch-setting/settings.controller.js';
 import { ProfileController } from './contexts/profile/features/update-profile/profile.controller.js';
 import { AuthModule } from './shared/auth/auth.module.js';
 import { JwtAuthGuard } from './shared/auth/jwt-auth.guard.js';
@@ -58,6 +59,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     AuthController,
     AdminController,
     ProfileController,
+    SettingsController,
     PingController,
     InternalAlertsController,
     InternalHeartbeatController,
