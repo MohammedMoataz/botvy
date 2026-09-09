@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Model } from 'mongoose';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import { SettingsStore, type StoredSetting } from '../../../shared/settings/settings.store.js';
-import { AuditPort, type AuditEntry } from '../domain/audit.port.js';
+import { AuditPort, type AuditEntry } from '../../../shared/audit/audit.port.js';
 import { HeartbeatRepository, type Heartbeat } from '../domain/heartbeat.repository.js';
 
 /**
@@ -30,15 +30,6 @@ export class MongoAuditAdapter extends AuditPort {
       ],
       session ? { session } : {},
     );
-  }
-}
-
-/** The audit adapter specs bind. */
-@Injectable()
-export class InMemoryAuditAdapter extends AuditPort {
-  readonly entries: AuditEntry[] = [];
-  async record(entry: AuditEntry): Promise<void> {
-    this.entries.push(entry);
   }
 }
 

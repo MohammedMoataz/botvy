@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { InMemoryAuditAdapter } from '../../../operations/infrastructure/mongo-operations.adapters.js';
+import { InMemoryAuditAdapter } from '../../../../shared/audit/in-memory-audit.adapter.js';
 import { User } from '../../domain/user.aggregate.js';
 import {
   InMemoryRefreshTokenRepository,

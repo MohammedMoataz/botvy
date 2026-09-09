@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import type { PushService } from '../../../../shared/push/push.service.js';
-import { AuditPort } from '../../domain/audit.port.js';
+import { AuditPort } from '../../../../shared/audit/audit.port.js';
 
 /** What Identity answers when asked for a member's devices. */
 export interface DeviceSummary {

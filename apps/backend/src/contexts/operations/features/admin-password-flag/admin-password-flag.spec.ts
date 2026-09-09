@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { newId } from '../../../../shared/cqrs/ids.js';
 import { InMemorySettingsStore } from '../../../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
-import { InMemoryAuditAdapter } from '../../infrastructure/mongo-operations.adapters.js';
+import { InMemoryAuditAdapter } from '../../../../shared/audit/in-memory-audit.adapter.js';
 import { ADMIN_PASSWORD_FLAG, AdminPasswordFlagHandler } from './admin-password-flag.handler.js';
 
 const OWNER = { kind: 'user', id: 'admin-1', role: 'admin' } as const;

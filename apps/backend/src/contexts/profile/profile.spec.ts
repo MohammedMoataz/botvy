@@ -3,7 +3,7 @@ import type { DomainEvent } from '../../shared/cqrs/domain-event.js';
 import { newId } from '../../shared/cqrs/ids.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
-import { InMemoryAuditAdapter } from '../operations/infrastructure/mongo-operations.adapters.js';
+import { InMemoryAuditAdapter } from '../../shared/audit/in-memory-audit.adapter.js';
 import { Profile } from './domain/profile.aggregate.js';
 import { BootstrapOnRegisteredHandler } from './features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ProfileQueryHandler } from './features/profile-query/profile.query.js';

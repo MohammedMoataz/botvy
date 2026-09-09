@@ -22,6 +22,10 @@ import { OperationsBootstrap } from './features/admin-password-flag/operations.b
 import { PingHandler } from './features/ping/ping.handler.js';
 import { PingedHandler } from './features/ping/pinged.handler.js';
 import { ADMIN_DEVICE_LOOKUP, SeededAdminDeviceLookup } from './infrastructure/admin-device.lookup.js';
+import {
+  ADMIN_PASSWORD_PROBE,
+  IdentityAdminPasswordProbe,
+} from './infrastructure/admin-password.probe.js';
 import { MongoPingRepository, type PingDoc } from './infrastructure/mongo-ping.repository.js';
 
 /**
@@ -59,6 +63,7 @@ import { MongoPingRepository, type PingDoc } from './infrastructure/mongo-ping.r
       },
     },
     { provide: ADMIN_DEVICE_LOOKUP, useClass: SeededAdminDeviceLookup },
+    { provide: ADMIN_PASSWORD_PROBE, useClass: IdentityAdminPasswordProbe },
     PingHandler,
     PingedHandler,
     AdminPasswordFlagHandler,

@@ -1,6 +1,6 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { Principal } from '../auth/principal.js';
-import { AuditPort } from '../../contexts/operations/domain/audit.port.js';
+import { AuditPort } from '../audit/audit.port.js';
 import {
   SETTING_KEYS,
   definitionOf,

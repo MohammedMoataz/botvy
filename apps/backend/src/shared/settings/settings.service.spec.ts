@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Principal } from '../auth/principal.js';
-import { AuditPort, type AuditEntry } from '../../contexts/operations/domain/audit.port.js';
+import { AuditPort, type AuditEntry } from '../audit/audit.port.js';
 import { InMemorySettingsStore } from './in-memory-settings.store.js';
 import {
   InvalidSettingError,

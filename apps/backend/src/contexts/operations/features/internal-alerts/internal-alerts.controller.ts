@@ -4,7 +4,7 @@ import { IsOptional, IsString } from 'class-validator';
 import { CurrentPrincipal, Scopes, ServiceOnly } from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { PushService } from '../../../../shared/push/push.service.js';
-import { AuditPort } from '../../domain/audit.port.js';
+import { AuditPort } from '../../../../shared/audit/audit.port.js';
 import { ADMIN_DEVICE_LOOKUP } from '../../infrastructure/admin-device.lookup.js';
 import { InternalAlertsHandler, type AdminDeviceLookup } from './internal-alerts.handler.js';
 

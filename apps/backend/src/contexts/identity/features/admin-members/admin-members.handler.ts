@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Principal, Role } from '../../../../shared/auth/principal.js';
-import { AuditPort } from '../../../operations/domain/audit.port.js';
+import { AuditPort } from '../../../../shared/audit/audit.port.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { RefreshTokenRepository } from '../../domain/refresh-token.repository.js';
 import { UserRepository } from '../../domain/user.repository.js';

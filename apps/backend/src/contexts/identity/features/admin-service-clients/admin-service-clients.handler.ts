@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { hashToken } from '../../../../shared/auth/service-token.guard.js';
-import { AuditPort } from '../../../operations/domain/audit.port.js';
+import { AuditPort } from '../../../../shared/audit/audit.port.js';
 import { ServiceClientRepository } from '../../domain/service-client.repository.js';
 
 export class ServiceClientNotFound extends Error {

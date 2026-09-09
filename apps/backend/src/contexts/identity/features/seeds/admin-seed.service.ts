@@ -89,13 +89,6 @@ export class AdminSeedService {
    * written here, as this comment used to, is how a capability every phase
    * credits to another phase ends up built by none of them.
    */
-  async isStillDefault(email: string, password: string): Promise<boolean> {
-    if (password !== DEFAULT_ADMIN_PASSWORD && email !== DEFAULT_ADMIN_EMAIL) return false;
-    const user = await this.users.findByLogin(email);
-    if (!user?.passwordHash) return false;
-    return this.hasher.verify(user.passwordHash, DEFAULT_ADMIN_PASSWORD);
-  }
-
   warnIfDefault(email: string, isDefault: boolean): void {
     if (!isDefault) return;
     this.logger.warn(

@@ -1,8 +1,13 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ENV } from '../../../../shared/config/config.module.js';
 import type { Env } from '../../../../shared/config/env.schema.js';
-import { AdminSeedService } from '../../../identity/features/seeds/admin-seed.service.js';
-import { AdminPasswordFlagHandler } from './admin-password-flag.handler.js';
+import {
+  ADMIN_PASSWORD_PROBE,
+} from '../../infrastructure/admin-password.probe.js';
+import {
+  AdminPasswordFlagHandler,
+  type AdminPasswordProbe,
+} from './admin-password-flag.handler.js';
 
 /**
  * Records at boot whether the seeded administrator still has its published
@@ -15,6 +20,12 @@ import { AdminPasswordFlagHandler } from './admin-password-flag.handler.js';
  * permitted direction; Identity calling an Operations *feature handler* — which
  * is what it used to do — is the violation constitution IX describes, and it is
  * what made the module graph unresolvable.
+ *
+ * It asks through a port. This file used to import `AdminSeedService` from
+ * Identity's `features/` — the right direction reaching for the wrong thing,
+ * because a feature service is private to its context. The adapter that knows
+ * Identity exists is in `infrastructure/`, which is the layer for exactly that,
+ * and `no-restricted-imports` now refuses the shortcut.
  *
  * The ordering is guaranteed rather than hoped for: Nest initialises a module's
  * imports before the module itself, and `OperationsModule` imports
@@ -29,7 +40,7 @@ export class OperationsBootstrap implements OnApplicationBootstrap {
 
   constructor(
     @Inject(ENV) private readonly env: Env,
-    private readonly admin: AdminSeedService,
+    @Inject(ADMIN_PASSWORD_PROBE) private readonly admin: AdminPasswordProbe,
     private readonly flag: AdminPasswordFlagHandler,
   ) {}
 
@@ -37,10 +48,7 @@ export class OperationsBootstrap implements OnApplicationBootstrap {
     if (process.env.BOTVY_GEN || this.env.BOTVY_ROLE !== 'backend') return;
 
     try {
-      const stillDefault = await this.admin.isStillDefault(
-        this.env.ADMIN_EMAIL,
-        this.env.ADMIN_PASSWORD,
-      );
+      const stillDefault = await this.admin.isStillDefault();
       await this.flag.record(stillDefault);
     } catch (error) {
       // A store that is not up yet must not stop the process starting: the

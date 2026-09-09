@@ -5,6 +5,18 @@ import { SettingsService } from '../../../../shared/settings/settings.service.js
 export const ADMIN_PASSWORD_FLAG = 'ops.adminPasswordIsDefault';
 
 /**
+ * What Operations needs to know from Identity, as a port.
+ *
+ * One boolean, and no arguments: the question is about the seeded account, and
+ * which account that is belongs to Identity. `IdentityAdminPasswordProbe` in
+ * `infrastructure/` is the adapter; nothing in this folder knows Identity
+ * exists.
+ */
+export interface AdminPasswordProbe {
+  isStillDefault(): Promise<boolean>;
+}
+
+/**
  * Keeps `ops.adminPasswordIsDefault` true or false.
  *
  * The flag exists because a boot log is not a warning anybody sees. The seeded

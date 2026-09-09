@@ -59,7 +59,14 @@ and a second `bootstrap.mjs` run that changes nothing.
   are a `QueryBus` call or an outbox event. If two slices need the same helper,
   duplicate it; move it to `shared/` on the third copy. A handler that dispatches
   another context's *command* is the same violation wearing a bus — the write
-  belongs to that context's own consumer of your event.
+  belongs to that context's own consumer of your event. Enforced now:
+  `no-restricted-imports` refuses a cross-context relative import from any
+  `domain/` or `features/` file. `infrastructure/` is the one layer allowed to
+  know another context exists, because binding a local port to somebody else's
+  query is its job — `admin-device.lookup.ts` and `admin-password.probe.ts` are
+  the pattern to copy. Reaching for another context's *feature service* is a
+  violation even in the permitted direction; a `*.query.ts` handler is the
+  published surface.
 - **A capability three phases each credit to another phase is a capability
   nobody builds.** The pinned `coach` and `planner` conversations were "created
   in P1" per P1 and P3, and built in P4, and the blueprint put the skeleton in
@@ -71,6 +78,13 @@ and a second `bootstrap.mjs` run that changes nothing.
   reactions spelled out, and no phase raised them — so a member who changed time
   zone kept alerts, meetings and sessions on the old wall clock. Both halves of
   an event, the raise and the handler, land in the same review.
+- **oxlint ignores `patterns` when `paths` is also present.** The driver-import
+  rule was written with both, so its `mongoose/*` and `@prisma/client/*` half
+  never ran and a deep import was refused by nothing for two phases. Everything
+  in `no-restricted-imports` is a `patterns` group now — a bare specifier
+  matches there too — and every change to that rule is probed by writing a file
+  that should fail and checking it does. A lint rule nobody has seen fire is a
+  comment.
 - **Handlers never import a database driver.** A context declares its repository
   and unit-of-work ports in `domain/`; only `infrastructure/` imports `mongoose`,
   `mongodb` or `@prisma/client`, one adapter per store. Handler specs bind the

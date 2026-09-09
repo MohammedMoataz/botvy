@@ -25,6 +25,7 @@ import { RefreshHandler } from './features/refresh/refresh.handler.js';
 import { RegisterHandler } from './features/register/register.handler.js';
 import { DevicesQueryHandler } from './features/devices/devices.query.js';
 import { SignInHandler } from './features/sign-in/sign-in.handler.js';
+import { AdminCredentialsQueryHandler } from './features/seeds/admin-credentials.query.js';
 import { AdminSeedService } from './features/seeds/admin-seed.service.js';
 import { IdentityBootstrap } from './features/seeds/identity.bootstrap.js';
 import { ServiceClientSeedService } from './features/seeds/service-client-seed.service.js';
@@ -100,6 +101,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     AdminMembersHandler,
     MembersQueryHandler,
     MeQueryHandler,
+    AdminCredentialsQueryHandler,
     AdminServiceClientsHandler,
     ServiceTokenGuard,
   ],
@@ -128,6 +130,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     AdminMembersHandler,
     MembersQueryHandler,
     MeQueryHandler,
+    AdminCredentialsQueryHandler,
     AdminServiceClientsHandler,
     ServiceTokenGuard,
   ],

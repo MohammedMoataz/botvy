@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { ENV } from '../../../../shared/config/config.module.js';
 import type { Env } from '../../../../shared/config/env.schema.js';
+import { AdminCredentialsQueryHandler } from './admin-credentials.query.js';
 import { AdminSeedService } from './admin-seed.service.js';
 import { ServiceClientSeedService } from './service-client-seed.service.js';
 
@@ -20,6 +21,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   constructor(
     @Inject(ENV) private readonly env: Env,
     private readonly admin: AdminSeedService,
+    private readonly credentials: AdminCredentialsQueryHandler,
     private readonly serviceClients: ServiceClientSeedService,
   ) {}
 
@@ -29,11 +31,14 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     const outcome = await this.admin.seed(this.env.ADMIN_EMAIL, this.env.ADMIN_PASSWORD);
     this.logger.log(`administrator seed: ${outcome}`);
 
-    const stillDefault = await this.admin.isStillDefault(
+    // Through the query rather than the seed, because Operations asks the same
+    // question through the same handler. Two implementations of "is this still
+    // the shipped password" would eventually disagree, and the one that drifts
+    // is the one nobody is looking at.
+    this.admin.warnIfDefault(
       this.env.ADMIN_EMAIL,
-      this.env.ADMIN_PASSWORD,
+      await this.credentials.seededAdminIsStillDefault(),
     );
-    this.admin.warnIfDefault(this.env.ADMIN_EMAIL, stillDefault);
     // Recorded in the registry too, so the portal can say it on every page
     // load rather than only in the seconds after a restart — by Operations,
     // which owns that key. `OperationsBootstrap` runs straight after this one,

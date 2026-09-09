@@ -4,6 +4,7 @@ import {
   InMemoryServiceClientRepository,
   InMemoryUserRepository,
 } from '../../infrastructure/in-memory-identity.repositories.js';
+import { AdminCredentialsQueryHandler } from './admin-credentials.query.js';
 import {
   AdminSeedService,
   DEFAULT_ADMIN_PASSWORD,
@@ -85,15 +86,85 @@ describe('admin seed', () => {
     expect((await users.findByLogin('someone@else.test'))!.role).toBe('admin');
   });
 
-  it('reports the seeded password as still default, and stops once it changes', async () => {
+});
+
+/**
+ * The one question another context asks about the seed.
+ *
+ * Its own handler rather than a method on the seed service, because a feature
+ * service is private to its context and `OperationsBootstrap` was importing
+ * this one directly to ask. `Identity` publishes queries; Operations binds a
+ * port to this one in its own `infrastructure/`.
+ */
+describe('the seeded administrator credentials query', () => {
+  const envFor = (email: string, password: string) =>
+    ({ ADMIN_EMAIL: email, ADMIN_PASSWORD: password }) as never;
+
+  it('reports the shipped password as still default, and stops once it changes', async () => {
+    const uow = new InMemoryUnitOfWork();
+    const users = new InMemoryUserRepository(uow);
+    const seed = new AdminSeedService(uow, users, fakeHasher);
+    const query = new AdminCredentialsQueryHandler(
+      envFor('admin', DEFAULT_ADMIN_PASSWORD),
+      users,
+      fakeHasher,
+    );
+
     await seed.seed('admin', DEFAULT_ADMIN_PASSWORD);
-    expect(await seed.isStillDefault('admin', DEFAULT_ADMIN_PASSWORD)).toBe(true);
+    expect(await query.seededAdminIsStillDefault()).toBe(true);
 
     const user = (await users.findByLogin('admin'))!;
     user.passwordHash = 'hashed:a-real-password';
     await uow.run(() => users.save(user));
 
-    expect(await seed.isStillDefault('admin', DEFAULT_ADMIN_PASSWORD)).toBe(false);
+    expect(await query.seededAdminIsStillDefault()).toBe(false);
+  });
+
+  /**
+   * The database is what decides, not `.env`. The seed never resets an existing
+   * password, so an installation whose Owner changed it in the portal still has
+   * `ADMIN_PASSWORD=admin` in its environment - and reading the environment for
+   * the answer would warn there for ever.
+   */
+  it('reads the stored hash rather than the environment', async () => {
+    const uow = new InMemoryUnitOfWork();
+    const users = new InMemoryUserRepository(uow);
+    const seed = new AdminSeedService(uow, users, fakeHasher);
+    const query = new AdminCredentialsQueryHandler(
+      envFor('admin', DEFAULT_ADMIN_PASSWORD),
+      users,
+      fakeHasher,
+    );
+
+    await seed.seed('admin', 'a-password-the-operator-chose');
+
+    expect(await query.seededAdminIsStillDefault()).toBe(false);
+  });
+
+  /** Both changed means this installation is not running the published pair. */
+  it('is false when the operator moved the account and the password', async () => {
+    const uow = new InMemoryUnitOfWork();
+    const users = new InMemoryUserRepository(uow);
+    const query = new AdminCredentialsQueryHandler(
+      envFor('owner@example.test', 'a-password-the-operator-chose'),
+      users,
+      fakeHasher,
+    );
+
+    expect(await query.seededAdminIsStillDefault()).toBe(false);
+  });
+
+  /** No account yet is not "still default"; there is nothing to sign into. */
+  it('is false before the seed has run', async () => {
+    const uow = new InMemoryUnitOfWork();
+    const users = new InMemoryUserRepository(uow);
+    const query = new AdminCredentialsQueryHandler(
+      envFor('admin', DEFAULT_ADMIN_PASSWORD),
+      users,
+      fakeHasher,
+    );
+
+    expect(await query.seededAdminIsStillDefault()).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
-import { AuditPort } from '../../contexts/operations/domain/audit.port.js';
+import { AuditPort } from '../audit/audit.port.js';
 import { HeartbeatRepository } from '../../contexts/operations/domain/heartbeat.repository.js';
 import {
   MongoAuditAdapter,

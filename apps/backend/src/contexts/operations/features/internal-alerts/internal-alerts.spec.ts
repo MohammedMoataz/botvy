@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import type { PushResult } from '../../../../shared/push/push.service.js';
-import { InMemoryAuditAdapter } from '../../infrastructure/mongo-operations.adapters.js';
+import { InMemoryAuditAdapter } from '../../../../shared/audit/in-memory-audit.adapter.js';
 import {
   InternalAlertsHandler,
   type AdminDeviceLookup,

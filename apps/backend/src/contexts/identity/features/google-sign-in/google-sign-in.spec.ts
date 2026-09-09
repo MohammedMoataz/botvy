@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
 import { InMemorySettingsStore } from '../../../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
-import { InMemoryAuditAdapter } from '../../../operations/infrastructure/mongo-operations.adapters.js';
+import { InMemoryAuditAdapter } from '../../../../shared/audit/in-memory-audit.adapter.js';
 import {
   GoogleTokenInvalid,
   type GoogleIdentity,
