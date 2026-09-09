@@ -47,10 +47,34 @@ Work this phase does not contain, stated plainly so no later phase assumes it ex
 - **Store-backed halves of the repository contract are skipped locally.** They
   run when `MONGO_URL` and `DATABASE_URL` are set, which CI does. Declared and
   skipped rather than silently absent, so the report says why.
-- **GraphQL and WebSocket edges are scaffolded, not wired.** Scalars, the nudge
-  service and the guards exist with specs; there are no resolvers or a gateway
-  class yet, because P0 has no queries to serve. The `schema.graphql` artefact is
-  therefore absent, which the contract generator now treats as normal rather
-  than as a half-finished run.
+- ~~**GraphQL and WebSocket edges are scaffolded, not wired.**~~ **Built in the
+  pre-016 review pass.** This entry was honest about the resolvers and the
+  gateway being absent while `tasks.md` marked T025, T026, T031 and T117 done —
+  the paperwork and the task list disagreed, and the task list was the one being
+  read. Nine queries, a gateway that authenticates in Socket.IO middleware, and
+  `schema.graphql` all exist now, and every read on all four surfaces goes
+  through the edge. The `NudgeService` and `WsAuthGuard` mentioned here as
+  "existing with specs" were provided by no module at all, so nothing they did
+  could ever have reached anybody.
+
+## Deferred by the Owner, on the record
+
+Answered on 9 September; the reasoning is in
+[`../015-identity-profile/decisions-answered.md`](../015-identity-profile/decisions-answered.md).
+
+- **No rate limiting on any credential endpoint** (A2 → P11). `/auth/login` is
+  public and unthrottled, and this installation's administrator login is
+  published in `SETUP.md`. Worth re-reading if this becomes reachable from the
+  internet before P11.
+- **A banned or deleted member keeps API access until their token expires**
+  (A3 → P11), up to `JWT_ACCESS_TTL`. The escalation path is closed — a banned
+  administrator cannot un-ban themselves — but the window is open. Deliberately
+  not patched with a shorter TTL either: the answer was P11, and a half-measure
+  nobody asked for is worse than a recorded gap.
+- **Backup retention stays configured twice** (A6 → accept). See the entry
+  above; it is a principle-XII wart rather than a bug.
+- **Google sign-in has no button on any surface** (A1 → P9). Endpoints, the
+  audience check and the cubits are built and tested; `GOOGLE_CLIENT_IDS` is
+  empty, and a control that always fails teaches people the app is broken.
 
 ---
