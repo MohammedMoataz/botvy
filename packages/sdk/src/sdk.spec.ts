@@ -284,6 +284,62 @@ describe('socket', () => {
     expect(sockets).toHaveLength(1);
   });
 
+  /**
+   * The refusal that actually arrives.
+   *
+   * A handshake the server rejects reaches the client as `connect_error` with
+   * an `Error`, not a string - so the old `String(payload) === 'token_expired'`
+   * check never matched and every expired token signed the member out of an app
+   * they were still entitled to use. The server puts the code on `err.data`.
+   */
+  it('refreshes when the handshake is refused for an expired token', async () => {
+    const store = new TokenStore(inMemoryStorage(), async () => pair('2'));
+    store.set(pair('1'));
+    const sockets: FakeSocket[] = [];
+    const client = new SocketClient({
+      tokens: store,
+      connect: () => {
+        const socket = fakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+    });
+    client.connect();
+
+    const refusal = Object.assign(new Error('token_expired'), {
+      data: { code: 'token_expired' },
+    });
+    sockets[0]!.handlers.get('connect_error')?.(refusal);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(sockets).toHaveLength(2);
+    expect(client.state).toBe('reconnecting');
+  });
+
+  /** A refusal a refresh cannot fix still means signing in again. */
+  it('signs out when the handshake is refused as unauthorized', async () => {
+    const store = new TokenStore(inMemoryStorage(), async () => pair('2'));
+    store.set(pair('1'));
+    const sockets: FakeSocket[] = [];
+    const client = new SocketClient({
+      tokens: store,
+      connect: () => {
+        const socket = fakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+    });
+    client.connect();
+
+    sockets[0]!.handlers.get('connect_error')?.(
+      Object.assign(new Error('unauthorized'), { data: { code: 'unauthorized' } }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(client.state).toBe('signed-out');
+    expect(sockets).toHaveLength(1);
+  });
+
   it('keeps its handlers across a reconnect', async () => {
     const store = new TokenStore(inMemoryStorage(), async () => pair('2'));
     store.set(pair('1'));

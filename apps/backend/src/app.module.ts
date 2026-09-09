@@ -22,6 +22,8 @@ import { HealthModule } from './shared/health/health.module.js';
 import { OutboxModule } from './shared/outbox/outbox.module.js';
 import { MongoPersistenceModule } from './shared/persistence/mongo/mongoose.module.js';
 import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
+import { GraphQLModule } from './graphql/graphql.module.js';
+import { WsModule } from './ws/ws.module.js';
 
 /**
  * The backend role: the public edge.
@@ -51,6 +53,12 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     OperationsModule,
     ProfileModule,
     HealthModule,
+
+    // The other two edges. Commands are REST above; these are the reads and the
+    // live connection, and the worker imports neither - it has no HTTP surface
+    // and nothing is watching from inside it.
+    GraphQLModule,
+    WsModule,
   ],
   // Declared here rather than on IdentityModule, because the worker imports
   // that module too and would otherwise mount the auth routes as well. One

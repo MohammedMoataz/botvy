@@ -86,7 +86,13 @@ export class SocketClient {
     socket.on('token_expired', () => void this.refreshAndReconnect());
     socket.on('auth.expiring', () => void this.refreshAndReconnect());
     socket.on('connect_error', (payload) => {
-      if (String(payload) === 'token_expired') void this.refreshAndReconnect();
+      // Socket.IO hands the server's refusal over as an `Error`, so
+      // `String(payload)` was "Error: token_expired" and never matched - every
+      // expired token signed the member out instead of refreshing. The server
+      // puts the code on `err.data`; the message is the fallback.
+      const error = payload as { data?: { code?: unknown }; message?: unknown } | undefined;
+      const code = error?.data?.code ?? error?.message ?? payload;
+      if (String(code) === 'token_expired') void this.refreshAndReconnect();
       else this.setState('signed-out');
     });
 

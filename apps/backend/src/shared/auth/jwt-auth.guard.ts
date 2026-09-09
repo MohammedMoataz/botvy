@@ -33,6 +33,11 @@ export class JwtAuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
+    // The socket authenticated in its handshake and carries the principal on
+    // `client.data`. There is no request here to read a bearer header from, so
+    // running this guard on a socket message would refuse every one of them.
+    if (context.getType<string>() === 'ws') return true;
+
     // A machine route authenticates with a service token, not a JWT; the
     // ServiceTokenGuard that follows this one owns that check.
     const requiredKind = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_KIND, [

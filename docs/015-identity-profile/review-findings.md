@@ -2,7 +2,7 @@
 
 Identity & Profile (P1) and Foundation (P0), reviewed in a fresh context before
 phase 016 begins. Twenty-six findings. This file records all of them, what state
-each is in, and which ones need a decision from the Owner.
+each is in, and which ones need a decision from the Owner. Eleven are fixed.
 
 The review's own headline is worth repeating: **the two most severe defects were
 invisible to all 483 passing tests**, because nothing in the repository ever
@@ -58,6 +58,51 @@ It also meant no registry key was retunable at runtime at all.
 **21. Every 404 became "not available in this build yet"** in the SDK, including
 "no such profile" and "no such service client".
 
+### The two missing pieces
+
+Not defects in written code but capabilities the phase claimed and did not
+build, so they are recorded apart from the bugs above.
+
+**10. GraphQL and the WebSocket gateway were never built**, though P0 marked
+T025, T026, T031 and T117 done. `src/graphql/` held `scalars.ts` and nothing
+else; `src/ws/` held a `NudgeService` and a `WsAuthGuard` that **no module
+provided**, so `attached` was false in both roles, every nudge in the
+application went nowhere, and all three clients connected to a path that
+answered nothing.
+
+Built now: nine queries (`me`, `myDevices`, `devicesOf`, `profile`,
+`bodyMetrics`, `preferences`, `users`, `settings`), each a thin adapter over the
+query handler its REST read already uses, and a gateway that authenticates in
+Socket.IO middleware, joins `user:<id>` and `ops`, stamps the install the alert
+sweep reads, and warns then closes on token expiry. 24 specs.
+
+Three things it turned up on the way. `@nestjs/graphql@13` peers on Nest 11 and
+deep-imports a path Nest 12's exports map rewrites to a file that does not
+exist — a **runtime** failure, so the blueprint's pin was unusable and both it
+and `@nestjs/apollo` went to 14. `autoSchemaFile` writes its file as a side
+effect of *serving*, so generation mode wrote none and reported nothing; the
+schema comes from `GraphQLSchemaFactory` instead. And the SDK's
+`connect_error` handler compared `String(payload)` against `'token_expired'`
+where Socket.IO hands over an `Error` — so every refused handshake signed the
+member out instead of refreshing.
+
+**12. Domain events were not written in the same transaction as the aggregate.**
+Every repository comment claimed they were; no handler opened a transaction, and
+`IdentityModule` bound no `UnitOfWork` at all. Each save was a row and an outbox
+entry as two independent statements — at-most-once delivery wearing an outbox.
+
+Wrapped where writes belong together: register, sign-in, Google, the admin seed,
+change-password, delete-account, ban, the profile bootstrap, the purge. Hashing
+stays outside (scrypt against Prisma's five-second transaction timeout), and so
+does the audit entry — it is in MongoDB and the member is in PostgreSQL, and
+constitution I forbids inventing a transaction across the two.
+
+`InMemoryUnitOfWork.collect` now refuses events raised with no transaction open,
+so a handler that forgets fails its own spec. It found the admin seed
+immediately, and `app.module.spec.ts` found the next one: `PrismaUnitOfWork`
+imported `PrismaService` with `import type`, which emits no runtime token, so
+Nest reported index [0] undefined at boot while tsc stayed green.
+
 ### And the guard against the recurrence
 
 `app.module.spec.ts` compiles both roles' dependency graphs. It found a fourth
@@ -94,32 +139,25 @@ guessing against a portal whose administrator login is published.
 
 These are recorded rather than fixed, in rough order of how much they matter.
 
-**10. GraphQL and the WebSocket gateway were never built**, though P0 marked
-T025, T026, T031 and T117 done. `src/graphql/` holds only `scalars.ts`;
-`src/ws/` has no gateway class. All three clients connect to nothing, and
-constitution X ("reads are GraphQL") is unmet phase-wide. There is also no `me`
-query anywhere — T117 claimed to *extend* one P0 never shipped.
-
 **11. Identity still imports Operations' `AuditPort` directly**, and the
 `no-restricted-imports` rule covers driver packages only, not cross-context
 relative imports. The boot failure is fixed but the rule that would have caught
 it is not written.
 
-**12. Domain events are not written in the same transaction as the aggregate.**
-No feature handler calls `PrismaUnitOfWork.run` or the Mongo equivalent, so the
-row and its outbox entry are two independent statements — an at-most-once hop
-the constitution was amended to close. Both unit-of-work providers exist; the
-handlers simply do not use them.
-
-**14. `openapi.json` is stale by 26 of 30 operations**, and both generated-type
-re-exports are commented out with `CONTRACTS_GENERATED = false`. So `packages/sdk`
-is hand-written and nothing enforces agreement — which is the root cause of
-findings 6, 9, 15 and 17.
+**14. Both generated-type re-exports are still commented out** with
+`CONTRACTS_GENERATED = false`, so `packages/sdk` is hand-written and nothing
+enforces agreement — which is the root cause of findings 6, 9, 15 and 17. The
+stale `openapi.json` half is fixed: it was 26 of 30 operations behind and is
+regenerated, and `schema.graphql` now exists at all. Turning the flag on means
+generating clients from them, which changes four surfaces and wants its own
+task.
 
 **15–20, 22–25.** Mobile has no way to set the gateway URL, so a real phone
 cannot reach the backend; onboarding "Skip" is a redirect trap; the ladder's
-catch-all cannot catch a forgotten step at the *next* bump; three incompatible
-Socket.IO wire shapes; event payloads disagree with the catalogue and two events
+catch-all cannot catch a forgotten step at the *next* bump; the Socket.IO wire
+shapes still disagree between the three clients, though the server side of them
+now exists and the SDK's `connect_error` reading is fixed; event payloads
+disagree with the catalogue and two events
 are uncatalogued; a scatter of unreachable mobile wiring (push never starts,
 notification permission never requested, no settings route for the password
 change); and a list of bare literals that principle XII arguably wants as
@@ -156,3 +194,19 @@ Worth recording, because it is what the next phase can rely on:
 - **`multer` ships with `@nestjs/platform-express` 12** and `sharp`'s musl
   prebuilts are in the lockfile, so neither is the first-run failure it could
   have been.
+- **The guards were already written for three transports.** `principalFrom` and
+  `CurrentPrincipal` each handle REST, GraphQL and the socket, which is why the
+  read edge needed no `GqlAuthGuard` of its own — the global guards covered it
+  the moment resolvers existed. `JwtAuthGuard` needed one line to skip `ws`,
+  where the handshake has already authenticated and there is no bearer header to
+  read.
+
+---
+
+## One thing to correct in the blueprint
+
+`contracts/graphql.schema.graphql` calls a body metric's timestamp `at`. The
+aggregate, the REST read, the phone and the portal all call it `recordedAt`, and
+the generated schema follows the code — giving one transport a different name
+for the same field is how a member's weight chart works on one surface and is
+empty on another. The document is the thing to change.

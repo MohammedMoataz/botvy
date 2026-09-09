@@ -27,22 +27,37 @@ export class WsAuthGuard {
   constructor(private readonly verifier: JwtVerifier) {}
 
   authenticate(handshake: HandshakeLike): Principal {
+    return this.authenticateWithExpiry(handshake).principal;
+  }
+
+  /**
+   * The same check, plus when the token runs out.
+   *
+   * The gateway schedules `auth.expiring` and the disconnect off this, so the
+   * expiry comes from the token that was actually accepted rather than from
+   * `JWT_ACCESS_TTL` read separately - a socket that opened just before the
+   * operator shortened the TTL would otherwise be warned at the wrong moment.
+   */
+  authenticateWithExpiry(handshake: HandshakeLike): {
+    principal: Principal;
+    expiresAt: Date | null;
+  } {
     const token = readToken(handshake);
     if (!token) throw new WsUnauthorized('unauthorized');
 
-    let principal: Principal;
+    let verified: { principal: Principal; expiresAt: Date | null };
     try {
-      principal = this.verifier.verify(token);
+      verified = this.verifier.verifyWithExpiry(token);
     } catch (error) {
       // The client reconnects with a fresh token on this rather than keeping a
       // dead socket open.
       throw new WsUnauthorized(error instanceof TokenExpiredError ? 'token_expired' : 'unauthorized');
     }
 
-    if (principal.kind !== 'user') {
+    if (verified.principal.kind !== 'user') {
       throw new WsUnauthorized('unauthorized');
     }
-    return principal;
+    return verified;
   }
 }
 

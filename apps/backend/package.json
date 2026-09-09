@@ -21,12 +21,12 @@
     "gen:contracts": "cross-env BOTVY_GEN=1 node dist/main.js"
   },
   "dependencies": {
-    "@apollo/server": "^4.11.3",
-    "@nestjs/apollo": "^13.0.0",
+    "@apollo/server": "^5.0.0",
+    "@nestjs/apollo": "^14.0.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/cqrs": "^11.0.0",
-    "@nestjs/graphql": "^13.0.0",
+    "@nestjs/graphql": "^14.0.0",
     "@nestjs/mongoose": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^12.0.1",

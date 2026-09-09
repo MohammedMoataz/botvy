@@ -3,6 +3,7 @@ import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
 import { JwtSigner } from './jwt.signer.js';
 import { JwtVerifier } from './jwt.verifier.js';
+import { WsAuthGuard } from './ws-auth.guard.js';
 
 /**
  * What turns a credential into a principal.
@@ -29,7 +30,11 @@ import { JwtVerifier } from './jwt.verifier.js';
       inject: [ENV],
       useFactory: (env: Env) => new JwtSigner(env),
     },
+    // The socket handshake authenticates through the same verifier. It was
+    // written in P0 and provided by no module at all, which is why the gateway
+    // that was also supposed to land in P0 could not have been wired.
+    WsAuthGuard,
   ],
-  exports: [JwtVerifier, JwtSigner],
+  exports: [JwtVerifier, JwtSigner, WsAuthGuard],
 })
 export class AuthModule {}

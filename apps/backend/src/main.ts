@@ -2,8 +2,11 @@ import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { GraphQLSchemaBuilderModule, GraphQLSchemaFactory } from '@nestjs/graphql';
+import { lexicographicSortSchema, printSchema } from 'graphql';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
+import { RESOLVERS } from './graphql/graphql.module.js';
 import { WorkerModule } from './worker.module.js';
 import { writeContracts } from './contracts.generate.js';
 import { corsOrigins, loadEnv } from './shared/config/env.schema.js';
@@ -128,13 +131,33 @@ async function generateContracts(): Promise<void> {
       .build(),
   );
 
-  // The GraphQL schema is written by the module's own autoSchemaFile once
-  // resolvers exist; until then the event contracts are what P0 has to publish.
-  const written = await writeContracts(document, null);
+  const written = await writeContracts(document, await graphqlSdl());
   await app.close();
 
   console.log(`wrote ${written.length} contract artefacts:`);
   for (const file of written) console.log(`  ${file}`);
+}
+
+/**
+ * The published GraphQL schema.
+ *
+ * Built from the resolver classes rather than from the running server. The
+ * driver's `autoSchemaFile` writes its file as a side effect of serving, and
+ * this mode never listens - so pointing it at the contracts package produced no
+ * file and no error, which is the worst of both. `GraphQLSchemaFactory` reads
+ * the same decorators and instantiates nothing, so the schema comes out of a
+ * process with no database, exactly like the OpenAPI document.
+ */
+async function graphqlSdl(): Promise<string> {
+  const builder = await NestFactory.create(GraphQLSchemaBuilderModule, {
+    logger: ['error', 'warn'],
+  });
+  await builder.init();
+  const schema = await builder.get(GraphQLSchemaFactory).create([...RESOLVERS]);
+  await builder.close();
+  // Sorted, so a regenerated file diffs by what changed rather than by the
+  // order Nest happened to visit the resolvers in.
+  return printSchema(lexicographicSortSchema(schema));
 }
 
 bootstrap().catch((error: unknown) => {

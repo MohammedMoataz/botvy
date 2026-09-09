@@ -14,6 +14,7 @@ import { RefreshTokenRepository } from './domain/refresh-token.repository.js';
 import { UserRepository } from './domain/user.repository.js';
 import { AdminMembersHandler } from './features/admin-members/admin-members.handler.js';
 import { MembersQueryHandler } from './features/admin-members/members.query.js';
+import { MeQueryHandler } from './features/me/me.query.js';
 import { AdminServiceClientsHandler } from './features/admin-service-clients/admin-service-clients.handler.js';
 import { ChangePasswordHandler } from './features/change-password/change-password.handler.js';
 import { DeleteAccountHandler } from './features/delete-account/delete-account.handler.js';
@@ -98,6 +99,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     GoogleSignInHandler,
     AdminMembersHandler,
     MembersQueryHandler,
+    MeQueryHandler,
     AdminServiceClientsHandler,
     ServiceTokenGuard,
   ],
@@ -125,6 +127,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     GoogleSignInHandler,
     AdminMembersHandler,
     MembersQueryHandler,
+    MeQueryHandler,
     AdminServiceClientsHandler,
     ServiceTokenGuard,
   ],
