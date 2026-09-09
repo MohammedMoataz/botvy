@@ -1,0 +1,158 @@
+# Pre-016 review: what was found, what is fixed, what is left
+
+Identity & Profile (P1) and Foundation (P0), reviewed in a fresh context before
+phase 016 begins. Twenty-six findings. This file records all of them, what state
+each is in, and which ones need a decision from the Owner.
+
+The review's own headline is worth repeating: **the two most severe defects were
+invisible to all 483 passing tests**, because nothing in the repository ever
+asked Nest to assemble the application or dispatched a domain event. A test that
+cannot be written is a defect that cannot be found.
+
+---
+
+## Fixed
+
+### Critical
+
+**1. The backend could not boot, in either role.** `IdentityModule` declared no
+`imports:` while four providers injected `AuditPort`, `SettingsService` and an
+Operations feature handler. `OperationsModule` already imports `IdentityModule`,
+so the reverse was a cycle. Shared-kernel services moved to a `@Global()`
+`PlatformModule`; the default-password check moved to `OperationsBootstrap`,
+which asks Identity rather than Identity calling Operations. The worker also
+never imported `AuthModule`.
+
+**2. No domain event could reach a handler.** The relay's dispatch was a
+three-case switch and `identity.UserRegistered` was not one of them, so **every
+account created got no profile and no preferences** and every deletion left the
+photo bytes on the volume. Two cases added.
+
+**3. A refresh token could be accepted twice.** `rotate` blind-wrote the old row,
+so two concurrent refreshes both succeeded and replay detection died for that
+family. It claims conditionally now; a lost race is treated as a replay, because
+it cannot be told from a theft.
+
+### High
+
+**4. Google sign-in could take over an account by email**, overwriting an
+existing `googleSub`. Refused now, with its own error.
+
+**5a. A banned administrator could un-ban themselves.** `unban` had no
+self-check while `ban` and `setRole` did. *(5b is open — see below.)*
+
+**6. The SDK deadlocked permanently on a refused refresh**, which is the normal
+case. The spec that claimed to cover it built two token stores so the re-entrant
+path never ran.
+
+**7. `@IsEmail()` rejected the documented `admin` login** with a 400 before the
+handler ran — the second half of a fix already made once in `env.schema.ts`.
+
+**8. `GET /profile/photo` returned JSON**, because Nest's Express adapter
+`res.json`s any object and a Buffer is one.
+
+**9. `/api/v1/admin/settings` did not exist**, so the Overview page's
+`Promise.all` rejected and the default-password warning never rendered either.
+It also meant no registry key was retunable at runtime at all.
+
+**21. Every 404 became "not available in this build yet"** in the SDK, including
+"no such profile" and "no such service client".
+
+### And the guard against the recurrence
+
+`app.module.spec.ts` compiles both roles' dependency graphs. It found a fourth
+defect on its first run — `IdentityModule` did not export `AdminSeedService`, so
+the fix for finding 1 was itself incomplete.
+
+It needed `unplugin-swc`: vitest's default esbuild does not implement
+`emitDecoratorMetadata`, so every Nest provider declared as a bare class
+resolves to `undefined` and the spec cannot tell a broken graph from a working
+one.
+
+---
+
+## Needs your decision
+
+Both are in [`inputs-needed.md`](inputs-needed.md) with options and costs.
+
+**5b. A banned or deleted member keeps API access until their access token
+expires** — up to 15 minutes. `JwtAuthGuard` verifies the signature and nothing
+else; ban and delete revoke refresh families only.
+
+Not fixed rather than half-fixed, because the correct version needs a revocation
+store that both roles agree on, and it collides with an existing gap: the relay
+runs in the *worker*, so an event that invalidates a cache never reaches the
+backend role. That affects the settings cache today and would affect this. It is
+one design decision covering both, not a patch.
+
+**13. No rate limiting on any credential endpoint.** Unlimited online password
+guessing against a portal whose administrator login is published.
+
+---
+
+## Open, and honest about it
+
+These are recorded rather than fixed, in rough order of how much they matter.
+
+**10. GraphQL and the WebSocket gateway were never built**, though P0 marked
+T025, T026, T031 and T117 done. `src/graphql/` holds only `scalars.ts`;
+`src/ws/` has no gateway class. All three clients connect to nothing, and
+constitution X ("reads are GraphQL") is unmet phase-wide. There is also no `me`
+query anywhere — T117 claimed to *extend* one P0 never shipped.
+
+**11. Identity still imports Operations' `AuditPort` directly**, and the
+`no-restricted-imports` rule covers driver packages only, not cross-context
+relative imports. The boot failure is fixed but the rule that would have caught
+it is not written.
+
+**12. Domain events are not written in the same transaction as the aggregate.**
+No feature handler calls `PrismaUnitOfWork.run` or the Mongo equivalent, so the
+row and its outbox entry are two independent statements — an at-most-once hop
+the constitution was amended to close. Both unit-of-work providers exist; the
+handlers simply do not use them.
+
+**14. `openapi.json` is stale by 26 of 30 operations**, and both generated-type
+re-exports are commented out with `CONTRACTS_GENERATED = false`. So `packages/sdk`
+is hand-written and nothing enforces agreement — which is the root cause of
+findings 6, 9, 15 and 17.
+
+**15–20, 22–25.** Mobile has no way to set the gateway URL, so a real phone
+cannot reach the backend; onboarding "Skip" is a redirect trap; the ladder's
+catch-all cannot catch a forgotten step at the *next* bump; three incompatible
+Socket.IO wire shapes; event payloads disagree with the catalogue and two events
+are uncatalogued; a scatter of unreachable mobile wiring (push never starts,
+notification permission never requested, no settings route for the password
+change); and a list of bare literals that principle XII arguably wants as
+registry keys.
+
+**T140 and T141 are marked done without a named deliverable** — the Google
+button (agreed, deliberate) and the photo picker (not agreed, simply absent:
+`ApiClient` has no `uploadPhoto` and `photoPath` is written by nobody).
+
+---
+
+## What the review found clean
+
+Worth recording, because it is what the next phase can rely on:
+
+- **Guards.** A service token cannot reach a member route and a member token
+  cannot reach `/internal/*`, in both directions; a member cannot reach an admin
+  route; global guard order is authenticate → service-token → kind → role; no
+  `@Public()` route leaks.
+- **The replay rule itself** (`session-chain.ts`) is correct and judges replay
+  before expiry. The Google **audience check is enforced** and unverified
+  addresses are refused.
+- **Principle XI on the backend**: no `process.env.TZ`, no server-local date
+  arithmetic, every `Intl.DateTimeFormat` inside `shared/time` with an explicit
+  zone.
+- **Principle XII's `readOnly` trap is avoided** — refused on the entry's own
+  flag, never a key prefix.
+- **No context opens another context's store**, and the driver-import lint rule
+  is live rather than decorative (probed).
+- **Cross-surface field names agree** across the backend, the SDK, mobile and
+  both web surfaces — including the v1 `/devices` defect being genuinely fixed.
+- **The drift 1→2 ladder is correct** and its test opens a genuinely v1-shaped
+  file and asserts the pre-existing row survived.
+- **`multer` ships with `@nestjs/platform-express` 12** and `sharp`'s musl
+  prebuilts are in the lockfile, so neither is the first-run failure it could
+  have been.

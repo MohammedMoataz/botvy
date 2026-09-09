@@ -1,14 +1,16 @@
 # What I need from you — Identity & Profile (P1)
 
-Six items. Two are decisions only you can make, three are credentials or
-commands I cannot run, and one is a heads-up.
+Seven items. Three are decisions only you can make, three are credentials or
+commands I cannot run, and two are heads-ups — one of which you should read
+first (C0).
 
 Answer inline — write after the `→` on each `**Your answer:**` line. A word is
 enough. Anything left blank I treat as "not decided yet" and leave alone.
 
-Not staged, and excluded in `.git/info/exclude`. P0's equivalent is
+P0's equivalent is
 [`../014-foundation/inputs-needed.md`](../014-foundation/inputs-needed.md), and
-its A1 and B1 are still open there.
+its A1 and B1 are still open there. The pre-016 review's full findings are in
+[`review-findings.md`](review-findings.md).
 
 ---
 
@@ -68,6 +70,40 @@ That is a design decision rather than a line of code.
 
 ---
 
+### A3. A banned member keeps API access for up to 15 minutes. How should that close?
+
+`JwtAuthGuard` verifies the token's signature and nothing else. Ban and delete
+revoke refresh families, which stops the member getting a *new* access token —
+but the one in their hand keeps working until it expires, and
+`JWT_ACCESS_TTL` defaults to 15 minutes.
+
+I fixed the sharp edge of this already: a banned administrator could un-ban
+themselves with that token and then ban whoever banned them. The window itself
+is still open.
+
+I did not fix it because the correct version needs a revocation store that
+*both roles* agree on, and it collides with a gap the review did not raise:
+the relay runs in the **worker**, so an event that invalidates a cache never
+reaches the **backend** role. That is already true of the settings cache today —
+an operator changing a key in the portal updates the backend's cache directly,
+but the worker only learns through the relay, and the reverse never happens.
+One mechanism would close both, which makes this a design decision rather than
+a patch.
+
+| Option | What happens | Cost |
+|---|---|---|
+| **shorten the window** | `JWT_ACCESS_TTL=2m` in `.env`. One line, closes most of it, costs a refresh round trip every two minutes per client | minutes |
+| **revocation store** | A `token_revocations` collection with a TTL index, an in-memory cache in each role, and a cross-role invalidation channel that also fixes the settings cache. The guard becomes async | half a day, wants its own spec |
+| **leave to P11** | Recorded with the rest of the hardening. The escalation path is already closed | — |
+
+My recommendation is **shorten the window now** and do the revocation store in
+P11 alongside the rate limiting — the two want the same cross-role channel, and
+building it once for both is cheaper than twice.
+
+**Your answer:** → _(shorten / revocation store / leave to P11)_
+
+---
+
 ## B. Things only you can do
 
 ### B1. `corepack enable`, from an administrator PowerShell — still open
@@ -107,6 +143,22 @@ The four ids from the table above. Paste them here or put them straight into
 ---
 
 ## C. Heads-up, no action needed
+
+### C0. The review found three critical defects, and they are fixed
+
+Before you read anything else in this file: a fresh-context review of P0 and P1
+found that **the backend could not boot in either role**, that **no domain event
+could reach a handler** — so every account created would have got no profile —
+and that **a refresh token could be accepted twice**. All three are fixed, along
+with six exploitable or user-visible HIGH findings.
+
+The full list, including what is still open, is in
+[`review-findings.md`](review-findings.md). Two of the open ones are the
+decisions above.
+
+The part worth your attention: all three criticals were invisible to 483
+passing tests, because nothing in the repository ever assembled the application.
+There is now a test that does, and it found a fourth defect on its first run.
 
 ### C1. What P1 cannot verify without the stack
 
