@@ -7,6 +7,8 @@ import '../core/db/database.dart';
 import '../core/notifications/local_notifications.dart';
 import '../core/push.dart';
 import '../features/auth/application/auth_cubit.dart';
+import '../features/onboarding/application/identity_steps.dart';
+import '../features/onboarding/application/onboarding_steps.dart';
 import '../features/profile/data/profile_mirror.dart';
 
 final GetIt sl = GetIt.instance;
@@ -43,7 +45,13 @@ Future<void> configureDependencies({required String baseUrl}) async {
     // to send somebody, and a second instance would answer differently.
     ..registerSingleton<AuthCubit>(
       AuthCubit(sl<ApiClient>(), sl<AppDatabase>(), sl<ProfileMirror>()),
-    );
+    )
+    ..registerSingleton<OnboardingRegistry>(OnboardingRegistry());
+
+  // Each feature registers its own walkthrough steps. Doing it here rather
+  // than inside the onboarding page is what lets a later phase contribute one
+  // without the walkthrough importing every feature to find it.
+  registerIdentitySteps(sl<OnboardingRegistry>(), sl<ProfileMirror>());
 
   // The API client discovers a dead session from inside an interceptor, where
   // it has no way to reach the cubit. Wired here, once, rather than passed

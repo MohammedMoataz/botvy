@@ -29,6 +29,7 @@ class AuthState {
     this.failure,
     this.linkEmail,
     this.mustChangePassword = false,
+    this.needsOnboarding = false,
   });
 
   final AuthPhase phase;
@@ -42,6 +43,14 @@ class AuthState {
   final String? linkEmail;
   final bool mustChangePassword;
 
+  /// The walkthrough has never been finished on this account.
+  ///
+  /// Read from the mirror rather than held as a flag of its own, because the
+  /// answer is `onboardingCompletedAt` on the profile — which the server owns
+  /// and every device shares. A local flag would make a member who set the app
+  /// up on their phone do it again on their tablet.
+  final bool needsOnboarding;
+
   bool get isSignedIn => phase == AuthPhase.signedIn;
   bool get isBusy => phase == AuthPhase.working;
 
@@ -52,6 +61,7 @@ class AuthState {
     AuthFailure? failure,
     String? linkEmail,
     bool? mustChangePassword,
+    bool? needsOnboarding,
     bool clearFailure = false,
   }) => AuthState(
     phase: phase ?? this.phase,
@@ -60,6 +70,7 @@ class AuthState {
     failure: clearFailure ? null : (failure ?? this.failure),
     linkEmail: clearFailure ? null : (linkEmail ?? this.linkEmail),
     mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+    needsOnboarding: needsOnboarding ?? this.needsOnboarding,
   );
 }
 
@@ -98,6 +109,7 @@ class AuthCubit extends Cubit<AuthState> {
         phase: AuthPhase.signedIn,
         email: await _api.tokens.readEmail(),
         userId: await _db.getValue(DbKeys.userId),
+        needsOnboarding: await _needsOnboarding(),
       ),
     );
   }
@@ -183,6 +195,7 @@ class AuthCubit extends Cubit<AuthState> {
           email: session.email,
           userId: session.userId,
           mustChangePassword: session.mustChangePassword,
+          needsOnboarding: await _needsOnboarding(),
         ),
       );
     } on ApiException catch (e) {
@@ -205,6 +218,24 @@ class AuthCubit extends Cubit<AuthState> {
       409 => AuthFailure.emailTaken,
       _ => AuthFailure.unknown,
     };
+  }
+
+  /// Called by the walkthrough when it finishes or is skipped, so the router
+  /// stops sending the member back to it.
+  Future<void> onboardingSettled() async {
+    emit(state.copyWith(needsOnboarding: await _needsOnboarding()));
+  }
+
+  /// Whether the walkthrough still has to run.
+  ///
+  /// Absent profile counts as *not* needing it: that only happens when the
+  /// mirror could not be filled, and trapping somebody in a walkthrough whose
+  /// writes cannot reach the server is worse than letting them into an app
+  /// that will tell them it is offline.
+  Future<bool> _needsOnboarding() async {
+    final profile = await _mirror.readProfile();
+    if (profile == null) return false;
+    return profile.onboardingCompletedAt == null;
   }
 
   /// This handset, as the server needs to know it.

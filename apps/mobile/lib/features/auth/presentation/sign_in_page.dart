@@ -1,186 +1,252 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../app/di.dart';
 import '../../../app/l10n/app_localizations.dart';
-import '../../../core/api/api_client.dart';
+import '../../../core/notifications/local_notifications.dart' show deviceTimezone;
+import '../application/auth_cubit.dart';
 
-/// What the sign-in form can be doing. Sealed so a new state cannot be added
-/// without every `switch` over it being updated.
-sealed class SignInState {
-  const SignInState();
-}
-
-class SignInIdle extends SignInState {
-  const SignInIdle();
-}
-
-class SignInBusy extends SignInState {
-  const SignInBusy();
-}
-
-class SignInFailed extends SignInState {
-  const SignInFailed(this.message);
-  final String message;
-}
-
-class SignInSucceeded extends SignInState {
-  const SignInSucceeded();
-}
-
-class SignInCubit extends Cubit<SignInState> {
-  SignInCubit(this._api) : super(const SignInIdle());
-
-  final ApiClient _api;
-
-  Future<void> submit(
-    String email,
-    String password, {
-    required String notYetAvailable,
-  }) async {
-    emit(const SignInBusy());
-    try {
-      await _api.login(email, password);
-      emit(const SignInSucceeded());
-    } on ApiException catch (e) {
-      // `POST /api/v1/auth/login` arrives in P1. Until then the round trip
-      // still proves the phone can reach the server and that the base URL is
-      // right, which is the whole point of the skeleton.
-      emit(SignInFailed(e.statusCode == 404 ? notYetAvailable : e.message));
-    }
-  }
-}
-
-class SignInPage extends StatelessWidget {
+/// Sign in, or create an account.
+///
+/// One page with a mode rather than two routes. The two forms differ by three
+/// fields, and a member who mistyped their address on the wrong one should be
+/// able to switch without losing what they typed — which two routes make
+/// awkward and this makes free.
+///
+/// No Google button. `AuthCubit.signInWithGoogle` and `linkGoogle` exist and
+/// are tested, but `GOOGLE_CLIENT_IDS` is unset on this installation, so a
+/// button here would fail every time it was pressed — and a control that always
+/// fails teaches people the app is broken. The link-with-password path is the
+/// half worth remembering when it lands: a 409 carrying `link_required` puts
+/// the address in `state.linkEmail`, and the same password field finishes it.
+class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => SignInCubit(sl<ApiClient>()),
-      child: const _SignInView(),
-    );
-  }
+  State<SignInPage> createState() => _SignInPageState();
 }
 
-class _SignInView extends StatefulWidget {
-  const _SignInView();
-
-  @override
-  State<_SignInView> createState() => _SignInViewState();
-}
-
-class _SignInViewState extends State<_SignInView> {
-  final _formKey = GlobalKey<FormState>();
+class _SignInPageState extends State<SignInPage> {
+  final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  final _name = TextEditingController();
+
+  bool _registering = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _confirm.dispose();
+    _name.dispose();
     super.dispose();
   }
 
-  void _submit(BuildContext context) {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    context.read<SignInCubit>().submit(
-      _email.text.trim(),
-      _password.text,
-      notYetAvailable: AppLocalizations.of(context).signInNotYetAvailable,
-    );
+  Future<void> _submit() async {
+    if (!(_form.currentState?.validate() ?? false)) return;
+
+    final cubit = context.read<AuthCubit>();
+    final locale = Localizations.localeOf(context).languageCode;
+
+    if (_registering) {
+      await cubit.register(
+        email: _email.text.trim(),
+        password: _password.text,
+        passwordConfirm: _confirm.text,
+        displayName: _name.text.trim(),
+        locale: locale,
+        // The phone's own zone, so the member's very first reminder is already
+        // in their local time rather than waiting for them to find the setting.
+        //
+        // `deviceTimezone()`, not `DateTime.now().timeZoneName`: the latter is
+        // an abbreviation like `EEST`, and the server validates an IANA zone —
+        // it would refuse the registration with a message about a field the
+        // member never filled in.
+        timezone: await deviceTimezone(),
+      );
+    } else {
+      await cubit.signIn(_email.text.trim(), _password.text);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final t = AppLocalizations.of(context);
 
     return Scaffold(
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      l10n.appTitle,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      l10n.signInTitle,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      // The field holds an address, which is written left to
-                      // right even when the page is not.
-                      textDirection: TextDirection.ltr,
-                      decoration: InputDecoration(labelText: l10n.email),
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? l10n.emailRequired
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _password,
-                      obscureText: true,
-                      autofillHints: const [AutofillHints.password],
-                      textDirection: TextDirection.ltr,
-                      decoration: InputDecoration(labelText: l10n.password),
-                      onFieldSubmitted: (_) => _submit(context),
-                      validator: (v) => (v == null || v.isEmpty)
-                          ? l10n.passwordRequired
-                          : null,
-                    ),
-                    const SizedBox(height: 20),
-                    BlocBuilder<SignInCubit, SignInState>(
-                      builder: (context, state) => Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          FilledButton(
-                            onPressed: state is SignInBusy
-                                ? null
-                                : () => _submit(context),
-                            child: state is SignInBusy
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : Text(l10n.signInAction),
-                          ),
-                          if (state is SignInFailed) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              state.message,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ],
+        child: BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, state) => Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Form(
+                  key: _form,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _registering ? t.registerTitle : t.signInTitle,
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+
+                      if (_registering) ...[
+                        TextFormField(
+                          controller: _name,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(labelText: t.displayName),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
+                      TextFormField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.username],
+                        textInputAction: TextInputAction.next,
+                        decoration: InputDecoration(labelText: t.email),
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? t.emailRequired : null,
+                      ),
+                      const SizedBox(height: 12),
+
+                      TextFormField(
+                        controller: _password,
+                        obscureText: _obscure,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: _registering
+                            ? TextInputAction.next
+                            : TextInputAction.done,
+                        decoration: InputDecoration(
+                          labelText: t.password,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscure ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () => setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return t.passwordRequired;
+                          // Only when registering. An existing password shorter
+                          // than today's minimum must still be able to sign in,
+                          // or its owner cannot reach the screen that changes it.
+                          if (_registering && v.length < 8) return t.passwordTooShort;
+                          return null;
+                        },
+                        onFieldSubmitted: (_) {
+                          if (!_registering) unawaited(_submit());
+                        },
+                      ),
+
+                      if (_registering) ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _confirm,
+                          obscureText: _obscure,
+                          textInputAction: TextInputAction.done,
+                          decoration: InputDecoration(
+                            labelText: t.confirmPassword,
+                          ),
+                          // Inline, so the member is told before they submit.
+                          // The server checks it too; that copy is for every
+                          // caller that is not this form.
+                          validator: (v) =>
+                              v == _password.text ? null : t.passwordsDoNotMatch,
+                          onFieldSubmitted: (_) => unawaited(_submit()),
+                        ),
+                      ],
+
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: state.isBusy ? null : () => unawaited(_submit()),
+                        child: state.isBusy
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                _registering ? t.registerAction : t.signInAction,
+                              ),
+                      ),
+
+                      const SizedBox(height: 8),
+                      TextButton(
+                        // The typed address survives the switch: somebody who
+                        // started on the wrong form should not retype it.
+                        onPressed: state.isBusy
+                            ? null
+                            : () => setState(() => _registering = !_registering),
+                        child: Text(_registering ? t.haveAccount : t.needAccount),
+                      ),
+
+                      if (state.failure != null) ...[
+                        const SizedBox(height: 16),
+                        _Failure(message: _describe(t, state.failure!)),
+                      ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// The failure, in the member's language.
+  ///
+  /// Never the server's own message: that is written for whoever reads a log,
+  /// and the sign-in path has exactly one thing it may say about a rejected
+  /// credential — the API answers a wrong password and an unknown address
+  /// identically, and so does this.
+  String _describe(AppLocalizations t, AuthFailure failure) => switch (failure) {
+    AuthFailure.invalidCredentials => t.invalidCredentials,
+    AuthFailure.registrationClosed => t.registrationClosed,
+    AuthFailure.emailTaken => t.emailTaken,
+    AuthFailure.passwordMismatch => t.passwordsDoNotMatch,
+    AuthFailure.offline => t.offline,
+    // The Google link path has no button to reach it yet, so it cannot happen
+    // here. Handled rather than defaulted, so adding the button does not
+    // silently show the wrong message.
+    AuthFailure.linkRequired => t.emailTaken,
+    AuthFailure.unknown => t.somethingWentWrong,
+  };
+}
+
+class _Failure extends StatelessWidget {
+  const _Failure({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colours = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colours.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: colours.onErrorContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: colours.onErrorContainer),
+            ),
+          ),
+        ],
       ),
     );
   }
