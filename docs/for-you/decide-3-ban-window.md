@@ -3,7 +3,7 @@
 ## ✍️ Your answer
 
 ```
-ANSWER:  (shorten / revocation store / leave to P11)
+ANSWER:  leave to P11
 
 IF SHORTEN, WHAT TTL:   (default 15m; I suggest 2m)
 ```

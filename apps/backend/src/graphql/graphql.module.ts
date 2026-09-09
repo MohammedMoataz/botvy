@@ -6,6 +6,7 @@ import { IdentityModule } from '../contexts/identity/identity.module.js';
 import { MeResolver } from '../contexts/identity/features/me/me.resolver.js';
 import { MyDevicesResolver } from '../contexts/identity/features/devices/devices.resolver.js';
 import { AdminMembersResolver } from '../contexts/identity/features/admin-members/admin-members.resolver.js';
+import { AdminServiceClientsResolver } from '../contexts/identity/features/admin-service-clients/admin-service-clients.resolver.js';
 import { OperationsModule } from '../contexts/operations/operations.module.js';
 import { AdminSettingsResolver } from '../contexts/operations/features/patch-setting/settings.resolver.js';
 import { ProfileModule } from '../contexts/profile/profile.module.js';
@@ -124,6 +125,7 @@ export const RESOLVERS = [
   MeResolver,
   MyDevicesResolver,
   AdminMembersResolver,
+  AdminServiceClientsResolver,
   ProfileResolver,
   AdminSettingsResolver,
 ] as const;

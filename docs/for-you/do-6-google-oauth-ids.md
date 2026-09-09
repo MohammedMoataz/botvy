@@ -6,7 +6,7 @@
 ## ☐ Answer
 
 ```
-ANSWER:  (pasted below / in .env / not doing this yet)
+ANSWER: not doing this yet
 
 ANDROID:
 IOS:

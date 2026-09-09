@@ -3,7 +3,7 @@
 ## ✍️ Your answer
 
 ```
-ANSWER:  (migrate in P2 / migrate now / keep both)
+ANSWER: migrate now
 
 NOTES:
 ```

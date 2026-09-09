@@ -172,23 +172,6 @@
         "tags": [
           "Auth"
         ]
-      },
-      "get": {
-        "operationId": "AuthController_myDevices",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Auth"
-        ]
       }
     },
     "/api/v1/auth/devices/{id}": {
@@ -293,66 +276,6 @@
         },
         "tags": [
           "Auth"
-        ]
-      }
-    },
-    "/api/v1/admin/users": {
-      "get": {
-        "operationId": "AdminController_users",
-        "parameters": [
-          {
-            "name": "q",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "role",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Admin"
         ]
       }
     },
@@ -461,23 +384,6 @@
       }
     },
     "/api/v1/admin/service-clients": {
-      "get": {
-        "operationId": "AdminController_listServiceClients",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Admin"
-        ]
-      },
       "post": {
         "operationId": "AdminController_createServiceClient",
         "parameters": [],
@@ -535,23 +441,6 @@
       }
     },
     "/api/v1/profile": {
-      "get": {
-        "operationId": "ProfileController_profile",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Profile"
-        ]
-      },
       "patch": {
         "operationId": "ProfileController_patch",
         "parameters": [],
@@ -646,23 +535,6 @@
       }
     },
     "/api/v1/preferences": {
-      "get": {
-        "operationId": "ProfileController_preferences_",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Profile"
-        ]
-      },
       "patch": {
         "operationId": "ProfileController_patchPreferences",
         "parameters": [],
@@ -678,25 +550,6 @@
         ],
         "tags": [
           "Profile"
-        ]
-      }
-    },
-    "/api/v1/admin/settings": {
-      "get": {
-        "operationId": "SettingsController_describe",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Settings"
         ]
       }
     },

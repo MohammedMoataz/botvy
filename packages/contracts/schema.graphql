@@ -79,6 +79,9 @@ type Query {
   """The caller's own profile."""
   profile: Profile!
 
+  """Registered machine callers. Administrators only."""
+  serviceClients: [ServiceClient!]!
+
   """The settings registry. Administrators only."""
   settings: [Setting!]!
 
@@ -94,6 +97,15 @@ type QuietHours {
 enum Role {
   admin
   user
+}
+
+type ServiceClient {
+  createdAt: DateTime!
+  id: ID!
+  lastUsedAt: DateTime
+  name: String!
+  revokedAt: DateTime
+  scopes: [String!]!
 }
 
 type Setting {

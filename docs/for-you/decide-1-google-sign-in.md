@@ -3,7 +3,7 @@
 ## ✍️ Your answer
 
 ```
-ANSWER:  (configure it / defer to P9 / drop it)
+ANSWER: defer to P9
 
 NOTES:
 ```

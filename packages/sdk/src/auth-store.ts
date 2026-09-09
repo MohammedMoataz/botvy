@@ -20,10 +20,17 @@ export interface DeviceDescriptor {
   pushToken?: string;
 }
 
+/**
+ * A registered installation, as a client sees it.
+ *
+ * `hasPush`, not the token. Whether a device can be reached is what a screen
+ * renders; the token is a credential for somebody else's service, and the REST
+ * read this replaced handed it to every browser the member signed in from.
+ */
 export interface DeviceView {
-  deviceId: string;
+  id: string;
   kind: string;
-  pushToken: string | null;
+  hasPush: boolean;
   lastSeenAt: string | null;
 }
 
@@ -228,7 +235,12 @@ export class AuthStore {
   }
 
   async devices(): Promise<DeviceView[]> {
-    return this.client.rest('GET', '/auth/devices');
+    const { myDevices } = await this.client.query<{ myDevices: DeviceView[] }>(`
+      query MyDevices {
+        myDevices { id kind hasPush lastSeenAt }
+      }
+    `);
+    return myDevices;
   }
 
   async removeDevice(deviceId: string): Promise<void> {

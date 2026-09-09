@@ -123,7 +123,14 @@ export class AdminStore {
   }
 
   async serviceClients(): Promise<ServiceClientSummary[]> {
-    return this.client.rest('GET', '/admin/service-clients');
+    const { serviceClients } = await this.client.query<{
+      serviceClients: ServiceClientSummary[];
+    }>(`
+      query ServiceClients {
+        serviceClients { id name scopes createdAt lastUsedAt revokedAt }
+      }
+    `);
+    return serviceClients;
   }
 
   /** The secret comes back once. The caller has to show it before it is gone. */
@@ -139,7 +146,15 @@ export class AdminStore {
   }
 
   async settings(): Promise<SettingEntry[]> {
-    return this.client.rest('GET', '/admin/settings');
+    // `defaultValue` aliased back to `default`: the schema cannot call a field
+    // `default` without every generated client needing a reserved-word escape,
+    // and the portal's table column is named after the registry's own term.
+    const { settings } = await this.client.query<{ settings: SettingEntry[] }>(`
+      query Settings {
+        settings { key value default: defaultValue description readOnly }
+      }
+    `);
+    return settings;
   }
 
   async patchSetting(key: string, value: unknown): Promise<void> {
@@ -170,14 +185,37 @@ export class AdminStore {
   }
 
   async #fetchMembers(filter: MemberFilter, cursor: string | null): Promise<MemberPage> {
-    const params = new URLSearchParams();
-    if (filter.query) params.set('q', filter.query);
-    if (filter.status) params.set('status', filter.status);
-    if (filter.role) params.set('role', filter.role);
-    params.set('limit', String(filter.limit ?? 25));
-    if (cursor) params.set('cursor', cursor);
-
-    return this.client.rest<MemberPage>('GET', `/admin/users?${params.toString()}`);
+    const { users } = await this.client.query<{
+      users: { nodes: MemberPage['members']; endCursor: string | null };
+    }>(
+      `
+      query Users(
+        $search: String
+        $status: UserStatus
+        $role: Role
+        $first: Int
+        $after: String
+      ) {
+        users(search: $search, status: $status, role: $role, first: $first, after: $after) {
+          nodes { id email displayName role status createdAt lastLoginAt deviceCount }
+          endCursor
+        }
+      }
+    `,
+      {
+        // Omitted rather than sent as null: the resolver treats an absent
+        // argument as "no filter", and `status: null` would be a filter on
+        // nothing.
+        ...(filter.query ? { search: filter.query } : {}),
+        ...(filter.status ? { status: filter.status } : {}),
+        ...(filter.role ? { role: filter.role } : {}),
+        first: filter.limit ?? 25,
+        ...(cursor ? { after: cursor } : {}),
+      },
+    );
+    // `hasNextPage` is derivable from the cursor and the store only ever used
+    // the cursor, so it is not selected.
+    return { members: users.nodes, nextCursor: users.endCursor };
   }
 
   #announce(): void {

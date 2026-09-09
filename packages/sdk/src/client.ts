@@ -28,6 +28,28 @@ function isRefreshPath(path: string): boolean {
   return path === '/auth/refresh' || path.startsWith('/auth/refresh?');
 }
 
+/**
+ * The HTTP status a GraphQL error code stands for.
+ *
+ * GraphQL answers 200 with an `errors` array, so a caller that branched on the
+ * status alone would treat "forbidden" as success. The codes come from the
+ * server's own `formatError`, which sets them precisely so both transports can
+ * be branched on the same way.
+ */
+function statusForCode(code: string | undefined, fallback: number): number {
+  switch (code) {
+    case 'unauthorized':
+    case 'token_expired':
+      return 401;
+    case 'forbidden':
+      return 403;
+    case 'not_found':
+      return 404;
+    default:
+      return fallback === 200 ? 500 : fallback;
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -140,7 +162,14 @@ export class BotvyClient {
     return this.unwrap<T>(response, path);
   }
 
-  /** A read. */
+  /**
+   * A read.
+   *
+   * Every read in the platform comes through here. It existed from P0 and was
+   * called by nobody until the resolvers did — all four surfaces read over the
+   * REST `GET`s they were built against, which is the split constitution X
+   * exists to prevent.
+   */
   async query<T>(document: string, variables?: Record<string, unknown>): Promise<T> {
     const send = async (): Promise<Response> =>
       this.fetchImpl(`${this.baseUrl}/graphql`, {
@@ -158,9 +187,27 @@ export class BotvyClient {
     // No refresh-path guard here: this posts to `/graphql`, which the refresh
     // exchange never uses. If a GraphQL mutation ever performs the exchange,
     // it needs the same guard `rest` has.
-    const payload = (await response.json()) as { data?: T; errors?: Array<{ message: string }> };
+
+    // A transport failure before GraphQL sees the request — a 502 from the
+    // edge, an HTML error page — is not a GraphQL error document, and parsing
+    // it as one throws a `SyntaxError` that tells a caller nothing.
+    const payload = (await response.json().catch(() => null)) as {
+      data?: T;
+      errors?: Array<{ message: string; extensions?: { code?: string } }>;
+    } | null;
+
+    if (!payload) {
+      throw new ApiError(response.status, null, `HTTP ${response.status} from /graphql`);
+    }
+
     if (payload.errors?.length) {
-      throw new ApiError(response.status, payload.errors, payload.errors[0]!.message);
+      const first = payload.errors[0]!;
+      const code = first.extensions?.code;
+      // `body` carries `{ code }` because that is where the stores already look
+      // — `AuthStore` reads `error.body.code` to decide between refreshing and
+      // signing out. A read that reported an expired token differently from a
+      // command would sign the member out of a session that is still good.
+      throw new ApiError(statusForCode(code, response.status), { code, errors: payload.errors }, first.message);
     }
     return payload.data as T;
   }

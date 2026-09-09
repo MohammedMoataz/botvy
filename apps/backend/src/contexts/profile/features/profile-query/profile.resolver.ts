@@ -4,6 +4,7 @@ import { CurrentPrincipal, UsersOnly } from '../../../../shared/auth/decorators.
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { DateTimeScalar } from '../../../../graphql/scalars.js';
 import { ProfileQueryHandler } from './profile.query.js';
+import { toProfileResponse } from './profile.response.js';
 
 /**
  * One reading.
@@ -157,12 +158,12 @@ export class ProfileResolver {
     // 404 is the honest answer either way, and the client retries.
     if (!view) throw new NotFoundException('no profile yet');
 
+    const response = toProfileResponse(view);
     return {
-      ...view,
-      photoUrl: view.photoPath ? '/api/v1/profile/photo' : undefined,
-      bodyMetrics: view.metrics as unknown as BodyMetricType[],
-      onboardingCompletedAt: view.onboardingCompletedAt
-        ? new Date(view.onboardingCompletedAt)
+      ...response,
+      bodyMetrics: response.metrics as unknown as BodyMetricType[],
+      onboardingCompletedAt: response.onboardingCompletedAt
+        ? new Date(response.onboardingCompletedAt)
         : undefined,
     } as ProfileType;
   }

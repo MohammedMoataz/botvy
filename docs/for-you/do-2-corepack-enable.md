@@ -9,7 +9,7 @@ corepack enable
 ## ☐ Done?
 
 ```
-DONE:  (yes / no)
+DONE:  yes
 ```
 
 ---

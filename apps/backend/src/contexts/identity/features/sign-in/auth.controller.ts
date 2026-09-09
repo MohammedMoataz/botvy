@@ -5,7 +5,6 @@ import {
   Controller,
   Delete,
   ForbiddenException,
-  Get,
   HttpCode,
   NotFoundException,
   Param,
@@ -304,13 +303,12 @@ export class AuthController {
     return this.devices.handle({ userId: principal.id, ...body });
   }
 
-  @Get('devices')
-  @UsersOnly()
-  @ApiBearerAuth()
-  async myDevices(@CurrentPrincipal() principal: Principal): Promise<unknown[]> {
-    return this.deviceList.forUser(principal.id);
-  }
+// GET /auth/devices was here. It is a read, and constitution X puts reads on GraphQL:
+  // `myDevices` at /graphql answers it. Removed rather than left beside the
+  // resolver, because two paths to one answer is the drift this rewrite exists
+  // to remove - and the REST one leaked every device's push token to the browser.
 
+  
   @Delete('devices/:id')
   @UsersOnly()
   @ApiBearerAuth()

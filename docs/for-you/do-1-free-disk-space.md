@@ -7,7 +7,7 @@
 ## ☐ Done?
 
 ```
-DONE:            (yes / no / partly)
+DONE:            partly
 FREE SPACE NOW:  C: ___ GB    D: ___ GB    E: ___ GB
 ```
 

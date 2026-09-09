@@ -27,12 +27,14 @@ import {
   Min,
 } from 'class-validator';
 import { CurrentPrincipal, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  toProfileResponse,
+  type ProfileResponse,
+} from '../profile-query/profile.response.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { PhotoStore } from '../../domain/profile.repository.js';
 import {
   ProfileQueryHandler,
-  type PreferencesView,
-  type ProfileView,
 } from '../profile-query/profile.query.js';
 import {
   InvalidPreference,
@@ -144,11 +146,23 @@ export class ProfileController {
     private readonly photos: PhotoStore,
   ) {}
 
-  @Get('profile')
-  async profile(@CurrentPrincipal() principal: Principal): Promise<ProfileView> {
+  /**
+   * The profile as a client sees it.
+   *
+   * No longer a route. `GET /profile` and `GET /preferences` were the reads
+   * every surface used, and constitution X puts reads on GraphQL - `profile`
+   * and `preferences` at `/graphql` answer them now, in one request instead of
+   * two. This stays because the patch, the metric and the photo upload all
+   * answer with the stored profile rather than the change, and that is a
+   * command's own result rather than a read.
+   */
+  private async profileResponse(principal: Principal): Promise<ProfileResponse> {
     const view = await this.queries.profile(principal.id);
     if (!view) throw new NotFoundException('this account has no profile yet');
-    return view;
+    // Through the mapper the GraphQL resolver uses, so both edges answer with
+    // the same shape. The patch, the metric and the photo upload all return
+    // through here, so this is the only place it has to happen.
+    return toProfileResponse(view);
   }
 
   @Patch('profile')
@@ -156,7 +170,7 @@ export class ProfileController {
   async patch(
     @Body() body: UpdateProfileDto,
     @CurrentPrincipal() principal: Principal,
-  ): Promise<ProfileView> {
+  ): Promise<ProfileResponse> {
     try {
       // The date is destructured out before the spread rather than overwritten
       // after it: spreading first leaves the string in the object's type, and
@@ -177,14 +191,14 @@ export class ProfileController {
     // The stored view, not the patch: the server normalises the tag lists and
     // trims the name, and a client that kept its own copy would show `Peanuts`
     // where the store holds `peanuts`.
-    return this.profile(principal);
+    return this.profileResponse(principal);
   }
 
   @Post('profile/metrics')
   async recordMetric(
     @Body() body: RecordMetricDto,
     @CurrentPrincipal() principal: Principal,
-  ): Promise<ProfileView> {
+  ): Promise<ProfileResponse> {
     try {
       await this.profiles.recordMetric(principal.id, {
         recordedAt: body.recordedAt ? new Date(body.recordedAt) : new Date(),
@@ -196,7 +210,7 @@ export class ProfileController {
     } catch (error) {
       throw this.translate(error);
     }
-    return this.profile(principal);
+    return this.profileResponse(principal);
   }
 
   /**
@@ -213,14 +227,14 @@ export class ProfileController {
   async uploadPhoto(
     @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
     @CurrentPrincipal() principal: Principal,
-  ): Promise<ProfileView> {
+  ): Promise<ProfileResponse> {
     if (!file) throw new BadRequestException('no photo was uploaded');
     try {
       await this.profiles.setPhoto(principal.id, file.buffer, file.mimetype);
     } catch (error) {
       throw this.translate(error);
     }
-    return this.profile(principal);
+    return this.profileResponse(principal);
   }
 
   /**
@@ -256,13 +270,12 @@ export class ProfileController {
     return new StreamableFile(bytes, { type: 'image/webp' });
   }
 
-  @Get('preferences')
-  async preferences_(@CurrentPrincipal() principal: Principal): Promise<PreferencesView> {
-    const view = await this.queries.preferencesFor(principal.id);
-    if (!view) throw new NotFoundException('this account has no preferences yet');
-    return view;
-  }
+// GET /preferences was here. It is a read, and constitution X puts reads on GraphQL:
+  // `preferences` at /graphql answers it. Removed rather than left beside the
+  // resolver, because two paths to one answer is the drift this rewrite exists
+  // to remove - and the REST one leaked nothing, but drifted anyway.
 
+  
   /**
    * Patches preferences. The body is deliberately untyped beyond "an object":
    * the handler validates every field against the zod schema of its own

@@ -560,8 +560,12 @@ class ApiClient {
   }
 
   Future<List<Map<String, dynamic>>> devices() async {
-    final res = await _guard(() => dio.get<dynamic>('/auth/devices'));
-    return (res.data as List)
+    final data = await query(r'''
+      query MyDevices {
+        myDevices { id kind hasPush lastSeenAt }
+      }
+    ''');
+    return (data['myDevices'] as List)
         .map((row) => Map<String, dynamic>.from(row as Map))
         .toList();
   }
@@ -573,13 +577,34 @@ class ApiClient {
   // -- profile ---------------------------------------------------------------
 
   Future<Map<String, dynamic>> profile() async {
-    final res = await _guard(() => dio.get<dynamic>('/profile'));
-    return Map<String, dynamic>.from(res.data as Map);
+    final data = await query('query Profile { profile { $_profileFields } }');
+    return Map<String, dynamic>.from(data['profile'] as Map);
   }
 
   Future<Map<String, dynamic>> preferences() async {
-    final res = await _guard(() => dio.get<dynamic>('/preferences'));
-    return Map<String, dynamic>.from(res.data as Map);
+    final data = await query(
+      'query Preferences { preferences { $_preferencesFields } }',
+    );
+    return Map<String, dynamic>.from(data['preferences'] as Map);
+  }
+
+  /// Both halves in one request.
+  ///
+  /// The screen needs both and the phone pays for every round trip twice on a
+  /// bad connection, which is the read edge earning its keep - two REST reads
+  /// could not be combined without inventing an endpoint that served both.
+  Future<({Map<String, dynamic> profile, Map<String, dynamic> preferences})>
+  profileAndPreferences() async {
+    final data = await query('''
+      query ProfileAndPreferences {
+        profile { $_profileFields }
+        preferences { $_preferencesFields }
+      }
+    ''');
+    return (
+      profile: Map<String, dynamic>.from(data['profile'] as Map),
+      preferences: Map<String, dynamic>.from(data['preferences'] as Map),
+    );
   }
 
   /// Returns the stored profile, not the patch: the server trims the name and
@@ -605,6 +630,76 @@ class ApiClient {
     // Re-read rather than assume: a patch answers with the fields that changed
     // and the screen wants the whole record.
     return preferences();
+  }
+
+  // -- reads -----------------------------------------------------------------
+
+  /// The selections, named once. A GraphQL query asks for exactly the fields it
+  /// wants, so the field list *is* the type - and two copies of it drift the
+  /// moment one is edited.
+  ///
+  /// `metrics` is aliased from the schema's `bodyMetrics` because the REST
+  /// commands that still return a profile call it `metrics`, and the mirror
+  /// stores whichever arrives last.
+  static const String _profileFields = '''
+    userId displayName photoUrl timezone locale
+    latestWeightKg latestHeightCm bmi
+    metrics: bodyMetrics { recordedAt weightKg heightCm bodyFatPct note }
+    foodLikes foodDislikes allergies symptoms onboardingCompletedAt
+  ''';
+
+  static const String _preferencesFields = '''
+    userId planTomorrowTime endOfDayTime morningBriefingTime nextPracticeCutoff
+    leadTimes quietHours { from to } weekStartsOn checkinEnabled
+    meetingDurationMin mealMode aiSuggestions
+  ''';
+
+  /// A read.
+  ///
+  /// Posted to `\$_origin/graphql`, an absolute URL, because `dio.options
+  /// .baseUrl` ends in `/api/v1` and the read edge sits beside that prefix
+  /// rather than under it. Dio leaves an absolute URL alone.
+  ///
+  /// It goes through `_guard` and the interceptor like every other call, so a
+  /// 401 refreshes and retries exactly as a command does. What it adds is the
+  /// GraphQL envelope: the server answers 200 with an `errors` array, so a
+  /// caller checking only the status reads a refusal as an empty answer.
+  Future<Map<String, dynamic>> query(
+    String document, [
+    Map<String, dynamic>? variables,
+  ]) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '\$_origin/graphql',
+        data: {
+          'query': document,
+          if (variables != null) 'variables': variables,
+        },
+      ),
+    );
+
+    final body = Map<String, dynamic>.from(res.data as Map);
+    final errors = body['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      final first = Map<String, dynamic>.from(errors.first as Map);
+      final extensions = first['extensions'];
+      final code = extensions is Map ? extensions['code'] as String? : null;
+      throw ApiException(
+        first['message'] as String? ?? 'the read failed',
+        // The codes the server sets, mapped to the statuses the rest of this
+        // client already branches on. `unauthorized` is deliberately not
+        // mapped to 401: the interceptor has already refreshed and retried by
+        // the time this line runs, so reaching it means the refresh failed
+        // too, and reporting 401 again would ask for a second one.
+        statusCode: switch (code) {
+          'forbidden' => 403,
+          'not_found' => 404,
+          _ => 500,
+        },
+      );
+    }
+
+    return Map<String, dynamic>.from(body['data'] as Map);
   }
 
   // -- health ----------------------------------------------------------------

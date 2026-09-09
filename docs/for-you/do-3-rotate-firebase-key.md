@@ -5,7 +5,7 @@
 ## ☐ Done?
 
 ```
-DONE:  (yes / no / later)
+DONE: later
 ```
 
 ---

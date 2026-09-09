@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   ForbiddenException,
-  Get,
   HttpCode,
   NotFoundException,
   Param,
@@ -55,13 +54,12 @@ export class SettingsController {
 
   /** The whole registry: every key, its current value, its default and whether
    * an operator may touch it. One request, because the portal renders a table. */
-  @Get()
-  async describe(): Promise<
-    Array<{ key: string; value: unknown; default: unknown; description: string; readOnly: boolean }>
-  > {
-    return this.settings.describe();
-  }
+// GET /admin/settings was here. It is a read, and constitution X puts reads on GraphQL:
+  // `settings` at /graphql answers it. Removed rather than left beside the
+  // resolver, because two paths to one answer is the drift this rewrite exists
+  // to remove - and the REST one leaked nothing, but drifted anyway.
 
+  
   @Patch(':key')
   @HttpCode(200)
   async patch(

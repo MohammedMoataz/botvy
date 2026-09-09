@@ -3,7 +3,7 @@
 ## ✍️ Your answer
 
 ```
-ANSWER:  (accept / fix now)
+ANSWER: accept
 ```
 
 ---

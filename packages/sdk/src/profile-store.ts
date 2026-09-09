@@ -16,10 +16,31 @@ export interface BodyMetric {
  * "no allergies recorded" from "allergies: none" — and the coach prompt in P4
  * depends on the same distinction.
  */
+/**
+ * The selections, named once.
+ *
+ * A GraphQL query asks for exactly the fields it wants, which means the field
+ * list is the type — and two copies of it drift the moment one is edited. Both
+ * reads below select from these, and `metrics` is aliased from the schema's
+ * `bodyMetrics` so the shape matches what the REST commands still return.
+ */
+const PROFILE_FIELDS = `
+  userId displayName photoUrl timezone locale
+  latestWeightKg latestHeightCm bmi
+  metrics: bodyMetrics { recordedAt weightKg heightCm bodyFatPct note }
+  foodLikes foodDislikes allergies symptoms onboardingCompletedAt
+`;
+
+const PREFERENCES_FIELDS = `
+  userId planTomorrowTime endOfDayTime morningBriefingTime nextPracticeCutoff
+  leadTimes quietHours { from to } weekStartsOn checkinEnabled
+  meetingDurationMin mealMode aiSuggestions
+`;
+
 export interface ProfileView {
   userId: string;
   displayName?: string;
-  photoPath?: string;
+  photoUrl?: string;
   timezone: string;
   locale: string;
   latestWeightKg?: number;
@@ -107,10 +128,18 @@ export class ProfileStore {
     this.#loading = true;
     this.#announce();
     try {
-      const [profile, preferences] = await Promise.all([
-        this.client.rest<ProfileView>('GET', '/profile'),
-        this.client.rest<PreferencesView>('GET', '/preferences'),
-      ]);
+      // One request for both, which is the read edge earning its keep: two
+      // REST calls were two round trips for one screen, and the phone pays for
+      // each of them twice on a bad connection.
+      const { profile, preferences } = await this.client.query<{
+        profile: ProfileView;
+        preferences: PreferencesView;
+      }>(`
+        query ProfileAndPreferences {
+          profile { ${PROFILE_FIELDS} }
+          preferences { ${PREFERENCES_FIELDS} }
+        }
+      `);
       this.#profile = profile;
       this.#preferences = preferences;
     } finally {
@@ -163,7 +192,10 @@ export class ProfileStore {
     };
 
     await this.client.rest<{ changed: string[] }>('PATCH', '/preferences', writable);
-    this.#preferences = await this.client.rest<PreferencesView>('GET', '/preferences');
+    const { preferences } = await this.client.query<{ preferences: PreferencesView }>(`
+      query Preferences { preferences { ${PREFERENCES_FIELDS} } }
+    `);
+    this.#preferences = preferences;
     this.#announce();
     return this.#preferences;
   }

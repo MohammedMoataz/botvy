@@ -5,7 +5,7 @@
 ## ☐ Answer
 
 ```
-ANSWER:  (public / keep private / not deploying yet)
+ANSWER:  (not deploying yet)
 ```
 
 ---

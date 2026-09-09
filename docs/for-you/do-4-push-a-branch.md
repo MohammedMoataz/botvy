@@ -3,7 +3,7 @@
 ## ☐ Answer
 
 ```
-ANSWER:  (pushed / not yet / I will not use CI)
+ANSWER: pushed
 ```
 
 ---

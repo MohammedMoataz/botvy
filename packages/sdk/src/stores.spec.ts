@@ -5,7 +5,7 @@ import {
   GoogleLinkRequired,
   RegistrationClosed,
 } from './auth-store.js';
-import { BotvyClient } from './client.js';
+import { ApiError, BotvyClient } from './client.js';
 import { ProfileStore } from './profile-store.js';
 import { TokenStore, inMemoryStorage } from './tokens.js';
 
@@ -25,8 +25,24 @@ class FakeApi {
   readonly calls: Array<{ method: string; path: string; body: unknown }> = [];
   #replies = new Map<string, Reply[]>();
 
+  #graphql = new Map<string, Reply[]>();
+
   on(method: string, path: string, ...replies: Reply[]): this {
     this.#replies.set(`${method} ${path}`, replies);
+    return this;
+  }
+
+  /**
+   * Answers a read, keyed on its operation name rather than on a path.
+   *
+   * Every GraphQL request is a POST to the same `/graphql`, so a path-keyed
+   * fake cannot tell one read from another. The operation name is what the
+   * documents in the stores already carry, and naming them is what makes this
+   * possible - an anonymous `query { ... }` would be unmockable here, which is
+   * a small reason to keep naming them.
+   */
+  onQuery(operation: string, ...replies: Reply[]): this {
+    this.#graphql.set(operation, replies);
     return this;
   }
 
@@ -39,6 +55,22 @@ class FakeApi {
     const path = requestUrl(url).replace(/^.*\/api\/v1/, '');
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body;
     this.calls.push({ method, path, body });
+
+    if (path === '/graphql') {
+      const document = String((body as { query?: unknown } | undefined)?.query ?? '');
+      const operation = /query\s+(\w+)/.exec(document)?.[1] ?? '';
+      const pending = this.#graphql.get(operation);
+      const answer = (pending && (pending.length > 1 ? pending.shift() : pending[0])) ?? {
+        status: 200,
+      };
+      // Wrapped in `data`, because that is the envelope the real server sends
+      // and the client unwraps. A fake that returned the bare object would let
+      // a client that forgot to unwrap pass its tests.
+      return new Response(JSON.stringify({ data: answer.body ?? {} }), {
+        status: answer.status ?? 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
 
     const queued = this.#replies.get(`${method} ${path}`);
     const reply = (queued && (queued.length > 1 ? queued.shift() : queued[0])) ?? { status: 200 };
@@ -301,6 +333,85 @@ describe('AuthStore', () => {
   });
 });
 
+/**
+ * The read edge, as the stores meet it.
+ *
+ * GraphQL answers 200 with an `errors` array, so a caller branching on the HTTP
+ * status alone reads every refusal as success. The server sets
+ * `extensions.code` precisely so both transports can be branched on the same
+ * way, and these pin that translation - `AuthStore` reads `error.body.code` to
+ * decide between refreshing and signing the member out, and a read that
+ * reported an expired token differently from a command would end a session that
+ * was still good.
+ */
+describe('a refused read', () => {
+  const errorReply = (code: string, message = 'nope') =>
+    new Response(
+      JSON.stringify({ errors: [{ message, extensions: { code } }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
+
+  const clientAnswering = (response: Response) =>
+    new BotvyClient({
+      baseUrl: '',
+      fetchImpl: async () => response.clone(),
+    });
+
+  it('carries the code where the stores already look for it', async () => {
+    const client = clientAnswering(errorReply('token_expired', 'jwt expired'));
+
+    const error = await client.query('query Me { me { id } }').catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(401);
+    expect(((error as ApiError).body as { code?: string }).code).toBe('token_expired');
+  });
+
+  it('maps a refusal and a miss to the statuses a caller branches on', async () => {
+    for (const [code, status] of [
+      ['forbidden', 403],
+      ['not_found', 404],
+      ['unauthorized', 401],
+    ] as const) {
+      const error = await clientAnswering(errorReply(code))
+        .query('query Me { me { id } }')
+        .catch((e: unknown) => e);
+      expect((error as ApiError).status).toBe(status);
+    }
+  });
+
+  /** A 200 with an unrecognised code is still a failure, not an empty answer. */
+  it('does not pass an unknown error off as success', async () => {
+    const error = await clientAnswering(errorReply('BAD_USER_INPUT'))
+      .query('query Me { me { id } }')
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(500);
+  });
+
+  /**
+   * A 502 from the edge is an HTML page, not a GraphQL document. Parsing it as
+   * one throws a `SyntaxError` that tells the caller nothing about what failed.
+   */
+  it('reports a transport failure as one', async () => {
+    const client = new BotvyClient({
+      baseUrl: '',
+      fetchImpl: async () =>
+        new Response('<html>502 Bad Gateway</html>', {
+          status: 502,
+          headers: { 'content-type': 'text/html' },
+        }),
+    });
+
+    const error = await client.query('query Me { me { id } }').catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(502);
+    expect((error as Error).message).toContain('/graphql');
+  });
+});
+
 describe('ProfileStore', () => {
   let api: FakeApi;
 
@@ -327,8 +438,7 @@ describe('ProfileStore', () => {
 
   beforeEach(() => {
     api = new FakeApi()
-      .on('GET', '/profile', { body: profile })
-      .on('GET', '/preferences', { body: preferences });
+      .onQuery('ProfileAndPreferences', { body: { profile, preferences } });
   });
 
   const store = () =>
@@ -391,7 +501,7 @@ describe('ProfileStore', () => {
 
   it('re-reads the preferences after a patch rather than guessing', async () => {
     api.on('PATCH', '/preferences', { body: { changed: ['endOfDayTime'] } });
-    api.on('GET', '/preferences', { body: preferences }, { body: { ...preferences, endOfDayTime: '23:00' } });
+    api.onQuery('Preferences', { body: { preferences: { ...preferences, endOfDayTime: '23:00' } } });
     const profiles = store();
     await profiles.load();
 
