@@ -1,19 +1,37 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
+import type { DeviceKind } from '../../domain/device.repository.js';
 import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
 import { UserRepository } from '../../domain/user.repository.js';
+import { RefreshHandler } from '../refresh/refresh.handler.js';
+import { RegisterDeviceHandler } from '../register-device/register-device.handler.js';
 
 export interface SignInCommand {
   email: string;
   password: string;
+  /**
+   * The client identifying its own installation. Optional because the admin
+   * portal has no device to register; a phone always sends it, and sending it
+   * is what binds the refresh family to that handset so signing one out leaves
+   * the others alone.
+   */
+  device?: {
+    installId: string;
+    kind: DeviceKind;
+    name?: string | null;
+    pushToken?: string | null;
+  };
 }
 
 export interface SignedIn {
   accessToken: string;
   expiresIn: string;
+  refreshToken: string;
+  refreshExpiresAt: Date;
   userId: string;
   email: string;
   role: string;
+  deviceId: string | null;
   mustChangePassword: boolean;
 }
 
@@ -32,13 +50,14 @@ export const DEFAULT_ADMIN_PASSWORD = 'admin';
 /**
  * Sign in with an email and a password.
  *
- * P0 shipped a seeded administrator, a hasher, a verifier and a warning telling
- * the Owner to change the password at an endpoint that did not exist. This is
- * the smallest thing that makes that warning true: it returns an access token
- * and nothing else.
+ * It landed in P0 returning an access token and nothing else, because the
+ * administrator seed had been warning on every boot that the Owner should change
+ * the default password at an endpoint that could not be reached. P1 gives it the
+ * other half: a refresh family, and the device that family belongs to.
  *
- * No refresh token. That is database-backed with rotation and reuse detection,
- * and it belongs to P1 whole rather than half.
+ * The order inside matters. The device is registered before the session is
+ * opened, so the refresh row can name it — that binding is what makes "sign out
+ * this phone" narrower than "sign out everywhere".
  */
 @Injectable()
 export class SignInHandler {
@@ -48,6 +67,8 @@ export class SignInHandler {
     private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
     private readonly signer: JwtSigner,
+    private readonly sessions: RefreshHandler,
+    private readonly deviceRegistry: RegisterDeviceHandler,
   ) {}
 
   async handle(command: SignInCommand): Promise<SignedIn> {
@@ -69,18 +90,29 @@ export class SignInHandler {
     user.recordSignIn();
     await this.users.save(user);
 
+    // The device before the session, so the refresh family can name it. A
+    // family with no device is what the portal gets; a family bound to one is
+    // what makes "sign out this phone" mean something narrower than "sign out".
+    const deviceId = command.device
+      ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
+      : null;
+
     const { accessToken, expiresIn } = this.signer.sign({
       sub: user.id,
       role: user.role,
       email: user.email,
     });
+    const session = await this.sessions.open(user.id, deviceId);
 
     return {
       accessToken,
       expiresIn,
+      refreshToken: session.refreshToken,
+      refreshExpiresAt: session.refreshExpiresAt,
       userId: user.id,
       email: user.email,
       role: user.role,
+      deviceId,
       // Surfaced rather than enforced: refusing to sign in would leave the
       // Owner with no way to reach the endpoint that fixes it.
       mustChangePassword: command.password === DEFAULT_ADMIN_PASSWORD,

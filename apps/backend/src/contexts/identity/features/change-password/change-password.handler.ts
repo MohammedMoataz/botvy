@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import { RefreshTokenRepository } from '../../domain/refresh-token.repository.js';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password-rules.js';
 import { UserRepository } from '../../domain/user.repository.js';
 
@@ -46,9 +47,10 @@ export class ChangePasswordHandler {
   constructor(
     private readonly users: UserRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    private readonly tokens: RefreshTokenRepository,
   ) {}
 
-  async handle(command: ChangePasswordCommand): Promise<{ changed: true }> {
+  async handle(command: ChangePasswordCommand): Promise<{ changed: true; sessionsEnded: number }> {
     const user = await this.users.findById(command.userId, command.userId);
     if (!user?.passwordHash) throw new CurrentPasswordWrong();
 
@@ -62,6 +64,12 @@ export class ChangePasswordHandler {
     user.recordPasswordChanged(true);
     await this.users.save(user);
 
-    return { changed: true };
+    // Every session, including this caller's. The point of changing a password
+    // is that access obtained with the old one ends — and a member who changes
+    // it because they think someone else has it would otherwise leave that
+    // someone signed in for another thirty days.
+    const sessionsEnded = await this.tokens.revokeAllForUser(user.id);
+
+    return { changed: true, sessionsEnded };
   }
 }

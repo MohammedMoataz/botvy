@@ -8,6 +8,9 @@ import { ServiceClientRepository } from './domain/service-client.repository.js';
 import { RefreshTokenRepository } from './domain/refresh-token.repository.js';
 import { UserRepository } from './domain/user.repository.js';
 import { ChangePasswordHandler } from './features/change-password/change-password.handler.js';
+import { DeleteAccountHandler } from './features/delete-account/delete-account.handler.js';
+import { LogoutHandler } from './features/logout/logout.handler.js';
+import { RegisterDeviceHandler } from './features/register-device/register-device.handler.js';
 import { RefreshHandler } from './features/refresh/refresh.handler.js';
 import { RegisterHandler } from './features/register/register.handler.js';
 import { DevicesQueryHandler } from './features/devices/devices.query.js';
@@ -69,6 +72,9 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     ChangePasswordHandler,
     RegisterHandler,
     RefreshHandler,
+    RegisterDeviceHandler,
+    LogoutHandler,
+    DeleteAccountHandler,
     ServiceTokenGuard,
   ],
   // `UserRepository` and `DeviceRepository` are deliberately *not* exported.
@@ -84,6 +90,9 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     ChangePasswordHandler,
     RegisterHandler,
     RefreshHandler,
+    RegisterDeviceHandler,
+    LogoutHandler,
+    DeleteAccountHandler,
     ServiceTokenGuard,
   ],
 })

@@ -3,13 +3,25 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   ForbiddenException,
+  Get,
   HttpCode,
+  NotFoundException,
+  Param,
   Post,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { CurrentPrincipal, Public, UsersOnly } from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import {
@@ -32,6 +44,13 @@ import {
   RegistrationClosed,
   type Registered,
 } from '../register/register.handler.js';
+import { DeleteAccountHandler, PasswordRequired } from '../delete-account/delete-account.handler.js';
+import { LogoutHandler } from '../logout/logout.handler.js';
+import {
+  DeviceNotFound,
+  RegisterDeviceHandler,
+} from '../register-device/register-device.handler.js';
+import { DevicesQueryHandler } from '../devices/devices.query.js';
 import { InvalidCredentials, SignInHandler, type SignedIn } from './sign-in.handler.js';
 
 export class RegisterDto {
@@ -66,6 +85,23 @@ export class RefreshDto {
   refreshToken!: string;
 }
 
+/** What a client says about its own installation. */
+export class DeviceDto {
+  @IsString()
+  installId!: string;
+
+  @IsIn(['android', 'ios', 'chrome_extension', 'web'])
+  kind!: 'android' | 'ios' | 'chrome_extension' | 'web';
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  pushToken?: string;
+}
+
 export class SignInDto {
   @IsEmail()
   email!: string;
@@ -75,6 +111,17 @@ export class SignInDto {
   // the endpoint below and replace it.
   @IsString()
   password!: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeviceDto)
+  device?: DeviceDto;
+}
+
+export class DeleteAccountDto {
+  @IsOptional()
+  @IsString()
+  password?: string;
 }
 
 export class ChangePasswordDto {
@@ -106,6 +153,10 @@ export class AuthController {
     private readonly changePassword: ChangePasswordHandler,
     private readonly registerMember: RegisterHandler,
     private readonly refreshSession: RefreshHandler,
+    private readonly logoutSession: LogoutHandler,
+    private readonly devices: RegisterDeviceHandler,
+    private readonly deviceList: DevicesQueryHandler,
+    private readonly deleteAccount: DeleteAccountHandler,
   ) {}
 
   @Post('register')
@@ -177,6 +228,82 @@ export class AuthController {
       if (error instanceof NewPasswordTooShort || error instanceof NewPasswordUnchanged) {
         throw new BadRequestException(error.message);
       }
+      throw error;
+    }
+  }
+
+  /**
+   * Signs out one session, not the account. The refresh token is the thing
+   * being revoked, so it is what the request carries.
+   */
+  @Post('logout')
+  @Public()
+  @HttpCode(200)
+  async logout(@Body() body: RefreshDto): Promise<{ signedOut: boolean }> {
+    return this.logoutSession.handle(body.refreshToken);
+  }
+
+  @Post('logout/all')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(200)
+  async logoutEverywhere(
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ sessionsEnded: number }> {
+    return this.logoutSession.everywhere(principal.id);
+  }
+
+  /**
+   * Registering a device is idempotent on `installId`, so a client that cannot
+   * tell whether its last attempt arrived simply sends it again.
+   */
+  @Post('devices')
+  @UsersOnly()
+  @ApiBearerAuth()
+  async registerDevice(
+    @Body() body: DeviceDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ deviceId: string; created: boolean }> {
+    return this.devices.handle({ userId: principal.id, ...body });
+  }
+
+  @Get('devices')
+  @UsersOnly()
+  @ApiBearerAuth()
+  async myDevices(@CurrentPrincipal() principal: Principal): Promise<unknown[]> {
+    return this.deviceList.forUser(principal.id);
+  }
+
+  @Delete('devices/:id')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(204)
+  async removeDevice(
+    @Param('id') id: string,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<void> {
+    try {
+      await this.devices.remove(principal.id, id);
+    } catch (error) {
+      // Another member's device is a 404, not a 403: whether it exists is not
+      // this caller's business to learn.
+      if (error instanceof DeviceNotFound) throw new NotFoundException(error.message);
+      throw error;
+    }
+  }
+
+  @Post('delete-account')
+  @UsersOnly()
+  @ApiBearerAuth()
+  @HttpCode(200)
+  async remove(
+    @Body() body: DeleteAccountDto,
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<{ deleted: true }> {
+    try {
+      return await this.deleteAccount.handle({ userId: principal.id, ...body });
+    } catch (error) {
+      if (error instanceof PasswordRequired) throw new UnauthorizedException(error.message);
       throw error;
     }
   }

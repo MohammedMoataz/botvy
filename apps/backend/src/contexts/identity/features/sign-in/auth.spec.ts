@@ -3,7 +3,13 @@ import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
 import { JwtVerifier } from '../../../../shared/auth/jwt.verifier.js';
 import type { PasswordHasher } from '../../domain/password-hasher.js';
 import { User } from '../../domain/user.aggregate.js';
-import { InMemoryUserRepository } from '../../infrastructure/in-memory-identity.repositories.js';
+import {
+  InMemoryDeviceRepository,
+  InMemoryRefreshTokenRepository,
+  InMemoryUserRepository,
+} from '../../infrastructure/in-memory-identity.repositories.js';
+import { RefreshHandler } from '../refresh/refresh.handler.js';
+import { RegisterDeviceHandler } from '../register-device/register-device.handler.js';
 import {
   ChangePasswordHandler,
   CurrentPasswordWrong,
@@ -23,7 +29,11 @@ const hasher: PasswordHasher = {
   },
 };
 
-const env = { JWT_ACCESS_SECRET: 'a-secret-long-enough', JWT_ACCESS_TTL: '15m' };
+const env = {
+  JWT_ACCESS_SECRET: 'a-secret-long-enough',
+  JWT_ACCESS_TTL: '15m',
+  JWT_REFRESH_TTL: '30d',
+};
 
 function admin(overrides: Partial<{ status: 'active' | 'banned'; password: string }> = {}) {
   return User.rehydrate({
@@ -43,11 +53,21 @@ function admin(overrides: Partial<{ status: 'active' | 'banned'; password: strin
 
 describe('sign-in', () => {
   let users: InMemoryUserRepository;
+  let tokens: InMemoryRefreshTokenRepository;
+  let devices: InMemoryDeviceRepository;
   let handler: SignInHandler;
 
   beforeEach(() => {
     users = new InMemoryUserRepository();
-    handler = new SignInHandler(users, hasher, new JwtSigner(env));
+    tokens = new InMemoryRefreshTokenRepository();
+    devices = new InMemoryDeviceRepository();
+    handler = new SignInHandler(
+      users,
+      hasher,
+      new JwtSigner(env),
+      new RefreshHandler(tokens, users, new JwtSigner(env), env as never),
+      new RegisterDeviceHandler(devices),
+    );
   });
 
   it('returns a token the verifier accepts, carrying the role', async () => {
@@ -121,6 +141,67 @@ describe('sign-in', () => {
     ).rejects.toBeInstanceOf(InvalidCredentials);
   });
 
+  /**
+   * The device is registered before the session opens, so the refresh row can
+   * name it. That binding is what makes signing out one phone narrower than
+   * signing out everywhere.
+   */
+  it('registers the device it was told about and binds the session to it', async () => {
+    await users.save(admin());
+
+    const result = await handler.handle({
+      email: 'imohammedmoataz@gmail.com',
+      password: 'admin',
+      device: { installId: 'install-1', kind: 'android', name: 'Pixel' },
+    });
+
+    expect(result.deviceId).toBeTruthy();
+    expect(devices.rows).toHaveLength(1);
+    expect(tokens.rows[0]?.deviceId).toBe(result.deviceId);
+  });
+
+  /** The admin portal has no device to register, and must still sign in. */
+  it('signs in without a device, leaving the session unbound', async () => {
+    await users.save(admin());
+
+    const result = await handler.handle({
+      email: 'imohammedmoataz@gmail.com',
+      password: 'admin',
+    });
+
+    expect(result.deviceId).toBeNull();
+    expect(devices.rows).toHaveLength(0);
+    expect(tokens.rows[0]?.deviceId).toBeNull();
+  });
+
+  /**
+   * A phone registers on every launch and cannot know whether the last attempt
+   * arrived. Two sign-ins from one handset are one device, or the member gets
+   * two push notifications for every reminder.
+   */
+  it('does not grow a second device for the same installation', async () => {
+    await users.save(admin());
+    const device = { installId: 'install-1', kind: 'android' } as const;
+
+    await handler.handle({ email: 'imohammedmoataz@gmail.com', password: 'admin', device });
+    await handler.handle({ email: 'imohammedmoataz@gmail.com', password: 'admin', device });
+
+    expect(devices.rows).toHaveLength(1);
+  });
+
+  it('hands back a refresh token that is not the access token', async () => {
+    await users.save(admin());
+
+    const result = await handler.handle({
+      email: 'imohammedmoataz@gmail.com',
+      password: 'admin',
+    });
+
+    expect(result.refreshToken).toBeTypeOf('string');
+    expect(result.refreshToken).not.toBe(result.accessToken);
+    expect(result.refreshExpiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
   it('records the sign-in on the account', async () => {
     await users.save(admin());
 
@@ -133,11 +214,13 @@ describe('sign-in', () => {
 
 describe('change password', () => {
   let users: InMemoryUserRepository;
+  let tokens: InMemoryRefreshTokenRepository;
   let handler: ChangePasswordHandler;
 
   beforeEach(async () => {
     users = new InMemoryUserRepository();
-    handler = new ChangePasswordHandler(users, hasher);
+    tokens = new InMemoryRefreshTokenRepository();
+    handler = new ChangePasswordHandler(users, hasher, tokens);
     await users.save(admin());
   });
 
@@ -150,6 +233,55 @@ describe('change password', () => {
 
     const stored = await users.findById('user-1', 'user-1');
     expect(stored?.passwordHash).toBe('hashed:a-longer-secret');
+  });
+
+  /**
+   * The point of changing a password is that access obtained with the old one
+   * ends. A member who changes it because they think someone else has it would
+   * otherwise leave that someone signed in for another thirty days.
+   */
+  it("ends every session, including the caller's own", async () => {
+    await tokens.issue({
+      userId: 'user-1',
+      familyId: 'fam-1',
+      tokenHash: 'hash-1',
+      expiresAt: new Date(Date.now() + 86_400_000),
+      deviceId: null,
+    });
+    await tokens.issue({
+      userId: 'user-1',
+      familyId: 'fam-2',
+      tokenHash: 'hash-2',
+      expiresAt: new Date(Date.now() + 86_400_000),
+      deviceId: 'dev-1',
+    });
+
+    const result = await handler.handle({
+      userId: 'user-1',
+      currentPassword: 'admin',
+      newPassword: 'a-longer-secret',
+    });
+
+    expect(result.sessionsEnded).toBe(2);
+    expect(tokens.rows.every((row) => row.revokedAt !== null)).toBe(true);
+  });
+
+  it("leaves another member's sessions alone", async () => {
+    await tokens.issue({
+      userId: 'someone-else',
+      familyId: 'fam-9',
+      tokenHash: 'hash-9',
+      expiresAt: new Date(Date.now() + 86_400_000),
+      deviceId: null,
+    });
+
+    await handler.handle({
+      userId: 'user-1',
+      currentPassword: 'admin',
+      newPassword: 'a-longer-secret',
+    });
+
+    expect(tokens.rows[0]?.revokedAt).toBeNull();
   });
 
   /**
