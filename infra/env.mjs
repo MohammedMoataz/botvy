@@ -8,14 +8,14 @@
  * actually ran — port 80 rather than `EDGE_PORT`, and a skipped credential
  * check announcing "not set in this shell" on a host where it was set all along.
  *
- * `.env` first, then `.env.v2` where it exists, second wins — the same order the
- * documented `--env-file --env-file` run uses. Nothing already in the
- * environment is overwritten, so an operator can still override one value for
- * one run.
+ * One file. It was `.env` then `.env.v2`, second winning, which is what kept v1
+ * runnable from the same directory; the Owner collapsed that to one file and the
+ * v2 values are folded into `.env`. Nothing already in the environment is
+ * overwritten, so an operator can still override one value for one run.
  */
 import { existsSync, readFileSync } from 'node:fs';
 
-const CANDIDATES = ['.env', '.env.v2'];
+const CANDIDATES = ['.env'];
 
 /** The files that exist, in the order compose reads them. */
 export const envFiles = () => CANDIDATES.filter((file) => existsSync(file));

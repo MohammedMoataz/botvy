@@ -3,7 +3,7 @@
 ## ✍️ Your answer
 
 ```
-ANSWER:  (keep two files / one file)
+ANSWER: one file
 ```
 
 ---
