@@ -63,6 +63,22 @@ It also meant no registry key was retunable at runtime at all.
 Not defects in written code but capabilities the phase claimed and did not
 build, so they are recorded apart from the bugs above.
 
+**A4's migration closed the other half of 10.** The edge existed and nothing
+called it; every read on all four surfaces now goes to `/graphql`, and the six
+REST read routes are gone rather than left beside the resolvers. Two GET
+operations remain in `openapi.json` and both belong on REST: the binary photo
+and the public `/health`. Constitution X is met at the client, not only at the
+server.
+
+It turned up three things worth naming. **`GET /auth/devices` had been handing
+every device's push token to the browser** — the GraphQL `Device` reports
+`hasPush` instead, so the leak closed with the migration. The two edges were
+about to disagree about the photo field, one serving `photoUrl` and the other
+`photoPath`, which would have given a store a profile whose photo key changed
+name depending on which call filled it last. And `client.query` reported
+failures in a shape no store branched on, so a refused read would have read as
+an empty success.
+
 **10. GraphQL and the WebSocket gateway were never built**, though P0 marked
 T025, T026, T031 and T117 done. `src/graphql/` held `scalars.ts` and nothing
 else; `src/ws/` held a `NudgeService` and a `WsAuthGuard` that **no module
@@ -180,10 +196,15 @@ These are recorded rather than fixed, in rough order of how much they matter.
 **14. Both generated-type re-exports are still commented out** with
 `CONTRACTS_GENERATED = false`, so `packages/sdk` is hand-written and nothing
 enforces agreement — which is the root cause of findings 6, 9, 15 and 17. The
-stale `openapi.json` half is fixed: it was 26 of 30 operations behind and is
-regenerated, and `schema.graphql` now exists at all. Turning the flag on means
-generating clients from them, which changes four surfaces and wants its own
-task.
+stale `openapi.json` half is fixed: it was 26 of 30 operations behind, and both
+it and `schema.graphql` are regenerated and now describe a REST surface of
+commands plus two reads that belong there.
+
+The cost of leaving it has gone down rather than up. The hand-written half is
+now mostly GraphQL documents, and a wrong field name in one of those fails at
+the server with a named error instead of arriving as `undefined` — which is what
+made findings 6 and 9 invisible. Turning the flag on still means generating
+clients on four surfaces, and still wants its own task.
 
 **16–20, 22–25.** Onboarding "Skip" is a redirect trap; the ladder's
 catch-all cannot catch a forgotten step at the *next* bump; the Socket.IO wire

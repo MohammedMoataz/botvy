@@ -1,40 +1,34 @@
 # Everything I need from you
 
-Both phases in one place: **P0** (`specs/014-foundation`) and **P1**
+Both phases: **P0** (`specs/014-foundation`) and **P1**
 (`specs/015-identity-profile`). Nothing else in `docs/` is waiting on you.
 
-**How to use this folder.** One file per item. Each starts with an answer box —
-type in it, save, and that is enough. **Delete a file once you have answered
-it**; an empty folder means nothing is waiting on me.
+**How to use this folder.** One file per item, each with an answer box at the
+top. **Delete a file once you have answered it** — an empty folder means nothing
+is waiting on me.
 
 Things to *read* rather than answer are in [`../to-review/`](../to-review/).
 
 ---
 
-## 🔨 Do — six things only you can do
+## ✅ Answered — nine of twelve
 
-| # | What | Why it matters | Done |
-|---|---|---|---|
-| [D1](do-1-free-disk-space.md) | **Free disk space** | 🔴 **The one thing blocking both phases.** Two phases are code-complete and neither gate can run | ☐ |
-| [D2](do-2-corepack-enable.md) | `corepack enable` | `pnpm` is not on your PATH; my workaround dies with this session | ☐ |
-| [D3](do-3-rotate-firebase-key.md) | Rotate the Firebase key | A committed credential is still live | ☐ |
-| [D4](do-4-push-a-branch.md) | Push a branch | CI has never run once, on any of this | ☐ |
-| [D5](do-5-ghcr-visibility.md) | GHCR package visibility | Only if you deploy by pulling images | ☐ |
-| [D6](do-6-google-oauth-ids.md) | Google OAuth client ids | Only if you answer A1 with "configure it" | ☐ |
+All six decisions and three of the six actions came back on 9 September and
+their files are gone. What each answer was and what it cost is recorded
+permanently in
+[`../015-identity-profile/decisions-answered.md`](../015-identity-profile/decisions-answered.md).
 
-## 🤔 Decide — six calls that are yours, not mine
-
-| # | Question | If you say nothing | Answered |
-|---|---|---|---|
-| [A1](decide-1-google-sign-in.md) | Google sign-in: configure, defer, or drop? | stays built with no button | ☐ |
-| [A2](decide-2-rate-limiting.md) | Rate-limit `/auth/login` before P1 is done? | unlimited password guessing | ☐ |
-| [A3](decide-3-ban-window.md) | A banned member keeps access for 15 minutes | window stays open | ☐ |
-| [A4](decide-4-graphql-migration.md) | When do the clients move to GraphQL? | two read paths, indefinitely | ☐ |
-| [A5](decide-5-env-files.md) | One `.env` or two? | two (working today) | ☐ |
-| [A6](decide-6-backup-retention.md) | Retention lives in two places — accept? | accepted, documented | ☐ |
+Two of them were work, and both are done: **every read moved to GraphQL** and
+the six REST read routes are gone (A4), and `.env.v2` is folded into `.env`
+(A5). The other four were "leave it", and the reasons are recorded so nobody
+re-opens them by accident.
 
 ---
 
-**If you only do one thing:** [D1](do-1-free-disk-space.md). Everything else can
-wait; that cannot, because it is why neither phase has been verified against a
-running stack.
+## Still open — three
+
+| # | What | Why it is still here |
+|---|---|---|
+| [D1](do-1-free-disk-space.md) | Free disk space | You answered "partly", and it worked: `D:` went 4.6 → 22.8 GB and **Docker starts now.** What remains is running the two gates, which I can do — the file stays so you can see how much headroom is left |
+| [D3](do-3-rotate-firebase-key.md) | Rotate the Firebase key | You answered "later". A committed credential is still live; tracked as `T1113` in `specs/025-hardening-release` |
+| [D4](do-4-push-a-branch.md) | Push a branch | You said "pushed", and it could not have worked — `specs/014-foundation/tasks.md` reached **1.58 GB** in history and GitHub refuses anything over 100 MB. I have repaired the history and am pushing it; this file goes when the push lands |
