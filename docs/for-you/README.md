@@ -1,7 +1,15 @@
 # Everything I need from you
 
-Both phases: **P0** (`specs/014-foundation`) and **P1**
-(`specs/015-identity-profile`). Nothing else in `docs/` is waiting on you.
+Two horizons.
+
+**Now** — the three still-open items from **P0** (`specs/014-foundation`) and
+**P1** (`specs/015-identity-profile`), one file each, listed below.
+
+**Later** — [`inputs-016-to-025.md`](inputs-016-to-025.md) is the whole
+remaining roadmap in one register: 25 items plus the Google Sign-In walkthrough,
+each with an answer box, a "needed by" phase and exact steps or commands. Read
+it once so nothing arrives as a surprise; answer each item when its phase comes
+up. Every decision in it has a default, so leaving one blank is an answer.
 
 **How to use this folder.** One file per item, each with an answer box at the
 top. **Delete a file once you have answered it** — an empty folder means nothing
@@ -25,10 +33,11 @@ re-opens them by accident.
 
 ---
 
-## Still open — three
+## Still open — two, plus the roadmap register
 
 | # | What | Why it is still here |
 |---|---|---|
-| [D1](do-1-free-disk-space.md) | 🔴 **Restart Docker Desktop from the tray** | Your headroom fix worked and the daemon started. Then recreating two containers wedged it, and I made it worse by killing `com.docker.build`. Docker Desktop now reports itself running with no engine behind it, and its own CLI cannot recover. A tray restart fixes it; both gates run the moment it does |
+| ~~D1~~ | ✅ **Done** — you restarted Docker from the tray | The engine came back and both gates ran: **P1 13/13**, **P0 4/5**, the fifth being I1 below. `do-1-free-disk-space.md` can be deleted |
 | [D3](do-3-rotate-firebase-key.md) | Rotate the Firebase key | You answered "later". A committed credential is still live; tracked as `T1113` in `specs/025-hardening-release` |
-| — | Open a pull request | **The branch is pushed.** But `ci.yml` triggers on `push: [master]` and on `pull_request`, so a branch push runs nothing. One command gets CI onto this work for the first time: `gh pr create --base master --head 015-identity-profile`. Yours to make, since a PR is public on your repo |
+| [I1–I25 + G](inputs-016-to-025.md) | Inputs for P2–P11 (n8n key, `google-services.json`, Ollama models, keystore, Google Sign-In, …) | Nothing is blocked today. The n8n API key (I1) is the one carried over from P0 and it is the last failing check in `node infra/verify.mjs` |
+| — | Open a pull request | **The work is merged into `main` already**, so this is only about getting CI to run on a phase branch for the first time — `ci.yml` triggers on `push: [main]` and on `pull_request`, so a plain branch push runs nothing. When 016 has commits: `gh pr create --base main --head 016-tasks-labels-reminders`. Yours to make, since a PR is public on your repo |
