@@ -57,6 +57,14 @@ Work this phase does not contain, stated plainly so no later phase assumes it ex
   "existing with specs" were provided by no module at all, so nothing they did
   could ever have reached anybody.
 
+## Measured, not estimated
+
+The `chown -R botvy:botvy /app` both runtime images ran turned out to cost more
+than the minutes it spent: removing it took the backend image from **1.24 GB to
+173 MB**. It was rewriting every file of the build output into a second layer,
+so the image carried two copies of `/out` — one root-owned, one botvy-owned.
+Neither application writes its own code, so the chown bought nothing at all.
+
 ## Deferred by the Owner, on the record
 
 Answered on 9 September; the reasoning is in
