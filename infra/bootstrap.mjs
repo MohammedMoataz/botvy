@@ -99,18 +99,39 @@ async function waitForStores() {
   });
 }
 
+/**
+ * The two migrators, each with the signal *it* actually emits.
+ *
+ * They do not agree, and assuming they did is what made this script report a
+ * change on every run for ever: Prisma prints "No pending migrations to apply"
+ * when there is nothing to do, and migrate-mongo prints **nothing at all**. A
+ * shared `!stdout.includes('No pending')` test is therefore always true for
+ * Mongo, so `changes` never reached zero and `verify.mjs`'s repeatability check
+ * could not pass however many times it ran.
+ *
+ * Each detector now looks for the positive evidence that work happened rather
+ * than for the absence of a phrase, which is the version that cannot be fooled
+ * by silence.
+ */
 async function migrate() {
-  for (const [name, args] of [
-    ['PostgreSQL migrations', ['exec', '-T', 'backend', 'node_modules/.bin/prisma', 'migrate', 'deploy', '--schema', 'prisma/schema.prisma']],
-    ['Mongo migrations', ['exec', '-T', 'backend', 'node_modules/.bin/migrate-mongo', 'up', '-f', 'migrations/mongo/migrate-mongo-config.js']],
+  for (const [name, args, didApply] of [
+    [
+      'PostgreSQL migrations',
+      ['exec', '-T', 'backend', 'node_modules/.bin/prisma', 'migrate', 'deploy', '--schema', 'prisma/schema.prisma'],
+      (out) => /Applying migration|migration.* applied/i.test(out),
+    ],
+    [
+      'Mongo migrations',
+      ['exec', '-T', 'backend', 'node_modules/.bin/migrate-mongo', 'up', '-f', 'migrate-mongo-config.cjs'],
+      (out) => /MIGRATED UP/i.test(out),
+    ],
   ]) {
     const s = step(name);
     try {
       const { stdout } = await compose(...args);
-      // "No pending migrations" on a second run is the whole point.
-      const pending = !stdout.includes('No pending');
-      if (pending) changes += 1;
-      s.ok(pending ? 'applied' : 'already applied');
+      const applied = didApply(stdout);
+      if (applied) changes += 1;
+      s.ok(applied ? 'applied' : 'already applied');
     } catch (error) {
       s.fail(error.stderr?.trim() || error.message);
     }

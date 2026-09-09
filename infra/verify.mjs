@@ -134,7 +134,14 @@ async function checkBootstrapIsRepeatable() {
         : `second run changed ${changed} thing${changed === 1 ? '' : 's'}`,
     );
   } catch (error) {
-    record('bootstrap is safe to run again', false, error.stdout?.trim() || error.message);
+    // Both streams, and stderr first. `bootstrap.mjs` prints its successes to
+    // stdout and its failures to stderr, so reading stdout alone reported "it
+    // failed" and then showed six lines of everything that worked - the one
+    // line naming the cause was the only line dropped. It hid a 401 between
+    // this script and n8n, which is precisely the failure the heartbeats exist
+    // to make visible.
+    const detail = [error.stderr?.trim(), error.stdout?.trim()].filter(Boolean).join(String.fromCharCode(10));
+    record('bootstrap is safe to run again', false, detail || error.message);
   }
 }
 

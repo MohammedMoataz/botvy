@@ -103,14 +103,29 @@ export class MongoOutboxStore implements RelayStore {
   async *watch(
     resumeToken: unknown | null,
   ): AsyncGenerator<{ event: DomainEvent; token: unknown }> {
-    const stream = this.outbox.watch<OutboxDoc>([{ $match: { operationType: 'insert' } }], {
-      fullDocument: 'updateLookup',
-      ...(resumeToken ? { resumeAfter: resumeToken as Record<string, unknown> } : {}),
-    });
+    // `this.outbox.collection.watch`, not `this.outbox.watch`.
+    //
+    // Mongoose's `Model.watch()` returns its own wrapper around the driver's
+    // change stream, and that wrapper has no `Symbol.asyncIterator` - so
+    // `for await` threw `stream is not async iterable` on the first tick, the
+    // relay crash-looped on a 30-second timer, and every domain event was
+    // delivered only when a restart happened to sweep the outbox. Nothing was
+    // lost, because the sweep is the durable path; nothing was prompt either.
+    //
+    // The cast below is what hid it: `as AsyncIterable<...>` silenced the type
+    // error that was telling the truth. The driver's own
+    // `Collection.watch()` *is* async-iterable, so the cast is gone with it.
+    const stream = this.outbox.collection.watch<OutboxDoc>(
+      [{ $match: { operationType: 'insert' } }],
+      {
+        fullDocument: 'updateLookup',
+        ...(resumeToken ? { resumeAfter: resumeToken as Record<string, unknown> } : {}),
+      },
+    );
     this.#stream = stream;
 
     try {
-      for await (const change of stream as AsyncIterable<mongo.ChangeStreamDocument<OutboxDoc>>) {
+      for await (const change of stream) {
         if (change.operationType !== 'insert' || !change.fullDocument) continue;
         yield { event: toEvent(change.fullDocument), token: change._id };
       }

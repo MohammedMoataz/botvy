@@ -36,6 +36,7 @@ RUN pnpm --filter @botvy/backend exec prisma generate \
 RUN pnpm --filter @botvy/backend deploy --prod /out \
  && cp -r apps/backend/dist /out/dist \
  && cp -r apps/backend/migrations /out/migrations \
+ && cp apps/backend/migrate-mongo-config.cjs /out/ \
  && cp -r apps/backend/src/contexts/identity/infrastructure/prisma /out/prisma
 
 # Generated *again*, inside /out, and this is not belt-and-braces.

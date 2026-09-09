@@ -22,9 +22,20 @@ module.exports = {
     databaseName,
     options: { directConnection: true },
   },
+  // The migrations, and this file no longer among them. It used to sit inside
+  // this directory, which made migrate-mongo treat the configuration itself as
+  // a migration and fail with `Expected a function` - a latent second fault
+  // that the extension bug had been hiding, because loading never got that far.
   migrationsDir: 'migrations/mongo',
   changelogCollectionName: 'migrations_changelog',
-  migrationFileExtension: '.js',
+  // `.cjs`, and every migration beside this file too.
+  //
+  // The backend package is `"type": "module"`, so Node reads a `.js` file here
+  // as ESM and `module.exports` throws before migrate-mongo's own
+  // `moduleSystem` setting is ever consulted - which is why the Mongo
+  // migrations had never once run. The extension is the only thing that
+  // decides this; the setting below cannot override it.
+  migrationFileExtension: '.cjs',
   useFileHash: false,
   moduleSystem: 'commonjs',
 };

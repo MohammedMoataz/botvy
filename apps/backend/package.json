@@ -17,7 +17,7 @@
     "lint": "oxlint --config ../../oxlint.json src",
     "migrate:pg": "prisma migrate deploy --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
     "migrate:pg:status": "prisma migrate status --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
-    "migrate:mongo": "migrate-mongo up -f migrations/mongo/migrate-mongo-config.js",
+    "migrate:mongo": "migrate-mongo up -f migrate-mongo-config.cjs",
     "gen:contracts": "cross-env BOTVY_GEN=1 node dist/main.js"
   },
   "dependencies": {

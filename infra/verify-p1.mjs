@@ -35,8 +35,16 @@ const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_P
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin';
 
-/** How long the relay is given to deliver. Generous: it is a change stream. */
-const RELAY_TIMEOUT_MS = 20_000;
+/**
+ * How long the relay is given to deliver.
+ *
+ * Longer than it should ever need, deliberately. At 20 seconds this window sat
+ * *under* the relay's 30-second restart interval, so a relay that was
+ * crash-looping looked identical to one that was merely slow - and the failure
+ * it was hiding took reading the worker's log to find, not this gate's output.
+ * A gate should fail for the right reason or not at all.
+ */
+const RELAY_TIMEOUT_MS = 45_000;
 
 const results = [];
 const record = (name, ok, detail) => {
@@ -143,9 +151,10 @@ async function main() {
     );
     return answer.data?.profile ? answer.data : null;
   });
+  const bootstrapped = Boolean(profile?.profile && profile?.preferences);
   record(
     'the relay bootstrapped a profile and preferences',
-    Boolean(profile?.profile && profile?.preferences),
+    bootstrapped,
     profile?.profile
       ? `timezone=${profile.profile.timezone} locale=${profile.profile.locale} briefing=${profile.preferences.morningBriefingTime}`
       : `nothing after ${RELAY_TIMEOUT_MS / 1000}s`,
@@ -252,10 +261,18 @@ async function main() {
       });
       return answer.errors?.length ? answer : null;
     });
+    // Only meaningful if there *was* a profile. On the run that found the relay
+    // crash-looping, the bootstrap check failed and this one passed - because a
+    // profile that never existed also "no longer resolves". A check that passes
+    // when its subject is absent is not a check.
     record(
       'the relay purged the profile',
-      Boolean(purged?.errors?.length),
-      purged?.errors?.length ? 'profile no longer resolves' : `still there after ${RELAY_TIMEOUT_MS / 1000}s`,
+      bootstrapped && Boolean(purged?.errors?.length),
+      !bootstrapped
+        ? 'skipped: there was no profile to purge, so this proves nothing'
+        : purged?.errors?.length
+          ? 'profile no longer resolves'
+          : `still there after ${RELAY_TIMEOUT_MS / 1000}s`,
     );
   } else {
     record('the new password works', false, `status=${signedIn.status}`);
