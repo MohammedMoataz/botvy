@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isValidTimezone } from '../time/time.js';
 
 /**
  * Every operator knob in the platform, registered here in P0 — not only the
@@ -29,18 +30,23 @@ const leadTime = z.string().regex(/^\d+[mhd]$/, 'a lead time like "30m", "1h" or
 
 const hexColour = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'a colour as #rrggbb');
 
-function define<T>(definition: SettingDefinition<T>): SettingDefinition<T> {
-  return definition;
-}
-
-/** Intl is the only authority on what is a zone; it throws on anything else. */
-function isIanaZone(value: string): boolean {
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: value });
-    return true;
-  } catch {
-    return false;
-  }
+/**
+ * Registers one key, taking its type from its schema.
+ *
+ * The generic is over the *schema*, not over the value. Inferring from
+ * `SettingDefinition<T>` let TypeScript take `T` from the `default` instead,
+ * which widens every literal: `z.enum(['monday', 'sunday', 'saturday'])` with a
+ * default of `'monday'` inferred as plain `string`, so `SettingValue` handed
+ * every consumer a `string` and anything expecting the union had to cast. The
+ * schema already knows the answer — this asks it.
+ */
+function define<S extends z.ZodTypeAny>(definition: {
+  schema: S;
+  default: z.infer<S>;
+  description: string;
+  readOnly?: boolean;
+}): SettingDefinition<z.infer<S>> {
+  return definition as SettingDefinition<z.infer<S>>;
 }
 
 export const SETTINGS_REGISTRY = {
@@ -49,7 +55,7 @@ export const SETTINGS_REGISTRY = {
   // changing one moves the starting point for everyone who joins next, and
   // never overwrites a member who has already chosen.
   'defaults.timezone': define({
-    schema: z.string().refine(isIanaZone, 'an IANA zone such as Africa/Cairo'),
+    schema: z.string().refine(isValidTimezone, 'an IANA zone such as Africa/Cairo'),
     default: 'Africa/Cairo',
     description: 'Time zone a new member starts with, until they set their own.',
   }),
