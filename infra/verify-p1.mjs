@@ -184,7 +184,7 @@ async function main() {
 
   if (admin.status === 200) {
     const users = await graphql(
-      'query Gate($search: String) { users(search: $search) { nodes { email role status deviceCount } } }',
+      'query Gate($search: String) { users(search: $search) { nodes { id email role status deviceCount } } }',
       { token: admin.body.accessToken, variables: { search: email } },
     );
     const found = users.data?.users?.nodes?.[0];
@@ -198,10 +198,16 @@ async function main() {
     const adminProfile = await graphql('query Gate { profile { userId } }', {
       token: admin.body.accessToken,
     });
+    // `id` is selected above for this comparison. Without it `found.id` is
+    // undefined, `!==` is true whatever the server did, and the check passes
+    // while testing nothing - which is the shape of assertion this whole
+    // review pass has been finding.
     record(
       'an administrator’s own profile is their own, not the member’s',
-      adminProfile.data?.profile?.userId !== found?.id,
-      'profile resolves from the principal, never an argument',
+      Boolean(found?.id) &&
+        Boolean(adminProfile.data?.profile?.userId) &&
+        adminProfile.data.profile.userId !== found.id,
+      `admin=${adminProfile.data?.profile?.userId?.slice(0, 8)} member=${found?.id?.slice(0, 8)}`,
     );
   }
 
