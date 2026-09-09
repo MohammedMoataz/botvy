@@ -26,6 +26,14 @@ import { MODEL_NAMES } from './shared/persistence/mongo/schemas.js';
  * every provider, and `init()` would additionally run `onApplicationBootstrap`
  * — the seeds, the relay — which needs real stores. The graph is what breaks,
  * so the graph is what this checks.
+ *
+ * What it therefore cannot see, and did not: a driver that loads part of itself
+ * only while serving. `@nestjs/apollo` resolves `@as-integrations/express5`
+ * during `init()`, not during `compile()`, so a missing peer dependency passed
+ * here and killed the container on boot with
+ * `The "@as-integrations/express5" package is missing`. A compiling graph and a
+ * serving one are two different claims; this file makes only the first one, and
+ * `infra/verify.mjs` is what makes the second.
  */
 
 /** Every environment variable `loadEnv` demands, with values it will accept. */
