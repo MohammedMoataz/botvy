@@ -7715,6 +7715,1821 @@ class PendingMessagesCompanion extends UpdateCompanion<LocalPendingMessage> {
   }
 }
 
+class $MeetingsTable extends Meetings
+    with TableInfo<$MeetingsTable, LocalMeeting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MeetingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _startAtMeta =
+      const VerificationMeta('startAt');
+  @override
+  late final GeneratedColumn<DateTime> startAt = GeneratedColumn<DateTime>(
+      'start_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _durationMinMeta =
+      const VerificationMeta('durationMin');
+  @override
+  late final GeneratedColumn<int> durationMin = GeneratedColumn<int>(
+      'duration_min', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(30));
+  static const VerificationMeta _allDayMeta = const VerificationMeta('allDay');
+  @override
+  late final GeneratedColumn<bool> allDay = GeneratedColumn<bool>(
+      'all_day', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("all_day" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _lockTimezoneMeta =
+      const VerificationMeta('lockTimezone');
+  @override
+  late final GeneratedColumn<String> lockTimezone = GeneratedColumn<String>(
+      'lock_timezone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _authoredTimezoneMeta =
+      const VerificationMeta('authoredTimezone');
+  @override
+  late final GeneratedColumn<String> authoredTimezone = GeneratedColumn<String>(
+      'authored_timezone', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _locationJsonMeta =
+      const VerificationMeta('locationJson');
+  @override
+  late final GeneratedColumn<String> locationJson = GeneratedColumn<String>(
+      'location_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _prepNotesMeta =
+      const VerificationMeta('prepNotes');
+  @override
+  late final GeneratedColumn<String> prepNotes = GeneratedColumn<String>(
+      'prep_notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _prepMinutesMeta =
+      const VerificationMeta('prepMinutes');
+  @override
+  late final GeneratedColumn<int> prepMinutes = GeneratedColumn<int>(
+      'prep_minutes', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _reminderOffsetsJsonMeta =
+      const VerificationMeta('reminderOffsetsJson');
+  @override
+  late final GeneratedColumn<String> reminderOffsetsJson =
+      GeneratedColumn<String>('reminder_offsets_json', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: false,
+          defaultValue: const Constant('[]'));
+  static const VerificationMeta _recurrenceJsonMeta =
+      const VerificationMeta('recurrenceJson');
+  @override
+  late final GeneratedColumn<String> recurrenceJson = GeneratedColumn<String>(
+      'recurrence_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('scheduled'));
+  static const VerificationMeta _completedAtMeta =
+      const VerificationMeta('completedAt');
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+      'completed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('app'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        title,
+        description,
+        startAt,
+        durationMin,
+        allDay,
+        lockTimezone,
+        authoredTimezone,
+        locationJson,
+        prepNotes,
+        prepMinutes,
+        reminderOffsetsJson,
+        recurrenceJson,
+        status,
+        completedAt,
+        source,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meetings';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalMeeting> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    }
+    if (data.containsKey('start_at')) {
+      context.handle(_startAtMeta,
+          startAt.isAcceptableOrUnknown(data['start_at']!, _startAtMeta));
+    } else if (isInserting) {
+      context.missing(_startAtMeta);
+    }
+    if (data.containsKey('duration_min')) {
+      context.handle(
+          _durationMinMeta,
+          durationMin.isAcceptableOrUnknown(
+              data['duration_min']!, _durationMinMeta));
+    }
+    if (data.containsKey('all_day')) {
+      context.handle(_allDayMeta,
+          allDay.isAcceptableOrUnknown(data['all_day']!, _allDayMeta));
+    }
+    if (data.containsKey('lock_timezone')) {
+      context.handle(
+          _lockTimezoneMeta,
+          lockTimezone.isAcceptableOrUnknown(
+              data['lock_timezone']!, _lockTimezoneMeta));
+    }
+    if (data.containsKey('authored_timezone')) {
+      context.handle(
+          _authoredTimezoneMeta,
+          authoredTimezone.isAcceptableOrUnknown(
+              data['authored_timezone']!, _authoredTimezoneMeta));
+    }
+    if (data.containsKey('location_json')) {
+      context.handle(
+          _locationJsonMeta,
+          locationJson.isAcceptableOrUnknown(
+              data['location_json']!, _locationJsonMeta));
+    }
+    if (data.containsKey('prep_notes')) {
+      context.handle(_prepNotesMeta,
+          prepNotes.isAcceptableOrUnknown(data['prep_notes']!, _prepNotesMeta));
+    }
+    if (data.containsKey('prep_minutes')) {
+      context.handle(
+          _prepMinutesMeta,
+          prepMinutes.isAcceptableOrUnknown(
+              data['prep_minutes']!, _prepMinutesMeta));
+    }
+    if (data.containsKey('reminder_offsets_json')) {
+      context.handle(
+          _reminderOffsetsJsonMeta,
+          reminderOffsetsJson.isAcceptableOrUnknown(
+              data['reminder_offsets_json']!, _reminderOffsetsJsonMeta));
+    }
+    if (data.containsKey('recurrence_json')) {
+      context.handle(
+          _recurrenceJsonMeta,
+          recurrenceJson.isAcceptableOrUnknown(
+              data['recurrence_json']!, _recurrenceJsonMeta));
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+          _completedAtMeta,
+          completedAt.isAcceptableOrUnknown(
+              data['completed_at']!, _completedAtMeta));
+    }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalMeeting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalMeeting(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      startAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}start_at'])!,
+      durationMin: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}duration_min'])!,
+      allDay: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}all_day'])!,
+      lockTimezone: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}lock_timezone']),
+      authoredTimezone: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}authored_timezone'])!,
+      locationJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}location_json']),
+      prepNotes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}prep_notes']),
+      prepMinutes: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}prep_minutes'])!,
+      reminderOffsetsJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}reminder_offsets_json'])!,
+      recurrenceJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}recurrence_json']),
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      completedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}completed_at']),
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $MeetingsTable createAlias(String alias) {
+    return $MeetingsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalMeeting extends DataClass implements Insertable<LocalMeeting> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String title;
+  final String? description;
+
+  /// The instant the member placed. For a series this is also what
+  /// `recurrence.dtstart` anchors on, and the expander re-reads its wall clock
+  /// rather than trusting the instant — see [authoredTimezone].
+  final DateTime startAt;
+  final int durationMin;
+
+  /// On the row because the server's document carries it, and unread here for
+  /// the same reason: a whole-day entry is a [CalendarEvents] row (FR-001).
+  final bool allDay;
+
+  /// The zone this series is pinned to, or null to follow the member (FR-007).
+  final String? lockTimezone;
+
+  /// The zone whose clock the member was reading when they wrote this. Never
+  /// written by the phone; see the class note.
+  final String authoredTimezone;
+
+  /// `{onlineLink, address}`, as the server sent it.
+  final String? locationJson;
+  final String? prepNotes;
+  final int prepMinutes;
+
+  /// JSON array of minutes before the occurrence, e.g. `[1440,30]`.
+  final String reminderOffsetsJson;
+
+  /// `{dtstart, rrule, exdates[], overrides[]}` or null. See the class note.
+  final String? recurrenceJson;
+
+  /// `scheduled` | `completed` | `cancelled`. A delete never touches it: the
+  /// status is the only record of whether the meeting happened, was called off
+  /// or was simply removed from the diary.
+  final String status;
+  final DateTime? completedAt;
+
+  /// `app` | `chat` | `extension`.
+  final String source;
+  final DateTime createdAt;
+  const LocalMeeting(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.title,
+      this.description,
+      required this.startAt,
+      required this.durationMin,
+      required this.allDay,
+      this.lockTimezone,
+      required this.authoredTimezone,
+      this.locationJson,
+      this.prepNotes,
+      required this.prepMinutes,
+      required this.reminderOffsetsJson,
+      this.recurrenceJson,
+      required this.status,
+      this.completedAt,
+      required this.source,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['start_at'] = Variable<DateTime>(startAt);
+    map['duration_min'] = Variable<int>(durationMin);
+    map['all_day'] = Variable<bool>(allDay);
+    if (!nullToAbsent || lockTimezone != null) {
+      map['lock_timezone'] = Variable<String>(lockTimezone);
+    }
+    map['authored_timezone'] = Variable<String>(authoredTimezone);
+    if (!nullToAbsent || locationJson != null) {
+      map['location_json'] = Variable<String>(locationJson);
+    }
+    if (!nullToAbsent || prepNotes != null) {
+      map['prep_notes'] = Variable<String>(prepNotes);
+    }
+    map['prep_minutes'] = Variable<int>(prepMinutes);
+    map['reminder_offsets_json'] = Variable<String>(reminderOffsetsJson);
+    if (!nullToAbsent || recurrenceJson != null) {
+      map['recurrence_json'] = Variable<String>(recurrenceJson);
+    }
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    map['source'] = Variable<String>(source);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  MeetingsCompanion toCompanion(bool nullToAbsent) {
+    return MeetingsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      title: Value(title),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      startAt: Value(startAt),
+      durationMin: Value(durationMin),
+      allDay: Value(allDay),
+      lockTimezone: lockTimezone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lockTimezone),
+      authoredTimezone: Value(authoredTimezone),
+      locationJson: locationJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(locationJson),
+      prepNotes: prepNotes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(prepNotes),
+      prepMinutes: Value(prepMinutes),
+      reminderOffsetsJson: Value(reminderOffsetsJson),
+      recurrenceJson: recurrenceJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceJson),
+      status: Value(status),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      source: Value(source),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalMeeting.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalMeeting(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      title: serializer.fromJson<String>(json['title']),
+      description: serializer.fromJson<String?>(json['description']),
+      startAt: serializer.fromJson<DateTime>(json['startAt']),
+      durationMin: serializer.fromJson<int>(json['durationMin']),
+      allDay: serializer.fromJson<bool>(json['allDay']),
+      lockTimezone: serializer.fromJson<String?>(json['lockTimezone']),
+      authoredTimezone: serializer.fromJson<String>(json['authoredTimezone']),
+      locationJson: serializer.fromJson<String?>(json['locationJson']),
+      prepNotes: serializer.fromJson<String?>(json['prepNotes']),
+      prepMinutes: serializer.fromJson<int>(json['prepMinutes']),
+      reminderOffsetsJson:
+          serializer.fromJson<String>(json['reminderOffsetsJson']),
+      recurrenceJson: serializer.fromJson<String?>(json['recurrenceJson']),
+      status: serializer.fromJson<String>(json['status']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      source: serializer.fromJson<String>(json['source']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'title': serializer.toJson<String>(title),
+      'description': serializer.toJson<String?>(description),
+      'startAt': serializer.toJson<DateTime>(startAt),
+      'durationMin': serializer.toJson<int>(durationMin),
+      'allDay': serializer.toJson<bool>(allDay),
+      'lockTimezone': serializer.toJson<String?>(lockTimezone),
+      'authoredTimezone': serializer.toJson<String>(authoredTimezone),
+      'locationJson': serializer.toJson<String?>(locationJson),
+      'prepNotes': serializer.toJson<String?>(prepNotes),
+      'prepMinutes': serializer.toJson<int>(prepMinutes),
+      'reminderOffsetsJson': serializer.toJson<String>(reminderOffsetsJson),
+      'recurrenceJson': serializer.toJson<String?>(recurrenceJson),
+      'status': serializer.toJson<String>(status),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'source': serializer.toJson<String>(source),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalMeeting copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? title,
+          Value<String?> description = const Value.absent(),
+          DateTime? startAt,
+          int? durationMin,
+          bool? allDay,
+          Value<String?> lockTimezone = const Value.absent(),
+          String? authoredTimezone,
+          Value<String?> locationJson = const Value.absent(),
+          Value<String?> prepNotes = const Value.absent(),
+          int? prepMinutes,
+          String? reminderOffsetsJson,
+          Value<String?> recurrenceJson = const Value.absent(),
+          String? status,
+          Value<DateTime?> completedAt = const Value.absent(),
+          String? source,
+          DateTime? createdAt}) =>
+      LocalMeeting(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        title: title ?? this.title,
+        description: description.present ? description.value : this.description,
+        startAt: startAt ?? this.startAt,
+        durationMin: durationMin ?? this.durationMin,
+        allDay: allDay ?? this.allDay,
+        lockTimezone:
+            lockTimezone.present ? lockTimezone.value : this.lockTimezone,
+        authoredTimezone: authoredTimezone ?? this.authoredTimezone,
+        locationJson:
+            locationJson.present ? locationJson.value : this.locationJson,
+        prepNotes: prepNotes.present ? prepNotes.value : this.prepNotes,
+        prepMinutes: prepMinutes ?? this.prepMinutes,
+        reminderOffsetsJson: reminderOffsetsJson ?? this.reminderOffsetsJson,
+        recurrenceJson:
+            recurrenceJson.present ? recurrenceJson.value : this.recurrenceJson,
+        status: status ?? this.status,
+        completedAt: completedAt.present ? completedAt.value : this.completedAt,
+        source: source ?? this.source,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalMeeting copyWithCompanion(MeetingsCompanion data) {
+    return LocalMeeting(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      title: data.title.present ? data.title.value : this.title,
+      description:
+          data.description.present ? data.description.value : this.description,
+      startAt: data.startAt.present ? data.startAt.value : this.startAt,
+      durationMin:
+          data.durationMin.present ? data.durationMin.value : this.durationMin,
+      allDay: data.allDay.present ? data.allDay.value : this.allDay,
+      lockTimezone: data.lockTimezone.present
+          ? data.lockTimezone.value
+          : this.lockTimezone,
+      authoredTimezone: data.authoredTimezone.present
+          ? data.authoredTimezone.value
+          : this.authoredTimezone,
+      locationJson: data.locationJson.present
+          ? data.locationJson.value
+          : this.locationJson,
+      prepNotes: data.prepNotes.present ? data.prepNotes.value : this.prepNotes,
+      prepMinutes:
+          data.prepMinutes.present ? data.prepMinutes.value : this.prepMinutes,
+      reminderOffsetsJson: data.reminderOffsetsJson.present
+          ? data.reminderOffsetsJson.value
+          : this.reminderOffsetsJson,
+      recurrenceJson: data.recurrenceJson.present
+          ? data.recurrenceJson.value
+          : this.recurrenceJson,
+      status: data.status.present ? data.status.value : this.status,
+      completedAt:
+          data.completedAt.present ? data.completedAt.value : this.completedAt,
+      source: data.source.present ? data.source.value : this.source,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMeeting(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('startAt: $startAt, ')
+          ..write('durationMin: $durationMin, ')
+          ..write('allDay: $allDay, ')
+          ..write('lockTimezone: $lockTimezone, ')
+          ..write('authoredTimezone: $authoredTimezone, ')
+          ..write('locationJson: $locationJson, ')
+          ..write('prepNotes: $prepNotes, ')
+          ..write('prepMinutes: $prepMinutes, ')
+          ..write('reminderOffsetsJson: $reminderOffsetsJson, ')
+          ..write('recurrenceJson: $recurrenceJson, ')
+          ..write('status: $status, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        title,
+        description,
+        startAt,
+        durationMin,
+        allDay,
+        lockTimezone,
+        authoredTimezone,
+        locationJson,
+        prepNotes,
+        prepMinutes,
+        reminderOffsetsJson,
+        recurrenceJson,
+        status,
+        completedAt,
+        source,
+        createdAt
+      ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalMeeting &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.title == this.title &&
+          other.description == this.description &&
+          other.startAt == this.startAt &&
+          other.durationMin == this.durationMin &&
+          other.allDay == this.allDay &&
+          other.lockTimezone == this.lockTimezone &&
+          other.authoredTimezone == this.authoredTimezone &&
+          other.locationJson == this.locationJson &&
+          other.prepNotes == this.prepNotes &&
+          other.prepMinutes == this.prepMinutes &&
+          other.reminderOffsetsJson == this.reminderOffsetsJson &&
+          other.recurrenceJson == this.recurrenceJson &&
+          other.status == this.status &&
+          other.completedAt == this.completedAt &&
+          other.source == this.source &&
+          other.createdAt == this.createdAt);
+}
+
+class MeetingsCompanion extends UpdateCompanion<LocalMeeting> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> title;
+  final Value<String?> description;
+  final Value<DateTime> startAt;
+  final Value<int> durationMin;
+  final Value<bool> allDay;
+  final Value<String?> lockTimezone;
+  final Value<String> authoredTimezone;
+  final Value<String?> locationJson;
+  final Value<String?> prepNotes;
+  final Value<int> prepMinutes;
+  final Value<String> reminderOffsetsJson;
+  final Value<String?> recurrenceJson;
+  final Value<String> status;
+  final Value<DateTime?> completedAt;
+  final Value<String> source;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const MeetingsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.title = const Value.absent(),
+    this.description = const Value.absent(),
+    this.startAt = const Value.absent(),
+    this.durationMin = const Value.absent(),
+    this.allDay = const Value.absent(),
+    this.lockTimezone = const Value.absent(),
+    this.authoredTimezone = const Value.absent(),
+    this.locationJson = const Value.absent(),
+    this.prepNotes = const Value.absent(),
+    this.prepMinutes = const Value.absent(),
+    this.reminderOffsetsJson = const Value.absent(),
+    this.recurrenceJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.source = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MeetingsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String title,
+    this.description = const Value.absent(),
+    required DateTime startAt,
+    this.durationMin = const Value.absent(),
+    this.allDay = const Value.absent(),
+    this.lockTimezone = const Value.absent(),
+    this.authoredTimezone = const Value.absent(),
+    this.locationJson = const Value.absent(),
+    this.prepNotes = const Value.absent(),
+    this.prepMinutes = const Value.absent(),
+    this.reminderOffsetsJson = const Value.absent(),
+    this.recurrenceJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.source = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        title = Value(title),
+        startAt = Value(startAt),
+        createdAt = Value(createdAt);
+  static Insertable<LocalMeeting> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? title,
+    Expression<String>? description,
+    Expression<DateTime>? startAt,
+    Expression<int>? durationMin,
+    Expression<bool>? allDay,
+    Expression<String>? lockTimezone,
+    Expression<String>? authoredTimezone,
+    Expression<String>? locationJson,
+    Expression<String>? prepNotes,
+    Expression<int>? prepMinutes,
+    Expression<String>? reminderOffsetsJson,
+    Expression<String>? recurrenceJson,
+    Expression<String>? status,
+    Expression<DateTime>? completedAt,
+    Expression<String>? source,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (startAt != null) 'start_at': startAt,
+      if (durationMin != null) 'duration_min': durationMin,
+      if (allDay != null) 'all_day': allDay,
+      if (lockTimezone != null) 'lock_timezone': lockTimezone,
+      if (authoredTimezone != null) 'authored_timezone': authoredTimezone,
+      if (locationJson != null) 'location_json': locationJson,
+      if (prepNotes != null) 'prep_notes': prepNotes,
+      if (prepMinutes != null) 'prep_minutes': prepMinutes,
+      if (reminderOffsetsJson != null)
+        'reminder_offsets_json': reminderOffsetsJson,
+      if (recurrenceJson != null) 'recurrence_json': recurrenceJson,
+      if (status != null) 'status': status,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (source != null) 'source': source,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MeetingsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? title,
+      Value<String?>? description,
+      Value<DateTime>? startAt,
+      Value<int>? durationMin,
+      Value<bool>? allDay,
+      Value<String?>? lockTimezone,
+      Value<String>? authoredTimezone,
+      Value<String?>? locationJson,
+      Value<String?>? prepNotes,
+      Value<int>? prepMinutes,
+      Value<String>? reminderOffsetsJson,
+      Value<String?>? recurrenceJson,
+      Value<String>? status,
+      Value<DateTime?>? completedAt,
+      Value<String>? source,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return MeetingsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      startAt: startAt ?? this.startAt,
+      durationMin: durationMin ?? this.durationMin,
+      allDay: allDay ?? this.allDay,
+      lockTimezone: lockTimezone ?? this.lockTimezone,
+      authoredTimezone: authoredTimezone ?? this.authoredTimezone,
+      locationJson: locationJson ?? this.locationJson,
+      prepNotes: prepNotes ?? this.prepNotes,
+      prepMinutes: prepMinutes ?? this.prepMinutes,
+      reminderOffsetsJson: reminderOffsetsJson ?? this.reminderOffsetsJson,
+      recurrenceJson: recurrenceJson ?? this.recurrenceJson,
+      status: status ?? this.status,
+      completedAt: completedAt ?? this.completedAt,
+      source: source ?? this.source,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (startAt.present) {
+      map['start_at'] = Variable<DateTime>(startAt.value);
+    }
+    if (durationMin.present) {
+      map['duration_min'] = Variable<int>(durationMin.value);
+    }
+    if (allDay.present) {
+      map['all_day'] = Variable<bool>(allDay.value);
+    }
+    if (lockTimezone.present) {
+      map['lock_timezone'] = Variable<String>(lockTimezone.value);
+    }
+    if (authoredTimezone.present) {
+      map['authored_timezone'] = Variable<String>(authoredTimezone.value);
+    }
+    if (locationJson.present) {
+      map['location_json'] = Variable<String>(locationJson.value);
+    }
+    if (prepNotes.present) {
+      map['prep_notes'] = Variable<String>(prepNotes.value);
+    }
+    if (prepMinutes.present) {
+      map['prep_minutes'] = Variable<int>(prepMinutes.value);
+    }
+    if (reminderOffsetsJson.present) {
+      map['reminder_offsets_json'] =
+          Variable<String>(reminderOffsetsJson.value);
+    }
+    if (recurrenceJson.present) {
+      map['recurrence_json'] = Variable<String>(recurrenceJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MeetingsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('title: $title, ')
+          ..write('description: $description, ')
+          ..write('startAt: $startAt, ')
+          ..write('durationMin: $durationMin, ')
+          ..write('allDay: $allDay, ')
+          ..write('lockTimezone: $lockTimezone, ')
+          ..write('authoredTimezone: $authoredTimezone, ')
+          ..write('locationJson: $locationJson, ')
+          ..write('prepNotes: $prepNotes, ')
+          ..write('prepMinutes: $prepMinutes, ')
+          ..write('reminderOffsetsJson: $reminderOffsetsJson, ')
+          ..write('recurrenceJson: $recurrenceJson, ')
+          ..write('status: $status, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('source: $source, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CalendarEventsTable extends CalendarEvents
+    with TableInfo<$CalendarEventsTable, LocalCalendarEvent> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CalendarEventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _startAtMeta =
+      const VerificationMeta('startAt');
+  @override
+  late final GeneratedColumn<DateTime> startAt = GeneratedColumn<DateTime>(
+      'start_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _endAtMeta = const VerificationMeta('endAt');
+  @override
+  late final GeneratedColumn<DateTime> endAt = GeneratedColumn<DateTime>(
+      'end_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _allDayMeta = const VerificationMeta('allDay');
+  @override
+  late final GeneratedColumn<bool> allDay = GeneratedColumn<bool>(
+      'all_day', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("all_day" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _colorMeta = const VerificationMeta('color');
+  @override
+  late final GeneratedColumn<String> color = GeneratedColumn<String>(
+      'color', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _recurrenceJsonMeta =
+      const VerificationMeta('recurrenceJson');
+  @override
+  late final GeneratedColumn<String> recurrenceJson = GeneratedColumn<String>(
+      'recurrence_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _authoredTimezoneMeta =
+      const VerificationMeta('authoredTimezone');
+  @override
+  late final GeneratedColumn<String> authoredTimezone = GeneratedColumn<String>(
+      'authored_timezone', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        title,
+        notes,
+        startAt,
+        endAt,
+        allDay,
+        color,
+        recurrenceJson,
+        authoredTimezone,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'calendar_events';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalCalendarEvent> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('start_at')) {
+      context.handle(_startAtMeta,
+          startAt.isAcceptableOrUnknown(data['start_at']!, _startAtMeta));
+    } else if (isInserting) {
+      context.missing(_startAtMeta);
+    }
+    if (data.containsKey('end_at')) {
+      context.handle(
+          _endAtMeta, endAt.isAcceptableOrUnknown(data['end_at']!, _endAtMeta));
+    } else if (isInserting) {
+      context.missing(_endAtMeta);
+    }
+    if (data.containsKey('all_day')) {
+      context.handle(_allDayMeta,
+          allDay.isAcceptableOrUnknown(data['all_day']!, _allDayMeta));
+    }
+    if (data.containsKey('color')) {
+      context.handle(
+          _colorMeta, color.isAcceptableOrUnknown(data['color']!, _colorMeta));
+    }
+    if (data.containsKey('recurrence_json')) {
+      context.handle(
+          _recurrenceJsonMeta,
+          recurrenceJson.isAcceptableOrUnknown(
+              data['recurrence_json']!, _recurrenceJsonMeta));
+    }
+    if (data.containsKey('authored_timezone')) {
+      context.handle(
+          _authoredTimezoneMeta,
+          authoredTimezone.isAcceptableOrUnknown(
+              data['authored_timezone']!, _authoredTimezoneMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalCalendarEvent map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalCalendarEvent(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      startAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}start_at'])!,
+      endAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}end_at'])!,
+      allDay: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}all_day'])!,
+      color: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}color']),
+      recurrenceJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}recurrence_json']),
+      authoredTimezone: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}authored_timezone'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $CalendarEventsTable createAlias(String alias) {
+    return $CalendarEventsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalCalendarEvent extends DataClass
+    implements Insertable<LocalCalendarEvent> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String title;
+  final String? notes;
+  final DateTime startAt;
+
+  /// After [startAt], and at most a year later — the server's own bound, and
+  /// not tidiness: the expander derives an occurrence's window from the length,
+  /// so an unbounded event would appear on every agenda between its two ends.
+  final DateTime endAt;
+  final bool allDay;
+
+  /// `#rrggbb`, or null for the theme's own. A string and not a palette index,
+  /// for the reason [Labels.color] gives.
+  final String? color;
+  final String? recurrenceJson;
+
+  /// As on [Meetings], and never written here. An event has no `lockTimezone`
+  /// at all — a birthday is a date rather than an instant, so pinning it to a
+  /// zone would put a member who flew on the wrong day of their own birthday.
+  final String authoredTimezone;
+  final DateTime createdAt;
+  const LocalCalendarEvent(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.title,
+      this.notes,
+      required this.startAt,
+      required this.endAt,
+      required this.allDay,
+      this.color,
+      this.recurrenceJson,
+      required this.authoredTimezone,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['start_at'] = Variable<DateTime>(startAt);
+    map['end_at'] = Variable<DateTime>(endAt);
+    map['all_day'] = Variable<bool>(allDay);
+    if (!nullToAbsent || color != null) {
+      map['color'] = Variable<String>(color);
+    }
+    if (!nullToAbsent || recurrenceJson != null) {
+      map['recurrence_json'] = Variable<String>(recurrenceJson);
+    }
+    map['authored_timezone'] = Variable<String>(authoredTimezone);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CalendarEventsCompanion toCompanion(bool nullToAbsent) {
+    return CalendarEventsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      title: Value(title),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      startAt: Value(startAt),
+      endAt: Value(endAt),
+      allDay: Value(allDay),
+      color:
+          color == null && nullToAbsent ? const Value.absent() : Value(color),
+      recurrenceJson: recurrenceJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recurrenceJson),
+      authoredTimezone: Value(authoredTimezone),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalCalendarEvent.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalCalendarEvent(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      title: serializer.fromJson<String>(json['title']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      startAt: serializer.fromJson<DateTime>(json['startAt']),
+      endAt: serializer.fromJson<DateTime>(json['endAt']),
+      allDay: serializer.fromJson<bool>(json['allDay']),
+      color: serializer.fromJson<String?>(json['color']),
+      recurrenceJson: serializer.fromJson<String?>(json['recurrenceJson']),
+      authoredTimezone: serializer.fromJson<String>(json['authoredTimezone']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'title': serializer.toJson<String>(title),
+      'notes': serializer.toJson<String?>(notes),
+      'startAt': serializer.toJson<DateTime>(startAt),
+      'endAt': serializer.toJson<DateTime>(endAt),
+      'allDay': serializer.toJson<bool>(allDay),
+      'color': serializer.toJson<String?>(color),
+      'recurrenceJson': serializer.toJson<String?>(recurrenceJson),
+      'authoredTimezone': serializer.toJson<String>(authoredTimezone),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalCalendarEvent copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? title,
+          Value<String?> notes = const Value.absent(),
+          DateTime? startAt,
+          DateTime? endAt,
+          bool? allDay,
+          Value<String?> color = const Value.absent(),
+          Value<String?> recurrenceJson = const Value.absent(),
+          String? authoredTimezone,
+          DateTime? createdAt}) =>
+      LocalCalendarEvent(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        title: title ?? this.title,
+        notes: notes.present ? notes.value : this.notes,
+        startAt: startAt ?? this.startAt,
+        endAt: endAt ?? this.endAt,
+        allDay: allDay ?? this.allDay,
+        color: color.present ? color.value : this.color,
+        recurrenceJson:
+            recurrenceJson.present ? recurrenceJson.value : this.recurrenceJson,
+        authoredTimezone: authoredTimezone ?? this.authoredTimezone,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalCalendarEvent copyWithCompanion(CalendarEventsCompanion data) {
+    return LocalCalendarEvent(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      title: data.title.present ? data.title.value : this.title,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      startAt: data.startAt.present ? data.startAt.value : this.startAt,
+      endAt: data.endAt.present ? data.endAt.value : this.endAt,
+      allDay: data.allDay.present ? data.allDay.value : this.allDay,
+      color: data.color.present ? data.color.value : this.color,
+      recurrenceJson: data.recurrenceJson.present
+          ? data.recurrenceJson.value
+          : this.recurrenceJson,
+      authoredTimezone: data.authoredTimezone.present
+          ? data.authoredTimezone.value
+          : this.authoredTimezone,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalCalendarEvent(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('startAt: $startAt, ')
+          ..write('endAt: $endAt, ')
+          ..write('allDay: $allDay, ')
+          ..write('color: $color, ')
+          ..write('recurrenceJson: $recurrenceJson, ')
+          ..write('authoredTimezone: $authoredTimezone, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      updatedAt,
+      baseUpdatedAt,
+      pendingOp,
+      pushAttempts,
+      deletedAt,
+      title,
+      notes,
+      startAt,
+      endAt,
+      allDay,
+      color,
+      recurrenceJson,
+      authoredTimezone,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalCalendarEvent &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.title == this.title &&
+          other.notes == this.notes &&
+          other.startAt == this.startAt &&
+          other.endAt == this.endAt &&
+          other.allDay == this.allDay &&
+          other.color == this.color &&
+          other.recurrenceJson == this.recurrenceJson &&
+          other.authoredTimezone == this.authoredTimezone &&
+          other.createdAt == this.createdAt);
+}
+
+class CalendarEventsCompanion extends UpdateCompanion<LocalCalendarEvent> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> title;
+  final Value<String?> notes;
+  final Value<DateTime> startAt;
+  final Value<DateTime> endAt;
+  final Value<bool> allDay;
+  final Value<String?> color;
+  final Value<String?> recurrenceJson;
+  final Value<String> authoredTimezone;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CalendarEventsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.title = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.startAt = const Value.absent(),
+    this.endAt = const Value.absent(),
+    this.allDay = const Value.absent(),
+    this.color = const Value.absent(),
+    this.recurrenceJson = const Value.absent(),
+    this.authoredTimezone = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CalendarEventsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String title,
+    this.notes = const Value.absent(),
+    required DateTime startAt,
+    required DateTime endAt,
+    this.allDay = const Value.absent(),
+    this.color = const Value.absent(),
+    this.recurrenceJson = const Value.absent(),
+    this.authoredTimezone = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        title = Value(title),
+        startAt = Value(startAt),
+        endAt = Value(endAt),
+        createdAt = Value(createdAt);
+  static Insertable<LocalCalendarEvent> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? title,
+    Expression<String>? notes,
+    Expression<DateTime>? startAt,
+    Expression<DateTime>? endAt,
+    Expression<bool>? allDay,
+    Expression<String>? color,
+    Expression<String>? recurrenceJson,
+    Expression<String>? authoredTimezone,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (title != null) 'title': title,
+      if (notes != null) 'notes': notes,
+      if (startAt != null) 'start_at': startAt,
+      if (endAt != null) 'end_at': endAt,
+      if (allDay != null) 'all_day': allDay,
+      if (color != null) 'color': color,
+      if (recurrenceJson != null) 'recurrence_json': recurrenceJson,
+      if (authoredTimezone != null) 'authored_timezone': authoredTimezone,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CalendarEventsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? title,
+      Value<String?>? notes,
+      Value<DateTime>? startAt,
+      Value<DateTime>? endAt,
+      Value<bool>? allDay,
+      Value<String?>? color,
+      Value<String?>? recurrenceJson,
+      Value<String>? authoredTimezone,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return CalendarEventsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      title: title ?? this.title,
+      notes: notes ?? this.notes,
+      startAt: startAt ?? this.startAt,
+      endAt: endAt ?? this.endAt,
+      allDay: allDay ?? this.allDay,
+      color: color ?? this.color,
+      recurrenceJson: recurrenceJson ?? this.recurrenceJson,
+      authoredTimezone: authoredTimezone ?? this.authoredTimezone,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (startAt.present) {
+      map['start_at'] = Variable<DateTime>(startAt.value);
+    }
+    if (endAt.present) {
+      map['end_at'] = Variable<DateTime>(endAt.value);
+    }
+    if (allDay.present) {
+      map['all_day'] = Variable<bool>(allDay.value);
+    }
+    if (color.present) {
+      map['color'] = Variable<String>(color.value);
+    }
+    if (recurrenceJson.present) {
+      map['recurrence_json'] = Variable<String>(recurrenceJson.value);
+    }
+    if (authoredTimezone.present) {
+      map['authored_timezone'] = Variable<String>(authoredTimezone.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CalendarEventsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('title: $title, ')
+          ..write('notes: $notes, ')
+          ..write('startAt: $startAt, ')
+          ..write('endAt: $endAt, ')
+          ..write('allDay: $allDay, ')
+          ..write('color: $color, ')
+          ..write('recurrenceJson: $recurrenceJson, ')
+          ..write('authoredTimezone: $authoredTimezone, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7733,6 +9548,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MessagesTable messages = $MessagesTable(this);
   late final $PendingMessagesTable pendingMessages =
       $PendingMessagesTable(this);
+  late final $MeetingsTable meetings = $MeetingsTable(this);
+  late final $CalendarEventsTable calendarEvents = $CalendarEventsTable(this);
   late final Index labelsSort =
       Index('labels_sort', 'CREATE INDEX labels_sort ON labels (sort_order)');
   late final Index labelsPending = Index(
@@ -7769,6 +9586,16 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX messages_client ON messages (client_id)');
   late final Index pendingMessagesComposed = Index('pending_messages_composed',
       'CREATE INDEX pending_messages_composed ON pending_messages (composed_at)');
+  late final Index meetingsStart = Index(
+      'meetings_start', 'CREATE INDEX meetings_start ON meetings (start_at)');
+  late final Index meetingsStatusStart = Index('meetings_status_start',
+      'CREATE INDEX meetings_status_start ON meetings (status, start_at)');
+  late final Index meetingsPending = Index('meetings_pending',
+      'CREATE INDEX meetings_pending ON meetings (pending_op)');
+  late final Index calendarEventsStart = Index('calendar_events_start',
+      'CREATE INDEX calendar_events_start ON calendar_events (start_at)');
+  late final Index calendarEventsPending = Index('calendar_events_pending',
+      'CREATE INDEX calendar_events_pending ON calendar_events (pending_op)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7787,6 +9614,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         conversations,
         messages,
         pendingMessages,
+        meetings,
+        calendarEvents,
         labelsSort,
         labelsPending,
         tasksDue,
@@ -7804,7 +9633,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         conversationsPending,
         messagesConversationSeq,
         messagesClient,
-        pendingMessagesComposed
+        pendingMessagesComposed,
+        meetingsStart,
+        meetingsStatusStart,
+        meetingsPending,
+        calendarEventsStart,
+        calendarEventsPending
       ];
   @override
   DriftDatabaseOptions get options =>
@@ -11260,6 +13094,766 @@ typedef $$PendingMessagesTableProcessedTableManager = ProcessedTableManager<
     ),
     LocalPendingMessage,
     PrefetchHooks Function()>;
+typedef $$MeetingsTableCreateCompanionBuilder = MeetingsCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String title,
+  Value<String?> description,
+  required DateTime startAt,
+  Value<int> durationMin,
+  Value<bool> allDay,
+  Value<String?> lockTimezone,
+  Value<String> authoredTimezone,
+  Value<String?> locationJson,
+  Value<String?> prepNotes,
+  Value<int> prepMinutes,
+  Value<String> reminderOffsetsJson,
+  Value<String?> recurrenceJson,
+  Value<String> status,
+  Value<DateTime?> completedAt,
+  Value<String> source,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$MeetingsTableUpdateCompanionBuilder = MeetingsCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> title,
+  Value<String?> description,
+  Value<DateTime> startAt,
+  Value<int> durationMin,
+  Value<bool> allDay,
+  Value<String?> lockTimezone,
+  Value<String> authoredTimezone,
+  Value<String?> locationJson,
+  Value<String?> prepNotes,
+  Value<int> prepMinutes,
+  Value<String> reminderOffsetsJson,
+  Value<String?> recurrenceJson,
+  Value<String> status,
+  Value<DateTime?> completedAt,
+  Value<String> source,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$MeetingsTableFilterComposer
+    extends Composer<_$AppDatabase, $MeetingsTable> {
+  $$MeetingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get startAt => $composableBuilder(
+      column: $table.startAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get durationMin => $composableBuilder(
+      column: $table.durationMin, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get allDay => $composableBuilder(
+      column: $table.allDay, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lockTimezone => $composableBuilder(
+      column: $table.lockTimezone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get authoredTimezone => $composableBuilder(
+      column: $table.authoredTimezone,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get locationJson => $composableBuilder(
+      column: $table.locationJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get prepNotes => $composableBuilder(
+      column: $table.prepNotes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get prepMinutes => $composableBuilder(
+      column: $table.prepMinutes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get reminderOffsetsJson => $composableBuilder(
+      column: $table.reminderOffsetsJson,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceJson => $composableBuilder(
+      column: $table.recurrenceJson,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$MeetingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MeetingsTable> {
+  $$MeetingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get startAt => $composableBuilder(
+      column: $table.startAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get durationMin => $composableBuilder(
+      column: $table.durationMin, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get allDay => $composableBuilder(
+      column: $table.allDay, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lockTimezone => $composableBuilder(
+      column: $table.lockTimezone,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get authoredTimezone => $composableBuilder(
+      column: $table.authoredTimezone,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get locationJson => $composableBuilder(
+      column: $table.locationJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get prepNotes => $composableBuilder(
+      column: $table.prepNotes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get prepMinutes => $composableBuilder(
+      column: $table.prepMinutes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get reminderOffsetsJson => $composableBuilder(
+      column: $table.reminderOffsetsJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceJson => $composableBuilder(
+      column: $table.recurrenceJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$MeetingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MeetingsTable> {
+  $$MeetingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startAt =>
+      $composableBuilder(column: $table.startAt, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMin => $composableBuilder(
+      column: $table.durationMin, builder: (column) => column);
+
+  GeneratedColumn<bool> get allDay =>
+      $composableBuilder(column: $table.allDay, builder: (column) => column);
+
+  GeneratedColumn<String> get lockTimezone => $composableBuilder(
+      column: $table.lockTimezone, builder: (column) => column);
+
+  GeneratedColumn<String> get authoredTimezone => $composableBuilder(
+      column: $table.authoredTimezone, builder: (column) => column);
+
+  GeneratedColumn<String> get locationJson => $composableBuilder(
+      column: $table.locationJson, builder: (column) => column);
+
+  GeneratedColumn<String> get prepNotes =>
+      $composableBuilder(column: $table.prepNotes, builder: (column) => column);
+
+  GeneratedColumn<int> get prepMinutes => $composableBuilder(
+      column: $table.prepMinutes, builder: (column) => column);
+
+  GeneratedColumn<String> get reminderOffsetsJson => $composableBuilder(
+      column: $table.reminderOffsetsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceJson => $composableBuilder(
+      column: $table.recurrenceJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$MeetingsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $MeetingsTable,
+    LocalMeeting,
+    $$MeetingsTableFilterComposer,
+    $$MeetingsTableOrderingComposer,
+    $$MeetingsTableAnnotationComposer,
+    $$MeetingsTableCreateCompanionBuilder,
+    $$MeetingsTableUpdateCompanionBuilder,
+    (LocalMeeting, BaseReferences<_$AppDatabase, $MeetingsTable, LocalMeeting>),
+    LocalMeeting,
+    PrefetchHooks Function()> {
+  $$MeetingsTableTableManager(_$AppDatabase db, $MeetingsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MeetingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MeetingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MeetingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<DateTime> startAt = const Value.absent(),
+            Value<int> durationMin = const Value.absent(),
+            Value<bool> allDay = const Value.absent(),
+            Value<String?> lockTimezone = const Value.absent(),
+            Value<String> authoredTimezone = const Value.absent(),
+            Value<String?> locationJson = const Value.absent(),
+            Value<String?> prepNotes = const Value.absent(),
+            Value<int> prepMinutes = const Value.absent(),
+            Value<String> reminderOffsetsJson = const Value.absent(),
+            Value<String?> recurrenceJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MeetingsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            title: title,
+            description: description,
+            startAt: startAt,
+            durationMin: durationMin,
+            allDay: allDay,
+            lockTimezone: lockTimezone,
+            authoredTimezone: authoredTimezone,
+            locationJson: locationJson,
+            prepNotes: prepNotes,
+            prepMinutes: prepMinutes,
+            reminderOffsetsJson: reminderOffsetsJson,
+            recurrenceJson: recurrenceJson,
+            status: status,
+            completedAt: completedAt,
+            source: source,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String title,
+            Value<String?> description = const Value.absent(),
+            required DateTime startAt,
+            Value<int> durationMin = const Value.absent(),
+            Value<bool> allDay = const Value.absent(),
+            Value<String?> lockTimezone = const Value.absent(),
+            Value<String> authoredTimezone = const Value.absent(),
+            Value<String?> locationJson = const Value.absent(),
+            Value<String?> prepNotes = const Value.absent(),
+            Value<int> prepMinutes = const Value.absent(),
+            Value<String> reminderOffsetsJson = const Value.absent(),
+            Value<String?> recurrenceJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MeetingsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            title: title,
+            description: description,
+            startAt: startAt,
+            durationMin: durationMin,
+            allDay: allDay,
+            lockTimezone: lockTimezone,
+            authoredTimezone: authoredTimezone,
+            locationJson: locationJson,
+            prepNotes: prepNotes,
+            prepMinutes: prepMinutes,
+            reminderOffsetsJson: reminderOffsetsJson,
+            recurrenceJson: recurrenceJson,
+            status: status,
+            completedAt: completedAt,
+            source: source,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$MeetingsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $MeetingsTable,
+    LocalMeeting,
+    $$MeetingsTableFilterComposer,
+    $$MeetingsTableOrderingComposer,
+    $$MeetingsTableAnnotationComposer,
+    $$MeetingsTableCreateCompanionBuilder,
+    $$MeetingsTableUpdateCompanionBuilder,
+    (LocalMeeting, BaseReferences<_$AppDatabase, $MeetingsTable, LocalMeeting>),
+    LocalMeeting,
+    PrefetchHooks Function()>;
+typedef $$CalendarEventsTableCreateCompanionBuilder = CalendarEventsCompanion
+    Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String title,
+  Value<String?> notes,
+  required DateTime startAt,
+  required DateTime endAt,
+  Value<bool> allDay,
+  Value<String?> color,
+  Value<String?> recurrenceJson,
+  Value<String> authoredTimezone,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$CalendarEventsTableUpdateCompanionBuilder = CalendarEventsCompanion
+    Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> title,
+  Value<String?> notes,
+  Value<DateTime> startAt,
+  Value<DateTime> endAt,
+  Value<bool> allDay,
+  Value<String?> color,
+  Value<String?> recurrenceJson,
+  Value<String> authoredTimezone,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$CalendarEventsTableFilterComposer
+    extends Composer<_$AppDatabase, $CalendarEventsTable> {
+  $$CalendarEventsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get startAt => $composableBuilder(
+      column: $table.startAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get endAt => $composableBuilder(
+      column: $table.endAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get allDay => $composableBuilder(
+      column: $table.allDay, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get color => $composableBuilder(
+      column: $table.color, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get recurrenceJson => $composableBuilder(
+      column: $table.recurrenceJson,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get authoredTimezone => $composableBuilder(
+      column: $table.authoredTimezone,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$CalendarEventsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CalendarEventsTable> {
+  $$CalendarEventsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get startAt => $composableBuilder(
+      column: $table.startAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get endAt => $composableBuilder(
+      column: $table.endAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get allDay => $composableBuilder(
+      column: $table.allDay, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get color => $composableBuilder(
+      column: $table.color, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get recurrenceJson => $composableBuilder(
+      column: $table.recurrenceJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get authoredTimezone => $composableBuilder(
+      column: $table.authoredTimezone,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CalendarEventsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CalendarEventsTable> {
+  $$CalendarEventsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get startAt =>
+      $composableBuilder(column: $table.startAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get endAt =>
+      $composableBuilder(column: $table.endAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get allDay =>
+      $composableBuilder(column: $table.allDay, builder: (column) => column);
+
+  GeneratedColumn<String> get color =>
+      $composableBuilder(column: $table.color, builder: (column) => column);
+
+  GeneratedColumn<String> get recurrenceJson => $composableBuilder(
+      column: $table.recurrenceJson, builder: (column) => column);
+
+  GeneratedColumn<String> get authoredTimezone => $composableBuilder(
+      column: $table.authoredTimezone, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$CalendarEventsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CalendarEventsTable,
+    LocalCalendarEvent,
+    $$CalendarEventsTableFilterComposer,
+    $$CalendarEventsTableOrderingComposer,
+    $$CalendarEventsTableAnnotationComposer,
+    $$CalendarEventsTableCreateCompanionBuilder,
+    $$CalendarEventsTableUpdateCompanionBuilder,
+    (
+      LocalCalendarEvent,
+      BaseReferences<_$AppDatabase, $CalendarEventsTable, LocalCalendarEvent>
+    ),
+    LocalCalendarEvent,
+    PrefetchHooks Function()> {
+  $$CalendarEventsTableTableManager(
+      _$AppDatabase db, $CalendarEventsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CalendarEventsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CalendarEventsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CalendarEventsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> startAt = const Value.absent(),
+            Value<DateTime> endAt = const Value.absent(),
+            Value<bool> allDay = const Value.absent(),
+            Value<String?> color = const Value.absent(),
+            Value<String?> recurrenceJson = const Value.absent(),
+            Value<String> authoredTimezone = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CalendarEventsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            title: title,
+            notes: notes,
+            startAt: startAt,
+            endAt: endAt,
+            allDay: allDay,
+            color: color,
+            recurrenceJson: recurrenceJson,
+            authoredTimezone: authoredTimezone,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String title,
+            Value<String?> notes = const Value.absent(),
+            required DateTime startAt,
+            required DateTime endAt,
+            Value<bool> allDay = const Value.absent(),
+            Value<String?> color = const Value.absent(),
+            Value<String?> recurrenceJson = const Value.absent(),
+            Value<String> authoredTimezone = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CalendarEventsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            title: title,
+            notes: notes,
+            startAt: startAt,
+            endAt: endAt,
+            allDay: allDay,
+            color: color,
+            recurrenceJson: recurrenceJson,
+            authoredTimezone: authoredTimezone,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CalendarEventsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CalendarEventsTable,
+    LocalCalendarEvent,
+    $$CalendarEventsTableFilterComposer,
+    $$CalendarEventsTableOrderingComposer,
+    $$CalendarEventsTableAnnotationComposer,
+    $$CalendarEventsTableCreateCompanionBuilder,
+    $$CalendarEventsTableUpdateCompanionBuilder,
+    (
+      LocalCalendarEvent,
+      BaseReferences<_$AppDatabase, $CalendarEventsTable, LocalCalendarEvent>
+    ),
+    LocalCalendarEvent,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11290,4 +13884,8 @@ class $AppDatabaseManager {
       $$MessagesTableTableManager(_db, _db.messages);
   $$PendingMessagesTableTableManager get pendingMessages =>
       $$PendingMessagesTableTableManager(_db, _db.pendingMessages);
+  $$MeetingsTableTableManager get meetings =>
+      $$MeetingsTableTableManager(_db, _db.meetings);
+  $$CalendarEventsTableTableManager get calendarEvents =>
+      $$CalendarEventsTableTableManager(_db, _db.calendarEvents);
 }

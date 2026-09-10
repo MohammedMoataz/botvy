@@ -1713,6 +1713,558 @@
         ]
       }
     },
+    "/api/v1/meetings": {
+      "post": {
+        "operationId": "MeetingsController_createMeeting",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMeetingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}": {
+      "patch": {
+        "operationId": "MeetingsController_updateMeeting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeetingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      },
+      "delete": {
+        "operationId": "MeetingsController_deleteMeeting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}/occurrences/{originalStart}/skip": {
+      "post": {
+        "operationId": "MeetingsController_skipOccurrence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "originalStart",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}/occurrences/{originalStart}/move": {
+      "post": {
+        "operationId": "MeetingsController_moveOccurrence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "originalStart",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveOccurrenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}/complete": {
+      "post": {
+        "operationId": "MeetingsController_completeMeeting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}/cancel": {
+      "post": {
+        "operationId": "MeetingsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}/restore": {
+      "post": {
+        "operationId": "MeetingsController_restoreMeeting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/meetings/{id}/purge": {
+      "delete": {
+        "operationId": "MeetingsController_purgeMeeting",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meetings"
+        ]
+      }
+    },
+    "/api/v1/calendar-events": {
+      "post": {
+        "operationId": "CalendarEventsController_createEvent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCalendarEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      }
+    },
+    "/api/v1/calendar-events/{id}": {
+      "patch": {
+        "operationId": "CalendarEventsController_updateEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCalendarEventDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      },
+      "delete": {
+        "operationId": "CalendarEventsController_deleteEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      }
+    },
+    "/api/v1/calendar-events/{id}/occurrences/{originalStart}/skip": {
+      "post": {
+        "operationId": "CalendarEventsController_skipOccurrence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "originalStart",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      }
+    },
+    "/api/v1/calendar-events/{id}/occurrences/{originalStart}/move": {
+      "post": {
+        "operationId": "CalendarEventsController_moveOccurrence",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "originalStart",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveEventOccurrenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      }
+    },
+    "/api/v1/calendar-events/{id}/restore": {
+      "post": {
+        "operationId": "CalendarEventsController_restoreEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      }
+    },
+    "/api/v1/calendar-events/{id}/purge": {
+      "delete": {
+        "operationId": "CalendarEventsController_purgeEvent",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "CalendarEvents"
+        ]
+      }
+    },
+    "/internal/notifications/reconcile-meeting-alerts": {
+      "post": {
+        "operationId": "InternalReconcileController_run",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalReconcile"
+        ]
+      }
+    },
     "/api/v1/sync": {
       "post": {
         "operationId": "SyncController_round",
@@ -1966,6 +2518,30 @@
         "properties": {}
       },
       "AddQuickQuestionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateMeetingDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateMeetingDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "MoveOccurrenceDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateCalendarEventDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateCalendarEventDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "MoveEventOccurrenceDto": {
         "type": "object",
         "properties": {}
       },

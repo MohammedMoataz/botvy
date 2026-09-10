@@ -12,10 +12,12 @@ import '../core/notifications/local_notifications.dart';
 import '../core/push.dart';
 import '../core/sync/sync_engine.dart';
 import '../features/auth/application/auth_cubit.dart';
+import '../features/calendar/application/calendar_cubit.dart';
 import '../features/chat/application/chat_cubit.dart';
 import '../features/chat/application/conversations_cubit.dart';
 import '../features/chat/data/chat_outbox.dart';
 import '../features/home/application/home_cubit.dart';
+import '../features/meetings/application/meetings_cubit.dart';
 import '../features/onboarding/application/identity_steps.dart';
 import '../features/onboarding/application/onboarding_steps.dart';
 import '../features/profile/data/profile_mirror.dart';
@@ -76,6 +78,16 @@ Future<void> configureDependencies({required String baseUrl}) async {
     ..registerSingleton<RemindersCubit>(
       RemindersCubit(sl<AppDatabase>(), sl<SyncEngine>()),
     )
+    // Singletons for the same reason: both listen to the sync engine's passes,
+    // and the calendar reads the meetings table the meetings cubit writes — two
+    // instances would each hold their own copy of the month, so a meeting
+    // skipped on the calendar would still show on the list behind it.
+    ..registerSingleton<MeetingsCubit>(
+      MeetingsCubit(sl<AppDatabase>(), sl<SyncEngine>()),
+    )
+    ..registerSingleton<CalendarCubit>(
+      CalendarCubit(sl<AppDatabase>(), sl<SyncEngine>()),
+    )
     // Home reads the day and writes nothing of its own: ticking a task off goes
     // through [TasksCubit], so there is one writer for the `tasks` table rather
     // than two copies of the recurrence and `pendingOp` rules.
@@ -117,6 +129,8 @@ Future<void> configureDependencies({required String baseUrl}) async {
 
   sl<TasksCubit>().listenToSync();
   sl<RemindersCubit>().listenToSync();
+  sl<MeetingsCubit>().listenToSync();
+  sl<CalendarCubit>().listenToSync();
   sl<HomeCubit>().listenToSync();
   sl<ConversationsCubit>().listenToSync();
   sl<ChatCubit>().listen();
@@ -172,11 +186,16 @@ Future<void> completeFromChat(String kind, String id) async {
       await sl<TasksCubit>().complete(id);
     case 'reminder':
       await sl<RemindersCubit>().complete(id);
+    case 'meeting':
+      // "It happened" — the whole meeting, series included (FR-013). A chat
+      // card names a meeting and never one of its dates, because an outcome
+      // belongs to the meeting: the two things a member can say about one date
+      // are "not this one" and "this one, later", and neither is a tick.
+      await sl<MeetingsCubit>().complete(id);
     default:
-      // `meeting` lands here until P5 ships the meetings feature, and a card of
-      // that kind cannot arrive before it does — the server only sends the
-      // kinds it can produce. Logged rather than thrown: a newer gateway
-      // offering a kind this build has no writer for must not crash the chat.
+      // A kind a newer gateway can produce and this build has no writer for.
+      // Logged rather than thrown: a card of an unknown kind must not crash
+      // the chat.
       debugPrint('no local writer for chat card kind $kind');
   }
 }
@@ -203,6 +222,18 @@ Future<void> handleAlertAction(String actionId, String payload) async {
       await sl<RemindersCubit>().complete(alert.id);
     case ('reminder', AlertActions.snooze):
       await sl<RemindersCubit>().snooze(alert.id);
+    case ('meeting', AlertActions.complete):
+      // The whole meeting, as everywhere else (FR-013). A meeting alert
+      // carries the occurrence in its payload, and completing "this
+      // occurrence" is deliberately not a thing: within a series a date is
+      // skipped or moved, never completed.
+      await sl<MeetingsCubit>().complete(alert.id);
+    case ('meeting', AlertActions.snooze):
+      // A meeting has no snooze of its own, for the reason a task has none:
+      // the moment it carries is when it starts, and moving that is a move of
+      // the occurrence rather than a delay to a warning. The shade's tap opens
+      // the meeting instead, where the joining link is.
+      break;
     case ('task', AlertActions.snooze):
       // A task has no snooze of its own: the moment it carries is its due
       // time, and moving that is a defer, not a delay to a warning. Deferring

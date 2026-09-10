@@ -203,6 +203,92 @@ export const eventSchemas = {
     role: z.enum(['user', 'assistant', 'system']),
   }),
 
+  /*
+   * ---- Meetings & Calendar ---------------------------------------------
+   *
+   * The four scheduling events share one payload, built by one method on the
+   * aggregate (`Meeting.alertFacts`) and called from all six of its raise
+   * sites. That is not tidiness: P2's task events omitted `title` and `allDay`,
+   * so **every task notification in the product said "Task due"** and every
+   * edit silently dropped the member's lead times. A payload crosses the
+   * boundary as `unknown`, so the type system cannot say a field is missing and
+   * the consumer's fallback quietly wins instead.
+   *
+   * The two occurrence events add the date they are about — which occurrence,
+   * and for a move, where it went. Both are needed and they are different
+   * facts: the first is how the saga finds the alerts it must remove, the
+   * second is where it puts them.
+   *
+   * `calendar_events` publishes nothing, and that is a decision rather than an
+   * omission: a personal event produces no notifications (FR-011 gives it a
+   * title, a time, a colour and a repeat, and no reminders), so an event raised
+   * for one would have no consumer. Its rows reach the member's other devices
+   * through `sync.ChangesApplied` like everything else.
+   */
+  'meetings.MeetingScheduled': z.object({
+    meetingId: z.string().uuid(),
+    title: z.string(),
+    startAt: z.coerce.date(),
+    durationMin: z.number().int(),
+    /** Null for a one-off. RFC 5545, without the `DTSTART` line. */
+    rrule: z.string().nullable(),
+    /** A named zone pins the series to that place's clock (FR-007). */
+    lockTimezone: z.string().nullable(),
+    /** Minutes before the occurrence, resolved at creation and stored. */
+    reminderOffsets: z.array(z.number().int()),
+    prepMinutes: z.number().int(),
+    status: z.enum(['scheduled', 'completed', 'cancelled']),
+  }),
+  'meetings.MeetingChanged': z.object({
+    meetingId: z.string().uuid(),
+    title: z.string(),
+    startAt: z.coerce.date(),
+    durationMin: z.number().int(),
+    rrule: z.string().nullable(),
+    lockTimezone: z.string().nullable(),
+    reminderOffsets: z.array(z.number().int()),
+    prepMinutes: z.number().int(),
+    status: z.enum(['scheduled', 'completed', 'cancelled']),
+  }),
+  'meetings.OccurrenceSkipped': z.object({
+    meetingId: z.string().uuid(),
+    title: z.string(),
+    startAt: z.coerce.date(),
+    durationMin: z.number().int(),
+    rrule: z.string().nullable(),
+    lockTimezone: z.string().nullable(),
+    reminderOffsets: z.array(z.number().int()),
+    prepMinutes: z.number().int(),
+    status: z.enum(['scheduled', 'completed', 'cancelled']),
+    /** The moment the *rule* produced. The override key, and it never moves. */
+    originalStart: z.coerce.date(),
+  }),
+  'meetings.OccurrenceMoved': z.object({
+    meetingId: z.string().uuid(),
+    title: z.string(),
+    startAt: z.coerce.date(),
+    durationMin: z.number().int(),
+    rrule: z.string().nullable(),
+    lockTimezone: z.string().nullable(),
+    reminderOffsets: z.array(z.number().int()),
+    prepMinutes: z.number().int(),
+    status: z.enum(['scheduled', 'completed', 'cancelled']),
+    originalStart: z.coerce.date(),
+    movedTo: z.coerce.date(),
+  }),
+  'meetings.MeetingCompleted': z.object({
+    meetingId: z.string().uuid(),
+    at: z.coerce.date(),
+  }),
+  'meetings.MeetingCancelled': z.object({
+    meetingId: z.string().uuid(),
+    at: z.coerce.date(),
+  }),
+  'meetings.MeetingDeleted': z.object({
+    meetingId: z.string().uuid(),
+    at: z.coerce.date(),
+  }),
+
   // ---- Sync -------------------------------------------------------------
   'sync.ChangesApplied': z.object({
     installId: z.string(),

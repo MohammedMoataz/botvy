@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { formatInTz, localDate, wallClockToUtc } from '../../../shared/time/time.js';
 import {
   IntentExecutorPort,
+  MeetingActionsPort,
   PlannerActionsPort,
   ProfileWritesPort,
   type CancellableItem,
@@ -58,6 +59,7 @@ export class IntentExecutor extends IntentExecutorPort {
   constructor(
     private readonly planner: PlannerActionsPort,
     private readonly profile: ProfileWritesPort,
+    private readonly meetings: MeetingActionsPort,
   ) {
     super();
   }
@@ -209,28 +211,105 @@ export class IntentExecutor extends IntentExecutorPort {
         };
       }
 
-      case 'set_meeting':
+      case 'set_meeting': {
         /*
-         * FR-006's rule applied to a capability rather than a field.
+         * Why the extractor produces this name at all — still the reason, and
+         * still worth keeping now that it is carried out rather than declined.
          *
-         * The extractor will produce `set_meeting` from "schedule a call with
-         * Sara at four" because `intent.md` teaches it to, and that is on
-         * purpose: the alternative is the model filing it as a task, and the
-         * member discovering months later that Botvy has been quietly turning
-         * their meetings into to-do items. Meetings are P5. Nothing is
-         * dispatched, nothing is stored, and the member is told plainly.
+         * `intent.md` teaches the model to answer `set_meeting` for "schedule a
+         * call with Sara at four" on purpose: the alternative is the model
+         * filing it as a task, and the member discovering months later that
+         * Botvy has been quietly turning their meetings into to-do items. A
+         * meeting is not a to-do item — it occupies a stretch of the day, it
+         * has a place, and somebody else is expecting them.
          */
+        const title = intent.args.title;
+        if (!title) {
+          return ask(
+            say('What is the meeting about?', 'الاجتماع بخصوص إيه؟'),
+          );
+        }
+
+        const when = intent.args.when;
+        if (!when) {
+          // A meeting is a time in the same way a reminder is. There is no
+          // sensible default and an invented hour is one the member finds out
+          // about when somebody else is waiting.
+          return ask(
+            say('When is the meeting?', 'الاجتماع امتى؟'),
+          );
+        }
+
+        const startAt = wallClockToUtc(when, zone);
+        if (!startAt) {
+          return ask(say('When is the meeting?', 'الاجتماع امتى؟'));
+        }
+        if (startAt.getTime() <= now.getTime()) {
+          return ask(this.pastQuestion(say, startAt, zone));
+        }
+
+        /*
+         * FR-001's rule, asked rather than guessed.
+         *
+         * At least one of a link and an address is required, and the aggregate
+         * refuses a meeting with neither — so storing on a guess is not even
+         * available. Asking is also the right answer on its own terms: a
+         * meeting with no location is one the member cannot attend, and it is
+         * the field a sentence most often leaves out.
+         */
+        const location = normaliseLocation(
+          intent.args.onlineLink,
+          intent.args.address,
+        );
+        if (!location) {
+          return ask(
+            say(
+              `Where is "${title}" — do you have a link, or is it somewhere in person?`,
+              `"${title}" فين — عندك لينك، ولا في مكان على الأرض؟`,
+            ),
+          );
+        }
+
+        const stored = await this.meetings.createMeeting({
+          userId,
+          title,
+          startAt,
+          ...(intent.args.durationMin !== undefined
+            ? { durationMin: intent.args.durationMin }
+            : {}),
+          ...location,
+        });
+
+        if (!stored) {
+          /*
+           * Meetings refused it on a rule of its own. Reported, never thrown:
+           * a turn that raises here loses the member's sentence to a stack
+           * trace, and the honest outcome is telling them nothing was saved so
+           * they can say it differently.
+           */
+          this.logger.debug(`meeting "${title}" was refused by Meetings`);
+          return {
+            reply: say(
+              `I couldn't save "${title}" — try telling me again with the time and where it is.`,
+              `مقدرتش أحفظ "${title}" — قوللي تاني بالوقت والمكان.`,
+            ),
+            actions: [],
+            asking: false,
+          };
+        }
+
+        // `stored.at` and not `startAt`: a length or a moment Meetings clamped
+        // is confirmed as it now is, which is the same rule as the reminder's.
+        const at = stored.at ?? startAt;
         return {
           reply: say(
-            "I can't create meetings yet — that's coming in a later version, so " +
-              "I haven't saved anything. You could put it on your list as a task " +
-              'for now.',
-            'لسه مش بقدر أعمل مواعيد اجتماعات — الميزة دي جاية في نسخة قادمة، ' +
-              'فمحفظتش حاجة. لو تحب أضيفها كمهمة في قائمتك مؤقتًا.',
+            `"${stored.title}" is in your calendar for ${formatInTz(at, zone)}.`,
+            `"${stored.title}" اتحفظ في التقويم يوم ${formatInTz(at, zone)}.`,
           ),
-          actions: [],
+          actions: [{ kind: 'meeting.created', id: stored.id }],
           asking: false,
         };
+      }
 
       case 'cancel': {
         const match = intent.args.match ?? intent.args.title;
@@ -319,18 +398,35 @@ export class IntentExecutor extends IntentExecutorPort {
          * they can already see.
          */
         const kind: ListKind = intent.args.listKind ?? 'plan';
-        if (kind === 'meetings' || kind === 'sessions') {
+
+        /*
+         * Meetings answer from their own port, and sessions still do not exist.
+         *
+         * The two were one refusal until P5 built meetings, and separating them
+         * is the point: a capability that exists must not keep answering "not
+         * yet" because it shares a branch with one that does not. `sessions`
+         * keeps the refusal until P6, and it names only itself — a member asking
+         * for their meetings and being told the feature is coming in a later
+         * version would be the product lying about itself.
+         */
+        if (kind === 'sessions') {
           return {
             reply: say(
-              `I can't list ${kind} yet — that's coming in a later version.`,
-              'لسه مش بقدر أعرض ده — الميزة دي جاية في نسخة قادمة.',
+              "I can't list training sessions yet — that's coming in a later version.",
+              'لسه مش بقدر أعرض حصص التدريب — الميزة دي جاية في نسخة قادمة.',
             ),
             actions: [],
             asking: false,
           };
         }
 
-        const items = await this.planner.list(userId, kind, now);
+        const items =
+          kind === 'meetings'
+            ? // A week, because "what have I got" means the near future and a
+              // month of a daily series would fill the card with one meeting
+              // said thirty times. The card is capped at ten below in any case.
+              await this.meetings.listUpcoming(userId, now, 7)
+            : await this.planner.list(userId, kind, now);
         if (items.length === 0) {
           return {
             reply: say(
@@ -601,6 +697,42 @@ function matching(items: CancellableItem[], match: string): CancellableItem[] {
     const title = ` ${fold(item.title)} `;
     return tokens.some((token) => title.includes(` ${token} `));
   });
+}
+
+/**
+ * Which half of a location the model actually filled, whatever it called it.
+ *
+ * The grammar cannot help here — a link is a string and so is a street — so
+ * this is the normalisation the enum does for `metric`. Two failures are worth
+ * correcting rather than refusing:
+ *
+ * - a *link* in `address` ("zoom.us/j/123"), which is a location and belongs in
+ *   the field the client renders as tappable;
+ * - a *place* in `onlineLink` ("meeting room 2"), which is a location too and
+ *   would otherwise be stored as a link nobody can open.
+ *
+ * `null` only when both are genuinely empty, which is the case FR-001 makes the
+ * executor ask about. Anything with a scheme, a `www.`, or a dot with no space
+ * around it is treated as a link; everything else is an address.
+ */
+function normaliseLocation(
+  onlineLink: string | undefined,
+  address: string | undefined,
+): { onlineLink?: string; address?: string } | null {
+  const link = onlineLink?.trim();
+  const place = address?.trim();
+  const linkish = (value: string): boolean =>
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ||
+    /^www\./i.test(value) ||
+    /^\S+\.[a-z]{2,}(\/|$)/i.test(value);
+
+  const parts: { onlineLink?: string; address?: string } = {};
+  for (const value of [link, place]) {
+    if (!value) continue;
+    if (linkish(value)) parts.onlineLink ??= value;
+    else parts.address ??= value;
+  }
+  return parts.onlineLink || parts.address ? parts : null;
 }
 
 /**

@@ -78,10 +78,21 @@ class SyncEngine {
   /// precedes `messages` because a message naming a thread this device has
   /// never heard of would render in no chat at all, and because clearing is
   /// applied from the conversation row.
+  /// `meetings` and `calendar_events` are push-and-pull, unlike the five that
+  /// follow them (P5). Everything a member does to a meeting is an edit to its
+  /// row — a skip is an `exdates` entry, a move is an override, a completion is
+  /// a column — so all of it works offline through this path; see
+  /// [_MeetingApplier] for why the REST commands for the same things exist
+  /// anyway. They sit here, after `reminders`, to read in the same order as the
+  /// server's `applyOrder` (30, 32, 34) and `contracts/sync.md`'s list. Neither
+  /// references anything, so the position buys nothing but a sequence that
+  /// nobody will "fix" in the wrong direction.
   static const List<String> entities = [
     'labels',
     'tasks',
     'reminders',
+    'meetings',
+    'calendar_events',
     'daily_plans',
     'checkins',
     'rhythm_state',
@@ -551,6 +562,8 @@ class SyncEngine {
     'labels': _LabelApplier(),
     'tasks': _TaskApplier(),
     'reminders': _ReminderApplier(),
+    'meetings': _MeetingApplier(),
+    'calendar_events': _CalendarEventApplier(),
     'daily_plans': _DailyPlanApplier(),
     'checkins': _CheckinApplier(),
     'rhythm_state': _RhythmStateApplier(),
@@ -1069,6 +1082,298 @@ class _ReminderApplier extends _EntityApplier {
   }
 }
 
+/// Meetings, push and pull (P5, `specs/019-meetings-calendar` T540).
+///
+/// Everything a member can do to a meeting travels through here as a row, and
+/// that is worth stating because half of it looks like it should be a command:
+/// skipping one occurrence, moving one, completing the series, cancelling it.
+/// All four are *edits to this row* — a skip is an entry in the recurrence's
+/// `exdates`, a move is an override in the same object, and a status is a
+/// column — so the server's `MeetingSyncAdapter` accepts them in `data` and the
+/// phone can do every one of them with no network (FR-010). The REST commands
+/// for the same things exist for the extension and the web app, which are
+/// online by construction.
+///
+/// The one thing this path deliberately cannot do is *ask*. A series edit that
+/// would discard a moved occurrence is refused by `Meeting.edit` unless it is
+/// forced, and there is no member standing in front of a sync push to answer
+/// the dialog — so the adapter forces it, and the warning lives in the editor
+/// where the member is. `MeetingsCubit.editSeries` raises it before it writes.
+class _MeetingApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.meetings)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          'data': {
+            'title': row.title,
+            'description': row.description,
+            'startAt': row.startAt.toUtc().toIso8601String(),
+            'durationMin': row.durationMin,
+            'lockTimezone': row.lockTimezone,
+            // The two JSON columns go up as objects, not as strings: the
+            // adapter reads `fields.location.onlineLink` and
+            // `fields.recurrence.dtstart`, so a string here would arrive as a
+            // location with neither half and be refused `location_required`.
+            'location': _decodeJson(row.locationJson) ??
+                const {'onlineLink': null, 'address': null},
+            'prepNotes': row.prepNotes,
+            'prepMinutes': row.prepMinutes,
+            'reminderOffsets': _decodeIntList(row.reminderOffsetsJson),
+            'recurrence': _decodeJson(row.recurrenceJson),
+            // A meeting completed or cancelled offline. The server *writes*
+            // this rather than re-running the transition — the phone already
+            // applied the local effects and is reporting an outcome.
+            'status': row.status,
+            'completedAt': row.completedAt?.toUtc().toIso8601String(),
+            'source': row.source,
+            // `authoredTimezone` is deliberately **not** sent. The server
+            // reads it from the member's profile and refuses a pushed copy,
+            // because it records what the member's clock read when they typed
+            // the time — a client that could rewrite it would move every
+            // occurrence of the series with nothing visibly changing.
+          },
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows = await (db.select(db.meetings)
+          ..where((r) => r.pendingOp.isNotNull()))
+        .get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.meetings)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.meetings)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.meetings)..where((r) => r.id.isIn(ids))).write(
+      const MeetingsCompanion(pendingOp: Value(null), pushAttempts: Value(0)),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.meetings)..where((r) => r.id.equals(id)))
+        .write(MeetingsCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.meetings)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+    final location = row['location'];
+    final recurrence = row['recurrence'];
+
+    await db.into(db.meetings).insertOnConflictUpdate(
+      MeetingsCompanion.insert(
+        id: row['id'] as String,
+        title: row['title'] as String? ?? '',
+        description: Value(row['description'] as String?),
+        startAt: _date(row['startAt']) ?? updatedAt,
+        durationMin: Value(row['durationMin'] as int? ?? 30),
+        allDay: Value(row['allDay'] as bool? ?? false),
+        lockTimezone: Value(row['lockTimezone'] as String?),
+        // The server's own value, kept and never written by this device. An
+        // empty string is the honest fallback for a row from a gateway that
+        // does not send it: the expander then falls back to the member's
+        // current zone, which is what an unpinned series does anyway.
+        authoredTimezone: Value(row['authoredTimezone'] as String? ?? ''),
+        locationJson:
+            Value(location == null ? null : jsonEncode(location)),
+        prepNotes: Value(row['prepNotes'] as String?),
+        prepMinutes: Value(row['prepMinutes'] as int? ?? 0),
+        reminderOffsetsJson: Value(
+          jsonEncode(
+            (row['reminderOffsets'] as List? ?? const [])
+                .map((raw) => raw is int ? raw : int.tryParse('$raw'))
+                .whereType<int>()
+                .toList(),
+          ),
+        ),
+        recurrenceJson:
+            Value(recurrence == null ? null : jsonEncode(recurrence)),
+        // Written, never transitioned, for the reason the task applier gives:
+        // the pulled row *is* the outcome of whatever happened on the other
+        // device.
+        status: Value(row['status'] as String? ?? 'scheduled'),
+        completedAt: Value(_date(row['completedAt'])),
+        source: Value(row['source'] as String? ?? 'app'),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.meetings)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
+/// Personal events, push and pull (FR-011).
+///
+/// The same shape as [_MeetingApplier] minus the four fields an event has no
+/// meaning for — location, preparation, reminders and a status. The *repeat* is
+/// identical and goes through the same expander, which is the whole reason the
+/// two tables carry the same `recurrenceJson` object rather than each having
+/// its own idea of a rule.
+class _CalendarEventApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.calendarEvents)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          'data': {
+            'title': row.title,
+            'notes': row.notes,
+            'startAt': row.startAt.toUtc().toIso8601String(),
+            'endAt': row.endAt.toUtc().toIso8601String(),
+            'allDay': row.allDay,
+            'color': row.color,
+            'recurrence': _decodeJson(row.recurrenceJson),
+          },
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows = await (db.select(db.calendarEvents)
+          ..where((r) => r.pendingOp.isNotNull()))
+        .get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.calendarEvents)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.calendarEvents)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.calendarEvents)..where((r) => r.id.isIn(ids))).write(
+      const CalendarEventsCompanion(
+        pendingOp: Value(null),
+        pushAttempts: Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.calendarEvents)..where((r) => r.id.equals(id)))
+        .write(CalendarEventsCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.calendarEvents)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+    final startAt = _date(row['startAt']) ?? updatedAt;
+    final recurrence = row['recurrence'];
+
+    await db.into(db.calendarEvents).insertOnConflictUpdate(
+      CalendarEventsCompanion.insert(
+        id: row['id'] as String,
+        title: row['title'] as String? ?? '',
+        notes: Value(row['notes'] as String?),
+        startAt: startAt,
+        // `?? startAt` rather than a guessed length: a zero-length window is
+        // read as one minute by `eventDurationMin`, which draws as a point on
+        // the agenda. Inventing a duration would put a block on the member's
+        // day that nobody asked for.
+        endAt: _date(row['endAt']) ?? startAt,
+        allDay: Value(row['allDay'] as bool? ?? false),
+        color: Value(row['color'] as String?),
+        recurrenceJson:
+            Value(recurrence == null ? null : jsonEncode(recurrence)),
+        authoredTimezone: Value(row['authoredTimezone'] as String? ?? ''),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.calendarEvents)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
 /// Everything an entity the phone only ever *reads* needs, which is a good deal
 /// less than nine methods.
 ///
@@ -1448,6 +1753,24 @@ DateTime? _date(Object? value) {
   if (value is DateTime) return value;
   if (value is! String || value.isEmpty) return null;
   return DateTime.tryParse(value)?.toUtc();
+}
+
+/// A JSON array of whole numbers, or an empty list.
+///
+/// A meeting's reminder offsets are minutes-before, and the server refuses a
+/// non-integer among them — so anything that is not one is dropped here rather
+/// than sent to be refused, which would block the whole row for a value the
+/// member never typed.
+List<int> _decodeIntList(String? encoded) {
+  final decoded = _decodeJson(encoded);
+  if (decoded is! List) return const [];
+  return [
+    for (final raw in decoded)
+      if (raw is int)
+        raw
+      else if (int.tryParse('$raw') != null)
+        int.parse('$raw'),
+  ];
 }
 
 Object? _decodeJson(String? encoded) {

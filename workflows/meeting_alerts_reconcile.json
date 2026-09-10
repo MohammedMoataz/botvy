@@ -1,0 +1,169 @@
+{
+  "name": "Botvy Meeting Alerts Reconcile",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 20
+            }
+          ]
+        }
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000031",
+      "name": "Nightly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -420,
+        -100
+      ],
+      "notes": "Nightly rather than every five minutes, and its own workflow rather than a branch of the rhythm tick. A meeting's occurrences are computed from its repeat rule, so the reminders are planned for a rolling window of `meetings.alertWindowDays` -- and that window has to advance on a day when nothing at all happens, which is the only thing this pass exists for. Every actual change to a meeting is already reconciled the moment its event is relayed.\n\n03:20 rather than 03:00: the sweep is already firing on every fifth minute and the backup job runs on the hour, and there is nothing to gain from landing on the same minute as either."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "botvy/meeting-alerts-reconcile",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000032",
+      "name": "Run Now",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        100
+      ],
+      "webhookId": "botvy-meeting-alerts-reconcile",
+      "notes": "The way a person runs the pass without waiting until tomorrow morning. Unconditional on purpose: it takes no input and the reconciliation is idempotent -- it recomputes the whole desired set for each meeting and makes the store match, so running it twice by hand plans nothing twice."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOTVY_API_BASE }}/internal/notifications/reconcile-meeting-alerts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.BOTVY_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000033",
+      "name": "Reconcile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 15000,
+      "notes": "`BOTVY_SERVICE_TOKEN` and `BOTVY_API_BASE` are the names the other two cron workflows read and the names compose sets -- the pair once disagreed (`BOTVY_INTERNAL_TOKEN` in compose, `BOTVY_SERVICE_TOKEN` here), which is an empty `Bearer ` and a silent 401 nobody noticed for days. Reading them at all needs `N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'`, which compose sets: n8n blocks `$env` inside node expressions by default, and until that was set every execution of every cron workflow here failed with `access to env vars denied`.\n\nFive minutes of timeout because this walks every member who has a meeting; three tries a quarter-minute apart because a retry is free -- the pass is idempotent.\n\n`neverError` is off deliberately. A 401 or a 500 has to FAIL here so the error workflow fires and the heartbeat `notifications.meeting-alerts` goes stale, which is what /health reports after fifteen minutes."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "members",
+              "value": "={{ $json.members }}",
+              "type": "number"
+            },
+            {
+              "id": "a2",
+              "name": "meetings",
+              "value": "={{ $json.meetings }}",
+              "type": "number"
+            },
+            {
+              "id": "a3",
+              "name": "planned",
+              "value": "={{ $json.planned }}",
+              "type": "number"
+            },
+            {
+              "id": "a4",
+              "name": "removed",
+              "value": "={{ $json.removed }}",
+              "type": "number"
+            },
+            {
+              "id": "a5",
+              "name": "ms",
+              "value": "={{ $json.ms }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000034",
+      "name": "Counts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        0
+      ],
+      "notes": "Kept as the execution's output so n8n's own log is the record of what each night's pass did. Note the counters are incremented as each member returns, so a member whose expansion threw leaves these short while whatever it saved before throwing stands -- read the alerts, not this line, when asking what a 03:20 pass actually planned."
+    }
+  ],
+  "connections": {
+    "Nightly": {
+      "main": [
+        [
+          {
+            "node": "Reconcile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Now": {
+      "main": [
+        [
+          {
+            "node": "Reconcile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile": {
+      "main": [
+        [
+          {
+            "node": "Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": "Botvy Error Handler"
+  }
+}

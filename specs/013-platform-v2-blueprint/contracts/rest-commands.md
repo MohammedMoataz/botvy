@@ -92,13 +92,21 @@ Live turns go over WebSocket — see `ws-chat.md`.
 
 | Method & path | Auth | Body |
 |---|---|---|
-| `POST /meetings` | user | `{ id, title, description?, startAt, durationMin, allDay?, location: { onlineLink?, address? }, prepNotes?, prepMinutes?, reminderOffsets?, recurrence?: { rrule, until? \| count? } }` |
-| `PATCH /meetings/:id` | user | series edit + `baseUpdatedAt` |
-| `POST /meetings/:id/occurrences/:originalStart/skip` | user | adds exdate |
-| `POST /meetings/:id/occurrences/:originalStart/move` | user | `{ startAt, durationMin? }` adds/updates override |
-| `POST /meetings/:id/complete` · `/cancel` | user | |
-| `DELETE /meetings/:id` · `POST /meetings/:id/restore` | user | |
-| `POST /calendar/events` · `PATCH /calendar/events/:id` · `DELETE /calendar/events/:id` | user | `{ id, title, startAt, endAt, allDay?, notes?, color?, recurrence? }` |
+| `POST /meetings` | user | `{ id, title, description?, startAt, durationMin?, location: { onlineLink?, address? }, prepNotes?, prepMinutes?, reminderOffsets?, lockTimezone?, recurrence?: { dtstart?, rrule, exdates?, overrides? }, source? }`. At least one of `onlineLink` and `address` is required (FR-001); no `durationMin` takes `defaults.meetingDurationMin`; no `reminderOffsets` takes the member's `defaults.leadTimes` as minute offsets, resolved **at creation** |
+| `PATCH /meetings/:id` | user | series edit + `baseUpdatedAt`, plus `force?: boolean`. Without `force`, an edit that would orphan a moved occurrence answers **409** carrying the orphaned moments, so the client can ask before discarding them (spec edge case); `force: true` is the retry |
+| `POST /meetings/:id/occurrences/:originalStart/skip` | user | adds exdate. `:originalStart` is an ISO instant — the moment the *rule* produced, which is the override key and never moves |
+| `POST /meetings/:id/occurrences/:originalStart/move` | user | `{ startAt, durationMin? }` adds/updates override. Moving the occurrence that was skipped clears that skip; moving one *onto another's* skipped date does not resurrect it |
+| `POST /meetings/:id/complete` · `/cancel` | user | Acts on the meeting, series included. There is deliberately no per-occurrence equivalent: an outcome belongs to the meeting, and a date is skipped or moved (FR-013) |
+| `DELETE /meetings/:id` · `POST /meetings/:id/restore` · `DELETE /meetings/:id/purge` | user | Deleting never touches `status`; purge refuses a row that is not a tombstone (`409 not_deleted`) |
+| `POST /calendar-events` · `PATCH /calendar-events/:id` · `DELETE /calendar-events/:id` · `POST /calendar-events/:id/restore` · `DELETE /calendar-events/:id/purge` | user | `{ id, title, startAt, endAt, allDay?, notes?, color?, recurrence? }` |
+| `POST /calendar-events/:id/occurrences/:originalStart/skip` · `.../move` | user | A repeating personal event skips and moves exactly as a repeating meeting does (FR-011), through the same expander |
+
+The blueprint wrote the second group as `/calendar/events`; P5 renamed it to
+`/calendar-events` so that the route, the collection (`calendar_events`), the
+sync entity name and the `entity` field of a `/sync` rejection are one word. A
+client that has to translate between two spellings of the same thing is a client
+that will translate one of them wrongly — and there is no `/calendar` resource
+for the path to have hung off.
 
 ## Training
 

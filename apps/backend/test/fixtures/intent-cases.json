@@ -205,6 +205,41 @@
     }
   },
   {
+    "id": "M03",
+    "text": "set up a meeting with the finance team on Monday at 2pm in room 3",
+    "expect": {
+      "name": "set_meeting",
+      "scope": "planning"
+    }
+  },
+  {
+    "id": "M04",
+    "text": "اعمل ميتنج مع منى بكرة الساعة ٩ الصبح على زوم",
+    "expect": {
+      "name": "set_meeting",
+      "scope": "planning",
+      "when": "TOMORROW_NINE"
+    }
+  },
+  {
+    "id": "M05",
+    "text": "book a call with Omar tomorrow at 6 in the evening, https://zoom.us/j/998",
+    "expect": {
+      "name": "set_meeting",
+      "scope": "planning",
+      "when": "TOMORROW_SIX_PM"
+    }
+  },
+  {
+    "id": "M06",
+    "text": "عندي معاد مع الدكتور في العيادة، اعمله في التقويم",
+    "expect": {
+      "name": "set_meeting",
+      "scope": "planning",
+      "whenAbsent": true
+    }
+  },
+  {
     "id": "P01",
     "text": "I weigh 80 kg",
     "expect": {

@@ -36,10 +36,13 @@ export type IntentScope = 'coaching' | 'planning' | 'other';
  * executor is a case in one switch — the shape a reader can check for
  * completeness.
  *
- * `set_meeting` is here before P5 exists, deliberately: the model will produce
- * it from "schedule a call with Sara at four", and the honest answer is "I
- * cannot do that yet" rather than a silent misfile into a task. FR-006's rule
- * applied to a capability instead of a field.
+ * `set_meeting` was here before P5 existed, deliberately: the model produces it
+ * from "schedule a call with Sara at four", and while Meetings did not exist
+ * the honest answer was "I cannot do that yet" rather than a silent misfile
+ * into a task. That reasoning is still why the *extractor* has the name at all,
+ * and it is worth keeping: without it the model files a meeting as a task and
+ * Botvy quietly turns the member's diary into a to-do list. P5 built the
+ * context, so the executor now carries it out instead of declining it.
  */
 export type IntentName =
   | 'chat'
@@ -80,6 +83,30 @@ export interface IntentArgs {
   match?: string;
   /** For `list`. */
   listKind?: ListKind;
+  /**
+   * For `set_meeting`: how long it runs, in minutes.
+   *
+   * An integer with bounds in the schema rather than a free number, for the
+   * same reason `metric` is an enum: the grammar is enforced and the prose is
+   * advice, and "half an hour" arriving as `0.5` or `"30 minutes"` is a
+   * duration the aggregate would refuse. Absent is the normal case and means
+   * the member's own default length (FR-001) — never a length this code
+   * invented.
+   */
+  durationMin?: number;
+  /**
+   * For `set_meeting`: the two halves of a location, at least one of which
+   * FR-001 requires.
+   *
+   * Two fields and not one, because a meeting held in a room that is also
+   * dialled into is one meeting rather than two, and because the executor's
+   * question when both are missing has to be answerable either way. Neither
+   * can be constrained by the grammar — a link is a string and so is a street
+   * — so the executor normalises what arrives instead: a model that puts the
+   * room in `onlineLink` has still told us where the meeting is.
+   */
+  onlineLink?: string;
+  address?: string;
   /**
    * For `record_metric`. A union, not a string, and the schema below carries
    * the same two values as an `enum`.
@@ -124,9 +151,10 @@ export const PLAIN_CHAT: Intent = {
 /**
  * Which intents actually do something.
  *
- * A set rather than `name !== 'chat'`, because `set_meeting` is an action the
- * executor *declines* and it still must not fall through to a plain reply —
- * the member asked for a meeting and deserves to be told it is not built yet.
+ * A set rather than `name !== 'chat'`, because an intent the executor answers
+ * with a *question* — a `set_meeting` with no location, a `cancel` with two
+ * matches — must not fall through to a plain reply. The member asked for
+ * something to be done and the answer is about doing it.
  */
 const ACTIONS = new Set<IntentName>([
   'set_task',
@@ -188,6 +216,17 @@ export const INTENT_SCHEMA = {
           type: 'string',
           enum: ['tasks', 'reminders', 'meetings', 'plan', 'sessions'],
         },
+        /*
+         * Bounded here as well as typed, because this is the half that is
+         * enforced. The floor is five minutes and the ceiling eight hours —
+         * `Meeting`'s own `MAX_DURATION_MIN`, duplicated rather than imported
+         * because `domain/` may not reach into another context (constitution
+         * IX). The aggregate remains the authority: this only stops the model
+         * offering something it would refuse.
+         */
+        durationMin: { type: 'integer', minimum: 5, maximum: 480 },
+        onlineLink: { type: 'string' },
+        address: { type: 'string' },
         metric: { type: 'string', enum: ['weightKg', 'heightCm'] },
         value: { type: 'number' },
         goal: { type: 'string' },

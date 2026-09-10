@@ -8,9 +8,14 @@ import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { localDate, wallClockToUtc } from '../../shared/time/time.js';
 import { nextDate as nextLocalDate } from './domain/adherence.js';
-import type { PlanTask, PlanTraining } from './domain/daily-plan.aggregate.js';
+import type {
+  PlanMeeting,
+  PlanTask,
+  PlanTraining,
+} from './domain/daily-plan.aggregate.js';
 import {
   CoachTranscriptPort,
+  MeetingsOnPort,
   MemberSchedulePort,
   NextSessionPort,
   PlannedTasksPort,
@@ -136,6 +141,13 @@ class StubTasks extends PlannedTasksPort {
   }
 }
 
+/** No meetings, which is every scenario in this file. See `rhythm-meetings.spec.ts`. */
+class NoMeetings extends MeetingsOnPort {
+  async onDate(): Promise<PlanMeeting[]> {
+    return [];
+  }
+}
+
 class StubSessions extends NextSessionPort {
   session: PlanTraining | null = null;
   async forDate(): Promise<PlanTraining | null> {
@@ -233,7 +245,13 @@ function bench(): Bench {
     stamp: vi.fn(async () => undefined),
   } as unknown as HeartbeatService;
 
-  const drafts = new DraftBuilder(tasks, sessions, meals, settings);
+  const drafts = new DraftBuilder(
+    tasks,
+    new NoMeetings(),
+    sessions,
+    meals,
+    settings,
+  );
   const tick = new TickHandler(
     uow,
     states,

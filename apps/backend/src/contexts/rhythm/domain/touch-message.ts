@@ -1,5 +1,9 @@
 import { localHhMm } from '../../../shared/time/time.js';
-import type { DailyPlan, PlanTask } from './daily-plan.aggregate.js';
+import type {
+  DailyPlan,
+  PlanMeeting,
+  PlanTask,
+} from './daily-plan.aggregate.js';
 
 /**
  * The words the three touches actually say.
@@ -53,6 +57,35 @@ function isMidnight(at: Date, timezone: string): boolean {
   return localHhMm(at, timezone) === '00:00';
 }
 
+/**
+ * The day's meetings, or nothing at all (FR-012).
+ *
+ * `null` and not an empty heading: a member with no meetings must read exactly
+ * the sentence they read before this phase, and "Meetings:" over a blank space
+ * is the "Training: none | Meals: none" failure this file's header argues
+ * against. The lines are only added when there is something to add.
+ *
+ * Times through `localHhMm`, which is the only function in `shared/time` that
+ * promises exactly `HH:mm` — see `isMidnight` above for what slicing
+ * `formatInTz` did on single-digit days. Midnight is *not* suppressed the way
+ * it is for a task: a meeting always occupies a stretch of the day (FR-001), so
+ * a 00:00 start is a real time somebody chose rather than a date with no hour.
+ */
+function meetingLines(
+  meetings: PlanMeeting[],
+  timezone: string,
+): string[] | null {
+  if (meetings.length === 0) return null;
+  return [
+    'Meetings:',
+    ...meetings.map(
+      (meeting) =>
+        `• ${localHhMm(meeting.startAt, timezone)} ${meeting.title}` +
+        ` (${meeting.durationMin}m)`,
+    ),
+  ];
+}
+
 function trainingLine(plan: DailyPlan, timezone: string): string | null {
   if (!plan.training) return null;
   const start = localHhMm(plan.training.startAt, timezone);
@@ -73,6 +106,8 @@ export function planPromptMessage(plan: DailyPlan, timezone: string): string {
       parts.push('', "Here's what I have:");
       parts.push(...plan.tasks.map((task) => taskLine(task, timezone)));
     }
+    const meetings = meetingLines(plan.meetings, timezone);
+    if (meetings) parts.push('', ...meetings);
     const training = trainingLine(plan, timezone);
     if (training) parts.push('', training);
     if (plan.mealLine) parts.push(plan.mealLine);
@@ -102,6 +137,17 @@ export function endOfDayMessage(
       parts.push('', 'Top priorities:');
       parts.push(...plan.tasks.map((task) => taskLine(task, timezone)));
     }
+    /*
+     * The summary names tomorrow's meetings for the same reason it names
+     * tomorrow's training: it is the part of the day the member cannot
+     * reconstruct from a task list. It is here rather than only in the two
+     * touches FR-012 names because `isEmpty` now counts meetings, so a day
+     * holding nothing but a meeting reaches this branch — and without these
+     * two lines it would read "Tomorrow's set. No training tomorrow." with the
+     * meeting nowhere in it.
+     */
+    const meetings = meetingLines(plan.meetings, timezone);
+    if (meetings) parts.push('', ...meetings);
     parts.push('', trainingLine(plan, timezone) ?? 'No training tomorrow.');
     if (plan.mealLine) parts.push(plan.mealLine);
   }
@@ -135,6 +181,10 @@ export function morningBriefingMessage(
   if (plan.tasks.length > 0) {
     parts.push(...plan.tasks.map((task) => taskLine(task, timezone)));
   }
+  // The half of FR-012 that gets forgotten: the briefing names *today's*
+  // meetings, and it is the touch a member reads before they leave the house.
+  const meetings = meetingLines(plan.meetings, timezone);
+  if (meetings) parts.push('', ...meetings);
   const training = trainingLine(plan, timezone);
   if (training) parts.push('', training);
   if (plan.mealLine) parts.push(plan.mealLine);

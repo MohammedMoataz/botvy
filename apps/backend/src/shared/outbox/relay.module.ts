@@ -11,6 +11,8 @@ import { NotificationsPurgeOnDeletedHandler } from '../../contexts/notifications
 import { PlanningPurgeOnDeletedHandler } from '../../contexts/planning/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RemindersPurgeOnDeletedHandler } from '../../contexts/reminders/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RemindersModule } from '../../contexts/reminders/reminders.module.js';
+import { MeetingsPurgeOnDeletedHandler } from '../../contexts/meetings/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { MeetingsModule } from '../../contexts/meetings/meetings.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
 import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
@@ -89,6 +91,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     NotificationsModule,
     ConversationsModule,
     RhythmModule,
+    MeetingsModule,
     SyncModule,
   ],
   providers: [
@@ -144,6 +147,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         CloseOnBannedHandler,
         RecordUsageHandler,
         OperationsPurgeOnDeletedHandler,
+        MeetingsPurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -169,6 +173,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         closeSockets: CloseOnBannedHandler,
         recordUsage: RecordUsageHandler,
         operationsPurge: OperationsPurgeOnDeletedHandler,
+        meetingsPurge: MeetingsPurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -244,6 +249,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await rhythmPurge.handle(event);
                 await conversationsPurge.handle(event);
                 await operationsPurge.handle(event);
+                await meetingsPurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -354,6 +360,37 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               case 'rhythm.EndOfDaySummarySent':
                 await alertPlanning.onRhythmTouch(event);
                 await rollover.handle(event);
+                return;
+
+              /*
+               * ---- meetings, and the window that has to keep moving ----
+               *
+               * All four scheduling events reach one method, because
+               * reconciling makes them the same operation: "here is what this
+               * meeting's alerts should be now". `MeetingChanged` also covers a
+               * *restore*, which the aggregate raises deliberately —
+               * `MeetingDeleted` drops the alerts, so a restore that announced
+               * nothing would put the meeting back on the calendar with no
+               * reminders and nothing would ever say so.
+               *
+               * `profile.ProfileUpdated` needs no row of its own: it already
+               * reaches `onProfileUpdated` above, and the meetings half of
+               * FR-014 lives inside that method. An unpinned series' occurrences
+               * *move* when the member does, so re-planning from the stored
+               * `source.occurrenceAt` would rebuild from an instant that is no
+               * longer where the meeting is — it goes back to Meetings and
+               * re-expands instead.
+               */
+              case 'meetings.MeetingScheduled':
+              case 'meetings.MeetingChanged':
+              case 'meetings.OccurrenceSkipped':
+              case 'meetings.OccurrenceMoved':
+                await alertPlanning.onMeetingChanged(event);
+                return;
+              case 'meetings.MeetingCompleted':
+              case 'meetings.MeetingCancelled':
+              case 'meetings.MeetingDeleted':
+                await alertPlanning.onMeetingClosed(event);
                 return;
 
               /*

@@ -141,6 +141,12 @@ export const SETTINGS_REGISTRY = {
     default: 24,
     description: 'After this long an unsent alert is expired rather than delivered late.',
   }),
+  'meetings.alertWindowDays': define({
+    schema: z.number().int().min(1).max(90),
+    default: 14,
+    description:
+      "How far ahead meeting reminders are planned. A meeting's occurrences are computed from its repeat rule rather than stored, so a series with no end date has infinitely many of them and its reminders have to be planned for a window that a nightly pass advances. Raise it and members' phones hold alarms further ahead, so a device that has been offline for longer still fires them; lower it and there are fewer alerts to keep in step. It does not change when anybody is warned about a given meeting.",
+  }),
   'rhythm.checkinWindowHours': define({
     schema: z.number().int().min(1).max(48),
     default: 12,

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "meetings.MeetingDeleted",
+  "description": "Payload of meetings.MeetingDeleted. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "meetingId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "at": {}
+  },
+  "required": [
+    "meetingId",
+    "at"
+  ],
+  "additionalProperties": false
+}

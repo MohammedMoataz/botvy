@@ -4,6 +4,7 @@ import type { PanelTaskRow } from '../../lib/db';
 import { SYNC_NUDGE_MESSAGE } from '../../lib/config';
 import { PanelStore } from '../../lib/store';
 import { locales, type Locale } from '../../lib/i18n';
+import { Meetings } from './Meetings';
 
 export const App = observer(function App() {
   // A new store per mount, hydrated from chrome.storage + Dexie — the panel is
@@ -192,6 +193,13 @@ export const App = observer(function App() {
               ))}
             </ul>
           )}
+
+          {/* Today, then the week ahead. The meetings are expanded from their
+              rules on every render — the panel holds the rule and not the rows,
+              because recurrence is a rule plus exceptions and never expanded
+              rows. */}
+          <hr />
+          <Meetings store={store} />
 
           <button
             className="btn btn-outline-secondary btn-sm mt-3"

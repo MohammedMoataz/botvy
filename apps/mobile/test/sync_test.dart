@@ -466,6 +466,42 @@ void main() {
       expect(await task('erase-me'), isNull);
     });
 
+    /// A refused *meeting* fed through the task path would write a meeting's id
+    /// into a task row — corruption rather than a crash, which is why the
+    /// engine looks the entity up instead of casting. The reminders case above
+    /// is the same rule; this one is here because P5 is the phase that added
+    /// two entities to the map, and the failure mode of forgetting one is that
+    /// its rejections silently fall through to `debugPrint`.
+    test('a rejection for a meeting never touches a task of the same id',
+        () async {
+      await insertTask('same-id', title: 'untouched');
+      await db.into(db.meetings).insert(
+        MeetingsCompanion.insert(
+          id: 'same-id',
+          title: 'the meeting',
+          startAt: now.add(const Duration(hours: 1)),
+          createdAt: now,
+          updatedAt: now,
+          pendingOp: const Value(PendingOps.update),
+        ),
+      );
+      api.next = reply(
+        rejections: [
+          {'entity': 'meetings', 'id': 'same-id', 'reason': 'gone'},
+        ],
+      );
+
+      await engine.sync();
+
+      expect(await task('same-id'), isNotNull);
+      expect((await task('same-id'))!.title, 'untouched');
+      expect(
+        await (db.select(db.meetings)..where((r) => r.id.equals('same-id')))
+            .getSingleOrNull(),
+        isNull,
+      );
+    });
+
     test('a refused purge keeps the row, so nothing is lost', () async {
       await insertTask('live-row', pendingOp: PendingOps.purge);
       api.next = reply(
@@ -774,6 +810,160 @@ void main() {
 
       // One round trip, then the pages the cap allows — and then it ends.
       expect(api.calls.length, SyncEngine.maxMessagePages + 1);
+    });
+  });
+
+  // ── meetings and personal events (P5) ──────────────────────────────────────
+
+  /// The two entities P5 adds, and the three things about them that are not
+  /// already covered by the rules asserted above on tasks.
+  group('meetings and personal events', () {
+    test('a pushed meeting carries its rule and its place as objects', () async {
+      // The server's adapter reads `fields.location.onlineLink` and
+      // `fields.recurrence.dtstart`. The phone stores both as JSON *text*, so
+      // sending the column verbatim would arrive as a location with neither
+      // half — refused `location_required` for ever, on a meeting the member
+      // can see is fine.
+      final start = now.add(const Duration(days: 1));
+      await db.into(db.meetings).insert(
+        MeetingsCompanion.insert(
+          id: 'meet-1',
+          title: 'Standup',
+          startAt: start,
+          durationMin: const Value(45),
+          authoredTimezone: const Value('Africa/Cairo'),
+          locationJson: const Value(
+            '{"onlineLink":"https://meet.example/abc","address":null}',
+          ),
+          reminderOffsetsJson: const Value('[1440,30]'),
+          recurrenceJson: Value(
+            '{"dtstart":"${start.toIso8601String()}",'
+            '"rrule":"FREQ=WEEKLY;COUNT=6","exdates":[],"overrides":[]}',
+          ),
+          createdAt: now,
+          updatedAt: now,
+          pendingOp: const Value(PendingOps.create),
+        ),
+      );
+      api.next = reply(accepted: {'meetings': ['meet-1']});
+
+      await engine.sync();
+
+      final pushed = (api.calls.single.push['meetings'] as List).single
+          as Map<String, dynamic>;
+      final data = pushed['data'] as Map<String, dynamic>;
+      expect(pushed['op'], PendingOps.create);
+      expect(data['location'], isA<Map<String, dynamic>>());
+      expect(
+        (data['location'] as Map)['onlineLink'],
+        'https://meet.example/abc',
+      );
+      expect(data['recurrence'], isA<Map<String, dynamic>>());
+      expect((data['recurrence'] as Map)['rrule'], 'FREQ=WEEKLY;COUNT=6');
+      // Whole numbers, not strings: the server refuses a non-integer offset.
+      expect(data['reminderOffsets'], <int>[1440, 30]);
+      expect(data['durationMin'], 45);
+      // `authoredTimezone` is deliberately absent. The server reads it from the
+      // member's profile and refuses a pushed copy, because a client that could
+      // rewrite it would move every occurrence of the series with nothing on
+      // the row visibly changing.
+      expect(data.containsKey('authoredTimezone'), isFalse);
+    });
+
+    test('a pulled meeting keeps the rule, the place and the server zone',
+        () async {
+      final start = now.add(const Duration(days: 2));
+      api.next = reply(
+        pull: {
+          'meetings': [
+            {
+              'id': 'meet-2',
+              'title': 'Review',
+              'description': 'quarterly',
+              'startAt': start.toIso8601String(),
+              'durationMin': 60,
+              'allDay': false,
+              'lockTimezone': 'Africa/Cairo',
+              'authoredTimezone': 'Africa/Cairo',
+              'location': {'onlineLink': null, 'address': 'Room 1'},
+              'prepNotes': 'read the deck',
+              'prepMinutes': 15,
+              'reminderOffsets': [60],
+              'recurrence': {
+                'dtstart': start.toIso8601String(),
+                'rrule': 'FREQ=MONTHLY;BYMONTHDAY=-1',
+                'exdates': <String>[],
+                'overrides': <dynamic>[],
+              },
+              'status': 'scheduled',
+              'completedAt': null,
+              'source': 'app',
+              'createdAt': now.toIso8601String(),
+              'updatedAt': now.toIso8601String(),
+              'deletedAt': null,
+            },
+          ],
+          'calendar_events': [
+            {
+              'id': 'event-1',
+              'title': 'Birthday',
+              'notes': null,
+              'startAt': start.toIso8601String(),
+              'endAt': start.add(const Duration(days: 1)).toIso8601String(),
+              'allDay': true,
+              'color': '#0ea5e9',
+              'recurrence': null,
+              'authoredTimezone': 'Africa/Cairo',
+              'createdAt': now.toIso8601String(),
+              'updatedAt': now.toIso8601String(),
+              'deletedAt': null,
+            },
+          ],
+        },
+      );
+
+      await engine.sync();
+
+      final row = (await db.select(db.meetings).get()).single;
+      expect(row.title, 'Review');
+      expect(row.durationMin, 60);
+      expect(row.prepMinutes, 15);
+      expect(row.lockTimezone, 'Africa/Cairo');
+      expect(row.authoredTimezone, 'Africa/Cairo');
+      expect(row.locationJson, contains('Room 1'));
+      expect(row.recurrenceJson, contains('BYMONTHDAY=-1'));
+      expect(row.reminderOffsetsJson, '[60]');
+      // The server's own timestamp, kept apart from any local edit time: it is
+      // what makes the next push uncontested and so clock-free.
+      expect(row.baseUpdatedAt, isNotNull);
+      expect(row.pendingOp, isNull);
+
+      final event = (await db.select(db.calendarEvents).get()).single;
+      expect(event.allDay, isTrue);
+      expect(event.color, '#0ea5e9');
+      expect(event.recurrenceJson, isNull);
+    });
+
+    test('a purge erases the meeting once the server has accepted it',
+        () async {
+      await db.into(db.meetings).insert(
+        MeetingsCompanion.insert(
+          id: 'erase-me',
+          title: 'Cancelled series',
+          startAt: now,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: Value(now),
+          pendingOp: const Value(PendingOps.purge),
+        ),
+      );
+      api.next = reply(accepted: {'meetings': ['erase-me']});
+
+      await engine.sync();
+
+      // A hard-deleted row appears in no pull, so its absence can only be
+      // recognised from having pushed it and not been refused.
+      expect(await db.select(db.meetings).get(), isEmpty);
     });
   });
 }

@@ -369,26 +369,59 @@ row — mark the cache and re-pull, never edit in place.
 
 ```ts
 { _id, userId, title, description: string|null,
-  startAt: Date, durationMin: number, allDay: boolean, lockTimezone: string|null,
+  startAt: Date, durationMin: number, allDay: boolean,
+  lockTimezone: string|null, authoredTimezone: string,
   location: { onlineLink: string|null, address: string|null },
   prepNotes: string|null, prepMinutes: number,
   reminderOffsets: number[] /* minutes before, e.g. [1440, 30] */,
   recurrence: { dtstart: Date, rrule: string /* RFC 5545 */, exdates: Date[],
                 overrides: [{ originalStart: Date, startAt?: Date, durationMin?: number, title?: string,
-                              location?: {...}, cancelled?: boolean }] }|null,
-  status: 'scheduled'|'completed'|'cancelled', createdAt, updatedAt, deletedAt, schemaVersion }
-// indexes: { userId, startAt }, { userId, updatedAt }
+                              location?: {...} }] }|null,
+  status: 'scheduled'|'completed'|'cancelled', completedAt: Date|null,
+  source: 'app'|'chat'|'extension', createdAt, updatedAt, deletedAt, schemaVersion }
+// indexes: { userId, startAt }, { userId, updatedAt }, { userId, deletedAt }
 ```
 
 Occurrences are computed with `rrule` for the requested window; `exdates` remove,
 `overrides` replace. Never stored as rows.
 
+Three notes P5 added while building it.
+
+**`authoredTimezone` is what makes FR-007 expressible.** A stored instant does
+not remember what the member typed: 18:00 in Cairo, read in Berlin, is 17:00. So
+a series expanded from the instant alone lands a member who has flown at neither
+the time they chose nor the time they left behind, and drifts again with every
+further move. With the authoring zone stored, both halves of the requirement are
+one line: the wall-clock digits come from `lockTimezone ?? authoredTimezone`, and
+the clock they are read on is `lockTimezone ?? the member's current zone`. A
+pinned series therefore keeps its instants when the member moves; an unpinned one
+keeps its digits and moves its instants, which is what FR-014 has Notifications
+re-plan.
+
+**`overrides` has no `cancelled` flag.** The blueprint listed one; a cancelled
+occurrence is an `exdate`, because a skip has nothing further to say about the
+occurrence and an override would keep a row alive to describe an absence. Two
+ways to express one thing is how the calendar and the alert reconciliation come
+to disagree about whether a date is happening.
+
+**`allDay` is unset and unread.** A whole-day entry is a `calendar_events` row
+(FR-001); the field stays on the document because the migration that would drop
+it is a migration for no gain.
+
 **`calendar_events`** (syncable) — non-meeting events
 
 ```ts
 { _id, userId, title, notes: string|null, startAt, endAt, allDay, color: string|null,
-  recurrence: {...}|null, createdAt, updatedAt, deletedAt, schemaVersion }
+  recurrence: {...}|null, authoredTimezone: string,
+  createdAt, updatedAt, deletedAt, schemaVersion }
+// indexes: { userId, startAt }, { userId, updatedAt }, { userId, deletedAt }
 ```
+
+The `recurrence` object is `meetings`' own, byte for byte, and goes through the
+same expander: FR-011 requires a repeating personal event to skip, move and end
+exactly as a repeating meeting does, and two copies of that logic is how a
+birthday moved one year would come out differently from a meeting moved one
+week.
 
 ### 2.11 Shared infrastructure collections
 

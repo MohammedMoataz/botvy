@@ -41,3 +41,30 @@ Either:
 
 The first is better, and is roughly where P4's own Arabic work will land anyway.
 Worth deciding then rather than building a translation table now.
+
+## P5: the phone half is built, which is the resolution this file proposed
+
+This file's own argument was that the phone holds its own strings and can render
+the rule from the structured fields, which are all on the row — so the server's
+English text is a convenience for the admin portal and for chat confirmations
+rather than the thing a member reads.
+
+P5 built that. `apps/mobile/lib/core/recurrence/rule_words.dart` turns a
+`RepeatSpec` into words in the member's own language, from the structured fields
+and not from `rrule`'s `toText()`, and the repeat picker reads it. The hard part
+was the part this file said it would be: Arabic number agreement is not
+pluralisation with an `s`. "Every 2 weeks" is **كل أسبوعين** — a dual form, not
+"2" plus a plural — 3 to 10 take the plural of the counted noun, 11 and above
+take the singular after the number, and the list separator is ، rather than a
+comma. Guessing any of those produces text that reads as broken to a native
+speaker, which is worse than English.
+
+**This file stays open**, narrowed to what it actually still covers: the
+*server's* `TaskView.recurrenceText`, which still comes from `rrule.toText()` in
+English and reaches the admin portal and the chat's confirmations. Two things
+would close it — a gettext table for `rrule` (real linguistic work, in a library
+that does not ship Arabic), or having the server stop sending prose at all and
+send only the structured rule, leaving every surface to render it the way the
+phone now does. The second is cheaper and is the direction the phone has just
+demonstrated; it is a change to a published read shape, so it belongs in a phase
+that is touching those reads anyway rather than here.

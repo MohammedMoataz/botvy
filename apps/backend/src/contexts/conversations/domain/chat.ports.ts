@@ -143,6 +143,60 @@ export abstract class PlannerActionsPort {
   ): Promise<CardItem[]>;
 }
 
+/**
+ * The one write the chat performs in Meetings.
+ *
+ * Its own port rather than a third method on `PlannerActionsPort`, because that
+ * one is bound to Planning's and Reminders' handlers and a meeting is neither.
+ * Keeping them apart is what lets a reviewer read the DI wiring and see which
+ * contexts a chat turn can write into — and it means the module import that
+ * makes meetings possible is a visible line rather than a widened constructor.
+ *
+ * The same argument as `PlannerActionsPort` applies to why this is a port and
+ * not an event: FR-004 requires the confirmation to name what was **actually
+ * stored**, and the relay is eventual, so an event-driven create cannot be
+ * confirmed in the turn that asked for it.
+ *
+ * `null` rather than a thrown error when Meetings refuses, exactly as
+ * `PlannerActionsPort.cancel` returns `false`: the refusal is a domain rule of
+ * another context — `MeetingRuleError`, whose union of codes this file may not
+ * import — and the executor's job is to tell the member it was not saved
+ * rather than to explain somebody else's vocabulary. The adapter logs the code.
+ */
+export abstract class MeetingActionsPort {
+  abstract createMeeting(input: {
+    userId: string;
+    title: string;
+    startAt: Date;
+    /** Absent means the member's own default length (FR-001). */
+    durationMin?: number;
+    /** At least one half is present; the executor asks when neither is. */
+    onlineLink?: string;
+    address?: string;
+  }): Promise<CreatedItem | null>;
+
+  /**
+   * The member's next meetings, for "what have I got this week".
+   *
+   * A read on the write port, which reads oddly until you see the alternative:
+   * a second port bound to the same module for the same context, so the DI
+   * wiring would show two lines where the honest statement is one — the chat
+   * can reach Meetings. `PlannerActionsPort` already carries both a `list` and
+   * its writes, for that reason.
+   *
+   * Occurrences and not rows. A weekly series is one document (FR-006), so
+   * "your meetings" is a question about a window rather than about a
+   * collection, and the answer comes from the same expansion the calendar
+   * uses — the adapter is bound to the published occurrence query, so the chat
+   * and the calendar cannot disagree about where a meeting is.
+   */
+  abstract listUpcoming(
+    userId: string,
+    now: Date,
+    days: number,
+  ): Promise<CardItem[]>;
+}
+
 /** One row of a structured list answer, as `ws-chat.md` types it. */
 export interface CardItem {
   id: string;

@@ -12,7 +12,7 @@ import {
   type IntentScope,
   type ListKind,
 } from '../domain/intent.js';
-import { preferSoonestDay, resolveRelativePhrase } from '../domain/relative-time.js';
+import { mentionsAMoment, preferSoonestDay, resolveRelativePhrase } from '../domain/relative-time.js';
 import { renderPrompt } from './prompt-files.js';
 
 /**
@@ -209,7 +209,21 @@ export class IntentExtractor extends IntentExtractorPort {
     const source = (body.args ?? {}) as Record<string, unknown>;
     const args: IntentArgs = {};
 
-    for (const key of ['title', 'label', 'notes', 'match', 'goal'] as const) {
+    for (const key of [
+      'title',
+      'label',
+      'notes',
+      'match',
+      'goal',
+      // `set_meeting`'s two halves of a location. Copied verbatim and sorted
+      // out in the executor: which of the two a value belongs in is a
+      // judgement the grammar cannot make, and dropping an unrecognised one
+      // here would turn "the room is 2B" into a meeting with no location at
+      // all. `args` is a whitelist, so a field added to `IntentArgs` and not
+      // to this list is a field the model can never deliver.
+      'onlineLink',
+      'address',
+    ] as const) {
       const value = str(source[key]);
       if (value !== null) args[key] = value;
     }
@@ -254,6 +268,21 @@ export class IntentExtractor extends IntentExtractorPort {
       // entirely would be a worse reading of the sentence than pinning it to
       // the nearest end of a scale they cannot see.
       args.priority = Math.min(4, Math.max(1, priority));
+    }
+
+    /*
+     * A meeting's length, kept only when it is a whole positive number of
+     * minutes.
+     *
+     * Dropped rather than clamped, unlike `priority`: absent means the member's
+     * own default meeting length (FR-001), which is a better answer than the
+     * nearest end of a range they never named. `Meeting` re-checks the bound
+     * anyway — the schema's `minimum`/`maximum` is enforced by the server and
+     * an older Ollama may not honour it.
+     */
+    const durationMin = Number(source.durationMin);
+    if (Number.isInteger(durationMin) && durationMin > 0) {
+      args.durationMin = durationMin;
     }
 
     const value = Number(source.value);
@@ -309,6 +338,30 @@ export class IntentExtractor extends IntentExtractorPort {
     if (spoken) return preferSoonestDay(spoken, text, now, timezone);
 
     if (modelWhen === null || !WALL_CLOCK.test(modelWhen)) return null;
+
+    /*
+     * The model may only report a time the sentence could have contained.
+     *
+     * P5's corpus found a 3B model answering `set_meeting` correctly for a
+     * sentence with no time in it at all and then supplying `08:00` — so a
+     * meeting would have been created at an hour the member never said, which
+     * is exactly what FR-006 exists to prevent. `mentionsAMoment` asks the
+     * weaker, safer question (is there a digit, a weekday, a month, a relative
+     * phrase, a clock word?) rather than requiring the resolver to have
+     * understood it, because "at 7:30" is a real time the resolver does not
+     * handle and refusing it would lose a time the member did give.
+     *
+     * Dropping the field is not a refusal: the executor asks. That is the
+     * cheaper error by a wide margin — one question, against a calendar entry
+     * at an hour nobody chose.
+     */
+    if (!mentionsAMoment(text)) {
+      this.logger.debug(
+        `dropped an invented time (${modelWhen}); the sentence names no moment`,
+      );
+      return null;
+    }
+
     // Normalise the `YYYY-MM-DD HH:mm` variant to the `T` form the rest of the
     // platform stores, so downstream regexes see one shape.
     const wallClock = modelWhen.replace(' ', 'T');

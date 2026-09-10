@@ -25,6 +25,13 @@ import {
   DailyPlanSyncAdapter,
   RhythmStateSyncAdapter,
 } from '../rhythm/infrastructure/rhythm-sync.adapters.js';
+import {
+  CalendarEventRepository,
+  MeetingRepository,
+} from '../meetings/domain/meetings.repositories.js';
+import { CalendarEventSyncAdapter } from '../meetings/infrastructure/calendar-event-sync.adapter.js';
+import { MeetingSyncAdapter } from '../meetings/infrastructure/meeting-sync.adapter.js';
+import { MeetingsModule } from '../meetings/meetings.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { LabelRepository } from '../planning/domain/label.repository.js';
 import { TaskRepository } from '../planning/domain/task.repository.js';
@@ -92,6 +99,7 @@ import {
     NotificationsModule,
     RhythmModule,
     ConversationsModule,
+    MeetingsModule,
     WsModule,
   ],
   providers: [
@@ -117,6 +125,34 @@ import {
       inject: [UnitOfWork, ReminderRepository],
       useFactory: (uow: UnitOfWork, reminders: ReminderRepository) =>
         new ReminderSyncAdapter(uow, reminders),
+    },
+    /*
+     * Meetings' two collections, both pull and push.
+     *
+     * 32 and 34 — `contracts/sync.md`'s `entities` order, after reminders at 30
+     * and before the rhythm's three at 40. Not a dependency, unlike labels
+     * before tasks: a meeting references nothing and nothing references a
+     * meeting, and the adapters say so in their own comments rather than
+     * leaving the number to look like one. The gaps leave room for an entity
+     * that ever does.
+     */
+    {
+      provide: MeetingSyncAdapter,
+      inject: [UnitOfWork, MeetingRepository, MemberContextPort],
+      useFactory: (
+        uow: UnitOfWork,
+        meetings: MeetingRepository,
+        member: MemberContextPort,
+      ) => new MeetingSyncAdapter(uow, meetings, member),
+    },
+    {
+      provide: CalendarEventSyncAdapter,
+      inject: [UnitOfWork, CalendarEventRepository, MemberContextPort],
+      useFactory: (
+        uow: UnitOfWork,
+        events: CalendarEventRepository,
+        member: MemberContextPort,
+      ) => new CalendarEventSyncAdapter(uow, events, member),
     },
     /*
      * The rhythm's two row entities, both **pull-only**.
@@ -195,6 +231,8 @@ import {
         LabelSyncAdapter,
         TaskSyncAdapter,
         ReminderSyncAdapter,
+        MeetingSyncAdapter,
+        CalendarEventSyncAdapter,
         DailyPlanSyncAdapter,
         CheckinSyncAdapter,
         ConversationSyncAdapter,

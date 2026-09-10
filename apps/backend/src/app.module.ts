@@ -12,6 +12,10 @@ import { NotificationsModule } from './contexts/notifications/notifications.modu
 import { InternalSweepController } from './contexts/notifications/features/sweep/internal-sweep.controller.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
 import { RemindersModule } from './contexts/reminders/reminders.module.js';
+import { CalendarEventsController } from './contexts/meetings/features/create-event/calendar-events.controller.js';
+import { MeetingsController } from './contexts/meetings/features/create-meeting/meetings.controller.js';
+import { MeetingsModule } from './contexts/meetings/meetings.module.js';
+import { InternalReconcileController } from './contexts/notifications/features/reconcile-meeting-alerts/internal-reconcile.controller.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
 import { RhythmModule } from './contexts/rhythm/rhythm.module.js';
 import { ConversationsModule } from './contexts/conversations/conversations.module.js';
@@ -71,6 +75,7 @@ import { WsModule } from './ws/ws.module.js';
     NotificationsModule,
     ConversationsModule,
     RhythmModule,
+    MeetingsModule,
     SyncModule,
     HealthModule,
 
@@ -96,6 +101,9 @@ import { WsModule } from './ws/ws.module.js';
     ConversationsController,
     ConversationsBatchController,
     QuickQuestionsController,
+    MeetingsController,
+    CalendarEventsController,
+    InternalReconcileController,
     SyncController,
     InternalAlertsController,
     InternalHeartbeatController,

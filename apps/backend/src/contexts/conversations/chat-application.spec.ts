@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Principal } from '../../shared/auth/principal.js';
 import { AuditPort, type AuditEntry } from '../../shared/audit/audit.port.js';
@@ -12,6 +15,7 @@ import { IntentExtractor } from './application/intent-extractor.js';
 import { PromptAssembler } from './application/prompt-assembler.js';
 import { delimitQuoted, renderPrompt, resetPromptCache } from './application/prompt-files.js';
 import {
+  MeetingActionsPort,
   MemberDayPort,
   PlannerActionsPort,
   ProfileWritesPort,
@@ -177,6 +181,50 @@ class FakeProfile extends ProfileWritesPort {
   }
 }
 
+/**
+ * Meetings, as the chat sees it.
+ *
+ * `refuse` models a domain rule the aggregate applies and this context may not
+ * name — `MeetingRuleError` is Meetings' vocabulary, and the port's contract is
+ * `null`. The executor has to report that to the member rather than let it
+ * escape as an exception, which is the assertion below.
+ */
+class FakeMeetings extends MeetingActionsPort {
+  readonly created: Array<Record<string, unknown>> = [];
+  refuse = false;
+  /** What the store hands back, so a spec can make it differ from the input. */
+  storedTitle: string | null = null;
+
+  async createMeeting(input: {
+    userId: string;
+    title: string;
+    startAt: Date;
+    durationMin?: number;
+    onlineLink?: string;
+    address?: string;
+  }): Promise<CreatedItem | null> {
+    if (this.refuse) return null;
+    this.created.push({ ...input });
+    return {
+      id: 'meeting-1',
+      title: this.storedTitle ?? input.title,
+      at: input.startAt,
+      allDay: false,
+    };
+  }
+
+  /** The rows a `list` with `listKind: 'meetings'` should render. */
+  upcoming: CardItem[] = [];
+
+  async listUpcoming(
+    _userId: string,
+    _now: Date,
+    _days: number,
+  ): Promise<CardItem[]> {
+    return this.upcoming;
+  }
+}
+
 class FakeDay extends MemberDayPort {
   day: MemberDay = {
     tasks: ['Pay the electricity bill'],
@@ -233,6 +281,59 @@ describe('prompt files', () => {
     });
 
     expect(prompt).toContain('{{profile}} and $&');
+  });
+});
+
+// -------------------------------------------------------------------- T451
+
+/**
+ * The corpus, found by walking *up* from this file rather than by counting
+ * `..` — the same reason `prompt-files.ts` gives at length: the count agrees
+ * between `src/` and `dist/` only by accident of the build layout.
+ */
+function corpusSentences(): string[] {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let hop = 0; hop < 8; hop += 1) {
+    const candidate = join(dir, 'test', 'fixtures', 'intent-cases.json');
+    if (existsSync(candidate)) {
+      const cases = JSON.parse(readFileSync(candidate, 'utf8')) as Array<{
+        text: string;
+      }>;
+      return cases.map((testCase) => testCase.text);
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error('no test/fixtures/intent-cases.json above this spec');
+}
+
+describe('the prompt does not quote the corpus that grades it', () => {
+  it('shares no example sentence with intent-cases.json', () => {
+    /*
+     * The rule this asserts was learned by breaking it. `intent.md`'s `scope`
+     * table was sharpened with sixteen examples and the fixture went 24 → 30;
+     * ten of those examples had been lifted straight out of the corpus, and the
+     * honest score with different sentences was 29. Teaching to the test
+     * measures the model recognising strings it was just handed.
+     *
+     * It lives in a spec rather than in the ad-hoc script that first checked
+     * it, because a check nobody runs is a comment: `pnpm vitest` runs on every
+     * change to either file, and adding a `set_meeting` example to the prompt
+     * is exactly the moment the mistake is easy to make again.
+     */
+    const prompt = renderPrompt('intent.md', {
+      now: '2026-09-10 14:05',
+      timezone: ZONE,
+      today: '2026-09-10',
+      // Deliberately not a corpus sentence: the member's own message is
+      // substituted into the prompt, so a real one here would fail this test
+      // by construction and prove nothing about the examples.
+      message: 'PROBE-MESSAGE',
+    });
+
+    const leaked = corpusSentences().filter((text) => prompt.includes(text));
+    expect(leaked).toEqual([]);
   });
 });
 
@@ -508,12 +609,14 @@ describe('IntentExtractor', () => {
 describe('IntentExecutor', () => {
   let planner: FakePlanner;
   let profile: FakeProfile;
+  let meetings: FakeMeetings;
   let executor: IntentExecutor;
 
   beforeEach(() => {
     planner = new FakePlanner();
     profile = new FakeProfile();
-    executor = new IntentExecutor(planner, profile);
+    meetings = new FakeMeetings();
+    executor = new IntentExecutor(planner, profile, meetings);
   });
 
   it('asks for a missing time and dispatches nothing', async () => {
@@ -771,6 +874,66 @@ describe('IntentExecutor', () => {
     expect(result.asking).toBe(false);
   });
 
+  it('lists the member’s meetings from the occurrence expansion', async () => {
+    /*
+     * `meetings` and `sessions` shared one "not yet" refusal until this phase
+     * built meetings. Separating them is the point of this test: a capability
+     * that exists must not keep answering "coming in a later version" because
+     * it shares a branch with one that does not.
+     *
+     * The rows come from the *expansion*, not from a collection — a weekly
+     * series is one document (FR-006) — so the port is bound to the same
+     * published occurrence query the calendar reads, and the chat cannot name a
+     * meeting on a day the member's calendar does not show it.
+     */
+    meetings.upcoming = [
+      {
+        id: 'm1',
+        title: 'Standup with Sara',
+        at: 'Tue 2 Sep, 18:00',
+        deepLink: 'botvy://meetings/m1',
+      },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'list',
+        scope: 'planning',
+        args: { listKind: 'meetings' },
+      }),
+      text: 'what meetings have I got this week?',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.card).toEqual({ kind: 'meetings', items: meetings.upcoming });
+    expect(result.reply).toContain('Standup with Sara');
+    expect(result.reply).not.toContain('later version');
+    expect(result.asking).toBe(false);
+  });
+
+  it('still refuses to list training sessions, and names only those', async () => {
+    // P6's. The refusal is kept and narrowed: a member asking for their
+    // meetings and being told the feature is coming later would be the product
+    // lying about itself.
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'list',
+        scope: 'planning',
+        args: { listKind: 'sessions' },
+      }),
+      text: 'what training have I got?',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.reply).toContain('later version');
+    expect(result.reply).toContain('training');
+    expect(result.card).toBeUndefined();
+  });
+
   it('lists the plan when the member did not say what kind, in Arabic', async () => {
     planner.items = [{ id: 't1', title: 'الفاتورة', at: null }];
 
@@ -919,7 +1082,110 @@ describe('IntentExecutor', () => {
     expect(profile.updates).toEqual([]);
   });
 
-  it('declines a meeting without filing it as anything else', async () => {
+  // ------------------------------------------------------------------ T551
+
+  it('creates a meeting with a link and confirms it in the member’s zone', async () => {
+    const startAt = wallClockToUtc(`${localToday(ZONE, 1)}T16:00`, ZONE)!;
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: {
+          title: 'call with Sara',
+          when: `${localToday(ZONE, 1)}T16:00`,
+          durationMin: 45,
+          onlineLink: 'https://meet.example.com/sara',
+        },
+      }),
+      text: 'schedule a call with Sara at four tomorrow on meet.example.com/sara',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(meetings.created).toEqual([
+      {
+        userId: MEMBER,
+        title: 'call with Sara',
+        startAt,
+        durationMin: 45,
+        onlineLink: 'https://meet.example.com/sara',
+      },
+    ]);
+    // Nothing became a task or a reminder — the failure this branch exists to
+    // prevent is a meeting quietly filed as a to-do item.
+    expect(planner.tasks).toEqual([]);
+    expect(planner.reminders).toEqual([]);
+    expect(result.actions).toEqual([{ kind: 'meeting.created', id: 'meeting-1' }]);
+    expect(result.asking).toBe(false);
+    // The member's own clock, never the server's: 16:00 is what they typed and
+    // 16:00 is what they must read back.
+    expect(result.reply).toBe(
+      `"call with Sara" is in your calendar for ${formatInTz(startAt, ZONE)}.`,
+    );
+    expect(formatInTz(startAt, ZONE)).toContain('16:00');
+  });
+
+  it('creates a meeting from an address and confirms it in Arabic', async () => {
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: {
+          title: 'اجتماع مع سارة',
+          when: `${localToday(ZONE, 1)}T16:00`,
+          address: 'مكتب المدير',
+        },
+      }),
+      text: 'اعمل اجتماع مع سارة بكرة الساعة ٤ في مكتب المدير',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(meetings.created).toHaveLength(1);
+    expect(meetings.created[0]).toMatchObject({
+      address: 'مكتب المدير',
+    });
+    // No length was named, so none is sent: absent means the member's own
+    // default meeting length (FR-001), not a number this code invented.
+    expect(meetings.created[0]).not.toHaveProperty('durationMin');
+    expect(result.reply).toContain('اتحفظ في التقويم');
+    expect(result.asking).toBe(false);
+  });
+
+  it('confirms the title the store kept rather than the one it was handed', async () => {
+    // FR-004: a title Meetings trimmed is confirmed as it now is, or the member
+    // is told something untrue about their own calendar.
+    meetings.storedTitle = 'Call with Sara';
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: {
+          title: '  call with Sara  ',
+          when: `${localToday(ZONE, 1)}T16:00`,
+          address: 'room 2',
+        },
+      }),
+      text: 'meeting with Sara tomorrow at four in room 2',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.reply).toContain('"Call with Sara"');
+  });
+
+  it('asks where the meeting is rather than storing one with no location', async () => {
+    /*
+     * FR-001: at least one of a link and an address. The aggregate refuses a
+     * meeting with neither, so storing on a guess is not even available — and
+     * asking is right on its own terms, because a meeting with no location is
+     * one the member cannot attend.
+     */
     const result = await executor.execute({
       userId: MEMBER,
       intent: intent({
@@ -932,23 +1198,102 @@ describe('IntentExecutor', () => {
       facts: facts(),
     });
 
-    expect(planner.tasks).toEqual([]);
-    expect(planner.reminders).toEqual([]);
+    expect(meetings.created).toEqual([]);
+    expect(result.asking).toBe(true);
+    expect(result.reply).toContain('call with Sara');
     expect(result.actions).toEqual([]);
-    expect(result.reply).toContain("can't create meetings yet");
   });
 
-  it('declines a meeting in Arabic', async () => {
+  it('asks when the meeting is when no time survived extraction', async () => {
     const result = await executor.execute({
       userId: MEMBER,
-      intent: intent({ name: 'set_meeting', scope: 'planning', args: { title: 'اجتماع' } }),
-      text: 'اعمل اجتماع مع سارة بكرة الساعة ٤',
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: { title: 'call with Sara', address: 'room 2' },
+      }),
+      text: 'set up a call with Sara in room 2',
       now: new Date(),
       facts: facts(),
     });
 
-    expect(planner.tasks).toEqual([]);
-    expect(result.reply).toContain('مواعيد');
+    expect(meetings.created).toEqual([]);
+    expect(result.asking).toBe(true);
+  });
+
+  it('refuses a meeting whose moment has already passed, and names it', async () => {
+    const now = todayAt('18:00', FIXED);
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: {
+          title: 'call with Sara',
+          when: `${localToday(FIXED)}T14:00`,
+          onlineLink: 'https://meet.example.com/sara',
+        },
+      }),
+      text: 'meeting with Sara at two',
+      now,
+      facts: facts({ timezone: FIXED }),
+    });
+
+    expect(meetings.created).toEqual([]);
+    expect(result.asking).toBe(true);
+    expect(result.reply).toContain('already passed');
+  });
+
+  it('files a room the model put in onlineLink as an address', async () => {
+    /*
+     * The normalisation the grammar cannot do: a link is a string and so is a
+     * street, so the schema cannot keep the two apart. Dropping an
+     * unrecognised value would turn "meeting room 2" into a meeting with no
+     * location and a needless question.
+     */
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: {
+          title: 'standup',
+          when: `${localToday(ZONE, 1)}T09:00`,
+          onlineLink: 'meeting room 2',
+        },
+      }),
+      text: 'standup tomorrow at nine in meeting room 2',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(meetings.created[0]).toMatchObject({ address: 'meeting room 2' });
+    expect(meetings.created[0]).not.toHaveProperty('onlineLink');
+    expect(result.asking).toBe(false);
+  });
+
+  it('reports a meeting Meetings refused rather than throwing', async () => {
+    meetings.refuse = true;
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'set_meeting',
+        scope: 'planning',
+        args: {
+          title: 'call with Sara',
+          when: `${localToday(ZONE, 1)}T16:00`,
+          address: 'room 2',
+        },
+      }),
+      text: 'meeting with Sara tomorrow at four in room 2',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.reply).toContain("couldn't save");
+    expect(result.actions).toEqual([]);
+    expect(result.asking).toBe(false);
   });
 
   it('reports a cancel the store refused rather than dressing it up', async () => {

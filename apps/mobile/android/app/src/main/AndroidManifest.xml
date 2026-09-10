@@ -75,5 +75,22 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!--
+          P5: a meeting's joining link and its address (story 1, scenarios 1
+          and 2). Android 11 and later hide every installed app from a package
+          unless it declares the intents it means to resolve, and url_launcher
+          answers "nothing can open that" for an intent that is not declared
+          here - so without these two the Join button and the map button are
+          silently inert on a modern handset and work perfectly on the emulator
+          somebody tested on.
+        -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="geo"/>
+        </intent>
     </queries>
 </manifest>

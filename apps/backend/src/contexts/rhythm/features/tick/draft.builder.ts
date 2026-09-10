@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
-import type { PlanTask, PlanTraining } from '../../domain/daily-plan.aggregate.js';
+import type {
+  PlanMeeting,
+  PlanTask,
+  PlanTraining,
+} from '../../domain/daily-plan.aggregate.js';
 import {
+  MeetingsOnPort,
   NextSessionPort,
   PlannedTasksPort,
   TodayMealsPort,
@@ -9,6 +14,7 @@ import {
 
 export interface Draft {
   tasks: PlanTask[];
+  meetings: PlanMeeting[];
   training: PlanTraining | null;
   mealLine: string | null;
 }
@@ -42,6 +48,7 @@ export interface Draft {
 export class DraftBuilder {
   constructor(
     private readonly tasks: PlannedTasksPort,
+    private readonly meetings: MeetingsOnPort,
     private readonly sessions: NextSessionPort,
     private readonly meals: TodayMealsPort,
     private readonly settings: SettingsService,
@@ -63,8 +70,17 @@ export class DraftBuilder {
   ): Promise<Draft> {
     const topN = await this.settings.get('rhythm.draftTopN');
 
-    const [due, training, mealLine] = await Promise.all([
+    /*
+     * Meetings join the parallel read rather than being fetched after it: the
+     * four are independent, and a serial await would add a round trip to every
+     * touch of every member for a list the sentence needs at the same moment as
+     * the tasks. Unlike the carry-over read below, this one is unconditional —
+     * both the evening proposal and the morning briefing name the day's
+     * meetings (FR-012).
+     */
+    const [due, meetings, training, mealLine] = await Promise.all([
       this.tasks.dueOn(userId, date),
+      this.meetings.onDate(userId, date),
       this.sessions.forDate(userId, date),
       this.meals.lineFor(userId, date),
     ]);
@@ -80,6 +96,14 @@ export class DraftBuilder {
 
     return {
       tasks: dedupeById([...chosen, ...carried]),
+      /*
+       * Not capped by `draftTopN` and not sorted here. A meeting is an
+       * appointment rather than a candidate — hiding the sixth one is hiding an
+       * hour the member has already committed — and `onDate` answers in
+       * ascending order across every series, which is the order the sentence
+       * wants.
+       */
+      meetings,
       training,
       mealLine,
     };

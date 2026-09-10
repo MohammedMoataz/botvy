@@ -15,6 +15,7 @@ import { PushService } from '../../shared/push/push.service.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
+import { MeetingsModule } from '../meetings/meetings.module.js';
 import { PlanningModule } from '../planning/planning.module.js';
 import { ProfileModule } from '../profile/profile.module.js';
 import { RemindersModule } from '../reminders/reminders.module.js';
@@ -22,6 +23,8 @@ import { AlertRepository } from './domain/alert.repository.js';
 import {
   DeviceLookupPort,
   DeviceRemovalPort,
+  MeetingMembersPort,
+  MeetingOccurrencesPort,
   TombstonePurgePort,
 } from './domain/notification.ports.js';
 import { PendingAlertsQueryHandler } from './features/pending-alerts/pending-alerts.query.js';
@@ -32,9 +35,13 @@ import {
   type AlertIdFactory,
 } from './features/plan-alerts-saga/plan-alerts.saga.js';
 import { SweepHandler } from './features/sweep/sweep.handler.js';
+import { ReconcileMeetingAlertsHandler } from './features/reconcile-meeting-alerts/reconcile-meeting-alerts.handler.js';
 import {
   IdentityDeviceLookup,
   IdentityDeviceRemoval,
+  MeetingsMemberLookup,
+  MeetingsOccurrenceLookup,
+  MeetingsTombstonePurge,
   PlanningTombstonePurge,
   RemindersTombstonePurge,
 } from './infrastructure/notification.adapters.js';
@@ -74,6 +81,7 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
     IdentityModule,
     PlanningModule,
     RemindersModule,
+    MeetingsModule,
     MongooseModule.forFeature([
       { name: MODEL_NAMES.alert, schema: AlertSchema },
     ]),
@@ -97,22 +105,84 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
     },
     { provide: DeviceLookupPort, useClass: IdentityDeviceLookup },
     { provide: DeviceRemovalPort, useClass: IdentityDeviceRemoval },
+    // Where an occurrence falls, and which members have a diary at all. Both
+    // are Meetings' published surface: this context owns `alerts` and may not
+    // read `meetings`, and the rule for a recurring meeting is never expanded
+    // into rows, so there is nothing to read even if it could.
+    { provide: MeetingOccurrencesPort, useClass: MeetingsOccurrenceLookup },
+    { provide: MeetingMembersPort, useClass: MeetingsMemberLookup },
     PlanningTombstonePurge,
     RemindersTombstonePurge,
+    MeetingsTombstonePurge,
     {
       provide: TOMBSTONE_PURGES,
-      inject: [PlanningTombstonePurge, RemindersTombstonePurge],
+      inject: [
+        PlanningTombstonePurge,
+        RemindersTombstonePurge,
+        MeetingsTombstonePurge,
+      ],
       useFactory: (...purges: TombstonePurgePort[]) => purges,
+    },
+    /*
+     * The meeting window's reconciliation, and it is provided *before* the saga
+     * because the saga takes it.
+     *
+     * A recurring meeting has many occurrences under one meeting id, and P2's
+     * `reconcile` keys on the alert's label alone — so reusing it would have
+     * occurrence two's `30m` warning overwrite occurrence one's. This handler
+     * keys on `alertKey` (`kind:id:occurrenceMs:label`) instead, which is also
+     * what `source.occurrenceAt` is on the row for. The task and reminder paths
+     * are untouched, which is why it is a sibling rather than a widening.
+     */
+    {
+      provide: ReconcileMeetingAlertsHandler,
+      inject: [
+        UnitOfWork,
+        AlertRepository,
+        MemberContextPort,
+        MeetingOccurrencesPort,
+        MeetingMembersPort,
+        SettingsService,
+        HeartbeatService,
+        ALERT_ID,
+      ],
+      useFactory: (
+        uow: UnitOfWork,
+        alerts: AlertRepository,
+        member: MemberContextPort,
+        occurrences: MeetingOccurrencesPort,
+        members: MeetingMembersPort,
+        settings: SettingsService,
+        heartbeats: HeartbeatService,
+        nextId: AlertIdFactory,
+      ) =>
+        new ReconcileMeetingAlertsHandler(
+          uow,
+          alerts,
+          member,
+          occurrences,
+          members,
+          settings,
+          heartbeats,
+          nextId,
+        ),
     },
     {
       provide: PlanAlertsSaga,
-      inject: [UnitOfWork, AlertRepository, MemberContextPort, ALERT_ID],
+      inject: [
+        UnitOfWork,
+        AlertRepository,
+        MemberContextPort,
+        ALERT_ID,
+        ReconcileMeetingAlertsHandler,
+      ],
       useFactory: (
         uow: UnitOfWork,
         alerts: AlertRepository,
         member: MemberContextPort,
         nextId: AlertIdFactory,
-      ) => new PlanAlertsSaga(uow, alerts, member, nextId),
+        meetings: ReconcileMeetingAlertsHandler,
+      ) => new PlanAlertsSaga(uow, alerts, member, nextId, meetings),
     },
     {
       provide: SweepHandler,
@@ -159,6 +229,8 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
     SweepHandler,
     PendingAlertsQueryHandler,
     DeviceLookupPort,
+    // For the internal controller the backend role declares, and for the gate.
+    ReconcileMeetingAlertsHandler,
   ],
 })
 export class NotificationsModule {}

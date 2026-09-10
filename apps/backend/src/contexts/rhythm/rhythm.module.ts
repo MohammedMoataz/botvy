@@ -16,11 +16,14 @@ import { AppendMessageHandler } from '../conversations/features/append-message/a
 import { OperationsModule } from '../operations/operations.module.js';
 import { TasksDueQueryHandler } from '../planning/features/tasks-due-query/tasks-due.query.js';
 import { PlanningModule } from '../planning/planning.module.js';
+import { MeetingOccurrencesQueryHandler } from '../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
+import { MeetingsModule } from '../meetings/meetings.module.js';
 import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { ProfileModule } from '../profile/profile.module.js';
 import {
   CoachTranscriptPort,
   MemberSchedulePort,
+  MeetingsOnPort,
   NextSessionPort,
   PlannedTasksPort,
   TodayMealsPort,
@@ -56,6 +59,7 @@ import {
 } from './infrastructure/mongo-rhythm.repositories.js';
 import { ProfileMemberSchedule } from './infrastructure/rhythm-member-schedule.adapter.js';
 import { NoTrainingYet } from './infrastructure/rhythm-next-session.stub.js';
+import { MeetingsOnDate } from './infrastructure/rhythm-meetings.adapter.js';
 import { PlanningPlannedTasks } from './infrastructure/rhythm-planned-tasks.adapter.js';
 import { NoMealsYet } from './infrastructure/rhythm-today-meals.stub.js';
 import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-transcript.adapter.js';
@@ -100,6 +104,17 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
     OperationsModule,
     ProfileModule,
     PlanningModule,
+    /*
+     * Meetings, and **not** through `forwardRef`.
+     *
+     * The Rhythm-Conversations edge below is a genuine cycle — the rhythm
+     * writes into the coach chat and the chat reads the plan — so it needs one.
+     * This edge is one-directional: the rhythm asks where the day's meetings
+     * are, and nothing in Meetings knows the rhythm exists. A `forwardRef` here
+     * would be cargo, and it would hide a real cycle if one were ever
+     * introduced.
+     */
+    MeetingsModule,
     // The other half of the cycle — see the note in `conversations.module.ts`.
     forwardRef(() => ConversationsModule),
     MongooseModule.forFeature([
@@ -156,6 +171,20 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
       inject: [AppendMessageHandler],
       useFactory: (append: AppendMessageHandler) =>
         new ConversationsCoachTranscript(append),
+    },
+    /*
+     * The day's meetings, from P5.
+     *
+     * The sixth port, and the second one bound to a real context rather than a
+     * stub. FR-012: both the evening proposal and the morning briefing name the
+     * day's meetings — the briefing is the half that gets forgotten, so both
+     * touches read this and `rhythm-meetings.spec.ts` asserts both.
+     */
+    {
+      provide: MeetingsOnPort,
+      inject: [MeetingOccurrencesQueryHandler],
+      useFactory: (occurrences: MeetingOccurrencesQueryHandler) =>
+        new MeetingsOnDate(occurrences),
     },
     // Rebound in P6 and P8. One line each, and every call site is already
     // correct because they have been calling a port all along.

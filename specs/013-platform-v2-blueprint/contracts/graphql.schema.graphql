@@ -115,21 +115,70 @@ type QuickQuestion { id: ID!, scope: ConversationKind!, text: String!, mood: Str
 # ---------- Meetings & Calendar ----------
 
 type Location { onlineLink: String, address: String }
-type Override { originalStart: DateTime!, startAt: DateTime, durationMin: Int, title: String, cancelled: Boolean }
+# `location` is served: an override may move where a meeting is as well as when, and
+# the day view has to show the room that changed.
+# `cancelled` is NOT served, and will not be. A skipped occurrence is an exdate — a
+# skip has nothing left to say about the occurrence, and an override kept alive to
+# describe an absence would give the expander two places to look for one fact. Kept
+# on this line to record the decision rather than to promise the field.
+type Override { originalStart: DateTime!, startAt: DateTime, durationMin: Int, title: String, location: Location, cancelled: Boolean }
 type MeetingRecurrence { dtstart: DateTime!, rrule: String!, humanText: String!, exdates: [DateTime!]!, overrides: [Override!]! }
 enum MeetingStatus { scheduled completed cancelled }
 type Meeting {
   id: ID!, title: String!, description: String, startAt: DateTime!, durationMin: Int!, allDay: Boolean!
   location: Location!, prepNotes: String, prepMinutes: Int!, reminderOffsets: [Int!]!, recurrence: MeetingRecurrence, status: MeetingStatus!
+  # null follows the member; a named zone pins the series to that place's clock (FR-007)
+  lockTimezone: String
   nextOccurrence: DateTime
 }
-type CalendarEvent { id: ID!, title: String!, notes: String, startAt: DateTime!, endAt: DateTime!, allDay: Boolean!, color: String, recurrence: Recurrence }
+# One expanded occurrence. `originalStart` is the moment the rule produced and is
+# the key a skip or a move addresses; `startAt` is where it actually sits.
+type MeetingOccurrence {
+  meetingId: ID!, title: String!, originalStart: DateTime!, startAt: DateTime!, endAt: DateTime!
+  durationMin: Int!, location: Location!, prepMinutes: Int!, reminderOffsets: [Int!]!, moved: Boolean!
+}
+# `startAt`/`endAt` are the series' own, not an occurrence's — an agenda row already
+# carries the occurrence, and this is the thing the member opens.
+# `recurrence` is `MeetingRecurrence`: FR-011 gives a repeating event exactly the
+# repeat a meeting has — one shape, one expander, one fixture table. It was written
+# `Recurrence`, a type this file never defines.
+# Reachable only through `AgendaItem.event`. This phase has no `event(id)` query, and
+# a type nothing references is dropped from the generated schema outright — a
+# contract promising a type no client can name is the same failure as a query
+# handler with no resolver.
+type CalendarEvent { id: ID!, title: String!, notes: String, startAt: DateTime!, endAt: DateTime!, allDay: Boolean!, color: String, recurrence: MeetingRecurrence }
 enum AgendaKind { meeting prep task session event }
+# `endAt` is null for a `task` row and only for that: a timed task has a moment and
+# no length, and inventing an end would draw a block the member never asked for.
+# `allDay` marks a whole-day personal event — still grouped into its day, because a
+# member looking at Tuesday wants to know Tuesday is a holiday, but flagged so the
+# client can lift it off the hour grid (FR-011 scenario 1). Always false on every
+# other kind. Without it that scenario cannot be satisfied at all.
+# `meeting` is populated on a `meeting` row **and on its `prep` row**, which shares
+# the meeting's id deliberately so tapping either opens the meeting it is
+# preparation for. `event` is populated on an `event` row.
+# `task` and `session` are NOT served. `Task` is Planning's type and `Session` is
+# Training's, and constitution IX refuses a Meetings `features/` file declaring
+# either — a local lookalike would be a second copy of somebody else's shape, free
+# to drift, with nothing saying they are meant to match. Those rows carry
+# `(kind, id)` and the client asks the context that owns them: `task(id)` here,
+# Training's equivalent from P6. Every row carries `title`, `subtitle` and `color`
+# regardless, so the agenda renders completely from the row alone; a nested object
+# only saves a client that wants the detail a second round trip.
 type AgendaItem {
   kind: AgendaKind!, id: ID!, occurrenceAt: DateTime!, endAt: DateTime, title: String!, subtitle: String
-  color: String, meeting: Meeting, task: Task, session: Session, event: CalendarEvent
+  color: String, allDay: Boolean!, meeting: Meeting, event: CalendarEvent, task: Task, session: Session
 }
 type AgendaDay { date: Date!, items: [AgendaItem!]! }
+type AgendaKindCounts { meeting: Int!, prep: Int!, task: Int!, session: Int!, event: Int! }
+# A day is busy when it holds at least one item of any kind (FR-009). That threshold
+# is the requirement and not a tuneable: raise it and a member taps an unmarked day
+# to find a meeting on it, at which point the marker is worse than none.
+# `byKind` is a typed count rather than `JSON!` — the marker is a dot per kind, and
+# JSON would leave every client guessing the key names.
+# One row per day of the month, empty days included: a grid has to know the 14th is
+# empty in order to leave it unmarked. `agenda` omits empty days instead.
+type MonthDay { date: Date!, total: Int!, busy: Boolean!, byKind: AgendaKindCounts! }
 
 # ---------- Operations / Admin ----------
 
@@ -196,7 +245,8 @@ type Query {
   meeting(id: ID!): Meeting
   meetings(includeCompleted: Boolean = false): [Meeting!]!
   agenda(from: DateTime!, to: DateTime!): [AgendaDay!]!    # merges meetings(+prep), timed tasks, sessions, events
-  monthOverview(year: Int!, month: Int!): [AgendaDay!]!
+  monthOverview(year: Int!, month: Int!): [MonthDay!]!
+  meetingOccurrences(from: DateTime!, to: DateTime!): [MeetingOccurrence!]!
 
   # operations (public health is REST; these are admin)
   health: Health!                              # @admin

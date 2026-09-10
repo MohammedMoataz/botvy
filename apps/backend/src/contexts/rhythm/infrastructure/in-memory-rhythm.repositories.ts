@@ -324,6 +324,7 @@ function stateOfPlan(plan: DailyPlan): DailyPlanState {
     status: plan.status,
     autoConfirmed: plan.autoConfirmed,
     tasks: plan.tasks,
+    meetings: plan.meetings,
     training: plan.training,
     workoutLine: plan.workoutLine,
     mealLine: plan.mealLine,

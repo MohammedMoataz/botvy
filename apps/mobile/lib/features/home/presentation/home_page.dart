@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../../../app/router.dart';
+import '../../calendar/application/agenda.dart';
 import '../../rhythm/application/rhythm_cubit.dart';
 import '../../rhythm/presentation/checkin_sheet.dart';
 import '../../rhythm/presentation/confirm_plan_sheet.dart';
@@ -65,6 +66,11 @@ class HomePage extends StatelessWidget {
                 onPressed: () => context.push(Routes.reminders),
               ),
               IconButton(
+                icon: const Icon(Icons.calendar_month),
+                tooltip: 'Calendar',
+                onPressed: () => context.push(Routes.calendar),
+              ),
+              IconButton(
                 icon: const Icon(Icons.person_outline),
                 tooltip: t.profileTitle,
                 onPressed: () => context.push(Routes.profile),
@@ -85,6 +91,7 @@ class HomePage extends StatelessWidget {
                       if (state.draft != null) const _PlanTomorrowCard(),
                       if (state.awaitingCheckin) const _CheckinCard(),
                       _TodayCard(state: state),
+                      if (state.agenda.isNotEmpty) _ScheduleCard(state: state),
                       _StreakCard(state: state),
                     ],
                   ),
@@ -185,6 +192,83 @@ class _TodayCard extends StatelessWidget {
                 icon: Icons.restaurant,
                 label: t.homeMeals,
                 value: state.mealLine!,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Today's calendar, as Home shows it (story 3: "the home screen shows
+/// today").
+///
+/// Drawn from [HomeState.agenda] — drift rows expanded on the device — and not
+/// from the server's `AgendaQuery`, which serves the extension and the web
+/// calendar. A query here would break FR-010 the first time the phone lost
+/// signal, and it would break it silently.
+///
+/// Hidden entirely on a day with nothing on it, rather than shown empty: the
+/// card above already says the day is quiet, and two empty cards saying the
+/// same thing reads as a broken screen.
+class _ScheduleCard extends StatelessWidget {
+  const _ScheduleCard({required this.state});
+
+  final HomeState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Today',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => context.push(Routes.calendar),
+                  child: const Text('Calendar'),
+                ),
+              ],
+            ),
+            for (final item in state.agenda)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(switch (item.kind) {
+                  AgendaKind.meeting => Icons.videocam_outlined,
+                  AgendaKind.preparation => Icons.timer_outlined,
+                  AgendaKind.task => Icons.check_box_outline_blank,
+                  AgendaKind.training => Icons.fitness_center,
+                  AgendaKind.event => Icons.cake_outlined,
+                }),
+                title: Text(item.title),
+                subtitle: Text(
+                  item.allDay
+                      ? 'All day'
+                      : TimeOfDay.fromDateTime(
+                          item.startAt.toLocal(),
+                        ).format(context),
+                ),
+                // A meeting opens its own screen, where the joining link and
+                // the map are one tap away (story 1, scenarios 1 and 2).
+                // Everything else opens the calendar, which is the screen that
+                // knows how to draw it.
+                onTap: () => context.push(
+                  item.kind == AgendaKind.meeting ||
+                          item.kind == AgendaKind.preparation
+                      ? Routes.meeting(item.id)
+                      : Routes.calendar,
+                ),
               ),
           ],
         ),

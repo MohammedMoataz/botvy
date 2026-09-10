@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { localDate, localHhMm, wallClockToUtc } from '../../../shared/time/time.js';
-import { preferSoonestDay, resolveRelativePhrase } from './relative-time.js';
+import {
+  mentionsAMoment,
+  preferSoonestDay,
+  resolveRelativePhrase,
+} from './relative-time.js';
 
 /**
  * The two time expressions a small model gets wrong, done in code instead.
@@ -188,5 +192,56 @@ describe('a bare time means today when today has not passed it', () => {
     expect(preferSoonestDay('not a time', 'remind me at 9pm', now, CAIRO)).toBe(
       'not a time',
     );
+  });
+});
+
+describe('mentionsAMoment', () => {
+  /*
+   * The guard that stops a model's invented time from becoming a calendar
+   * entry. P5's corpus found `qwen2.5:3b-instruct` answering `set_meeting`
+   * correctly for a sentence naming no time at all and then supplying `08:00`
+   * — so the extractor drops a wall clock the sentence could not have
+   * contained, and the executor asks instead (FR-006).
+   *
+   * The two halves are asserted separately because the failure modes are not
+   * symmetric: a false negative costs one question, a false positive is a
+   * meeting at an hour nobody chose.
+   */
+
+  it('is false for a sentence with no time in it, in either language', () => {
+    // The corpus case itself: "I have an appointment with the doctor at the
+    // clinic, put it in my calendar."
+    expect(
+      mentionsAMoment('عندي معاد مع الدكتور في العيادة، اعمله في التقويم'),
+    ).toBe(false);
+    expect(mentionsAMoment('schedule a call with Sara')).toBe(false);
+    expect(mentionsAMoment('put the standup in my calendar')).toBe(false);
+    expect(mentionsAMoment('اعملي اجتماع مع سارة')).toBe(false);
+  });
+
+  it('is true for anything a time could have been read from', () => {
+    for (const text of [
+      'meeting at 7:30',
+      'call at 9pm',
+      'lunch at noon',
+      'standup tomorrow',
+      'on Tuesday',
+      '14 Mar',
+      'in two hours',
+      'اجتماع بكرة',
+      'الساعة ٧ ونص',
+      'بعد ساعتين',
+      'الاجتماع الظهر',
+    ]) {
+      expect(mentionsAMoment(text), text).toBe(true);
+    }
+  });
+
+  it('counts a digit anywhere, which is the cheap majority of real times', () => {
+    // A member who names an hour almost always writes a number, so this one
+    // clause carries most of the recall — and it is why the word list can stay
+    // short, every entry in it being another chance to accept an invention.
+    expect(mentionsAMoment('meeting 3pm')).toBe(true);
+    expect(mentionsAMoment('اجتماع ٣ العصر')).toBe(true);
   });
 });

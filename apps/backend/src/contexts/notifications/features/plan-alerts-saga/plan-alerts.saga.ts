@@ -9,6 +9,7 @@ import {
   type AlertSourceKind,
 } from '../../domain/alert.aggregate.js';
 import { AlertRepository } from '../../domain/alert.repository.js';
+import { ReconcileMeetingAlertsHandler } from '../reconcile-meeting-alerts/reconcile-meeting-alerts.handler.js';
 
 /** Mints an alert id. A token, because the two adapters mint differently. */
 export const ALERT_ID = Symbol('ALERT_ID');
@@ -70,6 +71,22 @@ export class PlanAlertsSaga {
     private readonly alerts: AlertRepository,
     private readonly member: MemberContextPort,
     private readonly nextId: AlertIdFactory,
+    /**
+     * The meetings branch, which owns its own reconcile.
+     *
+     * A separate collaborator rather than five more constructor arguments,
+     * because the meetings window needs an occurrences port, a members port and
+     * a settings key that nothing else in this saga reads — and the nightly
+     * endpoint needs exactly the same reconciliation, so it would have had to
+     * live somewhere both could reach it either way.
+     *
+     * Optional so that a spec exercising the task, reminder and rhythm paths
+     * can bind four dependencies and no more. A meetings event arriving with
+     * nothing bound is a wiring fault rather than a quiet no-op, so it is
+     * logged as an error: a handler that silently never runs is the failure
+     * mode this codebase has paid for twice.
+     */
+    private readonly meetings?: ReconcileMeetingAlertsHandler,
   ) {}
 
   // ------------------------------------------------------------------ Planning
@@ -186,6 +203,74 @@ export class PlanAlertsSaga {
     );
   }
 
+  // ------------------------------------------------------------------ Meetings
+
+  /**
+   * `meetings.MeetingScheduled`, `MeetingChanged`, `OccurrenceSkipped` and
+   * `OccurrenceMoved`.
+   *
+   * All four are handled the same way, because reconciling makes them the same
+   * operation: "here is what this meeting's warnings should be now". The
+   * distinction matters to the *catalogue* — one means the meeting appeared,
+   * one that its rule or its offsets changed, one that a date was dropped, one
+   * that a date moved — but not to the work, and the alternative is four
+   * branches that must agree about a window and a quiet-hours rule.
+   *
+   * The desired set is *not* built from this payload, and that is the one thing
+   * about this branch worth reading twice. The payload carries the rule, and
+   * occurrences are not in a rule until something expands it against the
+   * member's zone — so the moments come from Meetings' own query, which runs the
+   * same expander every calendar screen does. Expanding here would be a second
+   * copy of the hardest logic in the platform, and its first divergence would
+   * be an alarm at one hour and a calendar insisting the meeting is at another.
+   */
+  async onMeetingChanged(event: DomainEvent): Promise<void> {
+    const payload = event.payload as { meetingId?: string };
+    const userId = event.userId;
+    if (!userId || !payload.meetingId) return;
+
+    if (!this.meetings) {
+      this.logger.error(
+        `${event.name} for ${userId}: no meeting reconciler is bound, so no ` +
+          'meeting alert was planned. Register ReconcileMeetingAlertsHandler ' +
+          'in notifications.module.ts.',
+      );
+      return;
+    }
+
+    await this.meetings.forMeeting(userId, payload.meetingId);
+  }
+
+  /**
+   * `meetings.MeetingCompleted`, `MeetingCancelled` and `MeetingDeleted`: the
+   * pending alerts go.
+   *
+   * A completed meeting drops its warnings exactly as a cancelled one does, and
+   * that is not laziness about the difference between them. The status is the
+   * record of which it was and the Deleted view exists to show it; a *warning*
+   * about a meeting that has already run is noise either way, and it would be
+   * noise arriving after the fact, which is the kind a member acts on.
+   *
+   * Straight to `deletePendingForSource` rather than through the reconciler:
+   * these three payloads carry `{ meetingId, at }` and nothing else, there is
+   * no window to expand, and an empty desired set is one delete either way.
+   * Note it never touches a *sent* alert — an alert already delivered is a
+   * thing that happened, and deleting the record of it would lose the only
+   * evidence the member was told.
+   */
+  async onMeetingClosed(event: DomainEvent): Promise<void> {
+    const payload = event.payload as { meetingId?: string };
+    const userId = event.userId;
+    if (!userId || !payload.meetingId) return;
+
+    await this.uow.run(() =>
+      this.alerts.deletePendingForSource(userId, {
+        kind: 'meeting',
+        id: payload.meetingId!,
+      }),
+    );
+  }
+
   // -------------------------------------------------------------- Daily Rhythm
 
   /**
@@ -266,14 +351,36 @@ export class PlanAlertsSaga {
    * event carries one `changed` list for the whole patch. Ignoring those is the
    * point of reading the list: a member editing their food dislikes must not
    * cost a full re-plan of their week.
+   *
+   * ## Meetings are re-planned, not re-computed (FR-014)
+   *
+   * `replanFuture` rebuilds each alert from `source.occurrenceAt`, which for a
+   * task or a reminder is the moment the member chose and is still that moment
+   * in the new zone. For a meeting it is now **the wrong instant**: an
+   * occurrence is a wall time, so an unpinned series' occurrences all moved
+   * when the member did — their 18:00 routine is at 18:00 wherever they are,
+   * which is a different instant. Rebuilding from the stored one would keep
+   * every warning on the old city's clock, and it would also read the member's
+   * default lead times instead of the meeting's own stored offsets.
+   *
+   * So the meeting half goes back to the port and re-expands the rule. A series
+   * marked `lockTimezone` expands in its own zone and comes back at the same
+   * instants, which is the entire point of the flag — it costs a reconcile that
+   * finds nothing to change, and a reconcile that finds nothing to change
+   * writes nothing.
+   *
+   * Without this branch a member who flies is wrong until the nightly pass:
+   * v1's three-hour bug again, a day long instead of permanent.
    */
   async onProfileUpdated(event: DomainEvent): Promise<void> {
     const changed = (event.payload as { changed?: string[] })?.changed ?? [];
     if (!event.userId || !changed.includes('timezone')) return;
 
     const count = await this.replanFuture(event.userId, event.occurredAt);
+    const meetings = await this.replanMeetings(event.userId);
     this.logger.log(
-      `time zone changed for ${event.userId}: re-planned ${count} alert(s)`,
+      `time zone changed for ${event.userId}: re-planned ${count} alert(s) ` +
+        `and ${meetings} meeting(s)`,
     );
   }
 
@@ -294,8 +401,15 @@ export class PlanAlertsSaga {
       return;
 
     const count = await this.replanFuture(event.userId, event.occurredAt);
+    // The quiet window moves a meeting's *derived* warnings too, and the
+    // meeting half of the re-plan is the port's, not `replanFuture`'s — the
+    // same reason as the time-zone branch, minus the moved instants. A changed
+    // `leadTimes` reaches here as well and correctly changes nothing about a
+    // meeting: its offsets were stored on it at creation.
+    const meetings = await this.replanMeetings(event.userId);
     this.logger.log(
-      `alert preferences changed for ${event.userId}: re-planned ${count} alert(s)`,
+      `alert preferences changed for ${event.userId}: re-planned ${count} ` +
+        `alert(s) and ${meetings} meeting(s)`,
     );
   }
 
@@ -467,6 +581,27 @@ export class PlanAlertsSaga {
 
     await this.uow.run(async () => {
       for (const alert of pending) {
+        /*
+         * A meeting's warnings are not rebuilt from here, and the reason is
+         * exactly why this method cannot be the whole of FR-014.
+         *
+         * Two things it would get wrong. The lead times it reads are the
+         * member's *defaults*, and a meeting carries its own offsets stored at
+         * creation — so a `30m` warning would find no matching entry and be
+         * left behind, and a `prep` warning has no lead time at all. And
+         * `occurrenceAt` is the *rule's* moment, which is the right key but the
+         * wrong instant to count back from once an override has moved the
+         * occurrence, or once the member has changed zone and every wall time
+         * has landed somewhere new.
+         *
+         * `replanMeetings` re-expands the rule through the port instead. The
+         * sweep's device filter is untroubled by the omission: a meeting
+         * warning is always future-dated, so the phone pulls it and schedules
+         * its own alarm — unlike a rhythm touch, whose alert is planned for
+         * *now* and therefore depends on the server sweep.
+         */
+        if (alert.source.kind === 'meeting') continue;
+
         const moment = alert.source.occurrenceAt;
         // Without an occurrence there is no member-chosen moment to rebuild
         // from — a rhythm touch, say, whose instant the rhythm owns. Left
@@ -490,6 +625,25 @@ export class PlanAlertsSaga {
     });
 
     return moved;
+  }
+
+  /**
+   * Re-expand every meeting this member has in the alert window and reconcile.
+   *
+   * Returns the number of meetings looked at rather than the number of alerts
+   * moved, because "nothing moved" is the correct and common answer — a member
+   * whose meetings are all pinned to a zone, or whose zone change was to one
+   * with the same offset, has a full window of warnings that are already right.
+   * Counting writes would report zero and read as a failure.
+   *
+   * A no-op with nothing bound, and quietly so: the profile and preference
+   * branches predate meetings by three phases, and a spec exercising them must
+   * not have to know this context now has a diary in it.
+   */
+  private async replanMeetings(userId: string): Promise<number> {
+    if (!this.meetings) return 0;
+    const result = await this.meetings.forMember(userId);
+    return result.meetings;
   }
 }
 

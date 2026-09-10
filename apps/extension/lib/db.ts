@@ -1,5 +1,12 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
-import type { LabelRow, PendingPush, SyncEntity, TaskRow } from '@botvy/sdk';
+import type {
+  CalendarEventRow,
+  LabelRow,
+  MeetingRow,
+  PendingPush,
+  SyncEntity,
+  TaskRow,
+} from '@botvy/sdk';
 
 /**
  * The panel re-mounts every time it is closed, so anything that must survive
@@ -51,6 +58,8 @@ export class BotvyDb extends Dexie {
   meta!: EntityTable<MetaRow, 'key'>;
   tasks!: Table<PanelTaskRow, string>;
   labels!: Table<LabelRow, string>;
+  meetings!: Table<MeetingRow, string>;
+  calendar_events!: Table<CalendarEventRow, string>;
   pending_ops!: Table<PendingOpRow, [SyncEntity, string]>;
 
   constructor() {
@@ -79,6 +88,27 @@ export class BotvyDb extends Dexie {
       meta: '&key',
       tasks: '&id',
       labels: '&id',
+      pending_ops: '[entity+id], entity',
+    });
+
+    // A new rung rather than an edit to version 2, for the reason version 1 is
+    // still declared above: Dexie replays the ladder for an install that is
+    // behind, so an installation sitting on version 2 needs a step that creates
+    // exactly these two stores. Editing version 2 in place would create them
+    // for a fresh install and for nobody else, and the panel would then read an
+    // object store that does not exist on every browser that already has the
+    // extension.
+    //
+    // Still only the primary keys, for the reason above: both of the reads the
+    // panel does over these tables turn on `deletedAt`, which is `null` for the
+    // ordinary row, and IndexedDB does not index `null` at all — so an index on
+    // it would quietly hide every live meeting.
+    this.version(3).stores({
+      meta: '&key',
+      tasks: '&id',
+      labels: '&id',
+      meetings: '&id',
+      calendar_events: '&id',
       pending_ops: '[entity+id], entity',
     });
   }

@@ -2,13 +2,20 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import {
   AuthStore as SdkAuthStore,
   BotvyClient,
+  MeetingsStore,
   ProfileStore,
   SyncStore,
   TokenStore,
+  expandOccurrences,
   localDay,
+  meetingAsRepeating,
   newId,
+  wallClockToUtc,
+  type CalendarEventRow,
   type CompleteTaskAck,
   type LabelRow,
+  type MeetingRow,
+  type Occurrence,
   type SignedInMember,
   type TaskAck,
   type TokenPair,
@@ -86,6 +93,31 @@ const TIMEZONE_KEY = 'profile.timezone';
 /** Priority 4 — the server's own default for a task nobody prioritised. */
 const DEFAULT_PRIORITY = 4;
 
+/** How far ahead the meetings list looks. Seven days, per T550. */
+const AGENDA_DAYS = 7;
+
+/**
+ * One occurrence the panel draws, with the id of the row it came from.
+ *
+ * The occurrence is derived on every read and the meeting is what the member
+ * can act on, so both travel together — and the pair is also the only stable
+ * identity a list key can use, because an occurrence has no id of its own.
+ */
+export interface AgendaEntry {
+  meetingId: string;
+  occurrence: Occurrence;
+}
+
+/** What the quick-add form collects. The wall clock is the member's, not the host's. */
+export interface MeetingDraft {
+  title: string;
+  /** `YYYY-MM-DDTHH:mm` as `<input type="datetime-local">` hands it over. */
+  startWallClock: string;
+  durationMin: number;
+  onlineLink: string;
+  address: string;
+}
+
 export class PanelStore {
   locale: Locale = 'en';
   hydrated = false;
@@ -97,6 +129,7 @@ export class PanelStore {
   /** The rows the panel draws, read out of Dexie — never held only in React. */
   tasks: PanelTaskRow[] = [];
   labels: LabelRow[] = [];
+  meetings: MeetingRow[] = [];
 
   /** The member's zone, from the profile and cached in Dexie. Never the host's. */
   timezone: string | null = null;
@@ -114,9 +147,10 @@ export class PanelStore {
   readonly client: BotvyClient;
   readonly auth: SdkAuthStore;
   readonly profile: ProfileStore;
+  readonly meetingsApi: MeetingsStore;
 
   /**
-   * The two local tables, and the engine that fills them.
+   * The local tables, and the engine that fills them.
    *
    * Labels are registered before tasks, and the order is the one thing this
    * declaration has to get right: `SyncStore` sends `entities` and builds
@@ -125,9 +159,32 @@ export class PanelStore {
    * label the same request is about to create. The server sorts its adapters by
    * `applyOrder` and would survive the wrong order; the wire should not have to
    * be rescued.
+   *
+   * Meetings and calendar events come after, in the order `contracts/sync.md`
+   * writes them and the server's `applyOrder` applies them (32 then 34).
+   * Neither references anything and nothing references either, so the order is
+   * not buying correctness there — it is buying a request that reads the same
+   * as the contract, so that nobody later "fixes" it in the wrong direction.
+   *
+   * Both are registered even though the panel only draws meetings. Registering
+   * is what makes the entity real to the engine: it is the key `entities` is
+   * built from, the table a `purge` push writes through, and — the part that is
+   * easy to miss — the branch a rejection takes. `SyncStore` looks a rejection's
+   * `entity` up in this map *before* it touches a row, and skips an entity it
+   * finds no table for. So an unregistered `calendar_events` rejection would be
+   * silently dropped rather than applied through some other table, and a
+   * registered one is branched correctly with no code here at all.
    */
   readonly labelsTable = new DexieSyncTable<LabelRow>('labels', db.labels);
   readonly tasksTable = new DexieSyncTable<PanelTaskRow>('tasks', db.tasks);
+  readonly meetingsTable = new DexieSyncTable<MeetingRow>(
+    'meetings',
+    db.meetings,
+  );
+  readonly eventsTable = new DexieSyncTable<CalendarEventRow>(
+    'calendar_events',
+    db.calendar_events,
+  );
 
   /** Built in `hydrate`, because the install id and the cursor are in Dexie. */
   sync: SyncStore | null = null;
@@ -170,14 +227,18 @@ export class PanelStore {
     });
     this.auth = new SdkAuthStore(this.client, this.mirror);
     this.profile = new ProfileStore(this.client);
+    this.meetingsApi = new MeetingsStore(this.client);
 
     makeAutoObservable(this, {
       mirror: false,
       client: false,
       auth: false,
       profile: false,
+      meetingsApi: false,
       labelsTable: false,
       tasksTable: false,
+      meetingsTable: false,
+      eventsTable: false,
       sync: false,
     });
 
@@ -243,6 +304,47 @@ export class PanelStore {
       );
   }
 
+  /**
+   * The next seven days of meetings, expanded from the rules the panel holds.
+   *
+   * **The rows are rules, not occurrences** — a repeating meeting is one
+   * document with `dtstart`, an RRULE, its skipped dates and its moved ones —
+   * so there is nothing to list until they are expanded, and the expansion has
+   * to happen here rather than on the server (FR-010: this list is readable
+   * with no connection). `expandOccurrences` in the SDK is that, and it is
+   * written to agree with the server's expander case for case: a panel showing
+   * an occurrence the phone does not is worse than a panel showing none.
+   *
+   * Cancelled, completed and deleted meetings are left out. That mirrors the
+   * aggregate, which produces no occurrences unless it is `scheduled` and
+   * live — and it is the same filter the alert saga gets its silence from, so a
+   * meeting the member cancelled is neither drawn here nor notified about.
+   *
+   * Drawn only once the member's own zone is known: without it there is no
+   * "next seven days", and guessing at one from the browser is the mistake that
+   * shifted every extracted reminder by three hours in v1.
+   */
+  get nextSevenDays(): AgendaEntry[] {
+    const zone = this.timezone;
+    if (!zone) return [];
+
+    const from = new Date();
+    const to = new Date(from.getTime() + AGENDA_DAYS * 86_400_000);
+
+    return this.meetings
+      .filter((row) => row.deletedAt === null && row.status === 'scheduled')
+      .flatMap((row) =>
+        expandOccurrences(meetingAsRepeating(row), from, to, zone).map(
+          (occurrence) => ({ meetingId: row.id, occurrence }),
+        ),
+      )
+      .sort(
+        (left, right) =>
+          new Date(left.occurrence.startAt).getTime() -
+          new Date(right.occurrence.startAt).getTime(),
+      );
+  }
+
   t = (key: string, params?: Record<string, string | number>): string =>
     translate(this.locale, key, params);
 
@@ -278,7 +380,12 @@ export class PanelStore {
 
     this.sync = new SyncStore(this.client, {
       installId,
-      tables: { labels: this.labelsTable, tasks: this.tasksTable },
+      tables: {
+        labels: this.labelsTable,
+        tasks: this.tasksTable,
+        meetings: this.meetingsTable,
+        calendar_events: this.eventsTable,
+      },
       cursorStorage: dexieCursorStorage(cursor ?? null),
     });
     // The engine writes rows through the tables rather than through this store,
@@ -361,6 +468,8 @@ export class PanelStore {
     await Promise.all([
       this.tasksTable.clear(),
       this.labelsTable.clear(),
+      this.meetingsTable.clear(),
+      this.eventsTable.clear(),
       setMeta(SYNC_LAST_AT_KEY, null),
       setMeta(TIMEZONE_KEY, null),
     ]);
@@ -370,6 +479,7 @@ export class PanelStore {
       this.status = 'idle';
       this.failure = null;
       this.member = null;
+      this.meetings = [];
       this.timezone = null;
       this.lastSyncedAt = null;
       this.noticeKey = null;
@@ -377,15 +487,25 @@ export class PanelStore {
     });
   }
 
-  /** Re-reads both tables out of Dexie. Called after every pass and every edit. */
+  /**
+   * Re-reads the drawn tables out of Dexie. Called after every pass and edit.
+   *
+   * `calendar_events` is deliberately absent: it is registered with the engine
+   * so its rows, rejections and purges are handled, and nothing in this panel
+   * draws a personal event yet (that is the calendar, which is P9's). Loading
+   * it into observable state would be a list to keep in step with no reader to
+   * notice when it drifted.
+   */
   async refresh(): Promise<void> {
-    const [tasks, labels] = await Promise.all([
+    const [tasks, labels, meetings] = await Promise.all([
       this.tasksTable.all(),
       this.labelsTable.all(),
+      this.meetingsTable.all(),
     ]);
     runInAction(() => {
       this.tasks = tasks;
       this.labels = labels;
+      this.meetings = meetings;
     });
   }
 
@@ -465,6 +585,81 @@ export class PanelStore {
     await this.sync.queue('tasks', { op: 'create', id, data, updatedAt: now });
     await this.refresh();
     void this.syncNow();
+  }
+
+  /**
+   * Quick add: a meeting with a time and somewhere to be.
+   *
+   * ## Through the route, not the push queue
+   *
+   * The opposite decision from `addTask`, and for the same reason `setCompleted`
+   * takes the route: the server owns two values this panel must not invent.
+   * A length nobody typed is the member's `defaults.meetingDurationMin`, and
+   * reminders nobody chose are their own advance warnings (FR-001, FR-003) —
+   * both an operator knob and a member preference, and **a hard-coded default
+   * is a bug**. Pushing the row would mean filling them in here or sending a
+   * zero the sync adapter refuses as `invalid`. So `POST /meetings` resolves
+   * them, and the created row arrives on the pull that follows.
+   *
+   * Which is also why nothing is drawn optimistically. The row the member would
+   * see for that second is one this panel would have had to make up — its
+   * duration, its reminders, the zone it was authored in — and every one of
+   * those is a field the server decides. A create that reached the server and a
+   * sync that then failed shows up on the next pass; a create that invented its
+   * own row would disagree with the server and look right.
+   *
+   * ## At least one of a link and an address
+   *
+   * Checked here because the server refuses a meeting with neither, so sending
+   * one spends a round trip to be told what the panel already knew — and the
+   * refusal would arrive as a notice about "the server", which is not what went
+   * wrong. The form disables its own button on the same condition; this is the
+   * guard that holds when the form is not the caller.
+   *
+   * ## The wall clock is the member's
+   *
+   * `<input type="datetime-local">` hands over digits with no zone, and
+   * `new Date(digits)` resolves them against the *browser's* zone. A member
+   * whose profile says Cairo, filling this in from a laptop in Berlin, would
+   * place the meeting an hour out — silently, and only on the trips where it
+   * matters. `wallClockToUtc` resolves it against the profile's zone instead,
+   * which is also the zone the server will record as `authoredTimezone`.
+   */
+  async addMeeting(draft: MeetingDraft): Promise<boolean> {
+    const title = draft.title.trim();
+    const onlineLink = draft.onlineLink.trim();
+    const address = draft.address.trim();
+    const zone = this.timezone;
+
+    if (!title || !zone || (!onlineLink && !address)) return false;
+
+    const startAt = wallClockToUtc(draft.startWallClock, zone);
+    if (!startAt) return false;
+
+    try {
+      await this.meetingsApi.create({
+        id: newId(),
+        title,
+        startAt: startAt.toISOString(),
+        // Absent means the member's own default length, resolved server-side.
+        durationMin: draft.durationMin > 0 ? draft.durationMin : null,
+        location: {
+          onlineLink: onlineLink || null,
+          address: address || null,
+        },
+        source: 'extension',
+      });
+      runInAction(() => {
+        this.noticeKey = null;
+      });
+      await this.syncNow();
+      return true;
+    } catch {
+      runInAction(() => {
+        this.noticeKey = 'meetings.failed';
+      });
+      return false;
+    }
   }
 
   /**

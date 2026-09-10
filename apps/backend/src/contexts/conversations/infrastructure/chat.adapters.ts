@@ -1,6 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { newId } from '../../../shared/cqrs/ids.js';
-import { localDate, localHhMm, wallClockToUtc } from '../../../shared/time/time.js';
+import { MemberContextPort } from '../../../shared/member/member-context.port.js';
+import {
+  formatInTz,
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../../shared/time/time.js';
+import { MeetingQueryHandler } from '../../meetings/features/meeting/meeting.query.js';
+import { MeetingOccurrencesQueryHandler } from '../../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
+import { CreateMeetingHandler } from '../../meetings/features/create-meeting/create-meeting.handler.js';
 import { CancelTaskHandler } from '../../planning/features/cancel-task/cancel-task.handler.js';
 import { CreateTaskHandler } from '../../planning/features/create-task/create-task.handler.js';
 import { TasksQueryHandler } from '../../planning/features/tasks-query/tasks.query.js';
@@ -17,6 +26,7 @@ import { UsageTodayQueryHandler } from '../../operations/features/usage-today/us
 import {
   CheckinPort,
   LatestCheckinPort,
+  MeetingActionsPort,
   MemberDayPort,
   MemberFactsPort,
   PlannerActionsPort,
@@ -296,6 +306,116 @@ export class PlanningReminderActions extends PlannerActionsPort {
       ...(task.priority ? { priority: task.priority } : {}),
       status: task.status,
       deepLink: `botvy://tasks/${task.id}`,
+    }));
+  }
+}
+
+/**
+ * Meetings creates the meeting a member asks for in the chat.
+ *
+ * The same shape as `PlanningReminderActions.createReminder`, and for the same
+ * three reasons.
+ *
+ * **The chat mints the id.** `CreateMeetingHandler` is idempotent on it and
+ * refuses anything that is not a UUID, so a retried offline batch flush is one
+ * meeting rather than two — the failure the client-minted-id rule exists to
+ * prevent, reachable from a server-side caller because a batch can be flushed
+ * twice.
+ *
+ * **It reads back what was stored.** FR-004's confirmation has to name the
+ * values the store actually holds: a title the aggregate trimmed or a duration
+ * it clamped is confirmed as it now is. `startAt` comes back from the row and
+ * not from the command.
+ *
+ * **A domain refusal becomes `null`.** `MeetingRuleError` is Meetings'
+ * vocabulary and `chat.ports.ts` may not import its union of codes, so the code
+ * is logged here and the executor tells the member nothing was saved. Anything
+ * that is not a rule refusal is rethrown: a store that is down is not a
+ * sentence the member typed wrongly, and swallowing it would confirm nothing
+ * and report nothing.
+ */
+@Injectable()
+export class MeetingsChatActions extends MeetingActionsPort {
+  private readonly logger = new Logger(MeetingsChatActions.name);
+
+  constructor(
+    private readonly meetings: CreateMeetingHandler,
+    private readonly queries: MeetingQueryHandler,
+    private readonly occurrences: MeetingOccurrencesQueryHandler,
+    private readonly member: MemberContextPort,
+  ) {
+    super();
+  }
+
+  async createMeeting(input: {
+    userId: string;
+    title: string;
+    startAt: Date;
+    durationMin?: number;
+    onlineLink?: string;
+    address?: string;
+  }): Promise<CreatedItem | null> {
+    const id = newId();
+    try {
+      await this.meetings.handle(input.userId, {
+        id,
+        title: input.title,
+        startAt: input.startAt,
+        ...(input.durationMin !== undefined
+          ? { durationMin: input.durationMin }
+          : {}),
+        location: {
+          onlineLink: input.onlineLink ?? null,
+          address: input.address ?? null,
+        },
+        source: 'chat',
+      });
+    } catch (error) {
+      if ((error as Error).name !== 'MeetingRuleError') throw error;
+      this.logger.debug(
+        `Meetings refused a chat-created meeting: ${(error as Error).message}`,
+      );
+      return null;
+    }
+
+    const stored = await this.queries.byId(input.userId, id);
+    return {
+      id,
+      title: stored?.title ?? input.title,
+      at: stored?.startAt ?? input.startAt,
+      // A meeting always occupies a stretch of the day (FR-001); a whole-day
+      // entry is a personal event, which is not this port's business.
+      allDay: false,
+    };
+  }
+
+  /**
+   * The member's next meetings, expanded from the rule.
+   *
+   * Through the published occurrence query, which is the same expansion the
+   * calendar and the alert reconciliation read — so the chat cannot tell a
+   * member about a meeting on a day their calendar does not show it.
+   *
+   * `at` is a wall-clock string in the member's zone, because that is what
+   * `CardItem.at` is: the client renders the row as given, and a card carrying
+   * an instant would be rendered against the *device's* zone. The occurrence
+   * query already resolves the window in the member's zone, so the formatting
+   * is the only thing left to do here.
+   */
+  async listUpcoming(
+    userId: string,
+    now: Date,
+    days: number,
+  ): Promise<CardItem[]> {
+    const to = new Date(now.getTime() + days * 86_400_000);
+    const occurrences = await this.occurrences.forMember(userId, now, to);
+    const { timezone } = await this.member.clock(userId);
+
+    return occurrences.map((occurrence) => ({
+      id: occurrence.meetingId,
+      title: occurrence.title,
+      at: formatInTz(occurrence.startAt, timezone),
+      deepLink: `botvy://meetings/${occurrence.meetingId}`,
     }));
   }
 }

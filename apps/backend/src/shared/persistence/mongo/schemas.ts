@@ -371,6 +371,33 @@ export const DailyPlanSchema = new Schema(
       ],
       default: [],
     },
+    /**
+     * The day's meetings, snapshotted beside the tasks (FR-012).
+     *
+     * Declared here and not only in the mapper, because `MongoRepositoryBase`
+     * saves through an upsert and Mongoose's `strict: true` **rejects an
+     * upsert naming an undeclared path outright** — the whole write fails, not
+     * just the field. That has shipped twice in this codebase (`AlertSchema`
+     * in P2, `MessageSchema` in P3) and both times the unit suite was green,
+     * because handler specs bind the in-memory adapter and it has no schema to
+     * be strict about.
+     *
+     * `meetingId` rather than an occurrence id: occurrences are derived from
+     * the rule and have no identity of their own, so a repeating meeting can
+     * legitimately appear twice in one day's array.
+     */
+    meetings: {
+      type: [
+        {
+          _id: false,
+          meetingId: { type: String, required: true },
+          title: { type: String, required: true },
+          startAt: { type: Date, required: true },
+          durationMin: { type: Number, required: true },
+        },
+      ],
+      default: [],
+    },
     training: {
       type: {
         _id: false,
@@ -645,6 +672,141 @@ export const QuickQuestionSchema = new Schema(
   { collection: 'quick_questions', versionKey: false, _id: false },
 );
 
+/**
+ * The repeat, shared by both of Meetings' collections.
+ *
+ * A rule, the dates the member removed and the occurrences they moved — never
+ * expanded rows (FR-006), so a weekly series with no end is one document and a
+ * series of any length costs the same to keep.
+ *
+ * `overrides` is keyed by `originalStart`, the moment the *rule* produced, and
+ * that key never moves. It is what lets a series edit still find a moved
+ * occurrence, and what makes moving the same occurrence twice update one
+ * override rather than accumulating two.
+ *
+ * Declared once and used by both schemas below rather than written twice,
+ * because FR-011 requires a repeating personal event to skip, move and end
+ * exactly as a repeating meeting does — two copies of this shape is how the two
+ * would come to disagree about what an override is.
+ */
+const recurrenceShape = {
+  _id: false,
+  dtstart: { type: Date, required: true },
+  rrule: { type: String, required: true },
+  exdates: { type: [Date], default: [] },
+  overrides: {
+    type: [
+      {
+        _id: false,
+        originalStart: { type: Date, required: true },
+        startAt: { type: Date, default: null },
+        durationMin: { type: Number, default: null },
+        title: { type: String, default: null },
+        location: {
+          type: {
+            _id: false,
+            onlineLink: { type: String, default: null },
+            address: { type: String, default: null },
+          },
+          default: null,
+        },
+      },
+    ],
+    default: [],
+  },
+} as const;
+
+/**
+ * One meeting, and for a repeating one, one series (data-model §2.10).
+ *
+ * `reminderOffsets` holds minutes before the occurrence and is resolved from
+ * the member's `defaults.leadTimes` **at creation**, so a later preference
+ * change never silently moves the reminders of a meeting that already exists.
+ *
+ * `lockTimezone` is the named zone a series is pinned to, or null to follow the
+ * member (FR-007): "keep this on Cairo's clock" for somebody who has flown to
+ * Berlin. Expansion reads it on every read rather than storing a resolved
+ * instant, which is what makes a member's move a re-read instead of a rewrite.
+ *
+ * `allDay` is present because the blueprint's document carries it and is unset
+ * and unread in this phase — a whole-day entry is a `calendar_events` row
+ * (FR-001), and a second way to say the same thing would be one more branch in
+ * the expander for nothing.
+ */
+export const MeetingSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    title: { type: String, required: true },
+    description: { type: String, default: null },
+    startAt: { type: Date, required: true },
+    durationMin: { type: Number, required: true, default: 30 },
+    allDay: { type: Boolean, required: true, default: false },
+    lockTimezone: { type: String, default: null },
+    /**
+     * The zone the member's clock was in when they wrote this, kept for ever.
+     *
+     * Without it a stored instant cannot say what the member typed: 18:00 in
+     * Cairo read in Berlin is 17:00, so a member who flies would find their
+     * series at neither the time they chose nor the time they left behind.
+     * `recurrence-expander.ts` takes the wall-clock digits from here (or from
+     * `lockTimezone`) and reads them on the member's current clock, which is
+     * both halves of FR-007 in one line.
+     */
+    authoredTimezone: { type: String, required: true },
+    location: {
+      type: {
+        _id: false,
+        onlineLink: { type: String, default: null },
+        address: { type: String, default: null },
+      },
+      required: true,
+    },
+    prepNotes: { type: String, default: null },
+    prepMinutes: { type: Number, required: true, default: 0 },
+    reminderOffsets: { type: [Number], default: [] },
+    recurrence: { type: recurrenceShape, default: null },
+    /** `scheduled` | `completed` | `cancelled`. A delete never touches it. */
+    status: { type: String, required: true, default: 'scheduled' },
+    completedAt: { type: Date, default: null },
+    source: { type: String, required: true, default: 'app' },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'meetings', versionKey: false, _id: false },
+);
+
+/**
+ * A birthday, a holiday, a block of focus time (FR-011).
+ *
+ * Its own collection rather than a flag on `meetings`, because the two
+ * disagree about almost everything a meeting is — a location that is required,
+ * a duration bounded by the working day, preparation, reminders and an outcome.
+ * What they share is the repeat, which is why `recurrence` above is one shape.
+ */
+export const CalendarEventSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    title: { type: String, required: true },
+    notes: { type: String, default: null },
+    startAt: { type: Date, required: true },
+    endAt: { type: Date, required: true },
+    allDay: { type: Boolean, required: true, default: false },
+    color: { type: String, default: null },
+    recurrence: { type: recurrenceShape, default: null },
+    /** As on `meetings`; see the note there. */
+    authoredTimezone: { type: String, required: true },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'calendar_events', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -666,4 +828,6 @@ export const MODEL_NAMES = {
   counter: 'Counter',
   usageLog: 'UsageLog',
   quickQuestion: 'QuickQuestion',
+  meeting: 'Meeting',
+  calendarEvent: 'CalendarEvent',
 } as const;

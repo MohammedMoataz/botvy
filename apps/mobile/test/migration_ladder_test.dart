@@ -19,7 +19,7 @@ import 'package:sqlite3/sqlite3.dart';
 ///
 /// "From the previous version" is not enough, and P3 found out why. drift calls
 /// `onUpgrade` **once**, with the pair it actually has: a phone that last ran
-/// version 1 and opens version 5 arrives as `(1, 5)`, and every branch in the
+/// version 1 and opens version 6 arrives as `(1, 6)`, and every branch in the
 /// ladder sees `from == 1`. A branch guarded `from >= 2 && from < 3` therefore
 /// never runs for it — so a v1 install upgrading to v3 came out with the
 /// profile mirrors and **no task tables at all**, and every query against them
@@ -119,13 +119,21 @@ void main() {
     'rhythm_state',
   ];
 
+  /// What version 5 shipped: the chat, on top of everything before it.
+  const v5Tables = [
+    ...v4Tables,
+    'conversations',
+    'messages',
+    'pending_messages',
+  ];
+
   /// Every earlier version, upgraded to the current schema, asserting the
   /// **whole** schema each time.
   ///
   /// The one test in this file that could not have been skipped by an oversight
   /// and is the reason P3's defect existed for two phases. drift calls
   /// `onUpgrade` **once** with the pair it actually has, so a phone at version
-  /// 1 opening version 5 arrives as `(1, 5)` and *every* branch sees
+  /// 1 opening version 6 arrives as `(1, 6)` and *every* branch sees
   /// `from == 1`. A branch guarded `from >= 4 && from < 5` therefore never runs
   /// for it, and that band is the only thing that would create `conversations`,
   /// `messages` and `pending_messages`: the install would come out with the
@@ -141,6 +149,7 @@ void main() {
       2: v2Tables,
       3: v3Tables,
       4: v4Tables,
+      5: v5Tables,
     };
 
     for (final entry in donors.entries) {
@@ -176,6 +185,16 @@ void main() {
             'messages_conversation_seq',
             'messages_client',
             'pending_messages_composed',
+            // P5's, in the same list rather than in a test of their own: the
+            // point of this loop is that *every* prior version ends up with the
+            // whole schema, and a phase whose indexes are only asserted from
+            // the version before it is a phase whose `from < N` guard was never
+            // exercised from further back.
+            'meetings_start',
+            'meetings_status_start',
+            'meetings_pending',
+            'calendar_events_start',
+            'calendar_events_pending',
           ]),
         );
 
@@ -211,6 +230,55 @@ void main() {
             composedAt: DateTime.now().toUtc(),
           ),
         );
+
+        // P5's two tables, written the way the sync applier writes them — a
+        // series with its rule in `recurrence_json` and its place in
+        // `location_json`, because those are the columns the whole calendar is
+        // derived from and a migration that got one of them wrong would draw an
+        // empty month rather than fail.
+        final stamp = DateTime.now().toUtc();
+        await db.into(db.meetings).insert(
+          MeetingsCompanion.insert(
+            id: 'meeting-1',
+            title: 'Standup',
+            startAt: stamp,
+            durationMin: const Value(30),
+            authoredTimezone: const Value('Africa/Cairo'),
+            locationJson: const Value(
+              '{"onlineLink":"https://meet.example/abc","address":null}',
+            ),
+            reminderOffsetsJson: const Value('[1440,30]'),
+            recurrenceJson: Value(
+              '{"dtstart":"${stamp.toIso8601String()}",'
+              '"rrule":"FREQ=WEEKLY;COUNT=6","exdates":[],"overrides":[]}',
+            ),
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+        await db.into(db.calendarEvents).insert(
+          CalendarEventsCompanion.insert(
+            id: 'event-1',
+            title: 'Birthday',
+            startAt: stamp,
+            endAt: stamp.add(const Duration(days: 1)),
+            allDay: const Value(true),
+            color: const Value('#0ea5e9'),
+            authoredTimezone: const Value('Africa/Cairo'),
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+
+        final meeting = (await db.select(db.meetings).get()).single;
+        // The defaults the columns declare, for a meeting nothing has happened
+        // to yet.
+        expect(meeting.status, 'scheduled');
+        expect(meeting.prepMinutes, 0);
+        expect(meeting.allDay, isFalse);
+        expect(meeting.lockTimezone, isNull);
+        expect(meeting.recurrenceJson, contains('FREQ=WEEKLY;COUNT=6'));
+        expect((await db.select(db.calendarEvents).get()).single.allDay, isTrue);
 
         expect((await db.select(db.conversations).get()).single.pinned, isTrue);
         // The defaults the columns declare, for a chat nothing has been
@@ -288,7 +356,7 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 5);
+    expect(db.schemaVersion, 6);
 
     final rows = await db
         .customSelect(
@@ -304,7 +372,7 @@ void main() {
     expect(await db.getValue('probe'), 'ok');
   });
 
-  /// 1 -> 5, the longest path there is, and the one that was broken.
+  /// 1 -> 6, the longest path there is, and the one that was broken.
   ///
   /// Opened as a v1-shaped file — the one table version 1 actually had, stamped
   /// with `user_version = 1` — so the upgrade path runs for real rather than
@@ -333,7 +401,7 @@ void main() {
       containsAll(declaredTables(db)),
       reason:
           'a v1 install must end up with every table, not only the ones the '
-          '1 -> 2 branch adds: drift calls onUpgrade once with (1, 5), so '
+          '1 -> 2 branch adds: drift calls onUpgrade once with (1, 6), so '
           'every later branch has to be guarded `from < N` rather than '
           '`from >= N-1 && from < N`',
     );
@@ -383,7 +451,7 @@ void main() {
     expect(stored.endOfDayTime, '22:00');
   });
 
-  /// 2 -> 5: the P2 tables, and then everything since.
+  /// 2 -> 6: the P2 tables, and then everything since.
   test('a version 2 file upgrades and gains the P2 tables', () async {
     final db = AppDatabase.forTesting(
       NativeDatabase.opened(await donorAt(2, v2Tables)),
@@ -432,7 +500,7 @@ void main() {
     expect((await db.select(db.tasks).get()).single.status, 'open');
   });
 
-  /// 3 -> 5: the daily rhythm (P3 T350), plus the chat on top.
+  /// 3 -> 6: the daily rhythm (P3 T350), plus the chat and the calendar on top.
   test('a version 3 file upgrades and gains the rhythm tables', () async {
     final raw = await donorAt(3, v3Tables);
     // A task the member already had, so the upgrade is asserted to *keep* what

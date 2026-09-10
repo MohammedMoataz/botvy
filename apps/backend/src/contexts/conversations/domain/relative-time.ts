@@ -189,6 +189,67 @@ const DATE_WORDS = new RegExp(
 );
 
 /**
+ * Does the member's own sentence name a moment at all?
+ *
+ * ## Why this is needed, and what it costs when it is missing
+ *
+ * `resolveWhen` trusts the sentence first and the model second: a phrase the
+ * code can resolve wins, and only when there is no such phrase does the model's
+ * wall clock get used. That ordering is right, and it has a hole — **when the
+ * sentence names no time whatsoever, the model sometimes supplies one anyway.**
+ *
+ * P5's corpus caught it. For "عندي معاد مع الدكتور في العيادة، اعمله في
+ * التقويم" — "I have an appointment with the doctor at the clinic, put it in my
+ * calendar" — `qwen2.5:3b-instruct` answered `set_meeting` correctly and then
+ * invented `08:00`. A meeting is then created for a time the member never said,
+ * which is precisely what FR-006 exists to prevent: a missing field is the thing
+ * to ask about rather than to invent. The corpus case for it asserts
+ * `whenAbsent`, so the hallucination is a visible failure rather than a
+ * surprise, and this function is what makes the pipeline behave as the corpus
+ * says it should.
+ *
+ * ## Why a vocabulary check rather than trusting the resolver's null
+ *
+ * Because `resolveRelativePhrase` returning null does not mean "no time was
+ * named" — it means "no *relative* phrase was recognised". "at 7:30" and "on
+ * the 14th" are real times it does not handle, and refusing the model's clock
+ * for those would lose a time the member genuinely gave.
+ *
+ * So this asks a weaker and safer question: is there anything in the sentence a
+ * time could have come from — a digit in either script, a weekday, a month, a
+ * relative word, a clock word? If there is, the model's answer is plausible and
+ * is kept. If there is not, it had nothing to read and the field is dropped, and
+ * the executor asks.
+ *
+ * The errors are deliberately asymmetric. A false negative costs one question —
+ * FR-006's own preferred failure. A false positive is a calendar entry at an
+ * hour nobody chose, discovered when the member misses something.
+ */
+export function mentionsAMoment(text: string): boolean {
+  return CLOCK_WORDS.test(text) || RELATIVE.test(text) || DATE_WORDS.test(text);
+}
+
+/**
+ * Anything a clock time could be written as, beyond the two tables above.
+ *
+ * Digits in both scripts carry most of it — a member who names an hour almost
+ * always writes a number. The words are the ones that name an hour without one,
+ * in both languages; they are deliberately few, because every entry here is a
+ * chance to accept an invented time, and the cost of a missing entry is a
+ * question rather than a wrong entry.
+ */
+const CLOCK_WORDS = new RegExp(
+  // A digit in either script carries most of the recall on its own.
+  String.raw`\d|[٠-٩]` +
+    // Word boundaries written as lookarounds rather than `\b`, because `am`
+    // and `pm` need them — without one, "ram" and "spam" name an hour.
+    String.raw`|(?<![a-z])(?:noon|midday|midnight|morning|afternoon|evening|night|` +
+    String.raw`o'?clock|am|pm|half\s+past|quarter\s+(?:past|to))(?![a-z])` +
+    String.raw`|الظهر|الضهر|منتصف\s*الليل|الصبح|الصباح|العصر|المغرب|المسا|المساء|بالليل`,
+  'iu',
+);
+
+/**
  * Pulls a bare time back to today when the model pushed it to tomorrow for no
  * reason. "Remind me at 9pm", said at six, means tonight — every reminder app
  * behaves this way, and the model does not.

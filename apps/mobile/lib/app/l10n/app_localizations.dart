@@ -4,6 +4,8 @@
 // while reading as a harmless info line in the output.
 import 'package:flutter/widgets.dart';
 
+import '../../core/i18n/counted.dart';
+
 /// English and Arabic, by hand.
 ///
 /// `flutter gen-l10n` would put the same map behind a build step and a
@@ -34,6 +36,9 @@ class AppLocalizations {
 
   String _t(String key) =>
       _strings[locale.languageCode]?[key] ?? _strings['en']![key] ?? key;
+
+  /// Which agreement rule a counted noun follows. See `core/i18n/counted.dart`.
+  bool get _isArabic => locale.languageCode == 'ar';
 
   /// A string with values substituted for `{name}` placeholders.
   ///
@@ -242,8 +247,29 @@ class AppLocalizations {
   String homeGreeting(String name) => _f('homeGreeting', {'name': name});
   String homeDoneOfTotal(int done, int total) =>
       _f('homeDoneOfTotal', {'done': '$done', 'total': '$total'});
-  String homeStreakDays(int count) =>
-      _f('homeStreakDays', {'count': '$count'});
+  /// The streak's length, in days, agreeing with the number in both languages.
+  ///
+  /// Not `_f('homeStreakDays', {'count': …})`, which is what this was — a
+  /// single template per language, so English said "1 days" and Arabic said
+  /// `2 يومًا` for a two-day streak and `5 يومًا` for a five-day one. Arabic has
+  /// four forms here and `_f` can substitute a placeholder but cannot *choose*
+  /// between them, so the choice is made in code and the words stay in the
+  /// tables below.
+  ///
+  /// `counted.dart` carries the rule and why it is not a plural framework.
+  String homeStreakDays(int count) => _isArabic
+      ? arabicCounted(
+          count,
+          one: _t('homeStreakDaysOne'),
+          two: _t('homeStreakDaysTwo'),
+          few: _t('homeStreakDaysFew'),
+          many: _t('homeStreakDaysMany'),
+        )
+      : englishCounted(
+          count,
+          one: _t('homeStreakDaysOne'),
+          other: _t('homeStreakDaysMany'),
+        );
   String homeStreakBest(int count) =>
       _f('homeStreakBest', {'count': '$count'});
 
@@ -514,7 +540,15 @@ class AppLocalizations {
       'homeMeals': 'Meals',
       'homeDoneOfTotal': '{done} of {total} done',
       'homeStreak': 'Streak',
-      'homeStreakDays': '{count} days',
+      /*
+       * Four keys, of which English uses two. The rule that picks between them
+       * is in `core/i18n/counted.dart`; these are only the words, which is the
+       * part a translator changes.
+       */
+      'homeStreakDaysOne': 'day',
+      'homeStreakDaysTwo': 'days',
+      'homeStreakDaysFew': 'days',
+      'homeStreakDaysMany': 'days',
       'homeStreakBest': 'Best so far: {count}',
       'homeWeek': 'The last seven days',
       'homeAdhered': 'followed the plan',
@@ -766,7 +800,16 @@ class AppLocalizations {
     'homeMeals': 'الوجبات',
     'homeDoneOfTotal': 'أُنجز {done} من {total}',
     'homeStreak': 'التتابع',
-    'homeStreakDays': '{count} يومًا',
+    /*
+     * The four Arabic forms. `يومان` is the nominative dual, which is what a
+     * bare count reads as under the "التتابع" label — `يومين` is the form after
+     * a preposition, as in the repeat picker's `كل يومين`. Both are on the
+     * native-review list for this phase.
+     */
+    'homeStreakDaysOne': 'يوم واحد',
+    'homeStreakDaysTwo': 'يومان',
+    'homeStreakDaysFew': 'أيام',
+    'homeStreakDaysMany': 'يومًا',
     'homeStreakBest': 'الأفضل حتى الآن: {count}',
     'homeWeek': 'الأيام السبعة الماضية',
     'homeAdhered': 'التزمت بالخطة',

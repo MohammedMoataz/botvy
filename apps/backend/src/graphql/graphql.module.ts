@@ -19,6 +19,8 @@ import { RhythmModule } from '../contexts/rhythm/rhythm.module.js';
 import { RhythmResolver } from '../contexts/rhythm/features/today-plan/rhythm.resolver.js';
 import { ConversationsModule } from '../contexts/conversations/conversations.module.js';
 import { ConversationsResolver } from '../contexts/conversations/features/conversations/conversations.resolver.js';
+import { MeetingsModule } from '../contexts/meetings/meetings.module.js';
+import { CalendarResolver } from '../contexts/meetings/features/agenda/calendar.resolver.js';
 
 /**
  * The read edge.
@@ -153,6 +155,16 @@ export const RESOLVERS = [
   RemindersResolver,
   RhythmResolver,
   ConversationsResolver,
+  /*
+   * P5's five reads, and the reason this line matters more than it looks.
+   *
+   * "A read that a client cannot reach is a read that does not exist" — a query
+   * handler with a spec and no resolver has shipped twice in this codebase
+   * (P2, and P4's `quickQuestions`). Adding a slice means adding it here *and*
+   * checking it appears in the regenerated `packages/contracts/schema.graphql`,
+   * which is the proof.
+   */
+  CalendarResolver,
 ] as const;
 
 @Module({
@@ -165,6 +177,7 @@ export const RESOLVERS = [
     RemindersModule,
     RhythmModule,
     ConversationsModule,
+    MeetingsModule,
   ],
   providers: [...RESOLVERS],
 })

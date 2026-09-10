@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "meetings.MeetingScheduled",
+  "description": "Payload of meetings.MeetingScheduled. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "meetingId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "title": {
+      "type": "string"
+    },
+    "startAt": {},
+    "durationMin": {
+      "type": "integer"
+    },
+    "rrule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lockTimezone": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reminderOffsets": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "prepMinutes": {
+      "type": "integer"
+    },
+    "status": {}
+  },
+  "required": [
+    "meetingId",
+    "title",
+    "startAt",
+    "durationMin",
+    "rrule",
+    "lockTimezone",
+    "reminderOffsets",
+    "prepMinutes",
+    "status"
+  ],
+  "additionalProperties": false
+}

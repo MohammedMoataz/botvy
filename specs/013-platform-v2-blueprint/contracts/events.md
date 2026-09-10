@@ -50,17 +50,39 @@ consumer needs — never whole documents (consumers query their own read side).
 | `conversations.MessageSent` | Conversations | `{ conversationId, seq, role }` | The socket push happens in `append-message` itself, not through the relay: a chat frame that waited for the change stream would arrive after the member had already scrolled. This event is for n8n, for usage in P10, and for the `sync.nudge` to the member's *other* devices |
 | `conversations.ConversationCreated` | Conversations | `{ conversationId, kind, pinned }` | (informational; the two pinned chats are created from `identity.UserRegistered` in P3) |
 | `conversations.IntentDetected` | Conversations | `{ seq, intent, args }` | (informational; the handler dispatches commands directly) |
-| `meetings.MeetingScheduled` / `MeetingChanged` / `OccurrenceSkipped` / `OccurrenceMoved` | Meetings | `{ meetingId, startAt, rrule?, reminderOffsets, prepMinutes }` | Notifications → (re)plan alerts for occurrences in the next 14 days (offsets + prep) |
-| `meetings.MeetingCompleted` / `MeetingCancelled` / `MeetingDeleted` | Meetings | `{ meetingId }` | Notifications → drop alerts |
+| `meetings.MeetingScheduled` / `MeetingChanged` / `OccurrenceSkipped` / `OccurrenceMoved` | Meetings | `{ meetingId, title, startAt, durationMin, rrule\|null, lockTimezone\|null, reminderOffsets, prepMinutes, status }`, plus `originalStart` on the two occurrence events and `movedTo` on `OccurrenceMoved` | Notifications → (re)plan alerts for occurrences in the next `meetings.alertWindowDays` (one per offset + one for prep) |
+| `meetings.MeetingCompleted` / `MeetingCancelled` / `MeetingDeleted` | Meetings | `{ meetingId, at }` | Notifications → drop alerts. A completed meeting drops them exactly as a cancelled one does |
 | `sync.ChangesApplied` | Sync | `{ installId, entities }` | Conversations → `sync.nudge` to the user's **other** sockets |
 | `operations.SettingChanged` | Operations | `{ key }` | all → invalidate settings cache; Notifications/Rhythm re-read |
 | `operations.WorkflowRun` / `UserRoleChanged` | Operations | `{ … }` | `audit_log` |
+
+### Two notes on the meetings payloads, added in P5
+
+**Every field the consumer reads is in the payload, and they are built by one
+method.** `Meeting.alertFacts()` composes the scheduling payload and all six of
+its raise sites call it. That is not tidiness: P2's task events omitted `title`
+and `allDay`, so every task notification in the product said "Task due" and
+every edit silently dropped the member's lead times. A payload crosses the
+boundary as `unknown`, so the type system cannot say a field is missing and the
+consumer's fallback quietly wins.
+`apps/backend/src/contexts/meetings/meetings-events.spec.ts` asserts the payload
+itself — asserting the reaction passes with the fallback in place.
+
+**Restoring a deleted meeting raises `MeetingChanged`.** `MeetingDeleted` drops
+the alerts, so a restore that raised nothing would put the meeting back on the
+calendar with no reminders and nothing would ever say so.
+
+**`calendar_events` raises nothing, and that is a decision rather than an
+omission.** A personal event produces no notifications (FR-011 gives it a title,
+a time, a colour and a repeat, and no reminders), so an event raised for one
+would have no consumer. Its rows reach the member's other devices through
+`sync.ChangesApplied` like everything else.
 
 ## Sagas (process managers)
 
 | Saga | Listens | Does |
 |---|---|---|
-| `AlertPlanningSaga` (Notifications) | every *Scheduled/Rescheduled/Completed/Cancelled/Deleted* above | keeps `alerts` consistent with sources; rolling 14-day window for recurring meetings |
+| `AlertPlanningSaga` (Notifications) | every *Scheduled/Rescheduled/Completed/Cancelled/Deleted* above, plus `profile.ProfileUpdated` and `PreferencesChanged` | keeps `alerts` consistent with sources; rolling `meetings.alertWindowDays` window for recurring meetings, advanced nightly by `POST /internal/notifications/reconcile-meeting-alerts` so it moves on a day when nothing happens. A time-zone change re-expands the member's unpinned series rather than shifting their stored alerts — an unpinned occurrence's *instant* moves with the member (FR-014), so the stored `source.occurrenceAt` is no longer the moment to rebuild from |
 | `TomorrowDraftSaga` (Rhythm) | `TaskScheduled`, `SessionScheduled`, `MealPlanReady` | marks tomorrow's draft stale so the plan prompt (or the end-of-day touch) rebuilds it |
 | `SessionMaterialiserSaga` (Training) | `SlotsChanged`, `ProgramApplied`, nightly tick | materialises planned sessions 14 days ahead |
 | `SuggestionSaga` (Knowledge) | `SessionScheduled` (+ `aiSuggestions`) | generates a suggestion when the member has relevant sources |

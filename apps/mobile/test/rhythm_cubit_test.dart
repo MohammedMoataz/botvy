@@ -600,10 +600,26 @@ void main() {
       // A newer gateway can plan an alert for a feature this build has no
       // screen for. Navigating "somewhere near it" drops the member on an
       // unrelated page with no way to know why.
-      expect(routeForDeepLink('botvy://meetings/abc'), isNull);
+      //
+      // `meetings` was this assertion's example until P5 gave them a screen,
+      // which is exactly the shape of change the case is about: the example
+      // has to be a feature that is still unbuilt, and `training` is P6's.
+      expect(routeForDeepLink('botvy://training/abc'), isNull);
       expect(routeForDeepLink(''), isNull);
       expect(routeForDeepLink('   '), isNull);
       expect(routeForDeepLink('botvy://'), isNull);
+    });
+
+    test('a meeting alert lands on the meeting, not on the list (P5)', () {
+      // The whole point of a meeting's reminder is that the joining link or the
+      // address is one tap away (story 1, scenarios 1 and 2), so the deep link
+      // has to reach the meeting itself. Both spellings the server may send:
+      // the alert saga's `meeting/<id>` and the REST path's `meetings/<id>`.
+      expect(routeForDeepLink('botvy://meeting/abc'), '/meetings/abc');
+      expect(routeForDeepLink('/meetings/abc'), '/meetings/abc');
+      // And a link naming no meeting at all still lands somewhere useful.
+      expect(routeForDeepLink('botvy://meetings'), '/meetings');
+      expect(routeForDeepLink('botvy://calendar'), '/calendar');
     });
   });
 }

@@ -1,12 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { DevicesQueryHandler } from '../../identity/features/devices/devices.query.js';
 import { ReapPushTokenHandler } from '../../identity/features/register-device/reap-push-token.handler.js';
+import { MeetingRepository } from '../../meetings/domain/meetings.repositories.js';
+import { MeetingOccurrencesQueryHandler } from '../../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
+import { PurgeMeetingHandler } from '../../meetings/features/purge-meeting/purge-meeting.handler.js';
 import { PurgeTaskHandler } from '../../planning/features/purge-task/purge-task.handler.js';
 import { ReminderLifecycleHandler } from '../../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import {
   DeviceLookupPort,
   DeviceRemovalPort,
+  MeetingMembersPort,
+  MeetingOccurrencesPort,
   TombstonePurgePort,
+  type MeetingOccurrence,
   type NotifiableDevice,
 } from '../domain/notification.ports.js';
 
@@ -87,6 +93,30 @@ export class PlanningTombstonePurge extends TombstonePurgePort {
   }
 }
 
+/**
+ * Meetings purging its own two collections, on request.
+ *
+ * The third owner, and the reason `TOMBSTONE_PURGES` is a multi-provider array
+ * rather than two named dependencies: joining the sweep is adding a provider,
+ * not editing the sweep. The sweep's job is to run on a timer and add up what
+ * the owners report; which owners exist is not its business.
+ *
+ * One handler covers `meetings` and `calendar_events` both, because
+ * `PurgeMeetingHandler.purgeTombstones` runs the pair inside one unit of work
+ * and returns the total — two ports would report two numbers the sweep would
+ * only add together again.
+ */
+@Injectable()
+export class MeetingsTombstonePurge extends TombstonePurgePort {
+  constructor(private readonly meetings: PurgeMeetingHandler) {
+    super();
+  }
+
+  async purgeBefore(before: Date): Promise<number> {
+    return this.meetings.purgeTombstones(before);
+  }
+}
+
 /** Reminders purging its own, on request. */
 @Injectable()
 export class RemindersTombstonePurge extends TombstonePurgePort {
@@ -96,5 +126,61 @@ export class RemindersTombstonePurge extends TombstonePurgePort {
 
   async purgeBefore(before: Date): Promise<number> {
     return this.reminders.purgeTombstones(before);
+  }
+}
+
+/**
+ * Where a meeting's occurrences come from: Meetings' own query handler, which
+ * runs the same expander every calendar screen does.
+ *
+ * Bound to the `*.query.ts` handler and never to a feature service, because
+ * the query handler is the published surface — the same distinction the two
+ * Identity adapters above observe.
+ */
+@Injectable()
+export class MeetingsOccurrenceLookup extends MeetingOccurrencesPort {
+  constructor(private readonly occurrences: MeetingOccurrencesQueryHandler) {
+    super();
+  }
+
+  /**
+   * Narrowed to the scheduling fields. The view also carries a location and a
+   * `moved` flag; a warning has nothing to do with either, and copying them
+   * across would be this context taking an interest it does not have.
+   */
+  async forMember(
+    userId: string,
+    from: Date,
+    to: Date,
+  ): Promise<MeetingOccurrence[]> {
+    const views = await this.occurrences.forMember(userId, from, to);
+    return views.map((view) => ({
+      meetingId: view.meetingId,
+      title: view.title,
+      originalStart: view.originalStart,
+      startAt: view.startAt,
+      durationMin: view.durationMin,
+      prepMinutes: view.prepMinutes,
+      reminderOffsets: view.reminderOffsets,
+    }));
+  }
+}
+
+/**
+ * Who has a diary at all, for the nightly pass.
+ *
+ * The repository port rather than a query handler, and that is deliberate:
+ * there is no read *screen* for "every member with a meeting", so there is no
+ * query slice to bind to — the method exists on Meetings' own repository port
+ * precisely for this caller, and it is the collection's owner that answers.
+ */
+@Injectable()
+export class MeetingsMemberLookup extends MeetingMembersPort {
+  constructor(private readonly meetings: MeetingRepository) {
+    super();
+  }
+
+  async withMeetings(): Promise<string[]> {
+    return this.meetings.memberIdsWithMeetings();
   }
 }

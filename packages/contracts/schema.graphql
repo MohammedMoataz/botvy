@@ -1,9 +1,57 @@
+type AgendaDay {
+  date: Date!
+  items: [AgendaItem!]!
+}
+
+type AgendaItem {
+  allDay: Boolean!
+  color: String
+  endAt: DateTime
+  event: CalendarEvent
+  id: ID!
+  kind: AgendaKind!
+  meeting: Meeting
+  occurrenceAt: DateTime!
+  subtitle: String
+  title: String!
+}
+
+"""
+What a row on the agenda is. `prep` is its own kind rather than an attribute of a meeting, because half an hour of preparation is half an hour that is not free (FR-002).
+"""
+enum AgendaKind {
+  event
+  meeting
+  prep
+  session
+  task
+}
+
+type AgendaKindCounts {
+  event: Int!
+  meeting: Int!
+  prep: Int!
+  session: Int!
+  task: Int!
+}
+
 type BodyMetric {
   bodyFatPct: Float
   heightCm: Float
   note: String
   recordedAt: DateTime!
   weightKg: Float
+}
+
+type CalendarEvent {
+  allDay: Boolean!
+  color: String
+  endAt: DateTime!
+  id: ID!
+  notes: String
+  recurrence: MeetingRecurrence
+  startAt: DateTime!
+  title: String!
 }
 
 type Checkin {
@@ -86,6 +134,58 @@ type LabelSnapshot {
   name: String!
 }
 
+type Location {
+  address: String
+  onlineLink: String
+}
+
+type Meeting {
+  allDay: Boolean!
+  description: String
+  durationMin: Int!
+  id: ID!
+  location: Location!
+  lockTimezone: String
+  nextOccurrence: DateTime
+  prepMinutes: Int!
+  prepNotes: String
+  recurrence: MeetingRecurrence
+  reminderOffsets: [Int!]!
+  startAt: DateTime!
+  status: MeetingStatus!
+  title: String!
+}
+
+type MeetingOccurrence {
+  durationMin: Int!
+  endAt: DateTime!
+  location: Location!
+  meetingId: ID!
+  moved: Boolean!
+  originalStart: DateTime!
+  prepMinutes: Int!
+  reminderOffsets: [Int!]!
+  startAt: DateTime!
+  title: String!
+}
+
+type MeetingRecurrence {
+  dtstart: DateTime!
+  exdates: [DateTime!]!
+  humanText: String!
+  overrides: [Override!]!
+  rrule: String!
+}
+
+"""
+In the diary, it happened, or it is off. Deleting never changes it — the status is the only record of which, and the Deleted view exists to show exactly that.
+"""
+enum MeetingStatus {
+  cancelled
+  completed
+  scheduled
+}
+
 type Message {
   clientId: String
   composedAt: DateTime
@@ -107,6 +207,21 @@ enum MessageRole {
   assistant
   system
   user
+}
+
+type MonthDay {
+  busy: Boolean!
+  byKind: AgendaKindCounts!
+  date: Date!
+  total: Int!
+}
+
+type Override {
+  durationMin: Int
+  location: Location
+  originalStart: DateTime!
+  startAt: DateTime
+  title: String
 }
 
 """
@@ -166,6 +281,8 @@ type Profile {
 }
 
 type Query {
+  agenda(from: DateTime!, to: DateTime!): [AgendaDay!]!
+
   """The caller's body metric history."""
   bodyMetrics(last: Int = 30): [BodyMetric!]!
   checkins(from: Date!, to: Date!): [Checkin!]!
@@ -178,7 +295,11 @@ type Query {
 
   """The authenticated member."""
   me: User!
+  meeting(id: ID!): Meeting
+  meetingOccurrences(from: DateTime!, to: DateTime!): [MeetingOccurrence!]!
+  meetings(includeCompleted: Boolean): [Meeting!]!
   messages(afterSeq: Int, conversationId: ID!, first: Int = 50): MessageConnection!
+  monthOverview(month: Int!, year: Int!): [MonthDay!]!
 
   """The caller's own registered devices."""
   myDevices: [Device!]!

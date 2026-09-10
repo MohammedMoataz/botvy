@@ -95,6 +95,10 @@ const planMapper: Mapper<DailyPlan, DailyPlanDoc> = {
       status: doc.status ?? 'draft',
       autoConfirmed: doc.autoConfirmed ?? false,
       tasks: doc.tasks ?? [],
+      // `?? []` and not `doc.meetings`: every plan written before P5 has no
+      // such key, and the mapper is the only place that can turn a missing
+      // array into an empty one before the aggregate reads it.
+      meetings: doc.meetings ?? [],
       training: doc.training ?? null,
       workoutLine: doc.workoutLine ?? null,
       mealLine: doc.mealLine ?? null,
@@ -114,6 +118,7 @@ const planMapper: Mapper<DailyPlan, DailyPlanDoc> = {
       status: plan.status,
       autoConfirmed: plan.autoConfirmed,
       tasks: plan.tasks,
+      meetings: plan.meetings,
       training: plan.training,
       workoutLine: plan.workoutLine,
       mealLine: plan.mealLine,

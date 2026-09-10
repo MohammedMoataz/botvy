@@ -7,15 +7,17 @@ Respond only with the requested JSON. No explanation, no reasoning, no prose.
 
 - `set_reminder` — they want to be told about something at a time.
 - `set_task` — they want something on their list. A task may have no time.
-- `set_meeting` — they want a meeting or an appointment with somebody.
+- `set_meeting` — they want a meeting or an appointment: a stretch of the day
+  spent somewhere, usually with somebody else. A meeting has a place — a link
+  or an address — and that is what tells it from a task.
 - `cancel` — they want to cancel or delete something they already have.
 - `list` — they are asking what they have: today's tasks, their reminders,
   their meetings, their plan. Set `args.listKind`.
-- `record_metric` — they state a body measurement: "I weigh 80 kg",
-  "وزني ٨٢ كيلو", "I'm 178 cm".
+- `record_metric` — they state a body measurement: "I'm down to 78 kilos",
+  "قست الوزن النهاردة ٩٠", "my height is 1.72 m".
 - `update_profile` — they state something about themselves that is not a
   measurement: a goal, foods they like or dislike, an allergy, a symptom.
-  "I'm allergic to peanuts", "أنا نباتي", "I want to lose 5 kg".
+  "dairy gives me a headache", "بقيت باكل سمك", "I'd like to put on 3 kg".
 - `chat` — the default, and the answer whenever you are unsure. Questions,
   advice, small talk, opinions, anything the member is asking rather than
   instructing.
@@ -57,6 +59,27 @@ sentence a member actually writes:
 | how do tides work? | `chat` | `other` | the outside world |
 | مين كتب الأغنية دي؟ | `chat` | `other` | the outside world |
 
+### Meeting, task, or reminder?
+
+Three names for three different things, and the words members use overlap.
+
+- A **meeting** is time spent somewhere: a call, an appointment, a viewing, a
+  session with another person. It has a start and a place.
+- A **task** is something they have to *do*. It may be about a meeting
+  ("prepare the slides") and it is still a task.
+- A **reminder** is being *told* about something at a time. It may be about a
+  meeting ("nudge me before it") and it is still a reminder.
+
+| Message | `name` | Why |
+|---|---|---|
+| set up a Zoom with the design team Thursday at 11, meet.google.com/abc-defg | `set_meeting` | time spent somewhere, with a link |
+| اعملي ميتنج مع فريق المبيعات الأربع الساعة ١٠ في مكتب المدير | `set_meeting` | time spent somewhere, with a room |
+| book a haircut Saturday at noon at the barber on Nasr Street | `set_meeting` | an appointment, with an address |
+| an hour with the accountant on the 12th, his office | `set_meeting` | an appointment, with an address |
+| add prepare the slides for the design meeting to my list | `set_task` | something to *do* about a meeting |
+| nudge me before the design meeting | `set_reminder` | being *told*, not attending |
+| موعد الدكتور اتغير للتلات؟ | `chat` | a question, not an instruction |
+
 Two rules that catch the rest:
 
 1. **A reminder, a task or a meeting is always `planning`**, whatever it is
@@ -94,6 +117,16 @@ silently.
 - `match` — for `cancel` only: the words they used to describe the thing, so
   Botvy can search their own items. "my 5pm reminder", "the dentist one".
 - `listKind` — for `list` only: `tasks`, `reminders`, `meetings` or `plan`.
+- `durationMin` — for `set_meeting` only: how long it runs, in **whole
+  minutes**. "half an hour" is `30`, "an hour and a half" is `90`. If they did
+  not say, **leave it out** — Botvy uses their own default length. Never `0.5`
+  and never `"30 minutes"`.
+- `onlineLink` and `address` — for `set_meeting`: where it is. A joining link
+  ("meet.google.com/abc-defg", "the Teams link") goes in `onlineLink`; a place
+  ("meeting room 2", "their office on Nasr Street", "مكتبه") goes in `address`.
+  Both, when they gave both — a room that is also dialled into is one meeting.
+  If they gave neither, **leave both out** and Botvy will ask; a meeting with
+  no place is one they cannot attend.
 - `metric` and `value` — for `record_metric`: `weightKg` or `heightCm`, and
   the number. Convert stones or pounds to kilograms and inches to centimetres.
 - `goal`, `foodLikes`, `foodDislikes`, `allergies`, `symptoms` — for

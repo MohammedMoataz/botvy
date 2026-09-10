@@ -52,3 +52,34 @@ Cheap, and most of the value is in the cheapest version.
 
 Step 1 is the one that matters and it is not a refactor. Worth doing before the
 next phase adds another dependency.
+
+## P5: the one command that *does* read the built output has no freshness guard
+
+`infra/verify-esm.mjs` closed the half this file is about — something now
+imports `dist/` with plain `node`, and P5's new `rrule` consumer (the meetings
+expander, which repeats the `const { RRule, rrulestr } = rrule` destructure for
+the same reason) is covered by it transitively.
+
+What P5 found is the mirror image, and it belongs here because it is the same
+species: **`pnpm gen:contracts` runs `node dist/main.js`, and nothing checks
+that `dist/` is current.** Regenerating the contracts without building first
+republishes the *previous* schema — silently, with a success message, and with
+the new resolvers and event payloads simply absent. It happened in this phase:
+`schema.graphql` came back with zero occurrences of `Meeting`, and the reason
+was a build that had not been run rather than a resolver that had not been
+registered.
+
+That matters more than a stale file usually would, because `schema.graphql` is
+the *proof artefact* for a rule this codebase already learned twice — "a read a
+client cannot reach is a read that does not exist", checked by looking for the
+new query in the regenerated schema. A generator that can quietly emit the old
+schema turns that proof into a coin flip.
+
+**What fixing it takes:** make the script build first — `"gen:contracts": "pnpm
+build && cross-env BOTVY_GEN=1 node dist/main.js"` — which costs a minute on a
+warm build and removes the failure mode entirely. The reason it is not done in
+this phase is that `pnpm build` also runs `prisma generate`, and making the
+contracts command depend on a Prisma toolchain being installed is a different
+trade that deserves its own look. A cheaper variant: have the generator compare
+the newest `mtime` under `src/` against `dist/main.js` and refuse rather than
+emit.

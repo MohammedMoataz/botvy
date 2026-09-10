@@ -17,6 +17,26 @@ export interface PlanTask {
   deferCount: number;
 }
 
+/**
+ * One occurrence of a meeting, as the plan recorded it.
+ *
+ * Snapshotted for the same reason `PlanTask` is: a meeting renamed on Thursday
+ * must not rewrite Tuesday's plan, and a series deleted afterwards must not
+ * make Tuesday's plan unreadable. `startAt` is where the occurrence actually
+ * sits — after any override — because that is the time the sentence named.
+ *
+ * `meetingId` rather than an occurrence id, because occurrences are derived
+ * from the rule and have no identity of their own (FR-006); it is the series
+ * the member taps through to. A repeating meeting can therefore appear twice in
+ * one day's list, which is a list and not a map.
+ */
+export interface PlanMeeting {
+  meetingId: string;
+  title: string;
+  startAt: Date;
+  durationMin: number;
+}
+
 /** The training slot, when Training exists to answer. Null until P6, by design. */
 export interface PlanTraining {
   sessionId: string;
@@ -34,6 +54,7 @@ export interface DailyPlanState {
   status: PlanStatus;
   autoConfirmed: boolean;
   tasks: PlanTask[];
+  meetings: PlanMeeting[];
   training: PlanTraining | null;
   workoutLine: string | null;
   mealLine: string | null;
@@ -70,6 +91,7 @@ export class DailyPlan extends AggregateRoot<string> {
   status: PlanStatus;
   autoConfirmed: boolean;
   tasks: PlanTask[];
+  meetings: PlanMeeting[];
   training: PlanTraining | null;
   workoutLine: string | null;
   mealLine: string | null;
@@ -87,6 +109,11 @@ export class DailyPlan extends AggregateRoot<string> {
     this.status = state.status;
     this.autoConfirmed = state.autoConfirmed;
     this.tasks = state.tasks;
+    // A plan row written before P5 has no `meetings` key at all, so the
+    // fallback is load-bearing rather than defensive: every plan already in
+    // the store rehydrates as a day with no meetings rather than one whose
+    // list is `undefined`, which is what `isEmpty` and the touches read.
+    this.meetings = state.meetings ?? [];
     this.training = state.training;
     this.workoutLine = state.workoutLine;
     this.mealLine = state.mealLine;
@@ -113,6 +140,7 @@ export class DailyPlan extends AggregateRoot<string> {
     userId: string;
     date: string;
     tasks: PlanTask[];
+    meetings?: PlanMeeting[];
     training?: PlanTraining | null;
     workoutLine?: string | null;
     mealLine?: string | null;
@@ -124,6 +152,7 @@ export class DailyPlan extends AggregateRoot<string> {
       status: 'draft',
       autoConfirmed: false,
       tasks: input.tasks,
+      meetings: input.meetings ?? [],
       training: input.training ?? null,
       workoutLine: input.workoutLine ?? null,
       mealLine: input.mealLine ?? null,
@@ -152,6 +181,7 @@ export class DailyPlan extends AggregateRoot<string> {
    */
   redraft(input: {
     tasks: PlanTask[];
+    meetings?: PlanMeeting[];
     training?: PlanTraining | null;
     workoutLine?: string | null;
     mealLine?: string | null;
@@ -159,6 +189,7 @@ export class DailyPlan extends AggregateRoot<string> {
   }): boolean {
     if (!this.isUnanswered) return false;
     this.tasks = input.tasks;
+    this.meetings = input.meetings ?? [];
     this.training = input.training ?? null;
     this.workoutLine = input.workoutLine ?? null;
     if (input.mealLine !== undefined) this.mealLine = input.mealLine;
@@ -302,7 +333,11 @@ export class DailyPlan extends AggregateRoot<string> {
 
   /** Whether the plan holds nothing to do — the sentence changes when it does. */
   get isEmpty(): boolean {
-    return this.tasks.length === 0 && this.training === null;
+    return (
+      this.tasks.length === 0 &&
+      this.meetings.length === 0 &&
+      this.training === null
+    );
   }
 }
 

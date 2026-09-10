@@ -8,6 +8,7 @@ import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart'
     show memberDate, memberZone;
 import '../../../core/sync/sync_engine.dart';
+import '../../calendar/application/agenda.dart';
 import '../../rhythm/application/daily_plan.dart';
 import '../../tasks/application/tasks_cubit.dart';
 
@@ -55,6 +56,7 @@ class HomeState {
     this.streakBest = 0,
     this.week = const [],
     this.awaitingCheckin = false,
+    this.agenda = const [],
   });
 
   final bool loading;
@@ -88,6 +90,17 @@ class HomeState {
   final int streakCurrent;
   final int streakBest;
   final List<AdherenceDay> week;
+
+  /// Today's calendar — meetings and their preparation blocks, timed tasks,
+  /// training sessions and personal events — in time order (FR-009).
+  ///
+  /// Read from drift and expanded on the device by `core/recurrence`, through
+  /// the same `localAgenda` the calendar screen uses. **Never the GraphQL
+  /// query**: FR-010 is that today's list is readable offline, the server's
+  /// `AgendaQuery` serves the extension and the web calendar, and a request on
+  /// this screen's critical path would break the promise SC-005 makes about it
+  /// — silently, because a developer's phone always has wifi.
+  final List<AgendaItem> agenda;
 
   /// Whether the end-of-day question is still open, from the mirrored rhythm
   /// state. The window it closes after is an operator setting the phone does
@@ -151,6 +164,7 @@ class HomeCubit extends Cubit<HomeState> {
     final today = memberDate(now, zone);
     final tomorrow = memberDate(now, zone, addDays: 1);
 
+    final window = dayWindow(today, profile?.timezone);
     final plan = await planForDate(_db, today);
     final draft = await planForDate(_db, tomorrow);
     final rhythm = await (_db.select(_db.rhythmState)..limit(1))
@@ -176,6 +190,15 @@ class HomeCubit extends Cubit<HomeState> {
         streakBest: rhythm?.streakBest ?? 0,
         week: await _week(now, zone),
         awaitingCheckin: rhythm?.awaitingCheckin ?? false,
+        // One day's window, resolved against the *profile's* zone rather than
+        // the handset's — a member in Cairo asking for "today" at 01:00 gets
+        // yesterday's day if the boundary is taken from a UTC instant.
+        agenda: await localAgenda(
+          _db,
+          from: window.from,
+          to: window.to,
+          timezone: profile?.timezone,
+        ),
       ),
     );
   }

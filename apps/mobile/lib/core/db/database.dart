@@ -515,6 +515,130 @@ class Conversations extends Table with SyncColumns {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// One meeting — and for a repeating one, one *series* (data-model §2.10).
+///
+/// Mirrors `MeetingSyncAdapter.pull` field for field. Three of those fields are
+/// the interesting ones and each is stored as the JSON the server sent rather
+/// than as columns or child rows:
+///
+/// * [recurrenceJson] is `{dtstart, rrule, exdates[], overrides[]}` — a rule
+///   plus its exceptions, **never expanded rows** (FR-006). A series of any
+///   length is one row here, and `core/recurrence/expander.dart` derives the
+///   occurrences for whatever window a screen asks about. Materialising them
+///   would make "skip one" ambiguous and would push a long series down the sync
+///   channel a device has to store.
+/// * [locationJson] is `{onlineLink, address}`. Two columns would have done and
+///   would then have to agree with the server's own object on the wire; the
+///   invariant that at least one half is present (FR-001) lives on the server's
+///   aggregate and in the editor, not in a column constraint that cannot
+///   express "either of these two".
+/// * [reminderOffsetsJson] is the minutes-before list, stored at creation from
+///   the member's defaults so a later change to those defaults never silently
+///   moves the warnings of a meeting that already exists.
+///
+/// [authoredTimezone] is carried and never written by this device. It records
+/// what the member's clock read when they typed "18:00", and the expander
+/// recovers those digits from the stored instant against it — a client that
+/// rewrote it would move every occurrence of the series with nothing on the row
+/// visibly changing. The server refuses to read a pushed copy for the same
+/// reason.
+@DataClassName('LocalMeeting')
+@TableIndex(name: 'meetings_start', columns: {#startAt})
+@TableIndex(name: 'meetings_status_start', columns: {#status, #startAt})
+@TableIndex(name: 'meetings_pending', columns: {#pendingOp})
+class Meetings extends Table with SyncColumns {
+  TextColumn get title => text()();
+  TextColumn get description => text().nullable()();
+
+  /// The instant the member placed. For a series this is also what
+  /// `recurrence.dtstart` anchors on, and the expander re-reads its wall clock
+  /// rather than trusting the instant — see [authoredTimezone].
+  DateTimeColumn get startAt => dateTime()();
+
+  IntColumn get durationMin => integer().withDefault(const Constant(30))();
+
+  /// On the row because the server's document carries it, and unread here for
+  /// the same reason: a whole-day entry is a [CalendarEvents] row (FR-001).
+  BoolColumn get allDay => boolean().withDefault(const Constant(false))();
+
+  /// The zone this series is pinned to, or null to follow the member (FR-007).
+  TextColumn get lockTimezone => text().nullable()();
+
+  /// The zone whose clock the member was reading when they wrote this. Never
+  /// written by the phone; see the class note.
+  TextColumn get authoredTimezone => text().withDefault(const Constant(''))();
+
+  /// `{onlineLink, address}`, as the server sent it.
+  TextColumn get locationJson => text().nullable()();
+
+  TextColumn get prepNotes => text().nullable()();
+  IntColumn get prepMinutes => integer().withDefault(const Constant(0))();
+
+  /// JSON array of minutes before the occurrence, e.g. `[1440,30]`.
+  TextColumn get reminderOffsetsJson =>
+      text().withDefault(const Constant('[]'))();
+
+  /// `{dtstart, rrule, exdates[], overrides[]}` or null. See the class note.
+  TextColumn get recurrenceJson => text().nullable()();
+
+  /// `scheduled` | `completed` | `cancelled`. A delete never touches it: the
+  /// status is the only record of whether the meeting happened, was called off
+  /// or was simply removed from the diary.
+  TextColumn get status => text().withDefault(const Constant('scheduled'))();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// `app` | `chat` | `extension`.
+  TextColumn get source => text().withDefault(const Constant('app'))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// One personal event — a birthday, a holiday, a block of focus time (FR-011).
+///
+/// Its own table rather than a flag on [Meetings], mirroring the server's two
+/// aggregates: an event has a colour and may fill a whole day, and has none of
+/// a meeting's location, preparation, reminders or outcome. A flag would switch
+/// off half the columns of one table.
+///
+/// The *repeat* is deliberately identical: [recurrenceJson] holds the same
+/// object a meeting's does and goes through the same expander, so a birthday
+/// moved one year behaves exactly as a meeting moved one week.
+@DataClassName('LocalCalendarEvent')
+@TableIndex(name: 'calendar_events_start', columns: {#startAt})
+@TableIndex(name: 'calendar_events_pending', columns: {#pendingOp})
+class CalendarEvents extends Table with SyncColumns {
+  TextColumn get title => text()();
+  TextColumn get notes => text().nullable()();
+
+  DateTimeColumn get startAt => dateTime()();
+
+  /// After [startAt], and at most a year later — the server's own bound, and
+  /// not tidiness: the expander derives an occurrence's window from the length,
+  /// so an unbounded event would appear on every agenda between its two ends.
+  DateTimeColumn get endAt => dateTime()();
+
+  BoolColumn get allDay => boolean().withDefault(const Constant(false))();
+
+  /// `#rrggbb`, or null for the theme's own. A string and not a palette index,
+  /// for the reason [Labels.color] gives.
+  TextColumn get color => text().nullable()();
+
+  TextColumn get recurrenceJson => text().nullable()();
+
+  /// As on [Meetings], and never written here. An event has no `lockTimezone`
+  /// at all — a birthday is a date rather than an instant, so pinning it to a
+  /// zone would put a member who flew on the wrong day of their own birthday.
+  TextColumn get authoredTimezone => text().withDefault(const Constant(''))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// One message, mirroring the server's `messages` shape (data-model §2.9).
 ///
 /// **Immutable, and that is load-bearing.** There is no [SyncColumns] here and
@@ -663,6 +787,8 @@ class MigrationLadderError extends Error {
     Conversations,
     Messages,
     PendingMessages,
+    Meetings,
+    CalendarEvents,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -672,7 +798,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -798,6 +924,25 @@ class AppDatabase extends _$AppDatabase {
         // in CI is worth more than an instruction nobody has executed. See
         // [repullMessages] for why a backfill is not available to this table.
         await repullMessages(this);
+      }
+
+      // 5 -> 6: meetings and personal events (P5, `specs/019-meetings-calendar`
+      // T540).
+      //
+      // `from < 6`, and the two indexes per table listed explicitly, for the
+      // reasons the branches above give: drift calls `onUpgrade` once with the
+      // pair it has, so every `createTable` is guarded `from < N`; and
+      // `createTable` builds the table and *not* its indexes, which drift keeps
+      // as separate schema entities that only `createAll` picks up.
+      if (from < 6) {
+        await m.createTable(meetings);
+        await m.createTable(calendarEvents);
+
+        await m.create(meetingsStart);
+        await m.create(meetingsStatusStart);
+        await m.create(meetingsPending);
+        await m.create(calendarEventsStart);
+        await m.create(calendarEventsPending);
       }
 
       // Anything the ladder above did not cover.

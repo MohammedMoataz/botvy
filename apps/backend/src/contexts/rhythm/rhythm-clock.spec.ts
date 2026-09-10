@@ -6,10 +6,15 @@ import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { localDate, localHhMm, wallClockToUtc } from '../../shared/time/time.js';
 import { nextDate } from './domain/adherence.js';
-import type { PlanTask, PlanTraining } from './domain/daily-plan.aggregate.js';
+import type {
+  PlanMeeting,
+  PlanTask,
+  PlanTraining,
+} from './domain/daily-plan.aggregate.js';
 import { RhythmState } from './domain/rhythm-state.aggregate.js';
 import {
   CoachTranscriptPort,
+  MeetingsOnPort,
   MemberSchedulePort,
   NextSessionPort,
   PlannedTasksPort,
@@ -128,6 +133,13 @@ class NoTasks extends PlannedTasksPort {
   }
 }
 
+/** No meetings, which is every scenario in this file. See `rhythm-meetings.spec.ts`. */
+class NoMeetings extends MeetingsOnPort {
+  async onDate(): Promise<PlanMeeting[]> {
+    return [];
+  }
+}
+
 class NoSessions extends NextSessionPort {
   async forDate(): Promise<PlanTraining | null> {
     return null;
@@ -192,7 +204,13 @@ function bench(): Bench {
     schedules,
     tasks,
     transcript,
-    new DraftBuilder(tasks, new NoSessions(), new NoMeals(), settings),
+    new DraftBuilder(
+      tasks,
+      new NoMeetings(),
+      new NoSessions(),
+      new NoMeals(),
+      settings,
+    ),
     settings,
     heartbeats,
   );

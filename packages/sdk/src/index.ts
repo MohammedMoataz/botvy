@@ -92,6 +92,25 @@ export {
   type TaskViewFilter,
 } from './tasks-store.js';
 export {
+  MeetingsStore,
+  meetingAsRepeating,
+  type CalendarEventRow,
+  type CreateMeetingAck,
+  type MeetingRow,
+  type MeetingSource,
+  type MeetingStatus,
+  type NewMeeting,
+} from './meetings-store.js';
+export {
+  expandOccurrences,
+  wallClockToUtc,
+  type MeetingLocation,
+  type MeetingRecurrence,
+  type Occurrence,
+  type OccurrenceOverride,
+  type Repeating,
+} from './recurrence.js';
+export {
   DuplicateLabelName,
   LabelsStore,
   type CreateLabelAck,

@@ -40,6 +40,7 @@ import {
   QuickQuestionSchema,
 } from '../../shared/persistence/mongo/schemas.js';
 import { LlmModule } from '../../shared/llm/llm.module.js';
+import { MemberContextPort } from '../../shared/member/member-context.port.js';
 import { OllamaClient } from '../../shared/llm/ollama.client.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { OperationsModule } from '../operations/operations.module.js';
@@ -53,6 +54,10 @@ import { TasksQueryHandler } from '../planning/features/tasks-query/tasks.query.
 import { ManageReminderHandler } from '../reminders/features/manage-reminder/manage-reminder.handler.js';
 import { ReminderLifecycleHandler } from '../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import { RemindersQueryHandler } from '../reminders/features/reminders-query/reminders.query.js';
+import { CreateMeetingHandler } from '../meetings/features/create-meeting/create-meeting.handler.js';
+import { MeetingQueryHandler } from '../meetings/features/meeting/meeting.query.js';
+import { MeetingOccurrencesQueryHandler } from '../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
+import { MeetingsModule } from '../meetings/meetings.module.js';
 import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { UpdateProfileHandler } from '../profile/features/update-profile/update-profile.handler.js';
 import { CaptureCheckinReplyHandler } from '../rhythm/features/capture-checkin-reply/capture-checkin-reply.handler.js';
@@ -67,6 +72,7 @@ import {
   IntentExtractorPort,
   LatestCheckinPort,
   MemberDayPort,
+  MeetingActionsPort,
   MemberFactsPort,
   PlannerActionsPort,
   ProfileWritesPort,
@@ -93,6 +99,7 @@ import { QuickQuestionsQueryHandler } from './features/quick-questions/quick-que
 import { RenameConversationHandler } from './features/rename/rename-conversation.handler.js';
 import { ChatGateway } from './features/send-message/chat.gateway.js';
 import {
+  MeetingsChatActions,
   OperationsUsage,
   PlanningReminderActions,
   ProfileChatWrites,
@@ -148,6 +155,7 @@ import {
     ProfileModule,
     PlanningModule,
     RemindersModule,
+    MeetingsModule,
     /*
      * `forwardRef`, because this edge is genuinely bidirectional.
      *
@@ -269,6 +277,31 @@ import {
         profiles: ProfileQueryHandler,
       ) => new RhythmMemberDay(plans, streaks, profiles),
     },
+    /*
+     * `set_meeting`, which until P5 answered "not yet".
+     *
+     * The write goes through a port bound here rather than through an event,
+     * for the reason `chat.ports.ts` gives about the planner's writes: FR-004
+     * needs a synchronous confirmation naming the values that were **actually
+     * stored**, and an event cannot answer a question. What it binds to is
+     * Meetings' own command handler, so the length, the offsets and the
+     * authoring zone are all resolved by the context that owns them.
+     */
+    {
+      provide: MeetingActionsPort,
+      inject: [
+        CreateMeetingHandler,
+        MeetingQueryHandler,
+        MeetingOccurrencesQueryHandler,
+        MemberContextPort,
+      ],
+      useFactory: (
+        meetings: CreateMeetingHandler,
+        queries: MeetingQueryHandler,
+        occurrences: MeetingOccurrencesQueryHandler,
+        member: MemberContextPort,
+      ) => new MeetingsChatActions(meetings, queries, occurrences, member),
+    },
     {
       provide: PlannerActionsPort,
       inject: [
@@ -331,9 +364,12 @@ import {
     },
     {
       provide: IntentExecutorPort,
-      inject: [PlannerActionsPort, ProfileWritesPort],
-      useFactory: (planner: PlannerActionsPort, profile: ProfileWritesPort) =>
-        new IntentExecutor(planner, profile),
+      inject: [PlannerActionsPort, ProfileWritesPort, MeetingActionsPort],
+      useFactory: (
+        planner: PlannerActionsPort,
+        profile: ProfileWritesPort,
+        meetings: MeetingActionsPort,
+      ) => new IntentExecutor(planner, profile, meetings),
     },
     {
       provide: PromptAssemblerPort,

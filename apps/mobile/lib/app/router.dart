@@ -4,14 +4,19 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/notifications/alert_plan.dart' show memberZone;
 import '../features/auth/application/auth_cubit.dart';
 import '../features/auth/presentation/sign_in_page.dart';
+import '../features/calendar/application/calendar_cubit.dart';
+import '../features/calendar/presentation/calendar_page.dart';
 import '../features/chat/application/chat_cubit.dart';
 import '../features/chat/application/conversations_cubit.dart';
 import '../features/chat/presentation/chat_page.dart';
 import '../features/chat/presentation/conversations_page.dart';
 import '../features/home/application/home_cubit.dart';
 import '../features/home/presentation/home_page.dart';
+import '../features/meetings/application/meetings_cubit.dart';
+import '../features/meetings/presentation/meetings_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/preferences/presentation/preferences_page.dart';
 import '../features/profile/presentation/profile_page.dart';
@@ -33,6 +38,20 @@ abstract final class Routes {
   static const String preferences = '/preferences';
   static const String tasks = '/tasks';
   static const String reminders = '/reminders';
+
+  /// The meetings list, and one meeting.
+  ///
+  /// A route for the single meeting and not only a pushed page, for the reason
+  /// the rhythm sheets give: a reminder for a meeting arrives with a deep link,
+  /// on a cold start, with no screen behind it — and the whole point of that
+  /// notification is that the joining link or the address is one tap away
+  /// (story 1, scenarios 1 and 2).
+  static const String meetings = '/meetings';
+
+  static String meeting(String meetingId) => '$meetings/$meetingId';
+
+  /// The month, the week and the day (story 3).
+  static const String calendar = '/calendar';
 
   /// The chat list, and one conversation.
   ///
@@ -105,6 +124,14 @@ String? routeForDeepLink(String deepLink) {
     // No per-row route exists for these yet, so the list is where a tap lands.
     // Better than nowhere, and it is the screen the member was going to have
     // to reach anyway.
+    // A meeting's own screen, which is where its link and its address are. The
+    // server plans a meeting's alerts with `meeting/<id>` deep links and a
+    // preparation alert with the same one, so both land on the meeting rather
+    // than on a list the member then has to search.
+    ['meeting', final String id] || ['meetings', final String id] =>
+      Routes.meeting(id),
+    ['meeting', ...] || ['meetings', ...] => Routes.meetings,
+    ['calendar', ...] => Routes.calendar,
     ['tasks', ...] => Routes.tasks,
     ['reminders', ...] => Routes.reminders,
     _ => null,
@@ -282,6 +309,41 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
         ),
       ),
     ),
+    // `.value` for both cubits, as everywhere else: they are singletons from
+    // the container and already listening to the sync engine. A second
+    // instance built by the route would have its own copy of the month, so a
+    // meeting skipped on the calendar would still show on the list behind it.
+    GoRoute(
+      path: Routes.meetings,
+      builder: (context, state) => BlocProvider<MeetingsCubit>.value(
+        value: sl<MeetingsCubit>(),
+        child: const MeetingsPage(),
+      ),
+    ),
+    // One meeting, by id. Renders the list and opens the meeting's actions over
+    // it, so a notification tap on a cold start lands somewhere the member can
+    // stay when the sheet closes rather than on a blank route — the same shape
+    // the two rhythm sheets use, and for the same reason.
+    GoRoute(
+      path: '${Routes.meetings}/:id',
+      builder: (context, state) => BlocProvider<MeetingsCubit>.value(
+        value: sl<MeetingsCubit>(),
+        child: _MeetingOverList(meetingId: state.pathParameters['id'] ?? ''),
+      ),
+    ),
+    GoRoute(
+      path: Routes.calendar,
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<CalendarCubit>.value(value: sl<CalendarCubit>()),
+          // The calendar reads meetings through the cubit that owns that
+          // table, so the `pendingOp` and `baseUpdatedAt` rules are written
+          // down once — the same reason Home delegates ticking a task off.
+          BlocProvider<MeetingsCubit>.value(value: sl<MeetingsCubit>()),
+        ],
+        child: const CalendarPage(),
+      ),
+    ),
     GoRoute(
       path: Routes.server,
       builder: (context, state) => const ServerPage(),
@@ -331,4 +393,57 @@ class _SheetOverHomeState extends State<_SheetOverHome> {
     ],
     child: const HomePage(),
   );
+}
+
+
+/// The meetings list, with one meeting's actions opened over it.
+///
+/// What a notification tap lands on. The sheet is opened in a post-frame
+/// callback rather than in `build`, because `showModalBottomSheet` pushes a
+/// route and pushing a route during a build is an assertion failure — and on a
+/// cold start this *is* the first build.
+///
+/// Guarded by [_opened] because a route's `build` runs again for every
+/// dependency change — a theme change, a keyboard appearing, the locale — and
+/// each of those would otherwise stack another copy of the sheet.
+class _MeetingOverList extends StatefulWidget {
+  const _MeetingOverList({required this.meetingId});
+
+  final String meetingId;
+
+  @override
+  State<_MeetingOverList> createState() => _MeetingOverListState();
+}
+
+class _MeetingOverListState extends State<_MeetingOverList> {
+  bool _opened = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_opened || !mounted) return;
+      _opened = true;
+      unawaited(_open());
+    });
+  }
+
+  Future<void> _open() async {
+    final cubit = sl<MeetingsCubit>();
+    // The state carries the member's zone, and it is empty until the first
+    // read: a tap on a cold start arrives before anything has loaded, so the
+    // refresh is awaited rather than assumed.
+    await cubit.refresh();
+    final meeting = await cubit.byId(widget.meetingId);
+    if (!mounted || meeting == null) return;
+    await showMeetingActions(
+      context,
+      cubit,
+      meeting,
+      zone: memberZone(cubit.state.timezone),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => const MeetingsPage();
 }

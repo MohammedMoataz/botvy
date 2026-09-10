@@ -339,6 +339,76 @@ finds it, with a test, and named in the commit; it does not go there.
   the only caller was the reachability probe, and wrong the moment the chat
   needed it, because a context importing `HealthModule` points the dependency
   backwards and drags a controller along with a client.
+- **A stored instant does not remember what the member typed.** "18:00" in
+  Cairo is one instant; read in Berlin the same instant is 17:00. So a
+  recurrence expanded from `dtstart` alone lands a member who has flown at
+  neither the time they chose nor the time they left behind — and it drifts
+  again with every further move. Recovering the digits needs the instant *and*
+  the zone it was written in, which is why `meetings.authoredTimezone` exists
+  and is never changed afterwards. Both halves of FR-007 then fall out of one
+  line: the wall-clock digits come from `lockTimezone ?? authoredTimezone`, and
+  the clock they are read on is `lockTimezone ?? the member's current zone`. A
+  pinned series keeps its instants when the member moves; an unpinned one keeps
+  its digits and moves its instants, which is what Notifications re-plans.
+- **`pnpm typecheck` ran one of the two TypeScript projects.**
+  `tsconfig.build.json` excludes `**/*.spec.ts` because that is what ships, so
+  a type error in a spec was invisible to every gate that recorded the command
+  as green — three agents in one phase hit it independently, one having shipped
+  a call with the wrong arity. The script runs both projects now. A check that
+  cannot see half the tree has recorded something other than what it says.
+- **An exception keyed by the rule's own moment means a move clears the
+  *source's* skip, not the destination's.** `exdates` are matched against the
+  dates the rule generates, *before* overrides are applied — so moving
+  occurrence A onto occurrence B's instant needs nothing done about B's
+  exclusion, and clearing the destination instead resurrects the occurrence the
+  member cancelled: a member who skipped Tuesday and then dragged another
+  meeting onto Tuesday ended up with two meetings and the cancelled one back.
+  The case that genuinely needs clearing is skipping A and then moving **A** —
+  without it the rule date is excluded, the override keyed to it is never
+  reached, and the drag silently does nothing.
+- **A controller declared in `AppModule` needs its handlers *exported* from the
+  context module, not merely provided.** Nest resolves a controller's
+  dependencies from the module that declares it, and the routes live in
+  `AppModule` so the worker can import a context without gaining an HTTP
+  surface. The failure is an `UnknownDependenciesException` at boot that no
+  typecheck sees; `app.module.spec.ts` resolves the whole graph in both roles,
+  which is what turns it into a red test instead of a red deploy.
+- **`gen:contracts` runs `node dist/main.js`.** Regenerating without building
+  first republishes the *previous* schema, silently and with a success message —
+  the new resolvers and event payloads simply are not in it, and `schema.graphql`
+  is the file everything else is checked against. The event catalogue in
+  `contracts.generate.ts` is hand-maintained besides, so a new context's events
+  need a row there as well as a producer; the sibling of "a read a client cannot
+  reach does not exist" is a payload no subscriber can validate against.
+- **Every new context is added to `oxlint.json`'s cross-context pattern list in
+  the change that creates it.** The rule enumerates context names, so an absent
+  one is unpoliced in the *reverse* direction: nothing stopped another context's
+  `domain/` from importing `../../meetings/**` until the twelve patterns were
+  added. And probe it — write a file that should fail and check the
+  "Constitution IX" message actually appears. A lint rule nobody has seen fire
+  is a comment.
+- **A member preference is never read from the settings registry.** They agree
+  for every member who has not changed it, which is exactly what makes the bug
+  invisible: `defaults.meetingDurationMin` read through `SettingsService` gives
+  the *installation* value, so the editor silently ignores what the member set.
+  Constitution XII means a `user_preferences` field is reached through a port
+  bound to Profile's published read, with the registry as the fallback for a
+  member whose bootstrap row does not exist yet. And a stub for such a port must
+  answer something *different* from the registry default, or the spec passes
+  whichever source the handler used.
+- **The script that was supposed to keep corpus sentences out of `intent.md` was
+  never committed.** P4's notes say "the script that writes the examples now
+  asserts none of them appears in the corpus"; it was ad-hoc, and three corpus
+  sentences were still quoted verbatim in the prompt's `record_metric` and
+  `update_profile` bullets — the leak was fixed in the `scope` table and nowhere
+  else. It is a spec assertion now, so it runs on every `pnpm vitest`, which is
+  the only version of that check worth having. A verification that lives in
+  somebody's shell history has not been performed since.
+- **Two capabilities sharing one "not yet" refusal becomes a lie when one of
+  them ships.** `list` answered "coming in a later version" for `meetings` and
+  `sessions` from the same branch, so building meetings left the chat denying a
+  feature that existed. Split the branch when you build the first half, and let
+  the refusal name only what is actually missing.
 - **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
   while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
   v2 served v1's live database and neither could run beside the other. Keep the

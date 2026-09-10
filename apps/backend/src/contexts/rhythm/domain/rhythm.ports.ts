@@ -1,9 +1,13 @@
-import type { PlanTask, PlanTraining } from './daily-plan.aggregate.js';
+import type {
+  PlanMeeting,
+  PlanTask,
+  PlanTraining,
+} from './daily-plan.aggregate.js';
 
 /**
  * Everything the rhythm needs that it does not own.
  *
- * Five ports, declared here in `domain/` and bound in this context's own
+ * Six ports, declared here in `domain/` and bound in this context's own
  * `infrastructure/` to whichever context publishes the answer. That is the one
  * seam constitution IX sanctions: `infrastructure/` is the single layer allowed
  * to know another context exists, because binding a local port to somebody
@@ -53,6 +57,24 @@ export abstract class PlannedTasksPort {
 
   /** Still-open tasks whose moment has already passed — the carry-over list. */
   abstract openBefore(userId: string, before: Date): Promise<PlanTask[]>;
+}
+
+/**
+ * Where the member's meetings fall on one of their days (FR-012).
+ *
+ * Bound to Meetings' `MeetingOccurrencesQueryHandler`, which P5 declared with
+ * this caller named in its own comment. Occurrences are derived from a rule and
+ * never stored, so there is nothing to read even if reading another context's
+ * collection were allowed — the expander is the only thing that knows where a
+ * weekly meeting falls, and asking for it is the only way to agree with the
+ * calendar the member is looking at.
+ *
+ * `date` is the member's own local `YYYY-MM-DD`, the same contract
+ * `PlannedTasksPort.dueOn` uses and for the same reason: a pair of instants
+ * would make this caller decide whose midnight it meant.
+ */
+export abstract class MeetingsOnPort {
+  abstract onDate(userId: string, date: string): Promise<PlanMeeting[]>;
 }
 
 /**

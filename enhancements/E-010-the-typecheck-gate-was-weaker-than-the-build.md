@@ -1,6 +1,6 @@
 # E-010 — The typecheck command is weaker than the build
 
-**Area**: build · **Status**: open · **Found**: P2
+**Area**: build · **Status**: done (P5) · **Found**: P2
 
 ## What
 
@@ -41,3 +41,34 @@ Pick one and make it the gate:
 Either way the script belongs in `package.json` next to `test` and `lint`, so
 nobody has to remember which invocation is the real one. Related: E-009, which
 is the same lesson about a gate that does not test what ships.
+
+## Resolved in P5
+
+`pnpm typecheck` in `apps/backend` now runs **both** projects:
+
+```
+tsc --noEmit -p tsconfig.build.json && tsc --noEmit -p tsconfig.json
+```
+
+Two things had to be true for that to be the fix rather than a gesture, and
+both are worth recording because one of them contradicts what this file
+originally said.
+
+**The two configs no longer differ in strictness.** `tsconfig.build.json`
+*extends* `tsconfig.json` and overrides only `rootDir` and the file lists, so
+every compiler option — `strict`, `noUncheckedIndexedAccess`,
+`noImplicitOverride` — is the same in both. Whatever made the bare `tsc -p` the
+looser command in P2 is no longer the case, so "two commands, two answers" is
+now purely a question of *which files* each one reads.
+
+**And the file lists are complementary, not nested.** The build project excludes
+`**/*.spec.ts`, `test/` and `scripts/`, because that is what ships; the wider
+project includes them. So neither is a superset: running only the build project
+left every spec, fixture and script unchecked, and P5 found out the hard way —
+three separate pieces of work hit spec-only type errors in one phase, one of
+them a call with the wrong arity that had already been reported as verified.
+Running both covers the union, which is the whole tree.
+
+The deeper cost this file named — that "typecheck clean" stopped meaning
+anything specific — is what the change actually buys back. One command, one
+answer, and it is the standard the code has to meet.
