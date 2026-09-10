@@ -61,7 +61,8 @@ export class AdminServiceClientsHandler {
     // changed INTERNAL_SERVICE_TOKEN updates its own row — but an admin
     // creating a client that silently replaced an existing one's secret would
     // break whichever integration held it, with nothing to say why.
-    if (await this.clients.findByName(trimmed)) throw new ServiceClientNameTaken(trimmed);
+    if (await this.clients.findByName(trimmed))
+      throw new ServiceClientNameTaken(trimmed);
 
     const secret = randomBytes(32).toString('base64url');
     const client = await this.clients.upsert({
@@ -84,9 +85,13 @@ export class AdminServiceClientsHandler {
     return { id: client.id, name: client.name, scopes: client.scopes, secret };
   }
 
-  async revoke(actor: Principal, name: string): Promise<{ id: string; revoked: true }> {
+  async revoke(
+    actor: Principal,
+    name: string,
+  ): Promise<{ id: string; revoked: true }> {
     const existing = await this.clients.findByName(name.trim());
-    if (!existing || existing.revokedAt !== null) throw new ServiceClientNotFound();
+    if (!existing || existing.revokedAt !== null)
+      throw new ServiceClientNotFound();
 
     await this.clients.revoke(existing.id);
 

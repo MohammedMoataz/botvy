@@ -17,7 +17,11 @@ describe('ScryptPasswordHasher', () => {
 
   it('answers false, never throws, for a hash it does not recognise', async () => {
     expect(await hasher.verify('', 'admin')).toBe(false);
-    expect(await hasher.verify('$argon2id$v=19$m=65536,t=3,p=4$abc$def', 'admin')).toBe(false);
-    expect(await hasher.verify('scrypt$x$8$1$c2FsdA==$aGFzaA==', 'admin')).toBe(false);
+    expect(
+      await hasher.verify('$argon2id$v=19$m=65536,t=3,p=4$abc$def', 'admin'),
+    ).toBe(false);
+    expect(await hasher.verify('scrypt$x$8$1$c2FsdA==$aGFzaA==', 'admin')).toBe(
+      false,
+    );
   });
 });

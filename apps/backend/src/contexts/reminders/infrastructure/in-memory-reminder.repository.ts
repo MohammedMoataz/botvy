@@ -173,15 +173,29 @@ function docOf(row: ReminderState): Record<string, unknown> {
  * risk of drift is real, so the *shape* is asserted by the specs that page
  * every view.
  */
-function matchesReminder(row: ReminderState, filter: ReminderListFilter): boolean {
+function matchesReminder(
+  row: ReminderState,
+  filter: ReminderListFilter,
+): boolean {
   const effective = row.snoozedUntil ?? row.remindAt;
   switch (filter.view) {
     case 'upcoming':
-      return row.deletedAt === null && row.status === 'active' && effective >= filter.now;
+      return (
+        row.deletedAt === null &&
+        row.status === 'active' &&
+        effective >= filter.now
+      );
     case 'overdue':
-      return row.deletedAt === null && row.status === 'active' && effective < filter.now;
+      return (
+        row.deletedAt === null &&
+        row.status === 'active' &&
+        effective < filter.now
+      );
     case 'done':
-      return row.deletedAt === null && (row.status === 'done' || row.status === 'cancelled');
+      return (
+        row.deletedAt === null &&
+        (row.status === 'done' || row.status === 'cancelled')
+      );
     case 'deleted':
       return row.deletedAt !== null;
   }

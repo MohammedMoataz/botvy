@@ -27,14 +27,18 @@ export class UserConnectionType {
 export class AdminMembersResolver {
   constructor(private readonly members: MembersQueryHandler) {}
 
-  @Query(() => UserConnectionType, { description: 'Every member. Administrators only.' })
+  @Query(() => UserConnectionType, {
+    description: 'Every member. Administrators only.',
+  })
   @UsersOnly()
   @Roles('admin')
   async users(
     @Args('search', { type: () => String, nullable: true }) search?: string,
-    @Args('status', { type: () => UserStatus, nullable: true }) status?: UserStatus,
+    @Args('status', { type: () => UserStatus, nullable: true })
+    status?: UserStatus,
     @Args('role', { type: () => Role, nullable: true }) role?: Role,
-    @Args('first', { type: () => Int, nullable: true, defaultValue: 50 }) first?: number,
+    @Args('first', { type: () => Int, nullable: true, defaultValue: 50 })
+    first?: number,
     @Args('after', { type: () => String, nullable: true }) after?: string,
   ): Promise<UserConnectionType> {
     // Clamped here rather than trusted from the argument. `first: 100000` is a

@@ -55,7 +55,8 @@ export function judgeRefresh(
   if (record.revokedAt !== null || record.replacedBy !== null) {
     return { outcome: 'replayed', record };
   }
-  if (record.expiresAt.getTime() <= now.getTime()) return { outcome: 'expired' };
+  if (record.expiresAt.getTime() <= now.getTime())
+    return { outcome: 'expired' };
 
   return { outcome: 'rotate', record };
 }

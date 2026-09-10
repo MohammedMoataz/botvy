@@ -19,7 +19,9 @@ export class CannotActOnSelf extends Error {
 
 export class LastAdminProtected extends Error {
   constructor() {
-    super('this is the only administrator; promote another before changing this one');
+    super(
+      'this is the only administrator; promote another before changing this one',
+    );
   }
 }
 
@@ -62,7 +64,11 @@ export class AdminMembersHandler {
       await this.refuse(actor, 'admin.setRole', userId, 'self_demotion');
       throw new CannotActOnSelf('demote');
     }
-    if (user.role === 'admin' && role !== 'admin' && (await this.isLastAdmin(userId))) {
+    if (
+      user.role === 'admin' &&
+      role !== 'admin' &&
+      (await this.isLastAdmin(userId))
+    ) {
       await this.refuse(actor, 'admin.setRole', userId, 'last_admin');
       throw new LastAdminProtected();
     }
@@ -125,7 +131,9 @@ export class AdminMembersHandler {
       meta: { reason, sessionsEnded },
     });
 
-    this.logger.log(`${userId} banned by ${actor.id}; ${sessionsEnded} session(s) ended`);
+    this.logger.log(
+      `${userId} banned by ${actor.id}; ${sessionsEnded} session(s) ended`,
+    );
     return { userId, sessionsEnded };
   }
 

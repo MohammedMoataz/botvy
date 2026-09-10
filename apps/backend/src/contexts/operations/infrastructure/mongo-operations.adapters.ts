@@ -1,9 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import type { Model } from 'mongoose';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
-import { SettingsStore, type StoredSetting } from '../../../shared/settings/settings.store.js';
-import { AuditPort, type AuditEntry } from '../../../shared/audit/audit.port.js';
-import { HeartbeatRepository, type Heartbeat } from '../domain/heartbeat.repository.js';
+import {
+  SettingsStore,
+  type StoredSetting,
+} from '../../../shared/settings/settings.store.js';
+import {
+  AuditPort,
+  type AuditEntry,
+} from '../../../shared/audit/audit.port.js';
+import {
+  HeartbeatRepository,
+  type Heartbeat,
+} from '../domain/heartbeat.repository.js';
 
 /**
  * The audit trail's only writer. Append-only by construction: the port has one
@@ -49,11 +58,18 @@ export class MongoHeartbeatRepository extends HeartbeatRepository {
     };
     if (heartbeat.lastOkAt) set.lastOkAt = heartbeat.lastOkAt;
 
-    await this.model.updateOne({ _id: heartbeat.job }, { $set: set }, { upsert: true });
+    await this.model.updateOne(
+      { _id: heartbeat.job },
+      { $set: set },
+      { upsert: true },
+    );
   }
 
   async listAll(): Promise<Heartbeat[]> {
-    const rows = await this.model.find().lean<Array<Record<string, unknown>>>().exec();
+    const rows = await this.model
+      .find()
+      .lean<Array<Record<string, unknown>>>()
+      .exec();
     return rows.map((row) => ({
       job: String(row._id),
       lastRunAt: row.lastRunAt as Date,
@@ -71,7 +87,10 @@ export class MongoSettingsStore extends SettingsStore {
   }
 
   async get(key: string): Promise<StoredSetting | null> {
-    const row = await this.model.findById(key).lean<Record<string, unknown>>().exec();
+    const row = await this.model
+      .findById(key)
+      .lean<Record<string, unknown>>()
+      .exec();
     return row ? toStoredSetting(row) : null;
   }
 
@@ -83,7 +102,11 @@ export class MongoSettingsStore extends SettingsStore {
     return rows.map(toStoredSetting);
   }
 
-  async set(key: string, value: unknown, updatedBy: string | null): Promise<StoredSetting> {
+  async set(
+    key: string,
+    value: unknown,
+    updatedBy: string | null,
+  ): Promise<StoredSetting> {
     const updatedAt = new Date();
     await this.model.updateOne(
       { _id: key },

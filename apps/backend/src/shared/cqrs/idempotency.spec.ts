@@ -90,7 +90,7 @@ class Thing extends AggregateRoot<string> {
     super();
   }
   doSomething(): void {
-    this.raise('operations.Pinged', 'thing', { note: 'hello' });
+    this.raise('operations.ThingTouched', 'thing', { note: 'hello' });
   }
 }
 
@@ -100,8 +100,8 @@ describe('aggregate events', () => {
     thing.doSomething();
 
     expect(thing.pendingEvents[0]).toMatchObject({
-      name: 'operations.Pinged',
-      context: contextOf('operations.Pinged'),
+      name: 'operations.ThingTouched',
+      context: contextOf('operations.ThingTouched'),
       aggregate: { type: 'thing', id: 't-1' },
       userId: 'user-1',
       schemaVersion: 1,

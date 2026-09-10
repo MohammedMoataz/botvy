@@ -306,6 +306,7 @@ export class TasksController {
   }
 
   @Post('tasks/:id/complete')
+  @HttpCode(200)
   async completeTask(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -317,6 +318,7 @@ export class TasksController {
   }
 
   @Post('tasks/:id/reopen')
+  @HttpCode(200)
   async reopenTask(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -328,6 +330,7 @@ export class TasksController {
   }
 
   @Post('tasks/:id/cancel')
+  @HttpCode(200)
   async cancel(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -339,6 +342,7 @@ export class TasksController {
   }
 
   @Post('tasks/:id/defer')
+  @HttpCode(200)
   async deferTask(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -358,6 +362,7 @@ export class TasksController {
   }
 
   @Post('tasks/:id/restore')
+  @HttpCode(200)
   async restoreTask(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -381,6 +386,7 @@ export class TasksController {
    * meeting are doing the same thing and the API should say so.
    */
   @Post('tasks/:id/occurrences/:occurrence/skip')
+  @HttpCode(200)
   async skipOccurrence(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -392,6 +398,7 @@ export class TasksController {
   }
 
   @Post('tasks/rollover')
+  @HttpCode(200)
   async rolloverTasks(
     @CurrentPrincipal() principal: Principal,
     @Body() body: RolloverDto,
@@ -418,6 +425,7 @@ export class TasksController {
   }
 
   @Patch('labels/:id')
+  @HttpCode(200)
   async patchLabel(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,

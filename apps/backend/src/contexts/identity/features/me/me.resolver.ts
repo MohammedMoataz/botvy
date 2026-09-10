@@ -1,6 +1,17 @@
 import { NotFoundException } from '@nestjs/common';
-import { Field, ID, Int, ObjectType, Query, Resolver, registerEnumType } from '@nestjs/graphql';
-import { CurrentPrincipal, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  Field,
+  ID,
+  Int,
+  ObjectType,
+  Query,
+  Resolver,
+  registerEnumType,
+} from '@nestjs/graphql';
+import {
+  CurrentPrincipal,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { DateTimeScalar } from '../../../../graphql/scalars.js';
 import { MeQueryHandler } from './me.query.js';

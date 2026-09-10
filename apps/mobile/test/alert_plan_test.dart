@@ -185,9 +185,22 @@ void main() {
         now: DateTime.now(),
       );
 
-      final released = tz.TZDateTime.from(plan.single.notifyAt, cairo);
+      // The derived warning, picked out by its label rather than by being the
+      // only alert. The plan also holds the member's own 03:00 moment, which is
+      // never shifted and which the phone now always plans — the server's
+      // `desiredFor` seeds its set with it whether or not `0m` is among the
+      // lead times, and the phone used to derive it from the list alone. See
+      // `test/alarm_parity_test.dart`.
+      final warning = plan.singleWhere((alert) => alert.label == '1h');
+      final released = tz.TZDateTime.from(warning.notifyAt, cairo);
       expect(released.hour, 8);
       expect(released.day, tz.TZDateTime.from(due, cairo).day);
+
+      expect(
+        plan.singleWhere((alert) => alert.isMemberChosen).notifyAt,
+        due,
+        reason: 'quiet hours never move a moment the member chose',
+      );
     });
   });
 

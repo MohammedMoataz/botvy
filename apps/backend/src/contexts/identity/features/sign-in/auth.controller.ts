@@ -21,7 +21,11 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CurrentPrincipal, Public, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  CurrentPrincipal,
+  Public,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { GoogleTokenInvalid } from '../../domain/google-verifier.js';
 import {
@@ -44,7 +48,10 @@ import {
   RegistrationClosed,
   type Registered,
 } from '../register/register.handler.js';
-import { DeleteAccountHandler, PasswordRequired } from '../delete-account/delete-account.handler.js';
+import {
+  DeleteAccountHandler,
+  PasswordRequired,
+} from '../delete-account/delete-account.handler.js';
 import { LogoutHandler } from '../logout/logout.handler.js';
 import {
   DeviceNotFound,
@@ -57,7 +64,11 @@ import {
   LinkRequired,
   RegistrationClosedForGoogle,
 } from '../google-sign-in/google-sign-in.handler.js';
-import { InvalidCredentials, SignInHandler, type SignedIn } from './sign-in.handler.js';
+import {
+  InvalidCredentials,
+  SignInHandler,
+  type SignedIn,
+} from './sign-in.handler.js';
 
 export class RegisterDto {
   @IsEmail()
@@ -203,9 +214,14 @@ export class AuthController {
     } catch (error) {
       // Each of these is a different thing for a client to show, so each gets
       // its own status rather than one flat 400.
-      if (error instanceof RegistrationClosed) throw new ForbiddenException(error.message);
-      if (error instanceof EmailAlreadyRegistered) throw new ConflictException(error.message);
-      if (error instanceof PasswordsDoNotMatch || error instanceof PasswordTooShort) {
+      if (error instanceof RegistrationClosed)
+        throw new ForbiddenException(error.message);
+      if (error instanceof EmailAlreadyRegistered)
+        throw new ConflictException(error.message);
+      if (
+        error instanceof PasswordsDoNotMatch ||
+        error instanceof PasswordTooShort
+      ) {
         throw new BadRequestException(error.message);
       }
       throw error;
@@ -219,7 +235,8 @@ export class AuthController {
     try {
       return await this.signIn.handle(body);
     } catch (error) {
-      if (error instanceof InvalidCredentials) throw new UnauthorizedException(error.message);
+      if (error instanceof InvalidCredentials)
+        throw new UnauthorizedException(error.message);
       throw error;
     }
   }
@@ -240,7 +257,10 @@ export class AuthController {
         // The code matters to the client: `token_expired` means sign in again,
         // and `session_replay` means the session was ended on purpose and
         // something is wrong. Flattening both to 401 loses that.
-        throw new UnauthorizedException({ code: error.code, message: error.message });
+        throw new UnauthorizedException({
+          code: error.code,
+          message: error.message,
+        });
       }
       throw error;
     }
@@ -255,13 +275,20 @@ export class AuthController {
     @CurrentPrincipal() principal: Principal,
   ): Promise<{ changed: true }> {
     try {
-      return await this.changePassword.handle({ userId: principal.id, ...body });
+      return await this.changePassword.handle({
+        userId: principal.id,
+        ...body,
+      });
     } catch (error) {
       // The current password being wrong is a 401, not a 400: it is a failed
       // credential check, and a client that treats it as a validation error
       // shows the member the wrong message.
-      if (error instanceof CurrentPasswordWrong) throw new UnauthorizedException(error.message);
-      if (error instanceof NewPasswordTooShort || error instanceof NewPasswordUnchanged) {
+      if (error instanceof CurrentPasswordWrong)
+        throw new UnauthorizedException(error.message);
+      if (
+        error instanceof NewPasswordTooShort ||
+        error instanceof NewPasswordUnchanged
+      ) {
         throw new BadRequestException(error.message);
       }
       throw error;
@@ -303,12 +330,11 @@ export class AuthController {
     return this.devices.handle({ userId: principal.id, ...body });
   }
 
-// GET /auth/devices was here. It is a read, and constitution X puts reads on GraphQL:
+  // GET /auth/devices was here. It is a read, and constitution X puts reads on GraphQL:
   // `myDevices` at /graphql answers it. Removed rather than left beside the
   // resolver, because two paths to one answer is the drift this rewrite exists
   // to remove - and the REST one leaked every device's push token to the browser.
 
-  
   @Delete('devices/:id')
   @UsersOnly()
   @ApiBearerAuth()
@@ -322,7 +348,8 @@ export class AuthController {
     } catch (error) {
       // Another member's device is a 404, not a 403: whether it exists is not
       // this caller's business to learn.
-      if (error instanceof DeviceNotFound) throw new NotFoundException(error.message);
+      if (error instanceof DeviceNotFound)
+        throw new NotFoundException(error.message);
       throw error;
     }
   }
@@ -338,7 +365,8 @@ export class AuthController {
     try {
       return await this.deleteAccount.handle({ userId: principal.id, ...body });
     } catch (error) {
-      if (error instanceof PasswordRequired) throw new UnauthorizedException(error.message);
+      if (error instanceof PasswordRequired)
+        throw new UnauthorizedException(error.message);
       throw error;
     }
   }
@@ -359,12 +387,19 @@ export class AuthController {
       return await this.googleSignIn.handle(body);
     } catch (error) {
       if (error instanceof LinkRequired) {
-        throw new ConflictException({ code: error.code, email: error.email, message: error.message });
+        throw new ConflictException({
+          code: error.code,
+          email: error.email,
+          message: error.message,
+        });
       }
       if (error instanceof RegistrationClosedForGoogle) {
         throw new ForbiddenException(error.message);
       }
-      if (error instanceof GoogleTokenInvalid || error instanceof InvalidCredentials) {
+      if (
+        error instanceof GoogleTokenInvalid ||
+        error instanceof InvalidCredentials
+      ) {
         throw new UnauthorizedException(error.message);
       }
       throw error;
@@ -376,7 +411,11 @@ export class AuthController {
   @HttpCode(200)
   async googleLink(@Body() body: GoogleLinkDto): Promise<SignedIn> {
     try {
-      return await this.googleSignIn.link(body.idToken, body.password, body.device);
+      return await this.googleSignIn.link(
+        body.idToken,
+        body.password,
+        body.device,
+      );
     } catch (error) {
       if (
         error instanceof LinkPasswordWrong ||

@@ -39,7 +39,9 @@ const env = {
   JWT_REFRESH_TTL: '30d',
 };
 
-function admin(overrides: Partial<{ status: 'active' | 'banned'; password: string }> = {}) {
+function admin(
+  overrides: Partial<{ status: 'active' | 'banned'; password: string }> = {},
+) {
   return User.rehydrate({
     id: 'user-1',
     email: 'imohammedmoataz@gmail.com',
@@ -85,7 +87,11 @@ describe('sign-in', () => {
     });
 
     const principal = new JwtVerifier(env).verify(result.accessToken);
-    expect(principal).toMatchObject({ kind: 'user', id: 'user-1', role: 'admin' });
+    expect(principal).toMatchObject({
+      kind: 'user',
+      id: 'user-1',
+      role: 'admin',
+    });
   });
 
   /** The seed's boot warning is only actionable if the client is told. */
@@ -115,7 +121,10 @@ describe('sign-in', () => {
     await users.save(admin());
 
     await expect(
-      handler.handle({ email: '  IMohammedMoataz@Gmail.com ', password: 'admin' }),
+      handler.handle({
+        email: '  IMohammedMoataz@Gmail.com ',
+        password: 'admin',
+      }),
     ).resolves.toMatchObject({ userId: 'user-1' });
   });
 
@@ -136,7 +145,9 @@ describe('sign-in', () => {
 
     expect(wrongPassword).toBeInstanceOf(InvalidCredentials);
     expect(noSuchUser).toBeInstanceOf(InvalidCredentials);
-    expect((wrongPassword as Error).message).toBe((noSuchUser as Error).message);
+    expect((wrongPassword as Error).message).toBe(
+      (noSuchUser as Error).message,
+    );
   });
 
   it('refuses a banned account without saying that is why', async () => {
@@ -189,8 +200,16 @@ describe('sign-in', () => {
     await users.save(admin());
     const device = { installId: 'install-1', kind: 'android' } as const;
 
-    await handler.handle({ email: 'imohammedmoataz@gmail.com', password: 'admin', device });
-    await handler.handle({ email: 'imohammedmoataz@gmail.com', password: 'admin', device });
+    await handler.handle({
+      email: 'imohammedmoataz@gmail.com',
+      password: 'admin',
+      device,
+    });
+    await handler.handle({
+      email: 'imohammedmoataz@gmail.com',
+      password: 'admin',
+      device,
+    });
 
     expect(devices.rows).toHaveLength(1);
   });
@@ -211,7 +230,10 @@ describe('sign-in', () => {
   it('records the sign-in on the account', async () => {
     await users.save(admin());
 
-    await handler.handle({ email: 'imohammedmoataz@gmail.com', password: 'admin' });
+    await handler.handle({
+      email: 'imohammedmoataz@gmail.com',
+      password: 'admin',
+    });
 
     const stored = await users.findByLogin('imohammedmoataz@gmail.com');
     expect(stored?.lastLoginAt).toBeInstanceOf(Date);
@@ -346,7 +368,11 @@ describe('change password', () => {
     );
 
     await expect(
-      handler.handle({ userId: 'user-2', currentPassword: '', newPassword: 'a-longer-secret' }),
+      handler.handle({
+        userId: 'user-2',
+        currentPassword: '',
+        newPassword: 'a-longer-secret',
+      }),
     ).rejects.toBeInstanceOf(CurrentPasswordWrong);
   });
 });

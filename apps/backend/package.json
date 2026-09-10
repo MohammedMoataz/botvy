@@ -11,6 +11,8 @@
     "prisma:generate": "prisma generate --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
     "postinstall": "prisma generate --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
     "build": "prisma generate --schema src/contexts/identity/infrastructure/prisma/schema.prisma && nest build",
+    "build:clean": "node -e \"const{rmSync}=require('node:fs');for(const p of ['dist','tsconfig.build.tsbuildinfo','tsconfig.tsbuildinfo'])rmSync(p,{recursive:true,force:true})\" && nest build",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "start": "node dist/main.js",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+} from '@nestjs/common';
 import { ENV } from '../../../../shared/config/config.module.js';
 import type { Env } from '../../../../shared/config/env.schema.js';
 import { AdminCredentialsQueryHandler } from './admin-credentials.query.js';
@@ -28,7 +33,10 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
   async onApplicationBootstrap(): Promise<void> {
     if (process.env.BOTVY_GEN || this.env.BOTVY_ROLE !== 'backend') return;
 
-    const outcome = await this.admin.seed(this.env.ADMIN_EMAIL, this.env.ADMIN_PASSWORD);
+    const outcome = await this.admin.seed(
+      this.env.ADMIN_EMAIL,
+      this.env.ADMIN_PASSWORD,
+    );
     this.logger.log(`administrator seed: ${outcome}`);
 
     // Through the query rather than the seed, because Operations asks the same
@@ -44,7 +52,9 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     // which owns that key. `OperationsBootstrap` runs straight after this one,
     // because its module imports this one.
 
-    const client = await this.serviceClients.seed(this.env.INTERNAL_SERVICE_TOKEN);
+    const client = await this.serviceClients.seed(
+      this.env.INTERNAL_SERVICE_TOKEN,
+    );
     this.logger.log(`service client seed: ${client}`);
   }
 }

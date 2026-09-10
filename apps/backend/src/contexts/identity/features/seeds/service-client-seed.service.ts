@@ -33,7 +33,9 @@ export class ServiceClientSeedService {
 
   constructor(private readonly clients: ServiceClientRepository) {}
 
-  async seed(internalServiceToken: string): Promise<'created' | 'rotated' | 'unchanged'> {
+  async seed(
+    internalServiceToken: string,
+  ): Promise<'created' | 'rotated' | 'unchanged'> {
     const tokenHash = hashToken(internalServiceToken);
     const existing = await this.clients.findByName(N8N_CLIENT_NAME);
 
@@ -41,7 +43,8 @@ export class ServiceClientSeedService {
     // one by definition, so the comparison would always read as unchanged and
     // a rotation would go unreported.
     const alreadyMatches =
-      existing !== null && (await this.clients.verifyToken(tokenHash))?.name === N8N_CLIENT_NAME;
+      existing !== null &&
+      (await this.clients.verifyToken(tokenHash))?.name === N8N_CLIENT_NAME;
 
     await this.clients.upsert({
       name: N8N_CLIENT_NAME,

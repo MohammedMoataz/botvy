@@ -711,6 +711,32 @@ describe('labels', () => {
     ).resolves.toMatchObject({ replayed: false });
   });
 
+  it('reports nameLower as undefined once tombstoned, which is what unsets it', async () => {
+    /*
+     * The domain half of a rule the store depends on, and the half that can be
+     * checked here.
+     *
+     * The unique index is partial on `nameLower` *existing*, so a tombstone has
+     * to make the field genuinely absent. `undefined` is how the aggregate says
+     * so, and `MongoRepositoryBase` turns an undefined value into `$unset`.
+     *
+     * Getting this wrong was a live defect: the mapper used to *omit* the key
+     * instead, and `$set` leaves fields it is not given alone — so the old
+     * value stayed in the document, the index kept holding the name, and
+     * deleting a label then recreating it was refused as a duplicate. Every
+     * spec here passed, because there is no `$set` in memory. The P2 gate
+     * caught it against a real Mongo.
+     */
+    const id = newId();
+    await b.createLabel.handle(MEMBER, { id, name: 'Work' });
+
+    const live = await b.labels.findById(MEMBER, id);
+    expect(live?.nameLower).toBe('work');
+
+    live!.tombstone();
+    expect(live!.nameLower).toBeUndefined();
+  });
+
   it('lets a label keep its own name when the editor is saved unchanged', async () => {
     // Without the id comparison in the handler, renaming a label to what it is
     // already called would refuse — a clash with itself.

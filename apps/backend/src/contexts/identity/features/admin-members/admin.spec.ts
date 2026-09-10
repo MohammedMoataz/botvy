@@ -96,16 +96,20 @@ describe('admin member actions', () => {
 
     expect(result.sessionsEnded).toBe(2);
     expect(tokens.rows.every((row) => row.revokedAt !== null)).toBe(true);
-    expect((await users.findById('member-1', 'member-1'))?.isActive).toBe(false);
+    expect((await users.findById('member-1', 'member-1'))?.isActive).toBe(
+      false,
+    );
   });
 
-  it('leaves another member\'s sessions alone', async () => {
+  it("leaves another member's sessions alone", async () => {
     await issueFor('member-1', 'fam-1');
     await issueFor('admin-2', 'fam-9');
 
     await handler.ban(OWNER, 'member-1', null);
 
-    expect(tokens.rows.find((row) => row.userId === 'admin-2')?.revokedAt).toBeNull();
+    expect(
+      tokens.rows.find((row) => row.userId === 'admin-2')?.revokedAt,
+    ).toBeNull();
   });
 
   /** A session that survived a ban is a session the ban did not end. */
@@ -121,13 +125,15 @@ describe('admin member actions', () => {
 
   /** Both of these are one click from an installation nobody can administer. */
   it('refuses to let an administrator ban themselves', async () => {
-    await expect(handler.ban(OWNER, 'admin-1', null)).rejects.toBeInstanceOf(CannotActOnSelf);
+    await expect(handler.ban(OWNER, 'admin-1', null)).rejects.toBeInstanceOf(
+      CannotActOnSelf,
+    );
   });
 
   it('refuses to let an administrator demote themselves', async () => {
-    await expect(handler.setRole(OWNER, 'admin-1', 'user')).rejects.toBeInstanceOf(
-      CannotActOnSelf,
-    );
+    await expect(
+      handler.setRole(OWNER, 'admin-1', 'user'),
+    ).rejects.toBeInstanceOf(CannotActOnSelf);
   });
 
   /**
@@ -154,13 +160,17 @@ describe('admin member actions', () => {
   });
 
   it('allows demoting an administrator while another remains', async () => {
-    await expect(handler.setRole(OWNER, 'admin-2', 'user')).resolves.toMatchObject({
+    await expect(
+      handler.setRole(OWNER, 'admin-2', 'user'),
+    ).resolves.toMatchObject({
       role: 'user',
     });
   });
 
   it('reports an unknown member as not found', async () => {
-    await expect(handler.ban(OWNER, 'nobody', null)).rejects.toBeInstanceOf(MemberNotFound);
+    await expect(handler.ban(OWNER, 'nobody', null)).rejects.toBeInstanceOf(
+      MemberNotFound,
+    );
   });
 
   it('treats a deleted member as gone', async () => {
@@ -168,9 +178,9 @@ describe('admin member actions', () => {
     member?.softDelete();
     if (member) await uow.run(() => users.save(member));
 
-    await expect(handler.setRole(OWNER, 'member-1', 'admin')).rejects.toBeInstanceOf(
-      MemberNotFound,
-    );
+    await expect(
+      handler.setRole(OWNER, 'member-1', 'admin'),
+    ).rejects.toBeInstanceOf(MemberNotFound);
   });
 
   /**
@@ -181,7 +191,10 @@ describe('admin member actions', () => {
     await handler.ban(OWNER, 'admin-1', null).catch(() => undefined);
 
     expect(actions()).toContain('admin.ban');
-    expect(audit.entries.at(-1)?.meta).toMatchObject({ outcome: 'refused', reason: 'self_ban' });
+    expect(audit.entries.at(-1)?.meta).toMatchObject({
+      outcome: 'refused',
+      reason: 'self_ban',
+    });
   });
 
   it('records a refusal for a member that does not exist', async () => {
@@ -197,9 +210,15 @@ describe('admin member listing', () => {
   beforeEach(async () => {
     uow = new InMemoryUnitOfWork();
     users = new InMemoryUserRepository(uow);
-    await users.save(account('user-a', { email: 'alice@example.test', displayName: 'Alice' }));
-    await users.save(account('user-b', { email: 'bob@example.test', status: 'banned' }));
-    await users.save(account('user-c', { email: 'carol@example.test', role: 'admin' }));
+    await users.save(
+      account('user-a', { email: 'alice@example.test', displayName: 'Alice' }),
+    );
+    await users.save(
+      account('user-b', { email: 'bob@example.test', status: 'banned' }),
+    );
+    await users.save(
+      account('user-c', { email: 'carol@example.test', role: 'admin' }),
+    );
   });
 
   it('finds a member by part of their address, case-insensitively', async () => {
@@ -215,8 +234,12 @@ describe('admin member listing', () => {
   });
 
   it('filters by status and by role', async () => {
-    expect((await users.search({ status: 'banned', limit: 10 })).members).toHaveLength(1);
-    expect((await users.search({ role: 'admin', limit: 10 })).members).toHaveLength(1);
+    expect(
+      (await users.search({ status: 'banned', limit: 10 })).members,
+    ).toHaveLength(1);
+    expect(
+      (await users.search({ role: 'admin', limit: 10 })).members,
+    ).toHaveLength(1);
   });
 
   it('omits deleted members', async () => {
@@ -233,16 +256,24 @@ describe('admin member listing', () => {
     expect(first.members).toHaveLength(2);
     expect(first.nextCursor).toBeTruthy();
 
-    const second = await users.search({ limit: 2, cursor: first.nextCursor ?? undefined });
+    const second = await users.search({
+      limit: 2,
+      cursor: first.nextCursor ?? undefined,
+    });
     expect(second.members).toHaveLength(1);
     expect(second.nextCursor).toBeNull();
   });
 
   it('does not repeat a member across pages', async () => {
     const first = await users.search({ limit: 2 });
-    const second = await users.search({ limit: 2, cursor: first.nextCursor ?? undefined });
+    const second = await users.search({
+      limit: 2,
+      cursor: first.nextCursor ?? undefined,
+    });
 
-    const ids = [...first.members, ...second.members].map((member) => member.id);
+    const ids = [...first.members, ...second.members].map(
+      (member) => member.id,
+    );
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
@@ -263,7 +294,9 @@ describe('admin service clients', () => {
     const created = await handler.create(OWNER, 'zapier', ['internal:alerts']);
 
     expect(created.secret).toBeTypeOf('string');
-    expect(audit.entries.at(-1)).toMatchObject({ action: 'admin.createServiceClient' });
+    expect(audit.entries.at(-1)).toMatchObject({
+      action: 'admin.createServiceClient',
+    });
   });
 
   /** A dump of the table must not hand over anyone's integration credentials. */
@@ -281,7 +314,9 @@ describe('admin service clients', () => {
     const created = await handler.create(OWNER, 'zapier', ['internal:ops']);
 
     expect(JSON.stringify(audit.entries)).not.toContain(created.secret);
-    expect(audit.entries.at(-1)?.meta).toMatchObject({ scopes: ['internal:ops'] });
+    expect(audit.entries.at(-1)?.meta).toMatchObject({
+      scopes: ['internal:ops'],
+    });
   });
 
   /**
@@ -303,11 +338,13 @@ describe('admin service clients', () => {
     await handler.revoke(OWNER, 'zapier');
 
     expect(clients.byName.get('zapier')?.revokedAt).toBeInstanceOf(Date);
-    expect(audit.entries.at(-1)).toMatchObject({ action: 'admin.revokeServiceClient' });
+    expect(audit.entries.at(-1)).toMatchObject({
+      action: 'admin.revokeServiceClient',
+    });
   });
 
   /** The point of revoking. Both adapters must agree on this. */
-  it('refuses a revoked client\'s token afterwards', async () => {
+  it("refuses a revoked client's token afterwards", async () => {
     const created = await handler.create(OWNER, 'zapier', []);
     expect(await clients.verifyToken(hashToken(created.secret))).not.toBeNull();
 
@@ -317,13 +354,17 @@ describe('admin service clients', () => {
   });
 
   it('reports an unknown client as not found', async () => {
-    await expect(handler.revoke(OWNER, 'nobody')).rejects.toBeInstanceOf(ServiceClientNotFound);
+    await expect(handler.revoke(OWNER, 'nobody')).rejects.toBeInstanceOf(
+      ServiceClientNotFound,
+    );
   });
 
   it('refuses to revoke the same client twice', async () => {
     await handler.create(OWNER, 'zapier', []);
     await handler.revoke(OWNER, 'zapier');
 
-    await expect(handler.revoke(OWNER, 'zapier')).rejects.toBeInstanceOf(ServiceClientNotFound);
+    await expect(handler.revoke(OWNER, 'zapier')).rejects.toBeInstanceOf(
+      ServiceClientNotFound,
+    );
   });
 });

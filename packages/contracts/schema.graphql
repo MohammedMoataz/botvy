@@ -28,6 +28,21 @@ Arbitrary JSON, used for a settings value and an audit entry’s metadata.
 """
 scalar JSON
 
+type Label {
+  color: String!
+  deletedAt: DateTime
+  id: ID!
+  name: String!
+  openTaskCount: Int!
+  sortOrder: Int!
+  updatedAt: DateTime!
+}
+
+type LabelSnapshot {
+  color: String!
+  name: String!
+}
+
 type Preferences {
   aiSuggestions: Boolean!
   checkinEnabled: Boolean!
@@ -66,6 +81,8 @@ type Query {
 
   """A member's devices. Administrators only."""
   devicesOf(userId: ID!): [Device!]!
+  labelPalette: [String!]!
+  labels(includeDeleted: Boolean): [Label!]!
 
   """The authenticated member."""
   me: User!
@@ -78,12 +95,16 @@ type Query {
 
   """The caller's own profile."""
   profile: Profile!
+  reminder(id: ID!): Reminder
+  reminders(cursor: String, limit: Int, view: ReminderViewName!): ReminderPage!
 
   """Registered machine callers. Administrators only."""
   serviceClients: [ServiceClient!]!
 
   """The settings registry. Administrators only."""
   settings: [Setting!]!
+  task(id: ID!): Task
+  tasks(cursor: String, labelId: ID, limit: Int, view: TaskViewName!): TaskPage!
 
   """Every member. Administrators only."""
   users(after: String, first: Int = 50, role: Role, search: String, status: UserStatus): UserConnection!
@@ -92,6 +113,32 @@ type Query {
 type QuietHours {
   from: String!
   to: String!
+}
+
+type Reminder {
+  deletedAt: DateTime
+  effectiveAt: DateTime!
+  id: ID!
+  leadTimes: [String!]!
+  remindAt: DateTime!
+  snoozedUntil: DateTime
+  source: String!
+  status: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+type ReminderPage {
+  nextCursor: String
+  nodes: [Reminder!]!
+}
+
+"""The four reminder lists. `done` carries cancelled ones too."""
+enum ReminderViewName {
+  deleted
+  done
+  overdue
+  upcoming
 }
 
 enum Role {
@@ -114,6 +161,42 @@ type Setting {
   key: String!
   readOnly: Boolean!
   value: JSON
+}
+
+type Task {
+  allDay: Boolean!
+  completedAt: DateTime
+  deferCount: Int!
+  deletedAt: DateTime
+  dueAt: DateTime
+  estimatedMinutes: Int
+  id: ID!
+  label: LabelSnapshot
+  labelId: ID
+  notes: String
+  priority: Int!
+  recurrenceMode: String
+  recurrenceText: String
+  repeats: Boolean!
+  source: String!
+  status: String!
+  title: String!
+  updatedAt: DateTime!
+}
+
+type TaskPage {
+  nextCursor: String
+  nodes: [Task!]!
+}
+
+"""The six task lists, named as the member sees them."""
+enum TaskViewName {
+  completed
+  deleted
+  label
+  overdue
+  today
+  upcoming
 }
 
 type User {

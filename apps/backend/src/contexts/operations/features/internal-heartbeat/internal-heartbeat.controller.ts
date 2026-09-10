@@ -35,9 +35,16 @@ export class InternalHeartbeatController {
   constructor(private readonly heartbeats: HeartbeatService) {}
 
   @Post()
-  async stamp(@Body() body: HeartbeatDto): Promise<{ job: string; ok: boolean; at: string }> {
+  async stamp(
+    @Body() body: HeartbeatDto,
+  ): Promise<{ job: string; ok: boolean; at: string }> {
     const at = new Date();
-    await this.heartbeats.stamp(body.job, body.ok, body.error || undefined, body.durationMs);
+    await this.heartbeats.stamp(
+      body.job,
+      body.ok,
+      body.error || undefined,
+      body.durationMs,
+    );
     return { job: body.job, ok: body.ok, at: at.toISOString() };
   }
 }

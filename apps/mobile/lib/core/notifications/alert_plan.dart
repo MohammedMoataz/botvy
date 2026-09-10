@@ -270,13 +270,32 @@ List<PlannedAlert> planLocalAlerts({
   final planned = <PlannedAlert>[];
 
   for (final source in sources) {
-    var leads = source.leadTimes.isEmpty ? defaultLeadTimes : source.leadTimes;
+    final leads = source.leadTimes.isEmpty
+        ? defaultLeadTimes
+        : source.leadTimes;
+
+    // The member's own moment is **always** planned, whether or not `0m` is
+    // among the lead times, and the server does the same: `desiredFor` in
+    // `contexts/notifications/domain/alert-plan.ts` seeds the set with
+    // `MEMBER_CHOSEN_LABEL` and then adds one alert per *non-zero* lead time.
+    //
+    // Prepending it here rather than falling back to it only when the list is
+    // empty. The fallback shape was wrong in a way that was invisible for the
+    // default preferences (`['1h','0m']`, which contains `0m` already) and
+    // silent for anything else: a member whose lead times were `['1h']`, or a
+    // reminder carrying its own `['15m']`, had the moment they actually asked
+    // for planned by the server and *not* by the phone — so a handset that had
+    // synced was skipped by the sweep and nobody was told at all. `planPings`
+    // de-duplicates by label, so passing it twice costs nothing.
+    //
     // A member who cleared their lead times asked for fewer warnings, not for
-    // silence: the moment they chose is still alarmed. Without this, an empty
-    // or unreadable preferences row would quietly stop every alert on the
-    // device, which is the failure nobody reports because nothing happens.
-    if (leads.isEmpty) leads = const [kOwnMomentLabel];
-    for (final ping in planPings(source.at, leads, now: now)) {
+    // silence, and this is also what answers that: an empty or unreadable
+    // preferences row still alarms the moment they chose.
+    for (final ping in planPings(
+      source.at,
+      [kOwnMomentLabel, ...leads],
+      now: now,
+    )) {
       final notifyAt = ping.label == kOwnMomentLabel
           ? ping.notifyAt
           : _heldToWindowEnd(ping.notifyAt, quietHours, zone);
@@ -376,11 +395,17 @@ Future<List<PlannedAlert>> plannedAlertsFor(
 /// resolving a due time against the wrong zone once shifted every extracted
 /// reminder in v1 by three hours.
 tz.Location memberZone(String? timezone) {
-  if (timezone == null || timezone.isEmpty) return tz.local;
   try {
+    if (timezone == null || timezone.isEmpty) return tz.local;
     return tz.getLocation(timezone);
   } catch (_) {
-    return tz.local;
+    // `tz.local` throws a `LateInitializationError` until
+    // `initializeTimeZones()` has run, so the fallback needs a fallback: UTC is
+    // built in and cannot fail. Reached by anything that resolves a zone before
+    // the scheduler has initialised — a query in a test, or a screen that draws
+    // before `main` has finished — where the alternative is not a wrong hour
+    // but a crash.
+    return tz.UTC;
   }
 }
 

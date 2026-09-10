@@ -95,6 +95,21 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         title: Text(t.profileTitle),
         actions: [
+          // Tasks and reminders, from the screen the router lands on. Two
+          // buttons here rather than a bottom navigation bar, because the shell
+          // this app eventually wants — a tab bar with Today, chat and the
+          // agenda — belongs with the agenda phase that fills its third tab.
+          // Building it now would mean building it twice.
+          IconButton(
+            icon: const Icon(Icons.checklist),
+            tooltip: t.taskToday,
+            onPressed: () => context.push(Routes.tasks),
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none),
+            tooltip: t.remindersTitle,
+            onPressed: () => context.push(Routes.reminders),
+          ),
           IconButton(
             icon: const Icon(Icons.tune),
             tooltip: t.preferencesTitle,

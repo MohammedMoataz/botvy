@@ -30,7 +30,10 @@ export interface OutboxInsert {
  * 2. **The optimistic check.** A save whose `updatedAt` is older than the stored
  *    row is a lost update; the filter refuses it rather than overwriting.
  */
-export abstract class MongoRepositoryBase<T extends AggregateRoot, Doc> extends Repository<T> {
+export abstract class MongoRepositoryBase<
+  T extends AggregateRoot,
+  Doc,
+> extends Repository<T> {
   protected abstract readonly model: Model<Doc>;
   protected abstract readonly outbox: Model<OutboxInsert>;
   protected abstract readonly mapper: Mapper<T, Doc>;
@@ -50,14 +53,45 @@ export abstract class MongoRepositoryBase<T extends AggregateRoot, Doc> extends 
     const doc = this.mapper.toPersistence(aggregate);
     const events = aggregate.pullEvents();
 
+    /*
+     * A field the mapper set to `undefined` is *removed*, not skipped.
+     *
+     * `$set` writes what it is given and leaves everything else alone, so a
+     * mapper that omits a key cannot clear a stored value — it can only fail
+     * to overwrite it. That is a subtle difference and it cost a real bug:
+     * `Label.tombstone()` drops `nameLower` so the member can reuse the name,
+     * the mapper duly omitted the key, and the old value stayed in the
+     * document. The partial unique index went on holding the name, so
+     * "delete a label and create it again" was refused with a duplicate-name
+     * error. Every in-memory spec passed, because there is no `$set` there.
+     *
+     * So `undefined` now means "unset this", which is the same meaning it has
+     * in the domain — `Label.nameLower` returns `undefined` for a tombstone
+     * precisely to say the field should not exist.
+     */
+    const fields = doc as Record<string, unknown>;
+    const set: Record<string, unknown> = {};
+    const unset: Record<string, ''> = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (value === undefined) unset[key] = '';
+      else set[key] = value;
+    }
+
+    const update: Record<string, unknown> = { $set: set };
+    // Mongo refuses an empty `$unset`, so it is only included when it has work.
+    if (Object.keys(unset).length > 0) update.$unset = unset;
+
     const result = await this.model
       .updateOne(
         {
           _id: aggregate.id,
           // Either the row is new, or the copy we hold is not older than it.
-          $or: [{ updatedAt: { $lte: aggregate.updatedAt } }, { updatedAt: { $exists: false } }],
+          $or: [
+            { updatedAt: { $lte: aggregate.updatedAt } },
+            { updatedAt: { $exists: false } },
+          ],
         } as Record<string, unknown>,
-        { $set: doc as Record<string, unknown> },
+        update,
         { upsert: true, session: session ?? undefined },
       )
       .exec();
@@ -73,7 +107,10 @@ export abstract class MongoRepositoryBase<T extends AggregateRoot, Doc> extends 
     const session = MongoUnitOfWork.currentSession();
     const events = aggregate.pullEvents();
     await this.model
-      .deleteOne({ _id: aggregate.id, userId: aggregate.userId } as Record<string, unknown>)
+      .deleteOne({ _id: aggregate.id, userId: aggregate.userId } as Record<
+        string,
+        unknown
+      >)
       .session(session)
       .exec();
     await this.appendToOutbox(events);
@@ -99,6 +136,9 @@ export abstract class MongoRepositoryBase<T extends AggregateRoot, Doc> extends 
       deliveredAt: null,
       attempts: 0,
     }));
-    await this.outbox.insertMany(rows, { session: session ?? undefined, ordered: true });
+    await this.outbox.insertMany(rows, {
+      session: session ?? undefined,
+      ordered: true,
+    });
   }
 }

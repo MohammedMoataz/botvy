@@ -3,7 +3,10 @@ import { newId } from '../../../../shared/cqrs/ids.js';
 import { InMemorySettingsStore } from '../../../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import { InMemoryAuditAdapter } from '../../../../shared/audit/in-memory-audit.adapter.js';
-import { ADMIN_PASSWORD_FLAG, AdminPasswordFlagHandler } from './admin-password-flag.handler.js';
+import {
+  ADMIN_PASSWORD_FLAG,
+  AdminPasswordFlagHandler,
+} from './admin-password-flag.handler.js';
 
 const OWNER = { kind: 'user', id: 'admin-1', role: 'admin' } as const;
 
@@ -64,7 +67,9 @@ describe('default administrator password flag', () => {
    * would describe a state nobody could record.
    */
   it('writes a key an operator is refused', async () => {
-    await expect(settings.set(ADMIN_PASSWORD_FLAG, false, OWNER)).rejects.toThrow();
+    await expect(
+      settings.set(ADMIN_PASSWORD_FLAG, false, OWNER),
+    ).rejects.toThrow();
 
     await expect(handler.record(false)).resolves.toBeUndefined();
   });

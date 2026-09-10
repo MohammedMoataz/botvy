@@ -10,7 +10,11 @@ import {
   DEFAULT_ADMIN_PASSWORD,
   type PasswordHasher,
 } from './admin-seed.service.js';
-import { N8N_CLIENT_NAME, N8N_SCOPES, ServiceClientSeedService } from './service-client-seed.service.js';
+import {
+  N8N_CLIENT_NAME,
+  N8N_SCOPES,
+  ServiceClientSeedService,
+} from './service-client-seed.service.js';
 
 import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
 
@@ -41,7 +45,9 @@ describe('admin seed', () => {
 
     const user = await users.findByLogin('admin');
     expect(user).toMatchObject({ role: 'admin', status: 'active' });
-    expect(users.events.map((event) => event.name)).toEqual(['identity.UserRegistered']);
+    expect(users.events.map((event) => event.name)).toEqual([
+      'identity.UserRegistered',
+    ]);
   });
 
   /** A second boot must change nothing, or every restart rewrites the account. */
@@ -85,7 +91,6 @@ describe('admin seed', () => {
     expect(await seed.seed('someone@else.test', 'ignored')).toBe('promoted');
     expect((await users.findByLogin('someone@else.test'))!.role).toBe('admin');
   });
-
 });
 
 /**
@@ -203,7 +208,9 @@ describe('n8n service-client seed', () => {
     expect(await seed.seed('the-new-token')).toBe('rotated');
 
     expect(clients.byName.size).toBe(1);
-    expect(await clients.verifyToken(hashToken('the-new-token'))).not.toBeNull();
+    expect(
+      await clients.verifyToken(hashToken('the-new-token')),
+    ).not.toBeNull();
     expect(await clients.verifyToken(hashToken('the-old-token'))).toBeNull();
   });
 

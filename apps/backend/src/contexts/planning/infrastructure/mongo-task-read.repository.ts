@@ -72,14 +72,28 @@ export const TASK_SORT_KEYS: Record<TaskListFilter['view'], SortKey[]> = {
  * view can report that a removed task had been completed: the delete never
  * touched the status.
  */
-export function taskPredicateFor(filter: TaskListFilter): Record<string, unknown> {
+export function taskPredicateFor(
+  filter: TaskListFilter,
+): Record<string, unknown> {
   switch (filter.view) {
     case 'today':
-      return { deletedAt: null, status: 'open', dueAt: { $ne: null, $lt: filter.dayEnd } };
+      return {
+        deletedAt: null,
+        status: 'open',
+        dueAt: { $ne: null, $lt: filter.dayEnd },
+      };
     case 'upcoming':
-      return { deletedAt: null, status: 'open', dueAt: { $gte: filter.dayEnd } };
+      return {
+        deletedAt: null,
+        status: 'open',
+        dueAt: { $gte: filter.dayEnd },
+      };
     case 'overdue':
-      return { deletedAt: null, status: 'open', dueAt: { $ne: null, $lt: filter.dayStart } };
+      return {
+        deletedAt: null,
+        status: 'open',
+        dueAt: { $ne: null, $lt: filter.dayStart },
+      };
     case 'label':
       return { deletedAt: null, labelId: filter.labelId ?? null };
     case 'completed':
@@ -105,7 +119,10 @@ export class MongoTaskReadRepository implements TaskReadRepository {
   ) {}
 
   async page(userId: string, filter: TaskListFilter): Promise<TaskPage> {
-    const query: Record<string, unknown> = { userId, ...taskPredicateFor(filter) };
+    const query: Record<string, unknown> = {
+      userId,
+      ...taskPredicateFor(filter),
+    };
     const keys = TASK_SORT_KEYS[filter.view];
 
     // The cursor is a position in *this* order, not a value in some unrelated
@@ -134,12 +151,22 @@ export class MongoTaskReadRepository implements TaskReadRepository {
       nodes: page.map((doc) => toTaskView(doc, filter.timezone)),
       nextCursor:
         hasMore && last
-          ? encodeCursor(positionOf(keys, last as unknown as Record<string, unknown>, last._id))
+          ? encodeCursor(
+              positionOf(
+                keys,
+                last as unknown as Record<string, unknown>,
+                last._id,
+              ),
+            )
           : null,
     };
   }
 
-  async byId(userId: string, id: string, timezone: string): Promise<TaskView | null> {
+  async byId(
+    userId: string,
+    id: string,
+    timezone: string,
+  ): Promise<TaskView | null> {
     const doc = await this.taskModel
       .findOne({ userId, _id: id })
       .session(MongoUnitOfWork.currentSession())
@@ -172,7 +199,14 @@ export class MongoTaskReadRepository implements TaskReadRepository {
         .exec(),
       this.taskModel
         .aggregate<{ _id: string | null; count: number }>([
-          { $match: { userId, deletedAt: null, status: 'open', labelId: { $ne: null } } },
+          {
+            $match: {
+              userId,
+              deletedAt: null,
+              status: 'open',
+              labelId: { $ne: null },
+            },
+          },
           { $group: { _id: '$labelId', count: { $sum: 1 } } },
         ])
         .session(session)
@@ -191,9 +225,19 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     }));
   }
 
-  async dueBetween(userId: string, from: Date, to: Date, timezone: string): Promise<TaskView[]> {
+  async dueBetween(
+    userId: string,
+    from: Date,
+    to: Date,
+    timezone: string,
+  ): Promise<TaskView[]> {
     const docs = await this.taskModel
-      .find({ userId, deletedAt: null, status: 'open', dueAt: { $gte: from, $lt: to } })
+      .find({
+        userId,
+        deletedAt: null,
+        status: 'open',
+        dueAt: { $gte: from, $lt: to },
+      })
       .sort({ priority: 1, dueAt: 1 })
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc[]>()
@@ -201,9 +245,18 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     return docs.map((doc) => toTaskView(doc, timezone));
   }
 
-  async openBefore(userId: string, before: Date, timezone: string): Promise<TaskView[]> {
+  async openBefore(
+    userId: string,
+    before: Date,
+    timezone: string,
+  ): Promise<TaskView[]> {
     const docs = await this.taskModel
-      .find({ userId, deletedAt: null, status: 'open', dueAt: { $ne: null, $lt: before } })
+      .find({
+        userId,
+        deletedAt: null,
+        status: 'open',
+        dueAt: { $ne: null, $lt: before },
+      })
       .sort({ dueAt: 1, priority: 1 })
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc[]>()
@@ -212,7 +265,12 @@ export class MongoTaskReadRepository implements TaskReadRepository {
   }
 
   /** `allDay: false` only — an all-day task has no place on an hour grid. */
-  async timedBetween(userId: string, from: Date, to: Date, timezone: string): Promise<TaskView[]> {
+  async timedBetween(
+    userId: string,
+    from: Date,
+    to: Date,
+    timezone: string,
+  ): Promise<TaskView[]> {
     const docs = await this.taskModel
       .find({
         userId,
@@ -233,7 +291,10 @@ export class MongoTaskReadRepository implements TaskReadRepository {
 export function toTaskView(doc: TaskDoc, timezone: string): TaskView {
   const recurrence = doc.recurrence ?? null;
   const rule = recurrence
-    ? Recurrence.parse({ ...recurrence, exdates: recurrence.exdates ?? [] }, timezone)
+    ? Recurrence.parse(
+        { ...recurrence, exdates: recurrence.exdates ?? [] },
+        timezone,
+      )
     : null;
 
   return {

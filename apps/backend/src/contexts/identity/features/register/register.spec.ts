@@ -9,7 +9,10 @@ import {
   InMemoryRefreshTokenRepository,
   InMemoryUserRepository,
 } from '../../infrastructure/in-memory-identity.repositories.js';
-import { RefreshHandler, hashRefreshToken } from '../refresh/refresh.handler.js';
+import {
+  RefreshHandler,
+  hashRefreshToken,
+} from '../refresh/refresh.handler.js';
 import {
   EmailAlreadyRegistered,
   PasswordTooShort,
@@ -54,7 +57,10 @@ describe('register', () => {
   beforeEach(() => {
     uow = new InMemoryUnitOfWork();
     users = new InMemoryUserRepository(uow);
-    settings = new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter());
+    settings = new SettingsService(
+      new InMemorySettingsStore(),
+      new InMemoryAuditAdapter(),
+    );
     handler = new RegisterHandler(uow, users, hasher, settings);
   });
 
@@ -62,7 +68,9 @@ describe('register', () => {
     const result = await handler.handle(good);
 
     expect(result.email).toBe('member@example.test');
-    expect(users.events.map((event) => event.name)).toEqual(['identity.UserRegistered']);
+    expect(users.events.map((event) => event.name)).toEqual([
+      'identity.UserRegistered',
+    ]);
   });
 
   /**
@@ -73,19 +81,27 @@ describe('register', () => {
   it('carries the supplied locale and time zone on the event', async () => {
     await handler.handle({ ...good, locale: 'ar', timezone: 'Africa/Cairo' });
 
-    expect(users.events[0]?.payload).toMatchObject({ locale: 'ar', timezone: 'Africa/Cairo' });
+    expect(users.events[0]?.payload).toMatchObject({
+      locale: 'ar',
+      timezone: 'Africa/Cairo',
+    });
   });
 
   it('reports absent locale and time zone as null rather than omitting them', async () => {
     await handler.handle(good);
 
-    expect(users.events[0]?.payload).toMatchObject({ locale: null, timezone: null });
+    expect(users.events[0]?.payload).toMatchObject({
+      locale: null,
+      timezone: null,
+    });
   });
 
   it('normalises the login, so the same address cannot register twice in two cases', async () => {
     await handler.handle({ ...good, email: '  Member@Example.test ' });
 
-    await expect(handler.handle(good)).rejects.toBeInstanceOf(EmailAlreadyRegistered);
+    await expect(handler.handle(good)).rejects.toBeInstanceOf(
+      EmailAlreadyRegistered,
+    );
   });
 
   /** The client's own check is for the person who mistyped. This one is for
@@ -118,7 +134,9 @@ describe('register', () => {
   it('refuses when the Owner has closed registration', async () => {
     await settings.set('auth.registrationOpen', false, OWNER);
 
-    await expect(handler.handle(good)).rejects.toBeInstanceOf(RegistrationClosed);
+    await expect(handler.handle(good)).rejects.toBeInstanceOf(
+      RegistrationClosed,
+    );
   });
 
   /**
@@ -129,11 +147,15 @@ describe('register', () => {
    */
   it('notices the key changing without a restart', async () => {
     await settings.set('auth.registrationOpen', false, OWNER);
-    await expect(handler.handle(good)).rejects.toBeInstanceOf(RegistrationClosed);
+    await expect(handler.handle(good)).rejects.toBeInstanceOf(
+      RegistrationClosed,
+    );
 
     await settings.set('auth.registrationOpen', true, OWNER);
 
-    await expect(handler.handle(good)).resolves.toMatchObject({ email: good.email });
+    await expect(handler.handle(good)).resolves.toMatchObject({
+      email: good.email,
+    });
   });
 });
 
@@ -147,13 +169,21 @@ describe('refresh rotation', () => {
     uow = new InMemoryUnitOfWork();
     users = new InMemoryUserRepository(uow);
     tokens = new InMemoryRefreshTokenRepository();
-    handler = new RefreshHandler(tokens, users, new JwtSigner(env), env as never);
+    handler = new RefreshHandler(
+      tokens,
+      users,
+      new JwtSigner(env),
+      env as never,
+    );
 
     const registered = await new RegisterHandler(
       uow,
       users,
       hasher,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     ).handle(good);
     userId = registered.userId;
   });
@@ -197,7 +227,9 @@ describe('refresh rotation', () => {
     const opened = await handler.open(userId, null);
     await handler.handle(opened.refreshToken);
 
-    const replay = await handler.handle(opened.refreshToken).catch((error: Error) => error);
+    const replay = await handler
+      .handle(opened.refreshToken)
+      .catch((error: Error) => error);
 
     expect(replay).toMatchObject({ code: 'session_replay' });
     expect(tokens.rows.every((row) => row.revokedAt !== null)).toBe(true);
@@ -209,13 +241,17 @@ describe('refresh rotation', () => {
     const rotated = await handler.handle(opened.refreshToken);
     await handler.handle(opened.refreshToken).catch(() => undefined);
 
-    const afterwards = await handler.handle(rotated.refreshToken).catch((error: Error) => error);
+    const afterwards = await handler
+      .handle(rotated.refreshToken)
+      .catch((error: Error) => error);
 
     expect(afterwards).toMatchObject({ code: 'session_replay' });
   });
 
   it('reports an unrecognised token as invalid, not as a replay', async () => {
-    const rejected = await handler.handle('never-issued').catch((error: Error) => error);
+    const rejected = await handler
+      .handle('never-issued')
+      .catch((error: Error) => error);
 
     expect(rejected).toMatchObject({ code: 'token_invalid' });
   });
@@ -224,7 +260,9 @@ describe('refresh rotation', () => {
     const opened = await handler.open(userId, null);
     for (const row of tokens.rows) row.expiresAt = new Date(Date.now() - 1);
 
-    const rejected = await handler.handle(opened.refreshToken).catch((error: Error) => error);
+    const rejected = await handler
+      .handle(opened.refreshToken)
+      .catch((error: Error) => error);
 
     expect(rejected).toMatchObject({ code: 'token_expired' });
   });
@@ -239,7 +277,9 @@ describe('refresh rotation', () => {
     account?.ban('admin-1');
     if (account) await uow.run(() => users.save(account));
 
-    const rejected = await handler.handle(opened.refreshToken).catch((error: Error) => error);
+    const rejected = await handler
+      .handle(opened.refreshToken)
+      .catch((error: Error) => error);
 
     expect(rejected).toMatchObject({ code: 'token_invalid' });
     expect(tokens.rows.every((row) => row.revokedAt !== null)).toBe(true);
@@ -249,7 +289,11 @@ describe('refresh rotation', () => {
   it('never stores the token it handed out', async () => {
     const opened = await handler.open(userId, null);
 
-    expect(tokens.rows.map((row) => row.tokenHash)).not.toContain(opened.refreshToken);
-    expect(tokens.rows[0]?.tokenHash).toBe(hashRefreshToken(opened.refreshToken));
+    expect(tokens.rows.map((row) => row.tokenHash)).not.toContain(
+      opened.refreshToken,
+    );
+    expect(tokens.rows[0]?.tokenHash).toBe(
+      hashRefreshToken(opened.refreshToken),
+    );
   });
 });

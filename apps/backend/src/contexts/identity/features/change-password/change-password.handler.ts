@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { RefreshTokenRepository } from '../../domain/refresh-token.repository.js';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password-rules.js';
 import { UserRepository } from '../../domain/user.repository.js';
@@ -21,7 +24,9 @@ export class CurrentPasswordWrong extends Error {
 
 export class NewPasswordTooShort extends Error {
   constructor() {
-    super(`the new password must be at least ${MIN_PASSWORD_LENGTH} characters`);
+    super(
+      `the new password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+    );
   }
 }
 
@@ -30,7 +35,6 @@ export class NewPasswordUnchanged extends Error {
     super('the new password is the same as the current one');
   }
 }
-
 
 /**
  * Change your own password.
@@ -52,15 +56,21 @@ export class ChangePasswordHandler {
     private readonly tokens: RefreshTokenRepository,
   ) {}
 
-  async handle(command: ChangePasswordCommand): Promise<{ changed: true; sessionsEnded: number }> {
+  async handle(
+    command: ChangePasswordCommand,
+  ): Promise<{ changed: true; sessionsEnded: number }> {
     const user = await this.users.findById(command.userId, command.userId);
     if (!user?.passwordHash) throw new CurrentPasswordWrong();
 
-    if (!(await this.hasher.verify(user.passwordHash, command.currentPassword))) {
+    if (
+      !(await this.hasher.verify(user.passwordHash, command.currentPassword))
+    ) {
       throw new CurrentPasswordWrong();
     }
-    if (command.newPassword.length < MIN_PASSWORD_LENGTH) throw new NewPasswordTooShort();
-    if (command.newPassword === command.currentPassword) throw new NewPasswordUnchanged();
+    if (command.newPassword.length < MIN_PASSWORD_LENGTH)
+      throw new NewPasswordTooShort();
+    if (command.newPassword === command.currentPassword)
+      throw new NewPasswordUnchanged();
 
     // Hashed outside the transaction, for the same reason as `register`.
     const nextHash = await this.hasher.hash(command.newPassword);

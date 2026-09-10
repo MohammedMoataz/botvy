@@ -16,14 +16,14 @@ export class Widget extends AggregateRoot<string> {
 
   static create(id: string, userId: string, label: string): Widget {
     const widget = new Widget(id, userId, label);
-    widget.raise('operations.Pinged', 'widget', { label });
+    widget.raise('operations.WidgetTouched', 'widget', { label });
     return widget;
   }
 
   rename(label: string, at: Date): void {
     this.label = label;
     this.updatedAt = at;
-    this.raise('operations.Pinged', 'widget', { label }, at);
+    this.raise('operations.WidgetTouched', 'widget', { label }, at);
   }
 }
 
@@ -94,7 +94,7 @@ export function describeRepositoryContract(adapter: AdapterUnderTest): void {
 
       const events = await capturedEvents();
       expect(events).toHaveLength(1);
-      expect(events[0]?.name).toBe('operations.Pinged');
+      expect(events[0]?.name).toBe('operations.WidgetTouched');
     } finally {
       await dispose?.();
     }

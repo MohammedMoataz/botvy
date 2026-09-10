@@ -48,7 +48,10 @@ export class InternalAlertsHandler {
     const admins = await this.devices.adminDevices();
     const tokens = admins
       .map((device) => device.pushToken)
-      .filter((token): token is string => typeof token === 'string' && token.length > 0);
+      .filter(
+        (token): token is string =>
+          typeof token === 'string' && token.length > 0,
+      );
 
     let notified = 0;
     if (tokens.length > 0) {

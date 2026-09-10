@@ -1,9 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ENV } from '../../../../shared/config/config.module.js';
 import type { Env } from '../../../../shared/config/env.schema.js';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { UserRepository } from '../../domain/user.repository.js';
-import { DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD } from './admin-seed.service.js';
+import {
+  DEFAULT_ADMIN_EMAIL,
+  DEFAULT_ADMIN_PASSWORD,
+} from './admin-seed.service.js';
 
 /**
  * Whether the seeded administrator still has the password this project ships.
@@ -40,7 +46,10 @@ export class AdminCredentialsQueryHandler {
     // not running the shipped default, whatever is in the database. Changing
     // only one of them is not enough: the published pair is what makes this
     // installation reachable by anybody who read SETUP.md.
-    if (this.env.ADMIN_PASSWORD !== DEFAULT_ADMIN_PASSWORD && email !== DEFAULT_ADMIN_EMAIL) {
+    if (
+      this.env.ADMIN_PASSWORD !== DEFAULT_ADMIN_PASSWORD &&
+      email !== DEFAULT_ADMIN_EMAIL
+    ) {
       return false;
     }
 

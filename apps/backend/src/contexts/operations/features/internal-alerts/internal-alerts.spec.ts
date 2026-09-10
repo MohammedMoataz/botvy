@@ -8,7 +8,12 @@ import {
   type DeviceSummary,
 } from './internal-alerts.handler.js';
 
-const n8n: Principal = { kind: 'service', id: 'svc-1', name: 'n8n', scopes: ['internal:alerts'] };
+const n8n: Principal = {
+  kind: 'service',
+  id: 'svc-1',
+  name: 'n8n',
+  scopes: ['internal:alerts'],
+};
 
 function device(overrides: Partial<DeviceSummary> = {}): DeviceSummary {
   return {
@@ -22,7 +27,11 @@ function device(overrides: Partial<DeviceSummary> = {}): DeviceSummary {
 }
 
 function lookup(devices: DeviceSummary[]): AdminDeviceLookup {
-  return { async adminDevices() { return devices; } };
+  return {
+    async adminDevices() {
+      return devices;
+    },
+  };
 }
 
 function pushThat(result: PushResult) {
@@ -36,7 +45,10 @@ function pushThat(result: PushResult) {
   };
 }
 
-const input = { workflow: 'rhythm_tick', error: 'HTTP 401 from /internal/rhythm/tick' };
+const input = {
+  workflow: 'rhythm_tick',
+  error: 'HTTP 401 from /internal/rhythm/tick',
+};
 
 describe('internal alerts', () => {
   it('notifies every administrator device that has a push token', async () => {
@@ -73,7 +85,12 @@ describe('internal alerts', () => {
    */
   it('answers zero, without throwing, when no administrator has a device', async () => {
     const push = pushThat({ sent: 0, failed: 0, invalidTokens: [] });
-    const handler = new InternalAlertsHandler(lookup([]), push, new InMemoryAuditAdapter(), n8n);
+    const handler = new InternalAlertsHandler(
+      lookup([]),
+      push,
+      new InMemoryAuditAdapter(),
+      n8n,
+    );
 
     expect(await handler.handle(input)).toEqual({ notified: 0 });
     expect(push.calls).toHaveLength(0);
@@ -90,7 +107,12 @@ describe('internal alerts', () => {
       },
     };
     const audit = new InMemoryAuditAdapter();
-    const handler = new InternalAlertsHandler(lookup([device()]), push, audit, n8n);
+    const handler = new InternalAlertsHandler(
+      lookup([device()]),
+      push,
+      audit,
+      n8n,
+    );
 
     await expect(handler.handle(input)).resolves.toEqual({ notified: 0 });
     expect(audit.entries).toHaveLength(1);

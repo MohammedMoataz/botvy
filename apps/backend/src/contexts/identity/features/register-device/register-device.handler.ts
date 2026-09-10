@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { newId } from '../../../../shared/cqrs/ids.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { Device } from '../../domain/device.aggregate.js';
-import { DeviceRepository, type DeviceKind } from '../../domain/device.repository.js';
+import {
+  DeviceRepository,
+  type DeviceKind,
+} from '../../domain/device.repository.js';
 
 export interface RegisterDeviceCommand {
   userId: string;
@@ -46,7 +49,10 @@ export class RegisterDeviceHandler {
     private readonly devices: DeviceRepository,
   ) {}
 
-  async handle(command: RegisterDeviceCommand, at: Date = new Date()): Promise<RegisteredDevice> {
+  async handle(
+    command: RegisterDeviceCommand,
+    at: Date = new Date(),
+  ): Promise<RegisteredDevice> {
     // One transaction for the whole decision. The move branch below removes a
     // row and creates another, and a crash between them would take a member's
     // handset off the alert list without putting it back on anybody else's.
@@ -61,7 +67,11 @@ export class RegisterDeviceHandler {
 
     if (existing && existing.userId === command.userId) {
       existing.reregister(
-        { kind: command.kind, name: command.name, pushToken: command.pushToken },
+        {
+          kind: command.kind,
+          name: command.name,
+          pushToken: command.pushToken,
+        },
         at,
       );
       await this.devices.save(existing);
@@ -103,7 +113,11 @@ export class RegisterDeviceHandler {
     return device.id;
   }
 
-  async remove(userId: string, deviceId: string, at: Date = new Date()): Promise<void> {
+  async remove(
+    userId: string,
+    deviceId: string,
+    at: Date = new Date(),
+  ): Promise<void> {
     // Scoped to the member: removing another member's device is a 404, not a
     // 403, because whether it exists is not this caller's business.
     const device = await this.devices.findById(userId, deviceId);

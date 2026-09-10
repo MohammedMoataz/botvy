@@ -707,6 +707,74 @@ class ApiClient {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  // -- sync ------------------------------------------------------------------
+
+  /// One round trip of the offline contract: this device's outbox up,
+  /// everything that changed since its cursor down.
+  ///
+  /// Answers the raw map rather than a typed result, deliberately. The shape of
+  /// a pulled row is owned by the context that produced it and is already
+  /// written down three times (the aggregate, the sync adapter, the contract);
+  /// a fourth copy here as Dart classes would be one more place to forget a
+  /// field, and every one of those fields is on its way into a drift companion
+  /// anyway. `core/sync/sync_engine.dart` is the single reader, and it reads
+  /// the map straight into the tables.
+  ///
+  /// [since] is the server's own `now` from the previous response, echoed
+  /// verbatim as the string it arrived as. Never a locally formatted time: the
+  /// cursor is the server's clock, and reformatting it through `DateTime` would
+  /// round the milliseconds a delta depends on.
+  Future<Map<String, dynamic>> sync({
+    required String installId,
+    required List<String> entities,
+    String? since,
+    Map<String, dynamic> push = const {},
+  }) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '/sync',
+        data: {
+          'installId': installId,
+          // Sent even when null: null is how a client asks for a full
+          // snapshot, and omitting the key would look the same to the server
+          // but not to anyone reading the request.
+          'since': since,
+          'entities': entities,
+          if (push.isNotEmpty) 'push': push,
+        },
+      ),
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// The colours the label picker offers.
+  ///
+  /// `settings.labels.palette` is an operator knob, so a hard-coded list here
+  /// would be a bug by constitution XII — the operator retunes the key and the
+  /// phone would go on offering the twelve colours somebody compiled in.
+  ///
+  /// Read through the admin `settings` query, which is the only surface that
+  /// exposes the registry: there is no member-facing read for this key yet (see
+  /// the note in `features/tasks/data/label_palette.dart`). A member whose role
+  /// is not `admin` gets a `forbidden` here, which the caller treats as "not
+  /// learned yet" rather than as an error — the picker then offers the colours
+  /// the member's own labels already use.
+  Future<List<String>> labelPalette() async {
+    final data = await query(r'''
+      query LabelPalette {
+        settings { key value }
+      }
+    ''');
+    final rows = data['settings'];
+    if (rows is! List) return const [];
+    for (final row in rows.whereType<Map>()) {
+      if (row['key'] != 'labels.palette') continue;
+      final value = row['value'];
+      if (value is List) return value.whereType<String>().toList();
+    }
+    return const [];
+  }
+
   // -- health ----------------------------------------------------------------
 
   /// The reachability indicator. `/health` is public, so it answers before

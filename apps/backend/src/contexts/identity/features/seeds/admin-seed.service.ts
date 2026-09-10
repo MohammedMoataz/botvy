@@ -1,6 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { newId } from '../../../../shared/cqrs/ids.js';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { User } from '../../domain/user.aggregate.js';
 import { UserRepository } from '../../domain/user.repository.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';

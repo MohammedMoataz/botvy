@@ -2,7 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { newId } from '../../../../shared/cqrs/ids.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { MIN_PASSWORD_LENGTH } from '../../domain/password-rules.js';
 import { User } from '../../domain/user.aggregate.js';
 import { UserRepository } from '../../domain/user.repository.js';
@@ -20,7 +23,6 @@ export interface Registered {
   userId: string;
   email: string;
 }
-
 
 export class RegistrationClosed extends Error {
   constructor() {
@@ -71,10 +73,13 @@ export class RegisterHandler {
   ) {}
 
   async handle(command: RegisterCommand): Promise<Registered> {
-    if (!(await this.settings.get('auth.registrationOpen'))) throw new RegistrationClosed();
+    if (!(await this.settings.get('auth.registrationOpen')))
+      throw new RegistrationClosed();
 
-    if (command.password !== command.passwordConfirm) throw new PasswordsDoNotMatch();
-    if (command.password.length < MIN_PASSWORD_LENGTH) throw new PasswordTooShort();
+    if (command.password !== command.passwordConfirm)
+      throw new PasswordsDoNotMatch();
+    if (command.password.length < MIN_PASSWORD_LENGTH)
+      throw new PasswordTooShort();
 
     const email = command.email.trim().toLowerCase();
 
@@ -84,7 +89,8 @@ export class RegisterHandler {
     const passwordHash = await this.hasher.hash(command.password);
 
     return this.uow.run(async () => {
-      if (await this.users.findByLogin(email)) throw new EmailAlreadyRegistered();
+      if (await this.users.findByLogin(email))
+        throw new EmailAlreadyRegistered();
 
       const now = new Date();
       const user = User.register(

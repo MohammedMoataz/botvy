@@ -20,7 +20,9 @@ describe('devices query', () => {
     uow = new InMemoryUnitOfWork();
     devices = new InMemoryDeviceRepository(uow);
     users = new InMemoryUserRepository(uow);
-    handler = new DevicesQueryHandler(devices, users, { ADMIN_EMAIL: 'admin' } as never);
+    handler = new DevicesQueryHandler(devices, users, {
+      ADMIN_EMAIL: 'admin',
+    } as never);
     devices.rows.push(
       {
         id: 'dev-1',
@@ -59,7 +61,10 @@ describe('devices query', () => {
   it('answers for several members in one call', async () => {
     const views = await handler.forUsers(['user-1', 'user-2']);
 
-    expect(views.map((view) => view.deviceId).sort()).toEqual(['dev-1', 'dev-2']);
+    expect(views.map((view) => view.deviceId).sort()).toEqual([
+      'dev-1',
+      'dev-2',
+    ]);
   });
 
   it('answers nothing for an empty list rather than everything', async () => {

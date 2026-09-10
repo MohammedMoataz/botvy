@@ -54,6 +54,7 @@ export class InternalSweepController {
    * ran and sent four hundred" the same line.
    */
   @Post('sweep')
+  @HttpCode(200)
   async run(): Promise<SweepResult> {
     return this.sweep.handle();
   }

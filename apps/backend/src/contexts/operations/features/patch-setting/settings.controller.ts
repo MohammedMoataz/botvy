@@ -9,7 +9,11 @@ import {
   Patch,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { CurrentPrincipal, Roles, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  CurrentPrincipal,
+  Roles,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import {
   InvalidSettingError,
@@ -54,12 +58,11 @@ export class SettingsController {
 
   /** The whole registry: every key, its current value, its default and whether
    * an operator may touch it. One request, because the portal renders a table. */
-// GET /admin/settings was here. It is a read, and constitution X puts reads on GraphQL:
+  // GET /admin/settings was here. It is a read, and constitution X puts reads on GraphQL:
   // `settings` at /graphql answers it. Removed rather than left beside the
   // resolver, because two paths to one answer is the drift this rewrite exists
   // to remove - and the REST one leaked nothing, but drifted anyway.
 
-  
   @Patch(':key')
   @HttpCode(200)
   async patch(
@@ -71,13 +74,16 @@ export class SettingsController {
       const value = await this.settings.set(key, body.value, actor);
       return { key, value };
     } catch (error) {
-      if (error instanceof UnknownSettingError) throw new NotFoundException(error.message);
+      if (error instanceof UnknownSettingError)
+        throw new NotFoundException(error.message);
       // 403 rather than 400: the value may be perfectly valid, and the reason
       // it is refused is who is asking rather than what they asked for.
-      if (error instanceof SettingReadOnlyError) throw new ForbiddenException(error.message);
+      if (error instanceof SettingReadOnlyError)
+        throw new ForbiddenException(error.message);
       // The schema's own message, which names the key and the rule. A generic
       // "invalid value" would throw away the only useful part.
-      if (error instanceof InvalidSettingError) throw new BadRequestException(error.message);
+      if (error instanceof InvalidSettingError)
+        throw new BadRequestException(error.message);
       throw error;
     }
   }

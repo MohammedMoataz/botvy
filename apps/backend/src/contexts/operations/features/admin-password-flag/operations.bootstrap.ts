@@ -1,9 +1,12 @@
-import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+} from '@nestjs/common';
 import { ENV } from '../../../../shared/config/config.module.js';
 import type { Env } from '../../../../shared/config/env.schema.js';
-import {
-  ADMIN_PASSWORD_PROBE,
-} from '../../infrastructure/admin-password.probe.js';
+import { ADMIN_PASSWORD_PROBE } from '../../infrastructure/admin-password.probe.js';
 import {
   AdminPasswordFlagHandler,
   type AdminPasswordProbe,

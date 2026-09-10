@@ -199,7 +199,11 @@ export class MongoReminderReadRepository implements ReminderReadRepository {
       nextCursor:
         hasMore && last
           ? encodeCursor(
-              positionOf(keys, last as unknown as Record<string, unknown>, last._id),
+              positionOf(
+                keys,
+                last as unknown as Record<string, unknown>,
+                last._id,
+              ),
             )
           : null,
     };
@@ -235,12 +239,13 @@ function effectiveAtIs(
 }
 
 /** The order each view is read in; `mongoSort` appends `_id` as the tiebreak. */
-export const REMINDER_SORT_KEYS: Record<ReminderListFilter['view'], SortKey[]> = {
-  upcoming: [{ field: 'remindAt', direction: 'asc' }],
-  overdue: [{ field: 'remindAt', direction: 'asc' }],
-  done: [{ field: 'updatedAt', direction: 'desc' }],
-  deleted: [{ field: 'deletedAt', direction: 'desc' }],
-};
+export const REMINDER_SORT_KEYS: Record<ReminderListFilter['view'], SortKey[]> =
+  {
+    upcoming: [{ field: 'remindAt', direction: 'asc' }],
+    overdue: [{ field: 'remindAt', direction: 'asc' }],
+    done: [{ field: 'updatedAt', direction: 'desc' }],
+    deleted: [{ field: 'deletedAt', direction: 'desc' }],
+  };
 
 /**
  * What each view is, as a filter. Exported so the in-memory adapter applies it

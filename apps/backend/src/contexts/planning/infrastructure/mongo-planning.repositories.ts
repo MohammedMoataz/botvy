@@ -125,12 +125,22 @@ const labelMapper: Mapper<Label, LabelDoc> = {
       deletedAt: label.deletedAt,
       schemaVersion: label.schemaVersion,
     };
-    // Present only when the label is live. The unique index is partial on this
-    // field existing, so *omitting* it is what frees the name for reuse — and
-    // writing `null` instead would make every tombstone collide with every
-    // other one, because to Mongo a null is a value like any other.
-    const nameLower = label.nameLower;
-    if (nameLower !== undefined) doc.nameLower = nameLower;
+    /*
+     * Always present as a key, and `undefined` when the label is a tombstone.
+     *
+     * The repository base turns an `undefined` value into `$unset`, which is
+     * what actually removes the field — omitting the key entirely does not,
+     * because `$set` leaves fields it is not given alone. That is the bug this
+     * comment used to describe the wrong way round: it said omitting the key
+     * "is what frees the name", and it was not, so deleting a label and
+     * recreating it was refused as a duplicate.
+     *
+     * `undefined` rather than `null` still matters for the same reason as
+     * before: the unique index is partial on this field *existing*, and to
+     * Mongo a null is a value like any other, so every tombstone would collide
+     * with every other one.
+     */
+    doc.nameLower = label.nameLower;
     return doc;
   },
 };

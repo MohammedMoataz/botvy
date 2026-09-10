@@ -215,7 +215,7 @@ export class SyncHandler {
       // each committed in theirs. This event is what nudges the member's
       // *other* sockets, and losing it costs a delay rather than data, which is
       // why it does not need to be transactional with anything.
-      await this.outbox.write([
+      await this.outbox.append([
         this.changesApplied(userId, request.installId, accepted, now),
       ]);
     }

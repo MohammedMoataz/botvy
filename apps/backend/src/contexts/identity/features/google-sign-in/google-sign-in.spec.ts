@@ -65,7 +65,9 @@ class FakeGoogle implements GoogleVerifier {
 
 const OWNER = { kind: 'user', id: 'admin-1', role: 'admin' } as const;
 
-function account(overrides: Partial<Parameters<typeof User.rehydrate>[0]> = {}) {
+function account(
+  overrides: Partial<Parameters<typeof User.rehydrate>[0]> = {},
+) {
   return User.rehydrate({
     id: 'user-1',
     email: 'member@example.test',
@@ -96,7 +98,10 @@ describe('google sign-in', () => {
     tokens = new InMemoryRefreshTokenRepository();
     devices = new InMemoryDeviceRepository(uow);
     google = new FakeGoogle();
-    settings = new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter());
+    settings = new SettingsService(
+      new InMemorySettingsStore(),
+      new InMemoryAuditAdapter(),
+    );
     handler = new GoogleSignInHandler(
       uow,
       users,
@@ -113,7 +118,9 @@ describe('google sign-in', () => {
     const result = await handler.handle({ idToken: 'valid' });
 
     expect(result.email).toBe('member@example.test');
-    expect(users.events.map((event) => event.name)).toContain('identity.UserRegistered');
+    expect(users.events.map((event) => event.name)).toContain(
+      'identity.UserRegistered',
+    );
     expect(result.refreshToken).toBeTypeOf('string');
   });
 
@@ -135,7 +142,9 @@ describe('google sign-in', () => {
     const result = await handler.handle({ idToken: 'valid' });
 
     expect(result.userId).toBe('user-1');
-    expect(users.events.map((event) => event.name)).not.toContain('identity.UserRegistered');
+    expect(users.events.map((event) => event.name)).not.toContain(
+      'identity.UserRegistered',
+    );
   });
 
   /**
@@ -145,10 +154,15 @@ describe('google sign-in', () => {
   it('refuses with link_required when the address has a password account', async () => {
     await users.save(account());
 
-    const refused = await handler.handle({ idToken: 'valid' }).catch((error: Error) => error);
+    const refused = await handler
+      .handle({ idToken: 'valid' })
+      .catch((error: Error) => error);
 
     expect(refused).toBeInstanceOf(LinkRequired);
-    expect(refused).toMatchObject({ code: 'link_required', email: 'member@example.test' });
+    expect(refused).toMatchObject({
+      code: 'link_required',
+      email: 'member@example.test',
+    });
   });
 
   it('does not link the identity while it is refusing', async () => {
@@ -176,7 +190,9 @@ describe('google sign-in', () => {
   it('refuses a banned account that is already linked', async () => {
     await users.save(account({ googleSub: 'g-sub-1', status: 'banned' }));
 
-    await expect(handler.handle({ idToken: 'valid' })).rejects.toBeInstanceOf(InvalidCredentials);
+    await expect(handler.handle({ idToken: 'valid' })).rejects.toBeInstanceOf(
+      InvalidCredentials,
+    );
   });
 
   /** The same switch that closes password registration closes this one. */
@@ -210,7 +226,9 @@ describe('google sign-in', () => {
   it('refuses a token the verifier will not accept', async () => {
     google.refuse = true;
 
-    await expect(handler.handle({ idToken: 'forged' })).rejects.toBeInstanceOf(GoogleTokenInvalid);
+    await expect(handler.handle({ idToken: 'forged' })).rejects.toBeInstanceOf(
+      GoogleTokenInvalid,
+    );
   });
 
   it('never reports mustChangePassword for an account with no password', async () => {
@@ -241,7 +259,10 @@ describe('google link', () => {
         env as never,
       ),
       new RegisterDeviceHandler(uow, new InMemoryDeviceRepository(uow)),
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
       hasher,
     );
     await users.save(account());
@@ -253,11 +274,15 @@ describe('google link', () => {
     expect(result.userId).toBe('user-1');
     const stored = await users.findById('user-1', 'user-1');
     expect(stored?.googleSub).toBe('g-sub-1');
-    expect(users.events.map((event) => event.name)).toContain('identity.GoogleLinked');
+    expect(users.events.map((event) => event.name)).toContain(
+      'identity.GoogleLinked',
+    );
   });
 
   it('refuses a wrong password, and links nothing', async () => {
-    await expect(handler.link('valid', 'not-it')).rejects.toBeInstanceOf(LinkPasswordWrong);
+    await expect(handler.link('valid', 'not-it')).rejects.toBeInstanceOf(
+      LinkPasswordWrong,
+    );
 
     const stored = await users.findById('user-1', 'user-1');
     expect(stored?.googleSub).toBeNull();
@@ -267,13 +292,17 @@ describe('google link', () => {
   it('says the same thing for an address with no account', async () => {
     google.identity = { ...google.identity, email: 'nobody@example.test' };
 
-    await expect(handler.link('valid', 'anything')).rejects.toBeInstanceOf(LinkPasswordWrong);
+    await expect(handler.link('valid', 'anything')).rejects.toBeInstanceOf(
+      LinkPasswordWrong,
+    );
   });
 
   it('is idempotent when the same identity is linked twice', async () => {
     await handler.link('valid', 'existing-password');
 
-    await expect(handler.link('valid', 'existing-password')).resolves.toMatchObject({
+    await expect(
+      handler.link('valid', 'existing-password'),
+    ).resolves.toMatchObject({
       userId: 'user-1',
     });
   });

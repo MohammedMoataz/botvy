@@ -69,10 +69,16 @@ export class RefreshHandler {
     const verdict = judgeRefresh(record);
 
     if (verdict.outcome === 'unknown') {
-      throw new RefreshRejected('token_invalid', 'that refresh token is not recognised');
+      throw new RefreshRejected(
+        'token_invalid',
+        'that refresh token is not recognised',
+      );
     }
     if (verdict.outcome === 'expired') {
-      throw new RefreshRejected('token_expired', 'that refresh token has expired');
+      throw new RefreshRejected(
+        'token_expired',
+        'that refresh token has expired',
+      );
     }
     if (verdict.outcome === 'replayed') {
       const revoked = await this.tokens.revokeFamily(verdict.record.familyId);
@@ -86,12 +92,18 @@ export class RefreshHandler {
       );
     }
 
-    const user = await this.users.findById(verdict.record.userId, verdict.record.userId);
+    const user = await this.users.findById(
+      verdict.record.userId,
+      verdict.record.userId,
+    );
     if (!user?.isActive) {
       // Banned or deleted between issuing and refreshing. The family goes too,
       // otherwise the holder keeps refreshing against an account that is gone.
       await this.tokens.revokeFamily(verdict.record.familyId);
-      throw new RefreshRejected('token_invalid', 'that account can no longer sign in');
+      throw new RefreshRejected(
+        'token_invalid',
+        'that account can no longer sign in',
+      );
     }
 
     const next = mintRefreshToken();
@@ -126,7 +138,12 @@ export class RefreshHandler {
       email: user.email,
     });
 
-    return { accessToken, expiresIn, refreshToken: next.token, refreshExpiresAt: expiresAt };
+    return {
+      accessToken,
+      expiresIn,
+      refreshToken: next.token,
+      refreshExpiresAt: expiresAt,
+    };
   }
 
   /** A fresh family. Called by sign-in, not by this slice's endpoint. */

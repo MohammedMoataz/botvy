@@ -61,11 +61,20 @@ class StubAlerts extends PendingAlertsPort {
   }
 }
 
-/** Records what would have gone to the outbox. */
+/**
+ * Records what would have gone to the outbox.
+ *
+ * The method is `append`, matching `OutboxWriter`'s real name — and this fake
+ * declared `write` for a while. It type-checked, because the `as unknown as`
+ * cast at the construction site erases the shape, and it failed twenty tests
+ * the moment the handler called the real method. A fake that does not match
+ * the port it stands in for can pass against code the real collaborator would
+ * reject; the cast is what let it.
+ */
 class RecordingOutbox {
   readonly written: Array<{ name: string; payload: unknown }> = [];
 
-  async write(
+  async append(
     events: Array<{ name: string; payload: unknown }>,
   ): Promise<void> {
     this.written.push(

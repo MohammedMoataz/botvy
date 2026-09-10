@@ -4,13 +4,22 @@ import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js
 import { newId } from '../../../../shared/cqrs/ids.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import type { DeviceKind } from '../../domain/device.repository.js';
-import { GOOGLE_VERIFIER, type GoogleVerifier } from '../../domain/google-verifier.js';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  GOOGLE_VERIFIER,
+  type GoogleVerifier,
+} from '../../domain/google-verifier.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { User } from '../../domain/user.aggregate.js';
 import { UserRepository } from '../../domain/user.repository.js';
 import { RefreshHandler } from '../refresh/refresh.handler.js';
 import { RegisterDeviceHandler } from '../register-device/register-device.handler.js';
-import { InvalidCredentials, type SignedIn } from '../sign-in/sign-in.handler.js';
+import {
+  InvalidCredentials,
+  type SignedIn,
+} from '../sign-in/sign-in.handler.js';
 
 export interface GoogleSignInCommand {
   idToken: string;
@@ -39,7 +48,9 @@ export class RegistrationClosedForGoogle extends Error {
 export class LinkRequired extends Error {
   readonly code = 'link_required';
   constructor(readonly email: string) {
-    super('an account with that email already exists; sign in with your password to link it');
+    super(
+      'an account with that email already exists; sign in with your password to link it',
+    );
   }
 }
 
@@ -52,7 +63,9 @@ export class LinkRequired extends Error {
 export class GoogleAccountMismatch extends Error {
   readonly code = 'google_account_mismatch';
   constructor(readonly email: string) {
-    super('that address belongs to an account linked to a different Google identity');
+    super(
+      'that address belongs to an account linked to a different Google identity',
+    );
   }
 }
 
@@ -175,7 +188,8 @@ export class GoogleSignInHandler {
     const user = await this.users.findByLogin(identity.email);
 
     if (!user?.passwordHash) throw new LinkPasswordWrong();
-    if (!(await this.hasher.verify(user.passwordHash, password))) throw new LinkPasswordWrong();
+    if (!(await this.hasher.verify(user.passwordHash, password)))
+      throw new LinkPasswordWrong();
     if (!user.isActive) throw new InvalidCredentials();
 
     return this.uow.run(async () => {
@@ -186,16 +200,27 @@ export class GoogleSignInHandler {
   }
 
   /** The same tokens and device handling an ordinary sign-in produces. */
-  private async issue(user: User, command: GoogleSignInCommand): Promise<SignedIn> {
+  private async issue(
+    user: User,
+    command: GoogleSignInCommand,
+  ): Promise<SignedIn> {
     const { deviceId, session } = await this.uow.run(async () => {
       user.recordSignIn();
       await this.users.save(user);
 
       const registered = command.device
-        ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
+        ? (
+            await this.deviceRegistry.handle({
+              userId: user.id,
+              ...command.device,
+            })
+          ).deviceId
         : null;
 
-      return { deviceId: registered, session: await this.sessions.open(user.id, registered) };
+      return {
+        deviceId: registered,
+        session: await this.sessions.open(user.id, registered),
+      };
     });
 
     const { accessToken, expiresIn } = this.signer.sign({

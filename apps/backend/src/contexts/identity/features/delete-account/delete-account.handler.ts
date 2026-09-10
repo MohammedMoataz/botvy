@@ -1,5 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { RefreshTokenRepository } from '../../domain/refresh-token.repository.js';
 import { UserRepository } from '../../domain/user.repository.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
@@ -70,7 +73,9 @@ export class DeleteAccountHandler {
       return this.tokens.revokeAllForUser(user.id);
     });
 
-    this.logger.log(`account ${user.id} deleted; ${sessionsEnded} session(s) ended`);
+    this.logger.log(
+      `account ${user.id} deleted; ${sessionsEnded} session(s) ended`,
+    );
     return { deleted: true };
   }
 }

@@ -2,7 +2,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtSigner } from '../../../../shared/auth/jwt.signer.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import type { DeviceKind } from '../../domain/device.repository.js';
-import { PASSWORD_HASHER, type PasswordHasher } from '../../domain/password-hasher.js';
+import {
+  PASSWORD_HASHER,
+  type PasswordHasher,
+} from '../../domain/password-hasher.js';
 import { UserRepository } from '../../domain/user.repository.js';
 import { RefreshHandler } from '../refresh/refresh.handler.js';
 import { RegisterDeviceHandler } from '../register-device/register-device.handler.js';
@@ -80,7 +83,9 @@ export class SignInHandler {
     // Compared even when there is no account, so a missing one and a wrong
     // password take the same time. Bailing out early here is a timing oracle
     // that tells an attacker which addresses are registered.
-    const hash = user?.passwordHash ?? (await this.hasher.hash('a value nobody will guess'));
+    const hash =
+      user?.passwordHash ??
+      (await this.hasher.hash('a value nobody will guess'));
     const matches = await this.hasher.verify(hash, command.password);
 
     if (!user || !matches) throw new InvalidCredentials();
@@ -106,10 +111,18 @@ export class SignInHandler {
       // family with no device is what the portal gets; a family bound to one is
       // what makes "sign out this phone" narrower than "sign out".
       const registered = command.device
-        ? (await this.deviceRegistry.handle({ userId: user.id, ...command.device })).deviceId
+        ? (
+            await this.deviceRegistry.handle({
+              userId: user.id,
+              ...command.device,
+            })
+          ).deviceId
         : null;
 
-      return { deviceId: registered, session: await this.sessions.open(user.id, registered) };
+      return {
+        deviceId: registered,
+        session: await this.sessions.open(user.id, registered),
+      };
     });
 
     const { accessToken, expiresIn } = this.signer.sign({

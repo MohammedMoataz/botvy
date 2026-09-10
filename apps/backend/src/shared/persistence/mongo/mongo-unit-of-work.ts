@@ -56,7 +56,9 @@ export class MongoUnitOfWork extends UnitOfWork {
   onCommit(callback: () => Promise<void>): void {
     const scope = MongoUnitOfWork.storage.getStore();
     if (!scope) {
-      throw new Error('onCommit called outside a unit of work; there is no commit to hang it on.');
+      throw new Error(
+        'onCommit called outside a unit of work; there is no commit to hang it on.',
+      );
     }
     scope.commitCallbacks.push(callback);
   }

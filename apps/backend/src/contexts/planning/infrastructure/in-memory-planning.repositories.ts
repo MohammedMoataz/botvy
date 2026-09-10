@@ -25,7 +25,10 @@ import {
   type TaskState,
 } from '../domain/task.aggregate.js';
 import { TaskRepository } from '../domain/task.repository.js';
-import { TASK_SORT_KEYS, taskPredicateFor } from './mongo-task-read.repository.js';
+import {
+  TASK_SORT_KEYS,
+  taskPredicateFor,
+} from './mongo-task-read.repository.js';
 
 /**
  * The adapters every Planning handler spec binds.
@@ -318,7 +321,9 @@ export class InMemoryTaskReadRepository implements TaskReadRepository {
     return {
       nodes: page.map((row) => viewOf(row, filter.timezone)),
       nextCursor:
-        hasMore && last ? encodeCursor(positionOf(keys, docOf(last), last.id)) : null,
+        hasMore && last
+          ? encodeCursor(positionOf(keys, docOf(last), last.id))
+          : null,
     };
   }
 
@@ -443,14 +448,23 @@ function docOf(row: TaskState): Record<string, unknown> {
  * store, so a spec would pass against rows production would not return, which
  * is the failure mode this whole exercise is about.
  */
-function matchesPredicate(row: TaskState, predicate: Record<string, unknown>): boolean {
+function matchesPredicate(
+  row: TaskState,
+  predicate: Record<string, unknown>,
+): boolean {
   for (const [field, expected] of Object.entries(predicate)) {
     const actual = docOf(row)[field] ?? null;
-    if (expected === null || expected instanceof Date || typeof expected !== 'object') {
+    if (
+      expected === null ||
+      expected instanceof Date ||
+      typeof expected !== 'object'
+    ) {
       if (compare(actual, expected ?? null) !== 0) return false;
       continue;
     }
-    for (const [operator, operand] of Object.entries(expected as Record<string, unknown>)) {
+    for (const [operator, operand] of Object.entries(
+      expected as Record<string, unknown>,
+    )) {
       const order = compare(actual, operand ?? null);
       switch (operator) {
         case '$ne':
@@ -479,8 +493,13 @@ function compare(a: unknown, b: unknown): number {
   if (left === null && right === null) return 0;
   if (left === null) return -1;
   if (right === null) return 1;
-  if (typeof left === 'number' && typeof right === 'number') return left - right;
-  return String(left) < String(right) ? -1 : String(left) > String(right) ? 1 : 0;
+  if (typeof left === 'number' && typeof right === 'number')
+    return left - right;
+  return String(left) < String(right)
+    ? -1
+    : String(left) > String(right)
+      ? 1
+      : 0;
 }
 
 function viewOf(row: TaskState, timezone: string): TaskView {

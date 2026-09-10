@@ -217,7 +217,10 @@ export class TaskSyncAdapter implements SyncableEntity {
         priority: fields.priority ?? 4,
         labelId: liveLabel?.id ?? null,
         label: liveLabel?.snapshot ?? null,
-        recurrence: normaliseRecurrence(fields.recurrence),
+        // `?? null` because a *create* has no previous value to leave alone:
+        // `normaliseRecurrence` answers `undefined` for "the patch did not
+        // mention it", which is meaningful on an edit and meaningless here.
+        recurrence: normaliseRecurrence(fields.recurrence) ?? null,
         estimatedMinutes: fields.estimatedMinutes ?? null,
         source: fields.source ?? 'app',
         createdAt: change.updatedAt,

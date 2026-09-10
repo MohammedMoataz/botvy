@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -22,7 +24,18 @@ Future<void> main() async {
 
   // Notifications are set up regardless of sign-in state: a scheduled alarm
   // must still be delivered and tappable on a cold start.
-  await sl<NotificationScheduler>().init();
+  //
+  // `onAction` is wired here, at boot, and not by a screen. The two buttons
+  // arrive from the platform channel whenever the OS decides to deliver them —
+  // including on a cold start, before any screen exists — so a handler
+  // registered in a widget's `initState` would miss exactly the case the
+  // buttons are for.
+  await sl<NotificationScheduler>().init(
+    onAction: (actionId, payload) =>
+        // ignore: discarded_futures — fire-and-forget by design: the platform
+        // callback must return promptly, and the write re-arms the plan itself.
+        unawaited(handleAlertAction(actionId, payload)),
+  );
 
   // Before the first frame. The router redirects on the session, so deciding
   // it afterwards is what makes a returning member watch the sign-in form

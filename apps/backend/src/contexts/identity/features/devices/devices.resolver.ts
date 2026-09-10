@@ -1,5 +1,17 @@
-import { Args, Field, ID, ObjectType, Query, Resolver, registerEnumType } from '@nestjs/graphql';
-import { CurrentPrincipal, Roles, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  Args,
+  Field,
+  ID,
+  ObjectType,
+  Query,
+  Resolver,
+  registerEnumType,
+} from '@nestjs/graphql';
+import {
+  CurrentPrincipal,
+  Roles,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { DateTimeScalar } from '../../../../graphql/scalars.js';
 import { DevicesQueryHandler, type DeviceView } from './devices.query.js';
@@ -48,9 +60,13 @@ function toDeviceType(view: DeviceView): DeviceType {
 export class MyDevicesResolver {
   constructor(private readonly devices: DevicesQueryHandler) {}
 
-  @Query(() => [DeviceType], { description: "The caller's own registered devices." })
+  @Query(() => [DeviceType], {
+    description: "The caller's own registered devices.",
+  })
   @UsersOnly()
-  async myDevices(@CurrentPrincipal() principal: Principal): Promise<DeviceType[]> {
+  async myDevices(
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<DeviceType[]> {
     return (await this.devices.forUser(principal.id)).map(toDeviceType);
   }
 
@@ -61,10 +77,14 @@ export class MyDevicesResolver {
    * admin-only: `myDevices` above cannot be asked about somebody else, and this
    * one can.
    */
-  @Query(() => [DeviceType], { description: "A member's devices. Administrators only." })
+  @Query(() => [DeviceType], {
+    description: "A member's devices. Administrators only.",
+  })
   @UsersOnly()
   @Roles('admin')
-  async devicesOf(@Args('userId', { type: () => ID }) userId: string): Promise<DeviceType[]> {
+  async devicesOf(
+    @Args('userId', { type: () => ID }) userId: string,
+  ): Promise<DeviceType[]> {
     return (await this.devices.forUser(userId)).map(toDeviceType);
   }
 }

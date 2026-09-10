@@ -10,8 +10,18 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
-import { CurrentPrincipal, Roles, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
+import {
+  CurrentPrincipal,
+  Roles,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import type { Principal, Role } from '../../../../shared/auth/principal.js';
 import {
   AdminServiceClientsHandler,
@@ -69,12 +79,11 @@ export class AdminController {
     private readonly serviceClients: AdminServiceClientsHandler,
   ) {}
 
-// GET /admin/users was here. It is a read, and constitution X puts reads on GraphQL:
+  // GET /admin/users was here. It is a read, and constitution X puts reads on GraphQL:
   // `users` at /graphql answers it. Removed rather than left beside the
   // resolver, because two paths to one answer is the drift this rewrite exists
   // to remove - and the REST one leaked nothing, but drifted anyway.
 
-  
   @Patch('users/:id/role')
   @HttpCode(200)
   async setRole(
@@ -104,12 +113,11 @@ export class AdminController {
     return this.guard(() => this.members.unban(actor, id));
   }
 
-// GET /admin/service-clients was here. It is a read, and constitution X puts reads on GraphQL:
+  // GET /admin/service-clients was here. It is a read, and constitution X puts reads on GraphQL:
   // `serviceClients` at /graphql answers it. Removed rather than left beside the
   // resolver, because two paths to one answer is the drift this rewrite exists
   // to remove - and the REST one leaked nothing, but drifted anyway.
 
-  
   /** The response carries the secret. It is the only time it ever will. */
   @Post('service-clients')
   async createServiceClient(
@@ -119,7 +127,8 @@ export class AdminController {
     try {
       return await this.serviceClients.create(actor, body.name, body.scopes);
     } catch (error) {
-      if (error instanceof ServiceClientNameTaken) throw new ConflictException(error.message);
+      if (error instanceof ServiceClientNameTaken)
+        throw new ConflictException(error.message);
       throw error;
     }
   }
@@ -133,7 +142,8 @@ export class AdminController {
     try {
       return await this.serviceClients.revoke(actor, name);
     } catch (error) {
-      if (error instanceof ServiceClientNotFound) throw new NotFoundException(error.message);
+      if (error instanceof ServiceClientNotFound)
+        throw new NotFoundException(error.message);
       throw error;
     }
   }
@@ -149,12 +159,15 @@ export class AdminController {
     try {
       return await action();
     } catch (error) {
-      if (error instanceof MemberNotFound) throw new NotFoundException(error.message);
-      if (error instanceof LastAdminProtected || error instanceof CannotActOnSelf) {
+      if (error instanceof MemberNotFound)
+        throw new NotFoundException(error.message);
+      if (
+        error instanceof LastAdminProtected ||
+        error instanceof CannotActOnSelf
+      ) {
         throw new ConflictException(error.message);
       }
       throw error;
     }
   }
 }
-

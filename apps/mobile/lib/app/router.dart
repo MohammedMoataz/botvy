@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_cubit.dart';
@@ -8,13 +9,20 @@ import '../features/auth/presentation/sign_in_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/preferences/presentation/preferences_page.dart';
 import '../features/profile/presentation/profile_page.dart';
+import '../features/reminders/application/reminders_cubit.dart';
+import '../features/reminders/presentation/reminders_page.dart';
 import '../features/settings/presentation/server_page.dart';
+import '../features/tasks/application/tasks_cubit.dart';
+import '../features/tasks/presentation/tasks_page.dart';
+import 'di.dart';
 
 abstract final class Routes {
   static const String signIn = '/sign-in';
   static const String onboarding = '/welcome';
   static const String profile = '/profile';
   static const String preferences = '/preferences';
+  static const String tasks = '/tasks';
+  static const String reminders = '/reminders';
 
   /// Where the gateway's address is set. Reachable signed out, deliberately —
   /// see the redirect below.
@@ -98,6 +106,25 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     GoRoute(
       path: Routes.preferences,
       builder: (context, state) => const PreferencesPage(),
+    ),
+    // `.value`, as `main.dart` does for the session: both cubits are
+    // singletons from the container and already listening to the sync engine.
+    // Letting `BlocProvider` construct one here would give this route a second
+    // instance, with its own listener and its own copy of the list — so a task
+    // completed from a notification would still read as open on screen.
+    GoRoute(
+      path: Routes.tasks,
+      builder: (context, state) => BlocProvider<TasksCubit>.value(
+        value: sl<TasksCubit>(),
+        child: const TasksPage(),
+      ),
+    ),
+    GoRoute(
+      path: Routes.reminders,
+      builder: (context, state) => BlocProvider<RemindersCubit>.value(
+        value: sl<RemindersCubit>(),
+        child: const RemindersPage(),
+      ),
     ),
     GoRoute(
       path: Routes.server,

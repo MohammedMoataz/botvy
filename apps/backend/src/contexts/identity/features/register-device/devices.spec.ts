@@ -13,7 +13,10 @@ import {
 } from '../delete-account/delete-account.handler.js';
 import { LogoutHandler } from '../logout/logout.handler.js';
 import { hashRefreshToken } from '../refresh/refresh.handler.js';
-import { DeviceNotFound, RegisterDeviceHandler } from './register-device.handler.js';
+import {
+  DeviceNotFound,
+  RegisterDeviceHandler,
+} from './register-device.handler.js';
 
 import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
 
@@ -30,7 +33,10 @@ const hasher: PasswordHasher = {
   },
 };
 
-const member = (id = 'user-1', passwordHash: string | null = 'hashed:secret-enough') =>
+const member = (
+  id = 'user-1',
+  passwordHash: string | null = 'hashed:secret-enough',
+) =>
   User.rehydrate({
     id,
     email: `${id}@example.test`,
@@ -55,14 +61,20 @@ describe('register device', () => {
     handler = new RegisterDeviceHandler(uow, devices);
   });
 
-  const android = { userId: 'user-1', installId: 'install-1', kind: 'android' } as const;
+  const android = {
+    userId: 'user-1',
+    installId: 'install-1',
+    kind: 'android',
+  } as const;
 
   it('creates the device and says it was new', async () => {
     const result = await handler.handle(android, NOW);
 
     expect(result.created).toBe(true);
     expect(devices.rows).toHaveLength(1);
-    expect(devices.events.map((event) => event.name)).toEqual(['identity.DeviceRegistered']);
+    expect(devices.events.map((event) => event.name)).toEqual([
+      'identity.DeviceRegistered',
+    ]);
   });
 
   /**
@@ -71,7 +83,10 @@ describe('register device', () => {
    */
   it('is idempotent on the install id', async () => {
     await handler.handle(android, NOW);
-    const second = await handler.handle(android, new Date(NOW.getTime() + 60_000));
+    const second = await handler.handle(
+      android,
+      new Date(NOW.getTime() + 60_000),
+    );
 
     expect(second.created).toBe(false);
     expect(devices.rows).toHaveLength(1);
@@ -133,9 +148,9 @@ describe('register device', () => {
   it("refuses to remove another member's device, as though it were not there", async () => {
     const created = await handler.handle(android, NOW);
 
-    await expect(handler.remove('user-2', created.deviceId)).rejects.toBeInstanceOf(
-      DeviceNotFound,
-    );
+    await expect(
+      handler.remove('user-2', created.deviceId),
+    ).rejects.toBeInstanceOf(DeviceNotFound);
     expect(devices.rows).toHaveLength(1);
   });
 });
@@ -175,7 +190,9 @@ describe('logout', () => {
    * exist, and the client is signing out either way.
    */
   it('is quiet about a token it does not recognise', async () => {
-    await expect(handler.handle('never-issued')).resolves.toEqual({ signedOut: false });
+    await expect(handler.handle('never-issued')).resolves.toEqual({
+      signedOut: false,
+    });
   });
 
   it('ends every session on request', async () => {
@@ -186,7 +203,9 @@ describe('logout', () => {
     const result = await handler.everywhere('user-1');
 
     expect(result.sessionsEnded).toBe(2);
-    expect(tokens.rows.find((row) => row.userId === 'someone-else')?.revokedAt).toBeNull();
+    expect(
+      tokens.rows.find((row) => row.userId === 'someone-else')?.revokedAt,
+    ).toBeNull();
   });
 });
 
@@ -213,7 +232,9 @@ describe('delete account', () => {
 
     const stored = await users.findById('user-1', 'user-1');
     expect(stored?.deletedAt).toBeInstanceOf(Date);
-    expect(users.events.map((event) => event.name)).toContain('identity.UserDeleted');
+    expect(users.events.map((event) => event.name)).toContain(
+      'identity.UserDeleted',
+    );
   });
 
   it('ends every session immediately rather than waiting for the purge', async () => {
@@ -235,7 +256,9 @@ describe('delete account', () => {
    * take on its own.
    */
   it('requires the password, and refuses without it', async () => {
-    await expect(handler.handle({ userId: 'user-1' })).rejects.toBeInstanceOf(PasswordRequired);
+    await expect(handler.handle({ userId: 'user-1' })).rejects.toBeInstanceOf(
+      PasswordRequired,
+    );
   });
 
   it('refuses a wrong password', async () => {
@@ -248,7 +271,9 @@ describe('delete account', () => {
   it('deletes an account that has no password without one', async () => {
     await users.save(member('user-2', null));
 
-    await expect(handler.handle({ userId: 'user-2' })).resolves.toEqual({ deleted: true });
+    await expect(handler.handle({ userId: 'user-2' })).resolves.toEqual({
+      deleted: true,
+    });
   });
 
   it('refuses a second delete rather than raising the event twice', async () => {

@@ -144,8 +144,148 @@ class AppLocalizations {
   String get finish => _t('finish');
   String get resumeOnboarding => _t('resumeOnboarding');
 
+  // -- tasks and labels ------------------------------------------------------
+  //
+  // English only for now: `016` T262 owns the Arabic for tasks and reminders
+  // and the RTL screenshots that go with it. `_t` falls back to English for a
+  // key Arabic has not got yet, so an untranslated string reads oddly rather
+  // than showing a key.
+  String get taskToday => _t('taskToday');
+  String get taskToDoToday => _t('taskToDoToday');
+  String get taskUpcoming => _t('taskUpcoming');
+  String get taskOverdue => _t('taskOverdue');
+  String get taskCompleted => _t('taskCompleted');
+  String get taskCancelled => _t('taskCancelled');
+  String get taskOpen => _t('taskOpen');
+  String get taskDeleted => _t('taskDeleted');
+  String get taskByLabel => _t('taskByLabel');
+  String get taskNothingHere => _t('taskNothingHere');
+  String get taskNothingToday => _t('taskNothingToday');
+  String get taskComplete => _t('taskComplete');
+  String get taskCancel => _t('taskCancel');
+  String get taskRestore => _t('taskRestore');
+  String get taskEraseForGood => _t('taskEraseForGood');
+  String get taskRepeats => _t('taskRepeats');
+  String get taskNotSyncedYet => _t('taskNotSyncedYet');
+  String get taskTitle => _t('taskTitle');
+  String get taskNotes => _t('taskNotes');
+  String get taskNoDate => _t('taskNoDate');
+  String get taskAllDay => _t('taskAllDay');
+  String get taskClearDate => _t('taskClearDate');
+  String get taskPriority => _t('taskPriority');
+  String get taskNoLabel => _t('taskNoLabel');
+  String get taskRepeat => _t('taskRepeat');
+  String get taskNoRepeat => _t('taskNoRepeat');
+  String get taskEstimate => _t('taskEstimate');
+  String get taskNoEstimate => _t('taskNoEstimate');
+  String get priorityHighest => _t('priorityHighest');
+  String get priorityHigh => _t('priorityHigh');
+  String get priorityNormal => _t('priorityNormal');
+  String get priorityNone => _t('priorityNone');
+  String get labels => _t('labels');
+  String get labelName => _t('labelName');
+  String get labelNoneYet => _t('labelNoneYet');
+  String get labelNoPalette => _t('labelNoPalette');
+  String get labelOwnColour => _t('labelOwnColour');
+  String get undo => _t('undo');
+  String get delete => _t('delete');
+
+  String taskCarriedOver(int times) =>
+      _f('taskCarriedOver', {'times': '$times'});
+  String taskDeletedMessage(String title) =>
+      _f('taskDeletedMessage', {'title': title});
+  String labelOpenCount(int count) =>
+      _f('labelOpenCount', {'count': '$count'});
+
+  // -- reminders -------------------------------------------------------------
+  String get remindersTitle => _t('remindersTitle');
+  String get reminderUpcoming => _t('reminderUpcoming');
+  String get reminderOverdue => _t('reminderOverdue');
+  String get reminderDone => _t('reminderDone');
+  String get reminderCancelled => _t('reminderCancelled');
+  String get reminderActive => _t('reminderActive');
+  String get reminderDeleted => _t('reminderDeleted');
+  String get reminderNothingHere => _t('reminderNothingHere');
+  String get reminderTitle => _t('reminderTitle');
+  String get reminderSnooze => _t('reminderSnooze');
+  String get reminderComplete => _t('reminderComplete');
+  String get reminderRestore => _t('reminderRestore');
+  String get reminderReactivate => _t('reminderReactivate');
+  String get reminderErase => _t('reminderErase');
+  String get reminderLeadsHelp => _t('reminderLeadsHelp');
+  String get syncNotSaved => _t('syncNotSaved');
+
+  String reminderSnoozedFrom(String moment) =>
+      _f('reminderSnoozedFrom', {'moment': moment});
+  String reminderDeletedMessage(String title) =>
+      _f('reminderDeletedMessage', {'title': title});
+
   static const Map<String, Map<String, String>> _strings = {
     'en': {
+      'taskToday': 'Today',
+      'taskToDoToday': 'To Do — Today',
+      'taskUpcoming': 'Upcoming',
+      'taskOverdue': 'Overdue',
+      'taskCompleted': 'Completed',
+      'taskCancelled': 'Cancelled',
+      'taskOpen': 'Open',
+      'taskDeleted': 'Deleted',
+      'taskByLabel': 'By label',
+      'taskNothingHere': 'Nothing here.',
+      'taskNothingToday': 'Nothing due today.',
+      'taskComplete': 'Complete',
+      'taskCancel': 'Cancel',
+      'taskRestore': 'Restore',
+      'taskEraseForGood': 'Erase for good',
+      'taskRepeats': 'Repeats',
+      'taskNotSyncedYet': 'Not uploaded yet',
+      'taskTitle': 'What needs doing',
+      'taskNotes': 'Notes',
+      'taskNoDate': 'No date',
+      'taskAllDay': 'All day',
+      'taskClearDate': 'Clear the date',
+      'taskPriority': 'Priority',
+      'taskNoLabel': 'No label',
+      'taskRepeat': 'Repeat',
+      'taskNoRepeat': 'Never',
+      'taskEstimate': 'Estimate (minutes)',
+      'taskNoEstimate': 'None',
+      'taskCarriedOver': 'Carried over {times}×',
+      'taskDeletedMessage': 'Deleted "{title}"',
+      'priorityHighest': 'Highest',
+      'priorityHigh': 'High',
+      'priorityNormal': 'Normal',
+      'priorityNone': 'None',
+      'labels': 'Labels',
+      'labelName': 'Label name',
+      'labelNoneYet': 'No labels yet.',
+      'labelNoPalette':
+          'The colour palette is set by whoever runs this Botvy, and this '
+          'account cannot read it. Type a colour instead.',
+      'labelOwnColour': 'Your own colour',
+      'labelOpenCount': '{count} open',
+      'undo': 'Undo',
+      'delete': 'Delete',
+      'remindersTitle': 'Reminders',
+      'reminderUpcoming': 'Upcoming',
+      'reminderOverdue': 'Overdue',
+      'reminderDone': 'Done',
+      'reminderCancelled': 'Cancelled',
+      'reminderActive': 'Active',
+      'reminderDeleted': 'Deleted',
+      'reminderNothingHere': 'Nothing here.',
+      'reminderTitle': 'Remind me to',
+      'reminderSnooze': 'Snooze',
+      'reminderComplete': 'Done',
+      'reminderRestore': 'Restore',
+      'reminderReactivate': 'Set a new time',
+      'reminderErase': 'Erase for good',
+      'reminderLeadsHelp':
+          'Leave these empty to use your own defaults, so changing them later '
+          'changes this reminder too.',
+      'reminderSnoozedFrom': 'snoozed from {moment}',
+      'reminderDeletedMessage': 'Deleted "{title}"',
+      'syncNotSaved': 'Not saved — tap to try again',
       'appTitle': 'Botvy',
       'signInTitle': 'Sign in',
       'email': 'Email',

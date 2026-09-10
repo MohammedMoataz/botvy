@@ -11,6 +11,10 @@ import { OperationsModule } from '../contexts/operations/operations.module.js';
 import { AdminSettingsResolver } from '../contexts/operations/features/patch-setting/settings.resolver.js';
 import { ProfileModule } from '../contexts/profile/profile.module.js';
 import { ProfileResolver } from '../contexts/profile/features/profile-query/profile.resolver.js';
+import { PlanningModule } from '../contexts/planning/planning.module.js';
+import { TasksResolver } from '../contexts/planning/features/tasks-query/tasks.resolver.js';
+import { RemindersModule } from '../contexts/reminders/reminders.module.js';
+import { RemindersResolver } from '../contexts/reminders/features/reminders-query/reminders.resolver.js';
 
 /**
  * The read edge.
@@ -70,8 +74,12 @@ export class GraphQLEdgeModule {}
  * would mean an expired token signs the member out on a query and refreshes on a
  * command, which is the sort of difference nobody debugs twice.
  */
-export function formatError(formatted: GraphQLFormattedError, error: unknown): GraphQLFormattedError {
-  const original = error instanceof GraphQLError ? error.originalError : undefined;
+export function formatError(
+  formatted: GraphQLFormattedError,
+  error: unknown,
+): GraphQLFormattedError {
+  const original =
+    error instanceof GraphQLError ? error.originalError : undefined;
   const status = (original as { status?: number } | undefined)?.status;
   const response = (original as { response?: unknown } | undefined)?.response;
   const message =
@@ -83,14 +91,23 @@ export function formatError(formatted: GraphQLFormattedError, error: unknown): G
     return {
       ...formatted,
       message: message ?? 'unauthorized',
-      extensions: { ...formatted.extensions, code: message === 'token_expired' ? 'token_expired' : 'unauthorized' },
+      extensions: {
+        ...formatted.extensions,
+        code: message === 'token_expired' ? 'token_expired' : 'unauthorized',
+      },
     };
   }
   if (status === 403) {
-    return { ...formatted, extensions: { ...formatted.extensions, code: 'forbidden' } };
+    return {
+      ...formatted,
+      extensions: { ...formatted.extensions, code: 'forbidden' },
+    };
   }
   if (status === 404) {
-    return { ...formatted, extensions: { ...formatted.extensions, code: 'not_found' } };
+    return {
+      ...formatted,
+      extensions: { ...formatted.extensions, code: 'not_found' },
+    };
   }
 
   // An unrecognised error keeps its own extensions rather than being relabelled
@@ -128,10 +145,19 @@ export const RESOLVERS = [
   AdminServiceClientsResolver,
   ProfileResolver,
   AdminSettingsResolver,
+  TasksResolver,
+  RemindersResolver,
 ] as const;
 
 @Module({
-  imports: [GraphQLEdgeModule, IdentityModule, ProfileModule, OperationsModule],
+  imports: [
+    GraphQLEdgeModule,
+    IdentityModule,
+    ProfileModule,
+    OperationsModule,
+    PlanningModule,
+    RemindersModule,
+  ],
   providers: [...RESOLVERS],
 })
 export class GraphQLModule {}

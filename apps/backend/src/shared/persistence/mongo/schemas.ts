@@ -173,6 +173,12 @@ export const LabelSchema = new Schema(
     _id: { type: String, required: true },
     userId: { type: String, required: true },
     name: { type: String, required: true },
+    /**
+     * Declared as optional *and removed* on delete — see the mapper. Omitting
+     * it from a `$set` is not enough: `$set` writes the fields it is given and
+     * leaves the rest alone, so the old value survived and the unique index
+     * kept holding the name. It takes `$unset`.
+     */
     nameLower: { type: String },
     color: { type: String, required: true },
     sortOrder: { type: Number, required: true, default: 0 },
@@ -303,6 +309,22 @@ export const AlertSchema = new Schema(
     sentAt: { type: Date, default: null },
     failedAt: { type: Date, default: null },
     error: { type: String, default: null },
+    /**
+     * The optimistic-write column, and its absence was a live defect.
+     *
+     * `MongoRepositoryBase` filters every save on `updatedAt` and writes it
+     * back, and Mongoose runs `strict: true` — so an upsert naming a path the
+     * schema does not declare is *rejected outright*:
+     * `Path "updatedAt" is not in schema, strict mode is 'true', and upsert is
+     * 'true'`. Every alert this pipeline ever tried to plan failed on it.
+     *
+     * Thirty-eight unit tests passed throughout, because the in-memory adapter
+     * has no schema to be strict about. It took running against a real Mongo,
+     * and the evidence was four undelivered rows in the outbox carrying that
+     * exact message — which is the outbox doing its job: nothing was lost, it
+     * simply never arrived.
+     */
+    updatedAt: { type: Date, required: true },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'alerts', versionKey: false },

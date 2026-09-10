@@ -64,7 +64,9 @@ export class GoogleIdTokenVerifier implements GoogleVerifier {
     }
 
     if (!payload?.sub || !payload.email) {
-      throw new GoogleTokenInvalid('the Google id token carries no subject or email');
+      throw new GoogleTokenInvalid(
+        'the Google id token carries no subject or email',
+      );
     }
 
     // An unverified address must not be trusted to identify an account. Google

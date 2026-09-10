@@ -43,6 +43,23 @@ export enum DeviceKind {
   Web = 'web'
 }
 
+export type Label = {
+  __typename?: 'Label';
+  color: Scalars['String']['output'];
+  deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  openTaskCount: Scalars['Int']['output'];
+  sortOrder: Scalars['Int']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type LabelSnapshot = {
+  __typename?: 'LabelSnapshot';
+  color: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+};
+
 export type Preferences = {
   __typename?: 'Preferences';
   aiSuggestions: Scalars['Boolean']['output'];
@@ -83,6 +100,8 @@ export type Query = {
   bodyMetrics: Array<BodyMetric>;
   /** A member's devices. Administrators only. */
   devicesOf: Array<Device>;
+  labelPalette: Array<Scalars['String']['output']>;
+  labels: Array<Label>;
   /** The authenticated member. */
   me: User;
   /** The caller's own registered devices. */
@@ -91,10 +110,14 @@ export type Query = {
   preferences: Preferences;
   /** The caller's own profile. */
   profile: Profile;
+  reminder?: Maybe<Reminder>;
+  reminders: ReminderPage;
   /** Registered machine callers. Administrators only. */
   serviceClients: Array<ServiceClient>;
   /** The settings registry. Administrators only. */
   settings: Array<Setting>;
+  task?: Maybe<Task>;
+  tasks: TaskPage;
   /** Every member. Administrators only. */
   users: UserConnection;
 };
@@ -107,6 +130,36 @@ export type QueryBodyMetricsArgs = {
 
 export type QueryDevicesOfArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QueryLabelsArgs = {
+  includeDeleted?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+export type QueryReminderArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryRemindersArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  view: ReminderViewName;
+};
+
+
+export type QueryTaskArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryTasksArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  labelId?: InputMaybe<Scalars['ID']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  view: TaskViewName;
 };
 
 
@@ -123,6 +176,34 @@ export type QuietHours = {
   from: Scalars['String']['output'];
   to: Scalars['String']['output'];
 };
+
+export type Reminder = {
+  __typename?: 'Reminder';
+  deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  effectiveAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  leadTimes: Array<Scalars['String']['output']>;
+  remindAt: Scalars['DateTime']['output'];
+  snoozedUntil?: Maybe<Scalars['DateTime']['output']>;
+  source: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type ReminderPage = {
+  __typename?: 'ReminderPage';
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  nodes: Array<Reminder>;
+};
+
+/** The four reminder lists. `done` carries cancelled ones too. */
+export enum ReminderViewName {
+  Deleted = 'deleted',
+  Done = 'done',
+  Overdue = 'overdue',
+  Upcoming = 'upcoming'
+}
 
 export enum Role {
   Admin = 'admin',
@@ -147,6 +228,44 @@ export type Setting = {
   readOnly: Scalars['Boolean']['output'];
   value?: Maybe<Scalars['JSON']['output']>;
 };
+
+export type Task = {
+  __typename?: 'Task';
+  allDay: Scalars['Boolean']['output'];
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  deferCount: Scalars['Int']['output'];
+  deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  dueAt?: Maybe<Scalars['DateTime']['output']>;
+  estimatedMinutes?: Maybe<Scalars['Int']['output']>;
+  id: Scalars['ID']['output'];
+  label?: Maybe<LabelSnapshot>;
+  labelId?: Maybe<Scalars['ID']['output']>;
+  notes?: Maybe<Scalars['String']['output']>;
+  priority: Scalars['Int']['output'];
+  recurrenceMode?: Maybe<Scalars['String']['output']>;
+  recurrenceText?: Maybe<Scalars['String']['output']>;
+  repeats: Scalars['Boolean']['output'];
+  source: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export type TaskPage = {
+  __typename?: 'TaskPage';
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  nodes: Array<Task>;
+};
+
+/** The six task lists, named as the member sees them. */
+export enum TaskViewName {
+  Completed = 'completed',
+  Deleted = 'deleted',
+  Label = 'label',
+  Overdue = 'overdue',
+  Today = 'today',
+  Upcoming = 'upcoming'
+}
 
 export type User = {
   __typename?: 'User';

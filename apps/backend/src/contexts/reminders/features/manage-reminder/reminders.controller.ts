@@ -170,6 +170,7 @@ export class RemindersController {
   }
 
   @Post('reminders/:id/snooze')
+  @HttpCode(200)
   async snooze(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -193,6 +194,7 @@ export class RemindersController {
   }
 
   @Post('reminders/:id/complete')
+  @HttpCode(200)
   async complete(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -201,6 +203,7 @@ export class RemindersController {
   }
 
   @Post('reminders/:id/cancel')
+  @HttpCode(200)
   async cancel(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -209,6 +212,7 @@ export class RemindersController {
   }
 
   @Post('reminders/:id/reactivate')
+  @HttpCode(200)
   async reactivate(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,
@@ -234,6 +238,7 @@ export class RemindersController {
   }
 
   @Delete('reminders/deleted')
+  @HttpCode(200)
   async clearDeleted(@CurrentPrincipal() principal: Principal) {
     return this.translate(() => this.lifecycle.clearDeleted(principal.id));
   }
@@ -247,6 +252,7 @@ export class RemindersController {
   }
 
   @Post('reminders/:id/restore')
+  @HttpCode(200)
   async restore(
     @CurrentPrincipal() principal: Principal,
     @Param('id') id: string,

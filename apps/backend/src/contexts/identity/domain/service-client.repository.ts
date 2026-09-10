@@ -34,7 +34,9 @@ export abstract class ServiceClientRepository {
    * constant-time in the adapter: a timing difference on a token check is a way
    * to guess the token one byte at a time.
    */
-  abstract verifyToken(presentedTokenHash: string): Promise<ServiceClient | null>;
+  abstract verifyToken(
+    presentedTokenHash: string,
+  ): Promise<ServiceClient | null>;
 
   abstract touch(id: string, at: Date): Promise<void>;
 
