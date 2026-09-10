@@ -91,7 +91,11 @@ export class BotvyClient {
    * retrying a command more than that risks performing it twice, which is what
    * the idempotency key exists to make safe rather than something to rely on.
    */
-  async command<T>(path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
+  async command<T>(
+    path: string,
+    body?: unknown,
+    idempotencyKey?: string,
+  ): Promise<T> {
     return this.rest<T>('POST', path, body, idempotencyKey);
   }
 
@@ -126,7 +130,11 @@ export class BotvyClient {
 
     let response = await send();
 
-    if (response.status === 401 && this.options.tokens && !isRefreshPath(path)) {
+    if (
+      response.status === 401 &&
+      this.options.tokens &&
+      !isRefreshPath(path)
+    ) {
       const refreshed = await this.options.tokens.refresh();
       if (refreshed) response = await send();
     }
@@ -155,7 +163,11 @@ export class BotvyClient {
       });
 
     let response = await send();
-    if (response.status === 401 && this.options.tokens && !isRefreshPath(path)) {
+    if (
+      response.status === 401 &&
+      this.options.tokens &&
+      !isRefreshPath(path)
+    ) {
       const refreshed = await this.options.tokens.refresh();
       if (refreshed) response = await send();
     }
@@ -170,7 +182,10 @@ export class BotvyClient {
    * REST `GET`s they were built against, which is the split constitution X
    * exists to prevent.
    */
-  async query<T>(document: string, variables?: Record<string, unknown>): Promise<T> {
+  async query<T>(
+    document: string,
+    variables?: Record<string, unknown>,
+  ): Promise<T> {
     const send = async (): Promise<Response> =>
       this.fetchImpl(`${this.baseUrl}/graphql`, {
         method: 'POST',
@@ -197,7 +212,11 @@ export class BotvyClient {
     } | null;
 
     if (!payload) {
-      throw new ApiError(response.status, null, `HTTP ${response.status} from /graphql`);
+      throw new ApiError(
+        response.status,
+        null,
+        `HTTP ${response.status} from /graphql`,
+      );
     }
 
     if (payload.errors?.length) {
@@ -207,7 +226,11 @@ export class BotvyClient {
       // — `AuthStore` reads `error.body.code` to decide between refreshing and
       // signing out. A read that reported an expired token differently from a
       // command would sign the member out of a session that is still good.
-      throw new ApiError(statusForCode(code, response.status), { code, errors: payload.errors }, first.message);
+      throw new ApiError(
+        statusForCode(code, response.status),
+        { code, errors: payload.errors },
+        first.message,
+      );
     }
     return payload.data as T;
   }
@@ -225,13 +248,17 @@ export class BotvyClient {
       // 404 means the route itself does not exist. Treating both the same told
       // an Owner that `/admin/service-clients/foo` "is not available in this
       // build yet" when they revoked a client twice.
-      if (response.status === 404 && !(body as { message?: string } | null)?.message) {
+      if (
+        response.status === 404 &&
+        !(body as { message?: string } | null)?.message
+      ) {
         throw new NotAvailableYetError(path);
       }
       throw new ApiError(
         response.status,
         body,
-        (body as { message?: string } | null)?.message ?? `HTTP ${response.status}`,
+        (body as { message?: string } | null)?.message ??
+          `HTTP ${response.status}`,
       );
     }
     if (response.status === 204) return undefined as T;

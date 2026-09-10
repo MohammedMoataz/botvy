@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reminders.ReminderSnoozed",
+  "description": "Payload of reminders.ReminderSnoozed. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "reminderId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "remindAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "leadTimes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "reminderId",
+    "remindAt",
+    "leadTimes"
+  ],
+  "additionalProperties": false
+}

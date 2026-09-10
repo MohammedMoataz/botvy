@@ -7,7 +7,6 @@ import { InternalAlertsController } from './contexts/operations/features/interna
 import { InternalHeartbeatController } from './contexts/operations/features/internal-heartbeat/internal-heartbeat.controller.js';
 import { AdminController } from './contexts/identity/features/admin-members/admin.controller.js';
 import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
-import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { NotificationsModule } from './contexts/notifications/notifications.module.js';
 import { InternalSweepController } from './contexts/notifications/features/sweep/internal-sweep.controller.js';
@@ -80,7 +79,6 @@ import { WsModule } from './ws/ws.module.js';
     AdminController,
     ProfileController,
     SettingsController,
-    PingController,
     TasksController,
     RemindersController,
     InternalSweepController,

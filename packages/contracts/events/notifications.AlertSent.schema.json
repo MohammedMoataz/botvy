@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "notifications.AlertSent",
+  "description": "Payload of notifications.AlertSent. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "alertId": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "occurrenceAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "occurrenceAt"
+      ],
+      "additionalProperties": false
+    },
+    "deviceIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "alertId",
+    "source",
+    "deviceIds"
+  ],
+  "additionalProperties": false
+}

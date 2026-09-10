@@ -240,7 +240,7 @@ async function workflowsByName() {
  *
  * `POST /workflows` creates unconditionally — it does not conflict on a name —
  * so posting on every run would leave a host with a growing pile of identical
- * "Botvy Ping Echo" workflows, several of them bound to the same webhook path.
+ * "Botvy Notifications Sweep" workflows, several bound to the same webhook path.
  * The name is the identity here, so the run looks up what is already there and
  * PUTs onto the match.
  *

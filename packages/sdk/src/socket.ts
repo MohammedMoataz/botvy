@@ -1,6 +1,7 @@
 import type { TokenStore } from './tokens.js';
 
-export type SocketState = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'signed-out';
+export type SocketState =
+  'idle' | 'connecting' | 'connected' | 'reconnecting' | 'signed-out';
 
 /** The subset of a Socket.IO socket this wrapper drives, so it can be faked. */
 export interface SocketLike {
@@ -68,7 +69,9 @@ export class SocketClient {
       return;
     }
 
-    this.setState(this.#socket || this.#hasConnected ? 'reconnecting' : 'connecting');
+    this.setState(
+      this.#socket || this.#hasConnected ? 'reconnecting' : 'connecting',
+    );
     this.#hasConnected = true;
 
     const socket = this.options.connect(`${this.options.baseUrl ?? ''}/ws`, {
@@ -90,7 +93,8 @@ export class SocketClient {
       // `String(payload)` was "Error: token_expired" and never matched - every
       // expired token signed the member out instead of refreshing. The server
       // puts the code on `err.data`; the message is the fallback.
-      const error = payload as { data?: { code?: unknown }; message?: unknown } | undefined;
+      const error = payload as
+        { data?: { code?: unknown }; message?: unknown } | undefined;
       const code = error?.data?.code ?? error?.message ?? payload;
       if (String(code) === 'token_expired') void this.refreshAndReconnect();
       else this.setState('signed-out');

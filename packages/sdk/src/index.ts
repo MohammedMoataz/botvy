@@ -7,7 +7,12 @@
  * admin app, on the phone — and the three drifted. One client, generated types,
  * one place to fix a mistake.
  */
-export { BotvyClient, ApiError, NotAvailableYetError, type ClientOptions } from './client.js';
+export {
+  BotvyClient,
+  ApiError,
+  NotAvailableYetError,
+  type ClientOptions,
+} from './client.js';
 export {
   TokenStore,
   inMemoryStorage,
@@ -15,7 +20,11 @@ export {
   type TokenPair,
   type TokenStorage,
 } from './tokens.js';
-export { SocketClient, type SocketOptions, type SocketState } from './socket.js';
+export {
+  SocketClient,
+  type SocketOptions,
+  type SocketState,
+} from './socket.js';
 export {
   AuthStore,
   EmailTaken,

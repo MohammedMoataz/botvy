@@ -14,17 +14,132 @@ import { z } from 'zod';
  * metadata. A second tool that reconstructed them would be a fourth place for
  * the domain to live.
  */
-export const CONTRACTS_DIR = join(process.cwd(), '..', '..', 'packages', 'contracts');
+export const CONTRACTS_DIR = join(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'contracts',
+);
 
-/** The events P0 introduces, as JSON Schema, for subscribers to validate against. */
+/**
+ * Every event a subscriber can subscribe to, as JSON Schema.
+ *
+ * This is the published contract for automation: n8n and anything else on the
+ * far side of a webhook validate against these rather than against whatever
+ * shape the payload happened to have last week. So an event added to
+ * `contracts/events.md` and raised by a context is not actually *published*
+ * until it is here — which is why the list grows with each phase rather than
+ * being derived.
+ *
+ * Not derived, deliberately. A schema generated from the payload type would
+ * document whatever the code currently does, including a field somebody
+ * renamed by accident; written down, it is a claim the code has to keep
+ * meeting. The events catalogue and this table are the two halves of that
+ * claim, and both change in the same review.
+ *
+ * `operations.Pinged` was here and is gone with the demonstration slice it
+ * belonged to: P2's `planning.TaskScheduled` makes the same journey for a
+ * member who wants the outcome.
+ */
 export const eventSchemas = {
-  'operations.Pinged': z.object({
-    pingId: z.string().uuid(),
-    clientId: z.string(),
-    at: z.string().datetime(),
-  }),
   'operations.SettingChanged': z.object({
     key: z.string(),
+  }),
+
+  // ---- Planning ---------------------------------------------------------
+  'planning.TaskScheduled': z.object({
+    taskId: z.string().uuid(),
+    dueAt: z.string().datetime().nullable(),
+    allDay: z.boolean(),
+    priority: z.number().int(),
+  }),
+  'planning.TaskRescheduled': z.object({
+    taskId: z.string().uuid(),
+    dueAt: z.string().datetime().nullable(),
+  }),
+  'planning.TaskCompleted': z.object({
+    taskId: z.string().uuid(),
+    at: z.string().datetime(),
+    // Present only when a repeating task re-armed rather than finished. Its
+    // absence is how a subscriber tells "done for ever" from "done for now".
+    recurrenceAdvancedTo: z.string().datetime().optional(),
+  }),
+  'planning.TaskCancelled': z.object({
+    taskId: z.string().uuid(),
+    at: z.string().datetime(),
+  }),
+  'planning.TaskDeleted': z.object({
+    taskId: z.string().uuid(),
+    at: z.string().datetime(),
+  }),
+  'planning.TaskDeferred': z.object({
+    taskId: z.string().uuid(),
+    fromDate: z.string().datetime().nullable(),
+    toDate: z.string().datetime(),
+    deferCount: z.number().int(),
+  }),
+  'planning.LabelUpdated': z.object({
+    labelId: z.string().uuid(),
+    name: z.string(),
+    color: z.string(),
+  }),
+  'planning.LabelDeleted': z.object({
+    labelId: z.string().uuid(),
+    name: z.string(),
+    color: z.string(),
+  }),
+
+  // ---- Reminders --------------------------------------------------------
+  //
+  // The three that carry a moment share one shape, because the alert saga
+  // reconciles from it and does not care which of the three brought it.
+  'reminders.ReminderScheduled': z.object({
+    reminderId: z.string().uuid(),
+    remindAt: z.string().datetime(),
+    leadTimes: z.array(z.string()),
+  }),
+  'reminders.ReminderRescheduled': z.object({
+    reminderId: z.string().uuid(),
+    remindAt: z.string().datetime(),
+    leadTimes: z.array(z.string()),
+  }),
+  'reminders.ReminderSnoozed': z.object({
+    reminderId: z.string().uuid(),
+    // The *effective* moment, so a subscriber never has to know what a snooze
+    // is to work out when the member will be told.
+    remindAt: z.string().datetime(),
+    leadTimes: z.array(z.string()),
+  }),
+  'reminders.ReminderCompleted': z.object({ reminderId: z.string().uuid() }),
+  'reminders.ReminderCancelled': z.object({ reminderId: z.string().uuid() }),
+  'reminders.ReminderDeleted': z.object({ reminderId: z.string().uuid() }),
+
+  // ---- Notifications ----------------------------------------------------
+  'notifications.AlertSent': z.object({
+    alertId: z.string(),
+    source: z.object({
+      kind: z.string(),
+      id: z.string(),
+      occurrenceAt: z.string().datetime().nullable(),
+    }),
+    deviceIds: z.array(z.string()),
+  }),
+  'notifications.AlertFailed': z.object({
+    alertId: z.string(),
+    source: z.object({
+      kind: z.string(),
+      id: z.string(),
+      occurrenceAt: z.string().datetime().nullable(),
+    }),
+    deviceIds: z.array(z.string()),
+    error: z.string(),
+  }),
+
+  // ---- Sync -------------------------------------------------------------
+  'sync.ChangesApplied': z.object({
+    installId: z.string(),
+    entities: z.array(z.string()),
   }),
 } as const;
 
@@ -55,7 +170,8 @@ export function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
   switch (def.typeName) {
     case 'ZodString': {
       const checks = (def.checks ?? []) as Array<{ kind: string }>;
-      if (checks.some((check) => check.kind === 'uuid')) return { type: 'string', format: 'uuid' };
+      if (checks.some((check) => check.kind === 'uuid'))
+        return { type: 'string', format: 'uuid' };
       if (checks.some((check) => check.kind === 'datetime')) {
         return { type: 'string', format: 'date-time' };
       }
@@ -68,7 +184,9 @@ export function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
     case 'ZodUnknown':
       return {};
     case 'ZodNullable':
-      return { anyOf: [toJsonSchema(def.innerType as z.ZodTypeAny), { type: 'null' }] };
+      return {
+        anyOf: [toJsonSchema(def.innerType as z.ZodTypeAny), { type: 'null' }],
+      };
     case 'ZodOptional':
     case 'ZodDefault':
       // Optionality is expressed by absence from `required`, not by the field's
@@ -84,7 +202,12 @@ export function toJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
         properties[key] = toJsonSchema(value);
         if (!value.isOptional()) required.push(key);
       }
-      return { type: 'object', properties, required, additionalProperties: false };
+      return {
+        type: 'object',
+        properties,
+        required,
+        additionalProperties: false,
+      };
     }
     default:
       // Better an honest gap than a schema that claims to describe something
@@ -107,7 +230,8 @@ export async function writeContracts(
     written.push(relative);
   };
 
-  if (openapi) await write('openapi.json', `${JSON.stringify(openapi, null, 2)}\n`);
+  if (openapi)
+    await write('openapi.json', `${JSON.stringify(openapi, null, 2)}\n`);
   if (graphqlSdl) await write('schema.graphql', graphqlSdl);
 
   for (const [name, schema] of Object.entries(eventSchemas)) {

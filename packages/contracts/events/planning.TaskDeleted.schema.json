@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "planning.TaskDeleted",
+  "description": "Payload of planning.TaskDeleted. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "taskId",
+    "at"
+  ],
+  "additionalProperties": false
+}

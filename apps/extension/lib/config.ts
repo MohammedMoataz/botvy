@@ -5,6 +5,17 @@ export const GATEWAY_URL: string =
 /** chrome.storage.local key holding the token pair, shared by panel and background. */
 export const TOKEN_STORAGE_KEY = 'botvy.tokens';
 
+/**
+ * The message the service worker sends the panel when the server nudges.
+ *
+ * The whole push path for this surface, and there is no other one: **FCM does
+ * not work in an extension**, so `sync.nudge` over the socket is how the
+ * extension learns that something changed elsewhere. The worker owns the socket
+ * and the panel owns the round trip (see `store.ts` on why), so the nudge has
+ * to cross between them, and one message type is the crossing.
+ */
+export const SYNC_NUDGE_MESSAGE = 'botvy.sync.nudge';
+
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;

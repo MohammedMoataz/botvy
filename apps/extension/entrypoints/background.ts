@@ -1,5 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import { GATEWAY_URL, readTokens } from '../lib/config';
+import { GATEWAY_URL, SYNC_NUDGE_MESSAGE, readTokens } from '../lib/config';
 
 const HEARTBEAT_ALARM = 'botvy-heartbeat';
 
@@ -22,10 +22,19 @@ export default defineBackground(() => {
 });
 
 /**
- * Socket connect stub. P0 has no sign-in, so there is no token and this returns
- * without touching the network — the handshake shape is here so P1 only has to
- * add the events. The gateway authenticates in the handshake (`auth.token`);
- * a service token is refused on /ws.
+ * The socket, established from whatever token is in chrome.storage.
+ *
+ * Signed out there is no token and this returns without touching the network.
+ * The gateway authenticates in the handshake (`auth.token`); a service token is
+ * refused on /ws.
+ *
+ * This worker deliberately does **not** refresh a token. The panel's
+ * `TokenStore` is the one refresher on this installation, and a second one
+ * racing it over the same `chrome.storage` key is a second chance to spend the
+ * same refresh token twice — which the API reads as a stolen token and answers
+ * by revoking the whole family. So an expired token drops the socket and the
+ * minute alarm re-reads storage; whenever the panel next refreshes, the
+ * following tick reconnects with the fresh value.
  */
 async function ensureSocket(): Promise<void> {
   if (socket?.connected) return;
@@ -45,6 +54,19 @@ async function ensureSocket(): Promise<void> {
     socket.on('token_expired', () => {
       socket?.disconnect();
       socket = null;
+    });
+
+    // Something changed on another device. Registered on the socket instance
+    // rather than per connect, so it survives Socket.IO's own reconnects.
+    //
+    // The worker does not sync — the panel does, because it holds the one token
+    // refresher — so all this does is wake it. `sendMessage` rejects when
+    // nothing is listening, which is the ordinary case: the panel is closed
+    // most of the time. That is not a failure and nothing is lost by it, since
+    // every mount syncs and a nudge only ever costs a delay. Swallowed, then,
+    // rather than logged on every tick.
+    socket.on('sync.nudge', () => {
+      void chrome.runtime.sendMessage({ type: SYNC_NUDGE_MESSAGE }).catch(() => undefined);
     });
   } else {
     socket.auth = { token: tokens.accessToken };

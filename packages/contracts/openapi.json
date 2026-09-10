@@ -591,35 +591,6 @@
         ]
       }
     },
-    "/api/v1/ping": {
-      "post": {
-        "operationId": "PingController_ping",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PingDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Ping"
-        ]
-      }
-    },
     "/api/v1/tasks": {
       "post": {
         "operationId": "TasksController_createTask",
@@ -1379,6 +1350,73 @@
         ]
       }
     },
+    "/internal/notifications/sweep": {
+      "post": {
+        "operationId": "InternalSweepController_run",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalSweep"
+        ]
+      }
+    },
+    "/internal/notifications/test": {
+      "post": {
+        "operationId": "InternalSweepController_sendTest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendTestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalSweep"
+        ]
+      }
+    },
+    "/api/v1/sync": {
+      "post": {
+        "operationId": "SyncController_round",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sync"
+        ]
+      }
+    },
     "/internal/alerts": {
       "post": {
         "operationId": "InternalAlertsController_alert",
@@ -1530,10 +1568,6 @@
         "type": "object",
         "properties": {}
       },
-      "PingDto": {
-        "type": "object",
-        "properties": {}
-      },
       "CreateTaskDto": {
         "type": "object",
         "properties": {}
@@ -1575,6 +1609,14 @@
         "properties": {}
       },
       "ReactivateDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SendTestDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SyncDto": {
         "type": "object",
         "properties": {}
       },

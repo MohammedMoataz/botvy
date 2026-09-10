@@ -18,3 +18,67 @@ body {
   font-weight: 700;
   margin-block-end: 2px;
 }
+
+.task-list {
+  margin: 0;
+}
+
+/* Logical properties throughout, so Arabic mirrors with dir="rtl" and no
+   second rule. `min-width: 0` on the row is what lets `.task-title`'s
+   text-truncate actually truncate: a flex item defaults to min-content and
+   would push the label chip out of the panel instead of ellipsising. */
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-block: 6px;
+  border-block-end: 1px solid var(--botvy-line, #e3e6ea);
+}
+
+.task-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Priority as a dot rather than a number: four levels, and the member reads
+   them at a glance. These are presentation, not an operator knob — nothing in
+   `settings` describes them — so they are literals here, unlike a label's
+   colour, which the server sends from `settings.labels.palette`. */
+.prio {
+  flex: 0 0 auto;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--botvy-radius-full, 9999px);
+  background: var(--botvy-unknown, #9ca3af);
+}
+
+.prio-1 {
+  background: var(--botvy-down, #dc2626);
+}
+
+.prio-2 {
+  background: #d97706;
+}
+
+.prio-3 {
+  background: var(--botvy-accent, #2563eb);
+}
+
+.label-chip {
+  flex: 0 0 auto;
+  max-inline-size: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline: 6px;
+  padding-block: 1px;
+  border-radius: var(--botvy-radius-full, 9999px);
+  font-size: var(--botvy-font-size-xs, 12px);
+  /* The chip's own colour arrives from the server and could be anything the
+     member picked, so the text is white with a shadow rather than a token —
+     legible on a dark chip and on a light one alike, without the panel having
+     to compute a contrast ratio for a colour it did not choose. */
+  color: #fff;
+  text-shadow: 0 0 2px rgb(0 0 0 / 45%);
+}

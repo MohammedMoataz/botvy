@@ -41,12 +41,32 @@ export interface TaskRecurrence {
 }
 
 /**
- * A task as this surface holds it: the server's `TaskView` with instants as ISO
- * strings, plus the two sync columns from `SyncedRow`.
+ * A task as this surface holds it: **the shape the sync pull sends**, with
+ * instants as ISO strings, plus the two sync columns from `SyncedRow`.
  *
- * `recurrenceText` ("every 2 weeks on Tuesday") is rendered by the server on
- * purpose — three surfaces show that sentence and none of them should have to
- * carry an RRULE parser to produce it.
+ * ## It is the pull's shape, not the GraphQL read model's
+ *
+ * This interface was first written against the server's `TaskView` — the read
+ * model behind the GraphQL queries — which carries `repeats`,
+ * `recurrenceMode` and a server-rendered `recurrenceText`. But rows do not
+ * arrive that way. Commands answer with an acknowledgement only, so every row
+ * a client holds comes from `POST /api/v1/sync`, and the sync adapter sends the
+ * *rule*: `recurrence` with its `dtstart`, `rrule`, `mode` and `exdates`, plus
+ * `deferredFrom`.
+ *
+ * So the old declaration promised three fields that were `undefined` on every
+ * row and omitted two that were always there. Typed from the wrong end.
+ *
+ * ## And the rule is what a client actually needs
+ *
+ * A screen showing "every 2 weeks on Tuesday" wants the sentence, and GraphQL
+ * is where a screen gets it. A client holding a local copy needs something
+ * else entirely: the phone completes a repeating task offline and has to work
+ * out where the series goes next, and it has to plan its own alarms from the
+ * rule. Neither is possible from a rendered sentence.
+ *
+ * Which is why the sync pull sends the rule and the read model sends the prose.
+ * Both are right for their caller; this row is the pull's.
  */
 export interface TaskRow extends SyncedRow {
   id: string;
@@ -59,11 +79,12 @@ export interface TaskRow extends SyncedRow {
   label: LabelSnapshot | null;
   status: TaskStatus;
   completedAt: string | null;
-  repeats: boolean;
-  recurrenceMode: RecurrenceMode | null;
-  recurrenceText: string | null;
+  /** The rule, never expanded rows. Null for a task that does not repeat. */
+  recurrence: TaskRecurrence | null;
   estimatedMinutes: number | null;
   deferCount: number;
+  /** Where the task was before it was last deferred, for "carried over" copy. */
+  deferredFrom: string | null;
   source: TaskSource;
   createdAt: string;
   updatedAt: string;
@@ -90,7 +111,8 @@ export type TaskPatch = Omit<NewTask, 'id' | 'source'>;
  * The six lists the member actually has, named as they are named on screen and
  * as the server's `TaskListView` names them.
  */
-export type TaskListView = 'today' | 'upcoming' | 'overdue' | 'label' | 'completed' | 'deleted';
+export type TaskListView =
+  'today' | 'upcoming' | 'overdue' | 'label' | 'completed' | 'deleted';
 
 /** What a command acknowledges. No route returns a view — see `TasksStore`. */
 export interface TaskAck {
@@ -171,6 +193,24 @@ export interface TaskViewFilter {
  */
 export class TasksStore {
   /** The local rows, and the `SyncTable` the engine writes them through. */
+  /**
+   * Where the rows live.
+   *
+   * In-memory, and **not injectable** — which contradicts what this class used
+   * to claim, so here is the actual position.
+   *
+   * The extension needs Dexie-backed storage and cannot use this store because
+   * of it; it restated `view('today')` in its own code instead, which is the
+   * third copy of the member's-day rule after the two server adapters. That is
+   * a real cost and it is recorded as E-011.
+   *
+   * It is not fixed by taking a `SyncTable` in the constructor, which was
+   * tried. The reads below are *synchronous* — `rows`, `byId`, `subscribe` —
+   * and IndexedDB is not, so satisfying the port is not the obstacle: the
+   * store's own read surface is. Making it injectable means making every read
+   * async and following that through the portal, which is a refactor rather
+   * than a fix in passing.
+   */
   readonly table = new MemorySyncTable<TaskRow>();
 
   #listeners = new Set<() => void>();
@@ -217,18 +257,35 @@ export class TasksStore {
       switch (view) {
         case 'today': {
           const due = dayOf(row);
-          return row.deletedAt === null && row.status === 'open' && due !== null && due <= today;
+          return (
+            row.deletedAt === null &&
+            row.status === 'open' &&
+            due !== null &&
+            due <= today
+          );
         }
         case 'upcoming': {
           const due = dayOf(row);
-          return row.deletedAt === null && row.status === 'open' && due !== null && due > today;
+          return (
+            row.deletedAt === null &&
+            row.status === 'open' &&
+            due !== null &&
+            due > today
+          );
         }
         case 'overdue': {
           const due = dayOf(row);
-          return row.deletedAt === null && row.status === 'open' && due !== null && due < today;
+          return (
+            row.deletedAt === null &&
+            row.status === 'open' &&
+            due !== null &&
+            due < today
+          );
         }
         case 'label':
-          return row.deletedAt === null && row.labelId === (filter.labelId ?? null);
+          return (
+            row.deletedAt === null && row.labelId === (filter.labelId ?? null)
+          );
         case 'completed':
           return row.deletedAt === null && row.status === 'completed';
         case 'deleted':
@@ -237,7 +294,8 @@ export class TasksStore {
     });
 
     return matches.sort((a, b) => {
-      if (view === 'completed') return time(b.completedAt) - time(a.completedAt);
+      if (view === 'completed')
+        return time(b.completedAt) - time(a.completedAt);
       if (view === 'deleted') return time(b.deletedAt) - time(a.deletedAt);
       return time(a.dueAt) - time(b.dueAt) || a.priority - b.priority;
     });
@@ -253,17 +311,22 @@ export class TasksStore {
    */
   async create(task: NewTask): Promise<CreateTaskAck> {
     const id = task.id ?? newId();
-    const ack = await this.client.rest<CreateTaskAck>('POST', '/tasks', { ...task, id });
+    const ack = await this.client.rest<CreateTaskAck>('POST', '/tasks', {
+      ...task,
+      id,
+    });
     this.#stamp(id, ack.updatedAt, rowFieldsFrom(task));
     return ack;
   }
 
-  async update(id: string, patch: TaskPatch): Promise<{ changed: string[]; updatedAt: string }> {
-    const ack = await this.client.rest<{ changed: string[]; updatedAt: string }>(
-      'PATCH',
-      `/tasks/${encodeURIComponent(id)}`,
-      patch,
-    );
+  async update(
+    id: string,
+    patch: TaskPatch,
+  ): Promise<{ changed: string[]; updatedAt: string }> {
+    const ack = await this.client.rest<{
+      changed: string[];
+      updatedAt: string;
+    }>('PATCH', `/tasks/${encodeURIComponent(id)}`, patch);
     this.#stamp(id, ack.updatedAt, rowFieldsFrom(patch));
     return ack;
   }
@@ -306,13 +369,19 @@ export class TasksStore {
   }
 
   /** Pushed to another day. The server counts the deferrals; this reads the count back. */
-  async defer(id: string, toDate: string): Promise<TaskAck & { deferCount: number }> {
+  async defer(
+    id: string,
+    toDate: string,
+  ): Promise<TaskAck & { deferCount: number }> {
     const ack = await this.client.rest<TaskAck & { deferCount: number }>(
       'POST',
       `/tasks/${encodeURIComponent(id)}/defer`,
       { toDate },
     );
-    this.#stamp(id, ack.updatedAt, { dueAt: toDate, deferCount: ack.deferCount });
+    this.#stamp(id, ack.updatedAt, {
+      dueAt: toDate,
+      deferCount: ack.deferCount,
+    });
     return ack;
   }
 
@@ -324,7 +393,10 @@ export class TasksStore {
    * with — and the Deleted view exists to show precisely that.
    */
   async remove(id: string): Promise<TaskAck> {
-    const ack = await this.client.rest<TaskAck>('DELETE', `/tasks/${encodeURIComponent(id)}`);
+    const ack = await this.client.rest<TaskAck>(
+      'DELETE',
+      `/tasks/${encodeURIComponent(id)}`,
+    );
     this.#stamp(id, ack.updatedAt, { deletedAt: ack.updatedAt });
     return ack;
   }
@@ -338,7 +410,10 @@ export class TasksStore {
 
   /** Erased for good. 204, so there is no acknowledgement to stamp. */
   async purge(id: string): Promise<void> {
-    await this.client.rest<void>('POST', `/tasks/${encodeURIComponent(id)}/purge`);
+    await this.client.rest<void>(
+      'POST',
+      `/tasks/${encodeURIComponent(id)}/purge`,
+    );
     this.table.removeRows([id]);
   }
 
@@ -349,7 +424,10 @@ export class TasksStore {
    * because a member skipping a repeating task and a member skipping a
    * repeating meeting are doing the same thing.
    */
-  async skipOccurrence(id: string, occurrence: string): Promise<TaskAck & { dueAt: string | null }> {
+  async skipOccurrence(
+    id: string,
+    occurrence: string,
+  ): Promise<TaskAck & { dueAt: string | null }> {
     const ack = await this.client.rest<TaskAck & { dueAt: string | null }>(
       'POST',
       `/tasks/${encodeURIComponent(id)}/occurrences/${encodeURIComponent(occurrence)}/skip`,
@@ -449,26 +527,24 @@ function time(value: string | null): number {
  * indistinguishable from clearing it. `null` survives, because for `notes`,
  * `dueAt` and `labelId` it means "clear this" and the API reads it the same way.
  *
- * Second, `recurrence` is a wire field and not a row field. The row carries
- * `repeats`, `recurrenceMode` and the server-rendered `recurrenceText`; passing
- * the rule straight through would leave a `recurrence` key on the row that
- * nothing reads and that the next pull would not overwrite. `recurrenceText` is
- * left null until the pull brings the server's sentence — guessing at it here
- * would mean carrying an RRULE parser, which is the thing the server renders it
- * to avoid.
+ * Second, `recurrence` **is** a row field and is kept. It used to be stripped
+ * here, on the belief that the row carried a rendered `recurrenceText`
+ * instead — see `TaskRow` for why that was the wrong end to type from. The
+ * rule is what the pull sends and what a client needs to advance a series
+ * locally, so a task created here holds it from the moment it is created
+ * rather than only after the next pull.
  */
 function rowFieldsFrom(patch: NewTask | TaskPatch): Partial<TaskRow> {
-  const { recurrence, ...rest } = patch as NewTask;
+  const rest = { ...patch } as NewTask;
   delete (rest as { id?: string }).id;
 
   const fields = Object.fromEntries(
     Object.entries(rest).filter(([, value]) => value !== undefined),
   ) as Partial<TaskRow>;
 
-  if (recurrence !== undefined) {
-    fields.repeats = recurrence !== null;
-    fields.recurrenceMode = recurrence?.mode ?? null;
-  }
+  // `recurrence` needs no projection now: it is the row's own field, so the
+  // spread above has already carried it. This used to derive `repeats` and
+  // `recurrenceMode` from it, which is what the row was wrongly typed to hold.
   return fields;
 }
 
@@ -491,11 +567,10 @@ function blankTask(id: string, ack: { updatedAt: string }): TaskRow {
     label: null,
     status: 'open',
     completedAt: null,
-    repeats: false,
-    recurrenceMode: null,
-    recurrenceText: null,
+    recurrence: null,
     estimatedMinutes: null,
     deferCount: 0,
+    deferredFrom: null,
     source: 'app',
     createdAt: ack.updatedAt,
     updatedAt: ack.updatedAt,

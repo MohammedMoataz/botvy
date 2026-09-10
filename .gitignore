@@ -71,3 +71,8 @@ secrets/
 
 # phase-pipeline handoff files
 .harness/
+
+# vitest writes a transient config next to the real one while it resolves
+# TypeScript. It is deleted on a clean exit and left behind on a kill, so it
+# must never be committable — one was staged once.
+*.timestamp-*.mjs

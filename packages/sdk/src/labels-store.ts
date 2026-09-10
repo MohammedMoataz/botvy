@@ -74,6 +74,7 @@ export class DuplicateLabelName extends Error {
  * which it does by never creating a task.
  */
 export class LabelsStore {
+  /** In-memory and not injectable, for the reason `TasksStore.table` gives. */
   readonly table = new MemorySyncTable<LabelRow>();
 
   #listeners = new Set<() => void>();
@@ -92,7 +93,9 @@ export class LabelsStore {
   get labels(): LabelRow[] {
     return this.table.rows
       .filter((row) => row.deletedAt === null)
-      .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+      .sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+      );
   }
 
   get deleted(): LabelRow[] {
@@ -139,7 +142,10 @@ export class LabelsStore {
    * `TasksStore`'s, and reaching into them from here to rewrite a name is the
    * cross-store write the platform's first principle exists to forbid.
    */
-  async update(id: string, patch: LabelPatch): Promise<{ changed: string[]; updatedAt: string }> {
+  async update(
+    id: string,
+    patch: LabelPatch,
+  ): Promise<{ changed: string[]; updatedAt: string }> {
     const ack = await this.#translate(patch.name ?? '', () =>
       this.client.rest<{ changed: string[]; updatedAt: string }>(
         'PATCH',
@@ -162,7 +168,10 @@ export class LabelsStore {
    * status and lose only the label — again, on the next pull.
    */
   async remove(id: string): Promise<LabelAck> {
-    const ack = await this.client.rest<LabelAck>('DELETE', `/labels/${encodeURIComponent(id)}`);
+    const ack = await this.client.rest<LabelAck>(
+      'DELETE',
+      `/labels/${encodeURIComponent(id)}`,
+    );
     this.#stamp(id, ack.updatedAt, { deletedAt: ack.updatedAt });
     return ack;
   }

@@ -4,10 +4,18 @@ import type {
   SyncablePatch,
 } from '../../sync/domain/syncable-entity.port.js';
 import { ProfileQueryHandler } from '../features/profile-query/profile.query.js';
-import {
-  PREFERENCE_FIELDS,
-  UpdatePreferencesHandler,
-} from '../features/update-preferences/update-preferences.handler.js';
+// From its own home, not from the handler that also imports it. The handler
+// imports `PREFERENCE_FIELDS` without re-exporting it, so
+// `import { PREFERENCE_FIELDS } from './...handler.js'` compiles — TypeScript
+// resolves the name through the import graph — and is `undefined` at runtime,
+// because an ES module exports only what it says it exports. `node
+// dist/main.js` refused to start with "does not provide an export named".
+//
+// The same shape as the rrule interop defect this phase already fixed, from the
+// other direction, and caught the same way: by booting the built output rather
+// than by reading the types. E-009 is the argument for making that a gate.
+import { PREFERENCE_FIELDS } from '../domain/preferences.aggregate.js';
+import { UpdatePreferencesHandler } from '../features/update-preferences/update-preferences.handler.js';
 import { UpdateProfileHandler } from '../features/update-profile/update-profile.handler.js';
 
 /**

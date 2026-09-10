@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "planning.LabelUpdated",
+  "description": "Payload of planning.LabelUpdated. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "labelId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "color": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "labelId",
+    "name",
+    "color"
+  ],
+  "additionalProperties": false
+}

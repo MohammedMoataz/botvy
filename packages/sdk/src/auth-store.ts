@@ -45,7 +45,9 @@ export interface DeviceView {
  */
 export class GoogleLinkRequired extends Error {
   constructor(readonly email: string) {
-    super('that address already has a password account; link it with the password');
+    super(
+      'that address already has a password account; link it with the password',
+    );
     this.name = 'GoogleLinkRequired';
   }
 }
@@ -65,7 +67,8 @@ export class EmailTaken extends Error {
 }
 
 /** The reason a session ended, when the store ends one by itself. */
-export type SignedOutReason = 'requested' | 'token_expired' | 'session_replay' | 'refused';
+export type SignedOutReason =
+  'requested' | 'token_expired' | 'session_replay' | 'refused';
 
 /**
  * Everything the web surfaces do with a credential.
@@ -125,11 +128,16 @@ export class AuthStore {
         accessToken: string;
         refreshToken: string;
       }>('POST', '/auth/refresh', { refreshToken });
-      return { accessToken: issued.accessToken, refreshToken: issued.refreshToken };
+      return {
+        accessToken: issued.accessToken,
+        refreshToken: issued.refreshToken,
+      };
     } catch (error) {
-      const code = (error as ApiError | undefined) instanceof ApiError
-        ? ((error as ApiError).body as { code?: SignedOutReason } | null)?.code
-        : undefined;
+      const code =
+        (error as ApiError | undefined) instanceof ApiError
+          ? ((error as ApiError).body as { code?: SignedOutReason } | null)
+              ?.code
+          : undefined;
       this.#signedOut(code ?? 'refused');
       return null;
     }
@@ -146,8 +154,10 @@ export class AuthStore {
     try {
       return await this.client.rest('POST', '/auth/register', input);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 403) throw new RegistrationClosed();
-      if (error instanceof ApiError && error.status === 409) throw new EmailTaken();
+      if (error instanceof ApiError && error.status === 403)
+        throw new RegistrationClosed();
+      if (error instanceof ApiError && error.status === 409)
+        throw new EmailTaken();
       throw error;
     }
   }
@@ -159,12 +169,19 @@ export class AuthStore {
   ): Promise<SignedInMember> {
     const answer = await this.client.rest<
       SignedInMember & { accessToken: string; refreshToken: string }
-    >('POST', '/auth/login', { email, password, ...(device ? { device } : {}) });
+    >('POST', '/auth/login', {
+      email,
+      password,
+      ...(device ? { device } : {}),
+    });
 
     return this.#adopt(answer);
   }
 
-  async google(idToken: string, device?: DeviceDescriptor): Promise<SignedInMember> {
+  async google(
+    idToken: string,
+    device?: DeviceDescriptor,
+  ): Promise<SignedInMember> {
     try {
       const answer = await this.client.rest<
         SignedInMember & { accessToken: string; refreshToken: string }
@@ -173,9 +190,11 @@ export class AuthStore {
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         const body = error.body as { code?: string; email?: string } | null;
-        if (body?.code === 'link_required') throw new GoogleLinkRequired(body.email ?? '');
+        if (body?.code === 'link_required')
+          throw new GoogleLinkRequired(body.email ?? '');
       }
-      if (error instanceof ApiError && error.status === 403) throw new RegistrationClosed();
+      if (error instanceof ApiError && error.status === 403)
+        throw new RegistrationClosed();
       throw error;
     }
   }
@@ -188,7 +207,11 @@ export class AuthStore {
   ): Promise<SignedInMember> {
     const answer = await this.client.rest<
       SignedInMember & { accessToken: string; refreshToken: string }
-    >('POST', '/auth/google/link', { idToken, password, ...(device ? { device } : {}) });
+    >('POST', '/auth/google/link', {
+      idToken,
+      password,
+      ...(device ? { device } : {}),
+    });
 
     return this.#adopt(answer);
   }
@@ -201,7 +224,8 @@ export class AuthStore {
   async logout(): Promise<void> {
     const refreshToken = this.tokens.tokens?.refreshToken;
     try {
-      if (refreshToken) await this.client.rest('POST', '/auth/logout', { refreshToken });
+      if (refreshToken)
+        await this.client.rest('POST', '/auth/logout', { refreshToken });
     } finally {
       this.#signedOut('requested');
     }
@@ -220,17 +244,29 @@ export class AuthStore {
    * including this one, so the tokens in hand are already dead. Clearing them
    * here is what stops the next request looking like a replay.
    */
-  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    await this.client.rest('POST', '/auth/password', { currentPassword, newPassword });
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    await this.client.rest('POST', '/auth/password', {
+      currentPassword,
+      newPassword,
+    });
     this.#signedOut('requested');
   }
 
   async deleteAccount(password?: string): Promise<void> {
-    await this.client.rest('POST', '/auth/delete-account', password ? { password } : {});
+    await this.client.rest(
+      'POST',
+      '/auth/delete-account',
+      password ? { password } : {},
+    );
     this.#signedOut('requested');
   }
 
-  async registerDevice(device: DeviceDescriptor): Promise<{ deviceId: string; created: boolean }> {
+  async registerDevice(
+    device: DeviceDescriptor,
+  ): Promise<{ deviceId: string; created: boolean }> {
     return this.client.rest('POST', '/auth/devices', device);
   }
 
@@ -244,11 +280,19 @@ export class AuthStore {
   }
 
   async removeDevice(deviceId: string): Promise<void> {
-    await this.client.rest('DELETE', `/auth/devices/${encodeURIComponent(deviceId)}`);
+    await this.client.rest(
+      'DELETE',
+      `/auth/devices/${encodeURIComponent(deviceId)}`,
+    );
   }
 
-  #adopt(answer: SignedInMember & { accessToken: string; refreshToken: string }): SignedInMember {
-    this.tokens.set({ accessToken: answer.accessToken, refreshToken: answer.refreshToken });
+  #adopt(
+    answer: SignedInMember & { accessToken: string; refreshToken: string },
+  ): SignedInMember {
+    this.tokens.set({
+      accessToken: answer.accessToken,
+      refreshToken: answer.refreshToken,
+    });
     this.#lastSignOutReason = null;
     this.#member = {
       userId: answer.userId,

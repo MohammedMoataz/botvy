@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sync.ChangesApplied",
+  "description": "Payload of sync.ChangesApplied. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "installId": {
+      "type": "string"
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "installId",
+    "entities"
+  ],
+  "additionalProperties": false
+}

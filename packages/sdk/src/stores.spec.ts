@@ -63,14 +63,18 @@ class FakeApi {
   readonly fetch: typeof fetch = async (url, init) => {
     const method = init?.method ?? 'GET';
     const path = requestUrl(url).replace(/^.*\/api\/v1/, '');
-    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body;
+    const body =
+      typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body;
     this.calls.push({ method, path, body });
 
     if (path === '/graphql') {
-      const document = String((body as { query?: unknown } | undefined)?.query ?? '');
+      const document = String(
+        (body as { query?: unknown } | undefined)?.query ?? '',
+      );
       const operation = /query\s+(\w+)/.exec(document)?.[1] ?? '';
       const pending = this.#graphql.get(operation);
-      const answer = (pending && (pending.length > 1 ? pending.shift() : pending[0])) ?? {
+      const answer = (pending &&
+        (pending.length > 1 ? pending.shift() : pending[0])) ?? {
         status: 200,
       };
       // Wrapped in `data`, because that is the envelope the real server sends
@@ -83,17 +87,21 @@ class FakeApi {
     }
 
     const queued = this.#replies.get(`${method} ${path}`);
-    const reply = (queued && (queued.length > 1 ? queued.shift() : queued[0])) ?? { status: 200 };
+    const reply = (queued &&
+      (queued.length > 1 ? queued.shift() : queued[0])) ?? { status: 200 };
 
     const status = reply.status ?? 200;
     // A 204 may not carry a body — `new Response('{}', {status: 204})` throws,
     // which is the runtime telling you the fake was lying about the protocol.
     if (status === 204 || status === 304) return new Response(null, { status });
 
-    return new Response(reply.body === undefined ? '{}' : JSON.stringify(reply.body), {
-      status,
-      headers: { 'content-type': 'application/json' },
-    });
+    return new Response(
+      reply.body === undefined ? '{}' : JSON.stringify(reply.body),
+      {
+        status,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
   };
 }
 
@@ -199,7 +207,9 @@ describe('AuthStore', () => {
    */
   it('signs out after changing the password', async () => {
     api.on('POST', '/auth/login', { body: session });
-    api.on('POST', '/auth/password', { body: { changed: true, sessionsEnded: 2 } });
+    api.on('POST', '/auth/password', {
+      body: { changed: true, sessionsEnded: 2 },
+    });
     const { auth } = build(api);
     await auth.login('member@example.test', 'a-password');
 
@@ -209,16 +219,30 @@ describe('AuthStore', () => {
   });
 
   it('reports a closed installation distinctly from a taken address', async () => {
-    api.on('POST', '/auth/register', { status: 403, body: { message: 'closed' } });
+    api.on('POST', '/auth/register', {
+      status: 403,
+      body: { message: 'closed' },
+    });
     const closed = build(api);
     await expect(
-      closed.auth.register({ email: 'a@b.test', password: 'x'.repeat(8), passwordConfirm: 'x'.repeat(8) }),
+      closed.auth.register({
+        email: 'a@b.test',
+        password: 'x'.repeat(8),
+        passwordConfirm: 'x'.repeat(8),
+      }),
     ).rejects.toBeInstanceOf(RegistrationClosed);
 
-    api.on('POST', '/auth/register', { status: 409, body: { message: 'taken' } });
+    api.on('POST', '/auth/register', {
+      status: 409,
+      body: { message: 'taken' },
+    });
     const taken = build(api);
     await expect(
-      taken.auth.register({ email: 'a@b.test', password: 'x'.repeat(8), passwordConfirm: 'x'.repeat(8) }),
+      taken.auth.register({
+        email: 'a@b.test',
+        password: 'x'.repeat(8),
+        passwordConfirm: 'x'.repeat(8),
+      }),
     ).rejects.toBeInstanceOf(EmailTaken);
   });
 
@@ -234,7 +258,9 @@ describe('AuthStore', () => {
     });
     const { auth } = build(api);
 
-    const refused = await auth.google('id-token').catch((error: Error) => error);
+    const refused = await auth
+      .google('id-token')
+      .catch((error: Error) => error);
 
     expect(refused).toBeInstanceOf(GoogleLinkRequired);
     expect((refused as GoogleLinkRequired).email).toBe('member@example.test');
@@ -266,7 +292,10 @@ describe('AuthStore', () => {
    */
   it('signs out when a refresh is refused, and says why', async () => {
     api.on('POST', '/auth/login', { body: session });
-    api.on('POST', '/auth/refresh', { status: 401, body: { code: 'session_replay' } });
+    api.on('POST', '/auth/refresh', {
+      status: 401,
+      body: { code: 'session_replay' },
+    });
 
     const { auth, tokens } = buildWired(api);
     await auth.login('member@example.test', 'a-password');
@@ -286,7 +315,10 @@ describe('AuthStore', () => {
    */
   it('does not hang when the refresh itself is refused', async () => {
     api.on('POST', '/auth/login', { body: session });
-    api.on('POST', '/auth/refresh', { status: 401, body: { code: 'token_expired' } });
+    api.on('POST', '/auth/refresh', {
+      status: 401,
+      body: { code: 'token_expired' },
+    });
 
     const { auth, tokens } = buildWired(api);
     await auth.login('member@example.test', 'a-password');
@@ -302,7 +334,10 @@ describe('AuthStore', () => {
   /** And the store is usable afterwards, rather than poisoned for good. */
   it('leaves the token store working after a refused refresh', async () => {
     api.on('POST', '/auth/login', { body: session });
-    api.on('POST', '/auth/refresh', { status: 401, body: { code: 'token_expired' } });
+    api.on('POST', '/auth/refresh', {
+      status: 401,
+      body: { code: 'token_expired' },
+    });
 
     const { auth, tokens } = buildWired(api);
     await auth.login('member@example.test', 'a-password');
@@ -370,11 +405,15 @@ describe('a refused read', () => {
   it('carries the code where the stores already look for it', async () => {
     const client = clientAnswering(errorReply('token_expired', 'jwt expired'));
 
-    const error = await client.query('query Me { me { id } }').catch((e: unknown) => e);
+    const error = await client
+      .query('query Me { me { id } }')
+      .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(401);
-    expect(((error as ApiError).body as { code?: string }).code).toBe('token_expired');
+    expect(((error as ApiError).body as { code?: string }).code).toBe(
+      'token_expired',
+    );
   });
 
   it('maps a refusal and a miss to the statuses a caller branches on', async () => {
@@ -414,7 +453,9 @@ describe('a refused read', () => {
         }),
     });
 
-    const error = await client.query('query Me { me { id } }').catch((e: unknown) => e);
+    const error = await client
+      .query('query Me { me { id } }')
+      .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
@@ -447,8 +488,9 @@ describe('ProfileStore', () => {
   };
 
   beforeEach(() => {
-    api = new FakeApi()
-      .onQuery('ProfileAndPreferences', { body: { profile, preferences } });
+    api = new FakeApi().onQuery('ProfileAndPreferences', {
+      body: { profile, preferences },
+    });
   });
 
   const store = () =>
@@ -486,7 +528,7 @@ describe('ProfileStore', () => {
    * store that echoed the request back would show `Peanuts` while the server
    * holds `peanuts`, and the next save would look like a change when it is not.
    */
-  it('takes the server\'s normalised answer, not the values it sent', async () => {
+  it("takes the server's normalised answer, not the values it sent", async () => {
     api.on('PATCH', '/profile', {
       body: { ...profile, allergies: ['peanuts'] },
     });
@@ -503,7 +545,10 @@ describe('ProfileStore', () => {
     const profiles = store();
     await profiles.load();
 
-    await profiles.updatePreferences({ userId: 'user-1', endOfDayTime: '23:00' });
+    await profiles.updatePreferences({
+      userId: 'user-1',
+      endOfDayTime: '23:00',
+    });
 
     const patch = api.calls.find((call) => call.method === 'PATCH');
     expect(patch?.body).toEqual({ endOfDayTime: '23:00' });
@@ -511,7 +556,9 @@ describe('ProfileStore', () => {
 
   it('re-reads the preferences after a patch rather than guessing', async () => {
     api.on('PATCH', '/preferences', { body: { changed: ['endOfDayTime'] } });
-    api.onQuery('Preferences', { body: { preferences: { ...preferences, endOfDayTime: '23:00' } } });
+    api.onQuery('Preferences', {
+      body: { preferences: { ...preferences, endOfDayTime: '23:00' } },
+    });
     const profiles = store();
     await profiles.load();
 
@@ -536,7 +583,8 @@ describe('ProfileStore', () => {
 
     await profiles.recordMetric({ weightKg: 81 });
 
-    const sent = api.calls.at(-1)?.body as { weightKg: number; recordedAt: string } | undefined;
+    const sent = api.calls.at(-1)?.body as
+      { weightKg: number; recordedAt: string } | undefined;
     expect(sent).toMatchObject({ weightKg: 81 });
     expect(sent?.recordedAt).toBeTypeOf('string');
   });
@@ -554,10 +602,9 @@ function taskRow(over: Partial<TaskRow> & { id: string }): TaskRow {
     label: null,
     status: 'open',
     completedAt: null,
-    repeats: false,
-    recurrenceMode: null,
-    recurrenceText: null,
+    recurrence: null,
     estimatedMinutes: null,
+    deferredFrom: null,
     deferCount: 0,
     source: 'app',
     createdAt: '2026-09-01T08:00:00.000Z',
@@ -617,7 +664,8 @@ function buildSync(api: FakeApi) {
 
 /** The `push` map of the last request the fake saw. */
 function lastPush(api: FakeApi): Record<string, PendingPush[]> {
-  const body = api.calls.at(-1)?.body as { push?: Record<string, PendingPush[]> } | undefined;
+  const body = api.calls.at(-1)?.body as
+    { push?: Record<string, PendingPush[]> } | undefined;
   return body?.push ?? {};
 }
 
@@ -638,7 +686,10 @@ describe('SyncStore', () => {
     const { sync } = buildSync(api);
 
     await sync.sync();
-    const first = api.calls.at(-1)?.body as { since: string | null; entities: string[] };
+    const first = api.calls.at(-1)?.body as {
+      since: string | null;
+      entities: string[];
+    };
     expect(first.since).toBeNull();
     expect(first.entities).toEqual(['labels', 'tasks']);
     expect(sync.cursor).toBe('2026-09-10T12:00:00.000Z');
@@ -660,7 +711,9 @@ describe('SyncStore', () => {
       'POST',
       '/sync',
       syncReply({
-        pull: { tasks: [taskRow({ id: 't1', updatedAt: '2026-09-10T10:00:00.000Z' })] },
+        pull: {
+          tasks: [taskRow({ id: 't1', updatedAt: '2026-09-10T10:00:00.000Z' })],
+        },
       }),
       syncReply(),
     );
@@ -695,14 +748,22 @@ describe('SyncStore', () => {
             entity: 'tasks',
             id: 't1',
             reason: 'stale',
-            server: taskRow({ id: 't1', title: 'theirs', updatedAt: '2026-09-10T11:00:00.000Z' }),
+            server: taskRow({
+              id: 't1',
+              title: 'theirs',
+              updatedAt: '2026-09-10T11:00:00.000Z',
+            }),
           },
         ],
       }),
     );
     const { sync, tasks } = buildSync(api);
     await sync.sync();
-    await sync.queue('tasks', { op: 'update', id: 't1', data: { title: 'mine' } });
+    await sync.queue('tasks', {
+      op: 'update',
+      id: 't1',
+      data: { title: 'mine' },
+    });
 
     await sync.sync();
 
@@ -717,7 +778,11 @@ describe('SyncStore', () => {
       'POST',
       '/sync',
       syncReply({ pull: { tasks: [taskRow({ id: 't1' })] } }),
-      syncReply({ rejections: [{ entity: 'tasks', id: 't1', reason: 'gone', server: null }] }),
+      syncReply({
+        rejections: [
+          { entity: 'tasks', id: 't1', reason: 'gone', server: null },
+        ],
+      }),
     );
     const { sync, tasks } = buildSync(api);
     await sync.sync();
@@ -737,14 +802,19 @@ describe('SyncStore', () => {
     api.on(
       'POST',
       '/sync',
-      syncReply({ pull: { tasks: [taskRow({ id: 'shared-id', title: 'a task' })] } }),
+      syncReply({
+        pull: { tasks: [taskRow({ id: 'shared-id', title: 'a task' })] },
+      }),
       syncReply({
         rejections: [
           {
             entity: 'labels',
             id: 'shared-id',
             reason: 'stale',
-            server: labelRow({ id: 'shared-id', updatedAt: '2026-09-10T11:00:00.000Z' }),
+            server: labelRow({
+              id: 'shared-id',
+              updatedAt: '2026-09-10T11:00:00.000Z',
+            }),
           },
         ],
       }),
@@ -804,8 +874,14 @@ describe('SyncStore', () => {
     api.on(
       'POST',
       '/sync',
-      syncReply({ full: true, pull: { tasks: [taskRow({ id: 't1' }), taskRow({ id: 't2' })] } }),
-      syncReply({ full: false, pull: { tasks: [taskRow({ id: 't1', title: 'edited' })] } }),
+      syncReply({
+        full: true,
+        pull: { tasks: [taskRow({ id: 't1' }), taskRow({ id: 't2' })] },
+      }),
+      syncReply({
+        full: false,
+        pull: { tasks: [taskRow({ id: 't1', title: 'edited' })] },
+      }),
     );
     const { sync, tasks } = buildSync(api);
     await sync.sync();
@@ -820,7 +896,10 @@ describe('SyncStore', () => {
     api.on(
       'POST',
       '/sync',
-      syncReply({ full: true, pull: { tasks: [taskRow({ id: 't1' }), taskRow({ id: 't2' })] } }),
+      syncReply({
+        full: true,
+        pull: { tasks: [taskRow({ id: 't1' }), taskRow({ id: 't2' })] },
+      }),
       syncReply({ full: true, pull: { tasks: [taskRow({ id: 't1' })] } }),
     );
     const { sync, tasks } = buildSync(api);
@@ -928,7 +1007,10 @@ describe('SyncStore', () => {
    * this client will never ask for again.
    */
   it('leaves the cursor and the queue alone when the request fails', async () => {
-    api.on('POST', '/sync', syncReply(), { status: 500, body: { message: 'nope' } });
+    api.on('POST', '/sync', syncReply(), {
+      status: 500,
+      body: { message: 'nope' },
+    });
     const { sync, tasks } = buildSync(api);
     await sync.sync();
     await sync.queue('tasks', { op: 'create', id: 't1' });
@@ -950,7 +1032,12 @@ describe('SyncStore', () => {
    * when the server has never seen it.
    */
   it('runs a second pass behind the one in flight rather than joining it', async () => {
-    api.on('POST', '/sync', syncReply(), syncReply({ now: '2026-09-10T12:05:00.000Z' }));
+    api.on(
+      'POST',
+      '/sync',
+      syncReply(),
+      syncReply({ now: '2026-09-10T12:05:00.000Z' }),
+    );
     const { sync } = buildSync(api);
 
     const first = sync.sync();
@@ -998,7 +1085,9 @@ describe('SyncStore', () => {
   it('refuses to queue a change for an entity this surface does not hold', async () => {
     const { sync } = buildSync(api);
 
-    await expect(sync.queue('meals', { op: 'create', id: 'm1' })).rejects.toThrow(/meals/);
+    await expect(
+      sync.queue('meals', { op: 'create', id: 'm1' }),
+    ).rejects.toThrow(/meals/);
   });
 });
 
@@ -1010,10 +1099,16 @@ describe('MemorySyncTable', () => {
    */
   it('does not let a local edit touch baseUpdatedAt', () => {
     const table = new MemorySyncTable<TaskRow>();
-    table.applyServerRows([taskRow({ id: 't1', updatedAt: '2026-09-10T10:00:00.000Z' })]);
+    table.applyServerRows([
+      taskRow({ id: 't1', updatedAt: '2026-09-10T10:00:00.000Z' }),
+    ]);
 
     table.applyLocal(
-      taskRow({ id: 't1', title: 'edited', updatedAt: '2026-09-10T11:00:00.000Z' }),
+      taskRow({
+        id: 't1',
+        title: 'edited',
+        updatedAt: '2026-09-10T11:00:00.000Z',
+      }),
       'update',
     );
 
@@ -1044,7 +1139,8 @@ describe('MemorySyncTable', () => {
 describe('TasksStore', () => {
   let api: FakeApi;
 
-  const store = () => new TasksStore(new BotvyClient({ baseUrl: '', fetchImpl: api.fetch }));
+  const store = () =>
+    new TasksStore(new BotvyClient({ baseUrl: '', fetchImpl: api.fetch }));
 
   beforeEach(() => {
     api = new FakeApi();
@@ -1053,7 +1149,11 @@ describe('TasksStore', () => {
   /** The id is the idempotency key: the route answers 200 and `replayed`, not 201. */
   it('mints a UUIDv7 a retry of which is the same task', async () => {
     api.on('POST', '/tasks', {
-      body: { id: 'echoed', updatedAt: '2026-09-10T12:00:00.000Z', replayed: false },
+      body: {
+        id: 'echoed',
+        updatedAt: '2026-09-10T12:00:00.000Z',
+        replayed: false,
+      },
     });
     const tasks = store();
 
@@ -1072,7 +1172,11 @@ describe('TasksStore', () => {
 
   it('accepts an id the caller minted, for a row created offline', async () => {
     api.on('POST', '/tasks', {
-      body: { id: 'mine', updatedAt: '2026-09-10T12:00:00.000Z', replayed: true },
+      body: {
+        id: 'mine',
+        updatedAt: '2026-09-10T12:00:00.000Z',
+        replayed: true,
+      },
     });
     const tasks = store();
     const id = newId();
@@ -1089,9 +1193,14 @@ describe('TasksStore', () => {
    */
   it('leaves the status untouched when a task is deleted', async () => {
     api.on('POST', '/tasks/t1/complete', {
-      body: { updatedAt: '2026-09-10T12:00:00.000Z', recurrenceAdvancedTo: null },
+      body: {
+        updatedAt: '2026-09-10T12:00:00.000Z',
+        recurrenceAdvancedTo: null,
+      },
     });
-    api.on('DELETE', '/tasks/t1', { body: { updatedAt: '2026-09-10T12:01:00.000Z' } });
+    api.on('DELETE', '/tasks/t1', {
+      body: { updatedAt: '2026-09-10T12:01:00.000Z' },
+    });
     const tasks = store();
     tasks.table.applyServerRows([taskRow({ id: 't1' })]);
 
@@ -1100,9 +1209,9 @@ describe('TasksStore', () => {
 
     expect(tasks.byId('t1')?.status).toBe('completed');
     expect(tasks.byId('t1')?.deletedAt).toBe('2026-09-10T12:01:00.000Z');
-    expect(tasks.view('deleted', { timezone: 'Africa/Cairo' }).map((row) => row.id)).toEqual([
-      't1',
-    ]);
+    expect(
+      tasks.view('deleted', { timezone: 'Africa/Cairo' }).map((row) => row.id),
+    ).toEqual(['t1']);
   });
 
   /**
@@ -1119,7 +1228,15 @@ describe('TasksStore', () => {
     });
     const tasks = store();
     tasks.table.applyServerRows([
-      taskRow({ id: 't1', repeats: true, dueAt: '2026-09-10T09:00:00.000Z' }),
+      taskRow({
+        id: 't1',
+        dueAt: '2026-09-10T09:00:00.000Z',
+        recurrence: {
+          dtstart: '2026-09-10T09:00:00.000Z',
+          rrule: 'FREQ=WEEKLY',
+          mode: 'schedule',
+        },
+      }),
     ]);
 
     await tasks.complete('t1');
@@ -1142,7 +1259,9 @@ describe('TasksStore', () => {
     // to come* for the member in Los Angeles. One row, two right answers, and
     // the only thing that decides between them is the zone passed in.
     const now = new Date('2026-09-11T01:00:00.000Z');
-    tasks.table.applyServerRows([taskRow({ id: 'due-11th', dueAt: '2026-09-11T18:00:00.000Z' })]);
+    tasks.table.applyServerRows([
+      taskRow({ id: 'due-11th', dueAt: '2026-09-11T18:00:00.000Z' }),
+    ]);
 
     const cairo = tasks.view('today', { timezone: 'Africa/Cairo', now });
     const la = tasks.view('today', { timezone: 'America/Los_Angeles', now });
@@ -1150,7 +1269,9 @@ describe('TasksStore', () => {
     expect(cairo.map((row) => row.id)).toEqual(['due-11th']);
     expect(la).toEqual([]);
     expect(
-      tasks.view('upcoming', { timezone: 'America/Los_Angeles', now }).map((row) => row.id),
+      tasks
+        .view('upcoming', { timezone: 'America/Los_Angeles', now })
+        .map((row) => row.id),
     ).toEqual(['due-11th']);
   });
 
@@ -1163,7 +1284,11 @@ describe('TasksStore', () => {
       taskRow({ id: 'today', dueAt: '2026-09-10T18:00:00.000Z' }),
       taskRow({ id: 'tomorrow', dueAt: '2026-09-11T09:00:00.000Z' }),
       taskRow({ id: 'no-date' }),
-      taskRow({ id: 'done', dueAt: '2026-09-10T07:00:00.000Z', status: 'completed' }),
+      taskRow({
+        id: 'done',
+        dueAt: '2026-09-10T07:00:00.000Z',
+        status: 'completed',
+      }),
       taskRow({
         id: 'binned',
         dueAt: '2026-09-10T07:00:00.000Z',
@@ -1172,36 +1297,66 @@ describe('TasksStore', () => {
     ]);
     const filter = { timezone: 'Africa/Cairo', now };
 
-    expect(tasks.view('today', filter).map((row) => row.id)).toEqual(['yesterday', 'today']);
-    expect(tasks.view('overdue', filter).map((row) => row.id)).toEqual(['yesterday']);
-    expect(tasks.view('upcoming', filter).map((row) => row.id)).toEqual(['tomorrow']);
-    expect(tasks.view('completed', filter).map((row) => row.id)).toEqual(['done']);
-    expect(tasks.view('deleted', filter).map((row) => row.id)).toEqual(['binned']);
+    expect(tasks.view('today', filter).map((row) => row.id)).toEqual([
+      'yesterday',
+      'today',
+    ]);
+    expect(tasks.view('overdue', filter).map((row) => row.id)).toEqual([
+      'yesterday',
+    ]);
+    expect(tasks.view('upcoming', filter).map((row) => row.id)).toEqual([
+      'tomorrow',
+    ]);
+    expect(tasks.view('completed', filter).map((row) => row.id)).toEqual([
+      'done',
+    ]);
+    expect(tasks.view('deleted', filter).map((row) => row.id)).toEqual([
+      'binned',
+    ]);
   });
 
   it('does not write a recurrence rule onto the row as a rule', async () => {
     api.on('POST', '/tasks', {
-      body: { id: 't1', updatedAt: '2026-09-10T12:00:00.000Z', replayed: false },
+      body: {
+        id: 't1',
+        updatedAt: '2026-09-10T12:00:00.000Z',
+        replayed: false,
+      },
     });
     const tasks = store();
 
     await tasks.create({
       id: 't1',
       title: 'every week',
-      recurrence: { dtstart: '2026-09-10T09:00:00.000Z', rrule: 'FREQ=WEEKLY', mode: 'schedule' },
+      recurrence: {
+        dtstart: '2026-09-10T09:00:00.000Z',
+        rrule: 'FREQ=WEEKLY',
+        mode: 'schedule',
+      },
     });
 
     const row = tasks.byId('t1');
-    expect(row?.repeats).toBe(true);
-    expect(row?.recurrenceMode).toBe('schedule');
-    // The sentence is the server's to render: three surfaces show it and none
-    // should carry an RRULE parser to produce it.
-    expect(row?.recurrenceText).toBeNull();
-    expect(row).not.toHaveProperty('recurrence');
+    /*
+     * The rule is kept on the row, not reduced to a boolean and a mode.
+     *
+     * This assertion used to be the other way round, and it was typed from the
+     * wrong end: rows arrive from the sync pull, which sends `recurrence`, not
+     * from the GraphQL read model, which sends a rendered `recurrenceText`. A
+     * client needs the rule — the phone completes a repeating task offline and
+     * has to work out where the series goes next, and it plans its own alarms
+     * from it. Neither is possible from a sentence.
+     */
+    expect(row?.recurrence).toEqual({
+      dtstart: '2026-09-10T09:00:00.000Z',
+      rrule: 'FREQ=WEEKLY',
+      mode: 'schedule',
+    });
   });
 
   it('only moves the tasks a rollover says it moved', async () => {
-    api.on('POST', '/tasks/rollover', { body: { moved: ['t1'], skipped: ['t2'] } });
+    api.on('POST', '/tasks/rollover', {
+      body: { moved: ['t1'], skipped: ['t2'] },
+    });
     const tasks = store();
     tasks.table.applyServerRows([
       taskRow({ id: 't1', dueAt: '2026-09-09T09:00:00.000Z' }),
@@ -1215,7 +1370,9 @@ describe('TasksStore', () => {
   });
 
   it('escapes an id in the path rather than pasting it in', async () => {
-    api.on('DELETE', '/tasks/a%2Fb', { body: { updatedAt: '2026-09-10T12:00:00.000Z' } });
+    api.on('DELETE', '/tasks/a%2Fb', {
+      body: { updatedAt: '2026-09-10T12:00:00.000Z' },
+    });
     const tasks = store();
 
     await tasks.remove('a/b');
@@ -1227,7 +1384,8 @@ describe('TasksStore', () => {
 describe('LabelsStore', () => {
   let api: FakeApi;
 
-  const store = () => new LabelsStore(new BotvyClient({ baseUrl: '', fetchImpl: api.fetch }));
+  const store = () =>
+    new LabelsStore(new BotvyClient({ baseUrl: '', fetchImpl: api.fetch }));
 
   beforeEach(() => {
     api = new FakeApi();
@@ -1241,7 +1399,9 @@ describe('LabelsStore', () => {
     });
     const labels = store();
 
-    const refused = await labels.create({ name: 'Work' }).catch((error: Error) => error);
+    const refused = await labels
+      .create({ name: 'Work' })
+      .catch((error: Error) => error);
 
     expect(refused).toBeInstanceOf(DuplicateLabelName);
     expect((refused as DuplicateLabelName).labelName).toBe('Work');
@@ -1249,10 +1409,15 @@ describe('LabelsStore', () => {
 
   /** Every other refusal stays what it was — this store is not a catch-all. */
   it('leaves any other refusal alone', async () => {
-    api.on('POST', '/labels', { status: 400, body: { code: 'invalid_id', message: 'nope' } });
+    api.on('POST', '/labels', {
+      status: 400,
+      body: { code: 'invalid_id', message: 'nope' },
+    });
     const labels = store();
 
-    const refused = await labels.create({ name: 'Work' }).catch((error: Error) => error);
+    const refused = await labels
+      .create({ name: 'Work' })
+      .catch((error: Error) => error);
 
     expect(refused).toBeInstanceOf(ApiError);
     expect(refused).not.toBeInstanceOf(DuplicateLabelName);
@@ -1265,7 +1430,11 @@ describe('LabelsStore', () => {
    */
   it('omits the colour so the server picks from its own palette', async () => {
     api.on('POST', '/labels', {
-      body: { id: 'l1', updatedAt: '2026-09-10T12:00:00.000Z', replayed: false },
+      body: {
+        id: 'l1',
+        updatedAt: '2026-09-10T12:00:00.000Z',
+        replayed: false,
+      },
     });
     const labels = store();
 
@@ -1280,7 +1449,12 @@ describe('LabelsStore', () => {
     labels.table.applyServerRows([
       labelRow({ id: 'l2', name: 'Home', sortOrder: 2 }),
       labelRow({ id: 'l1', name: 'Work', sortOrder: 1 }),
-      labelRow({ id: 'l3', name: 'Gone', sortOrder: 0, deletedAt: '2026-09-05T08:00:00.000Z' }),
+      labelRow({
+        id: 'l3',
+        name: 'Gone',
+        sortOrder: 0,
+        deletedAt: '2026-09-05T08:00:00.000Z',
+      }),
     ]);
 
     expect(labels.labels.map((row) => row.id)).toEqual(['l1', 'l2']);

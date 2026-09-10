@@ -88,19 +88,6 @@ export const IdempotencyKeySchema = new Schema(
   { collection: 'idempotency_keys', versionKey: false, _id: false },
 );
 
-/** The demonstration slice's collection, removed once P2 proves the same path. */
-export const PingSchema = new Schema(
-  {
-    _id: { type: String, required: true },
-    userId: { type: String, required: true },
-    clientId: { type: String, required: true },
-    at: { type: Date, required: true },
-    updatedAt: { type: Date, required: true },
-    schemaVersion: { type: Number, default: 1 },
-  },
-  { collection: 'pings', versionKey: false, _id: false },
-);
-
 /**
  * A member's own facts. Keyed by `userId` and nothing else: there is one profile
  * per account, so a separate `_id` would be a second key for one row.
@@ -328,7 +315,6 @@ export const MODEL_NAMES = {
   heartbeat: 'Heartbeat',
   auditLog: 'AuditLog',
   idempotencyKey: 'IdempotencyKey',
-  ping: 'Ping',
   profile: 'Profile',
   preferences: 'Preferences',
   label: 'Label',

@@ -56,13 +56,13 @@ mirroring the server's.
 
 ## Phase 6 — Extension and packages
 
-- [ ] T250 [P] Extension: Dexie `tasks`, `labels`, `pending_ops`; sync round trip with the entity subset; Today list with complete/undo; quick add; sync indicator
+- [X] T250 [P] Extension: Dexie `tasks`, `labels`, `pending_ops`; sync round trip with the entity subset; Today list with complete/undo; quick add; sync indicator
 - [X] T251 [P] `packages/sdk`: `TasksStore`, `LabelsStore`, `SyncStore` (cursor, push queue, rejection handling) shared by the extension and the frontend
 - [X] T252 [P] `pnpm gen:contracts` regenerated; mobile REST models regenerated
 
 ## Phase 7 — Retire the demo and polish
 
-- [ ] T260 Remove the `ping` slice, `pings` collection migration, `ping_echo.json` and the default subscription; the spine is now proven by `planning.TaskScheduled` (`014-foundation` F-13)
+- [X] T260 Remove the `ping` slice, `pings` collection migration, `ping_echo.json` and the default subscription; the spine is now proven by `planning.TaskScheduled` (`014-foundation` F-13)
 - [ ] T262 [P] Arabic strings for tasks and reminders; RTL screenshots
 - [X] T263 [P] `purge-on-deleted` handlers for `tasks`, `labels`, `reminders` (Planning, Reminders) and unsent `alerts` (Notifications) on `identity.UserDeleted`; spec: two deliveries, one purge
 - [ ] T264 Record gate evidence; open `017-daily-rhythm`

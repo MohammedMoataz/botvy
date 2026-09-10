@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "planning.TaskScheduled",
+  "description": "Payload of planning.TaskScheduled. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "taskId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "dueAt": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "allDay": {
+      "type": "boolean"
+    },
+    "priority": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "taskId",
+    "dueAt",
+    "allDay",
+    "priority"
+  ],
+  "additionalProperties": false
+}

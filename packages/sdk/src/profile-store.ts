@@ -156,16 +156,26 @@ export class ProfileStore {
   }
 
   async updateProfile(patch: ProfilePatch): Promise<ProfileView> {
-    this.#profile = await this.client.rest<ProfileView>('PATCH', '/profile', patch);
+    this.#profile = await this.client.rest<ProfileView>(
+      'PATCH',
+      '/profile',
+      patch,
+    );
     this.#announce();
     return this.#profile;
   }
 
-  async recordMetric(metric: Omit<BodyMetric, 'recordedAt'> & { recordedAt?: string }): Promise<ProfileView> {
-    this.#profile = await this.client.rest<ProfileView>('POST', '/profile/metrics', {
-      recordedAt: metric.recordedAt ?? new Date().toISOString(),
-      ...metric,
-    });
+  async recordMetric(
+    metric: Omit<BodyMetric, 'recordedAt'> & { recordedAt?: string },
+  ): Promise<ProfileView> {
+    this.#profile = await this.client.rest<ProfileView>(
+      'POST',
+      '/profile/metrics',
+      {
+        recordedAt: metric.recordedAt ?? new Date().toISOString(),
+        ...metric,
+      },
+    );
     this.#announce();
     return this.#profile;
   }
@@ -178,21 +188,34 @@ export class ProfileStore {
   async uploadPhoto(file: Blob, filename = 'avatar'): Promise<ProfileView> {
     const form = new FormData();
     form.append('photo', file, filename);
-    this.#profile = await this.client.upload<ProfileView>('POST', '/profile/photo', form);
+    this.#profile = await this.client.upload<ProfileView>(
+      'POST',
+      '/profile/photo',
+      form,
+    );
     this.#announce();
     return this.#profile;
   }
 
-  async updatePreferences(patch: Partial<PreferencesView>): Promise<PreferencesView> {
+  async updatePreferences(
+    patch: Partial<PreferencesView>,
+  ): Promise<PreferencesView> {
     // `userId` is not a preference. Sending it back from a spread of the
     // current view would be refused by the API, which rejects unknown fields
     // rather than ignoring them — and rightly so.
-    const { userId: _ignored, ...writable } = patch as Partial<PreferencesView> & {
-      userId?: string;
-    };
+    const { userId: _ignored, ...writable } =
+      patch as Partial<PreferencesView> & {
+        userId?: string;
+      };
 
-    await this.client.rest<{ changed: string[] }>('PATCH', '/preferences', writable);
-    const { preferences } = await this.client.query<{ preferences: PreferencesView }>(`
+    await this.client.rest<{ changed: string[] }>(
+      'PATCH',
+      '/preferences',
+      writable,
+    );
+    const { preferences } = await this.client.query<{
+      preferences: PreferencesView;
+    }>(`
       query Preferences { preferences { ${PREFERENCES_FIELDS} } }
     `);
     this.#preferences = preferences;

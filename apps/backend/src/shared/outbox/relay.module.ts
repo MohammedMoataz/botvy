@@ -6,7 +6,6 @@ import { IdentityModule } from '../../contexts/identity/identity.module.js';
 import { AdminPasswordFlagHandler } from '../../contexts/operations/features/admin-password-flag/admin-password-flag.handler.js';
 import { BootstrapOnRegisteredHandler } from '../../contexts/profile/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { PurgeOnDeletedHandler } from '../../contexts/profile/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { PingedHandler } from '../../contexts/operations/features/ping/pinged.handler.js';
 import { PlanAlertsSaga } from '../../contexts/notifications/features/plan-alerts-saga/plan-alerts.saga.js';
 import { NotificationsPurgeOnDeletedHandler } from '../../contexts/notifications/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PlanningPurgeOnDeletedHandler } from '../../contexts/planning/features/purge-on-deleted/purge-on-deleted.handler.js';
@@ -112,7 +111,6 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         MongoOutboxStore,
         WebhookFanout,
         SettingsService,
-        PingedHandler,
         AdminPasswordFlagHandler,
         BootstrapOnRegisteredHandler,
         PurgeOnDeletedHandler,
@@ -128,7 +126,6 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         store: MongoOutboxStore,
         fanout: WebhookFanout,
         settings: SettingsService,
-        pinged: PingedHandler,
         passwordFlag: AdminPasswordFlagHandler,
         profileBootstrap: BootstrapOnRegisteredHandler,
         profilePurge: PurgeOnDeletedHandler,
@@ -164,9 +161,6 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
            */
           publish: async (event: DomainEvent) => {
             switch (event.name) {
-              case 'operations.Pinged':
-                await pinged.handle(event);
-                return;
               // Profile reacts to Identity. Two stores, so no transaction can
               // span them — the event is the only way across, and it is why
               // both handlers are idempotent on re-delivery.

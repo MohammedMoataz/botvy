@@ -44,7 +44,11 @@ describe('token store', () => {
     const store = new TokenStore(inMemoryStorage(), refreshFn);
     store.set(pair('1'));
 
-    const [a, b, c] = await Promise.all([store.refresh(), store.refresh(), store.refresh()]);
+    const [a, b, c] = await Promise.all([
+      store.refresh(),
+      store.refresh(),
+      store.refresh(),
+    ]);
 
     expect(refreshFn).toHaveBeenCalledTimes(1);
     expect(a).toEqual(pair('2'));
@@ -134,7 +138,9 @@ describe('client', () => {
       tokens: store,
       fetchImpl: async () => {
         calls += 1;
-        return calls === 1 ? jsonResponse({ message: 'expired' }, 401) : jsonResponse({ id: 'ok' });
+        return calls === 1
+          ? jsonResponse({ message: 'expired' }, 401)
+          : jsonResponse({ id: 'ok' });
       },
     });
 
@@ -162,14 +168,19 @@ describe('client', () => {
 
   /** P0 ships a wired sign-in form against an endpoint P1 delivers. */
   it('names a missing endpoint as not available yet', async () => {
-    const client = new BotvyClient({ fetchImpl: async () => jsonResponse(null, 404) });
+    const client = new BotvyClient({
+      fetchImpl: async () => jsonResponse(null, 404),
+    });
 
-    await expect(client.command('/auth/login', {})).rejects.toBeInstanceOf(NotAvailableYetError);
+    await expect(client.command('/auth/login', {})).rejects.toBeInstanceOf(
+      NotAvailableYetError,
+    );
   });
 
   it('surfaces a GraphQL error rather than returning empty data', async () => {
     const client = new BotvyClient({
-      fetchImpl: async () => jsonResponse({ errors: [{ message: 'forbidden' }] }, 200),
+      fetchImpl: async () =>
+        jsonResponse({ errors: [{ message: 'forbidden' }] }, 200),
     });
 
     await expect(client.query('{ me { id } }')).rejects.toThrow('forbidden');
@@ -332,7 +343,9 @@ describe('socket', () => {
     client.connect();
 
     sockets[0]!.handlers.get('connect_error')?.(
-      Object.assign(new Error('unauthorized'), { data: { code: 'unauthorized' } }),
+      Object.assign(new Error('unauthorized'), {
+        data: { code: 'unauthorized' },
+      }),
     );
     await new Promise((resolve) => setTimeout(resolve, 0));
 

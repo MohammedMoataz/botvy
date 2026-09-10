@@ -274,11 +274,22 @@ export const SETTINGS_REGISTRY = {
         enabled: z.boolean().default(false),
       }),
     ),
-    default: [
-      { event: 'operations.Pinged', url: 'http://n8n:5678/webhook/botvy/pinged', enabled: true },
-    ],
+    // Empty by default, and that is the change P2 made.
+    //
+    // P0 shipped one subscription — `operations.Pinged` to a webhook whose only
+    // job was to echo it — because the spine needed proving before there was a
+    // real domain to prove it with. `planning.TaskScheduled` now makes that
+    // whole journey for a member who wants the outcome, so the demonstration
+    // has been retired and its subscription with it.
+    //
+    // It is not replaced by a default pointing at `TaskScheduled`, deliberately:
+    // a subscription is a delivery to somewhere, and shipping one that names a
+    // webhook path no committed workflow serves would have every task the
+    // member creates log a failed delivery for ever. An operator adds the
+    // events they have somewhere to send.
+    default: [],
     description:
-      'Which domain events the relay forwards to automation, and where. Deliveries are signed and carry an event id, because delivery is at-least-once and a subscriber must discard a repeat.',
+      'Which domain events the relay forwards to automation, and where. Deliveries are signed and carry an event id, because delivery is at-least-once and a subscriber must discard a repeat. Empty by default: a subscription names a webhook, and one that nothing serves is a failed delivery on every event.',
   }),
   'labels.palette': define({
     schema: z.array(hexColour).min(1).max(24),

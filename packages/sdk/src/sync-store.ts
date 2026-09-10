@@ -40,7 +40,8 @@ export type PushOp = 'create' | 'update' | 'delete' | 'restore' | 'purge';
  * client "you are behind, take the server's row and try again", so a protected
  * row reported as stale is a client that retries forever.
  */
-export type RejectionReason = 'stale' | 'gone' | 'protected' | 'not_deleted' | 'invalid';
+export type RejectionReason =
+  'stale' | 'gone' | 'protected' | 'not_deleted' | 'invalid';
 
 /**
  * The shape every synced row shares.
@@ -336,7 +337,12 @@ export class SyncStore {
    */
   async queue(
     entity: SyncEntity,
-    change: { op: PushOp; id: string; data?: Record<string, unknown>; updatedAt?: string },
+    change: {
+      op: PushOp;
+      id: string;
+      data?: Record<string, unknown>;
+      updatedAt?: string;
+    },
   ): Promise<void> {
     const table = this.options.tables[entity];
     if (!table) {
@@ -367,10 +373,12 @@ export class SyncStore {
     if (this.#inFlight) {
       // One pass may wait behind the one on the wire; every further caller
       // joins that same waiting pass rather than adding another.
-      this.#queuedRerun ??= this.#inFlight.catch(() => undefined).then(() => {
-        this.#queuedRerun = null;
-        return this.#start();
-      });
+      this.#queuedRerun ??= this.#inFlight
+        .catch(() => undefined)
+        .then(() => {
+          this.#queuedRerun = null;
+          return this.#start();
+        });
       return this.#queuedRerun;
     }
     return this.#start();
@@ -394,7 +402,9 @@ export class SyncStore {
    */
   async retryBlocked(): Promise<void> {
     for (const table of Object.values(this.options.tables) as SyncTable[]) {
-      const stuck = (await table.pending()).filter((push) => push.attempts >= MAX_PUSH_ATTEMPTS);
+      const stuck = (await table.pending()).filter(
+        (push) => push.attempts >= MAX_PUSH_ATTEMPTS,
+      );
       for (const push of stuck) await table.enqueue({ ...push, attempts: 0 });
     }
     this.#blocked = [];
@@ -437,7 +447,8 @@ export class SyncStore {
       // server is not an attempt the server judged, so nothing is counted
       // against `MAX_PUSH_ATTEMPTS` here — five flights through a tunnel would
       // otherwise blocked-badge an edit the server has no opinion about.
-      this.#lastError = error instanceof Error ? error : new Error(String(error));
+      this.#lastError =
+        error instanceof Error ? error : new Error(String(error));
       throw error;
     } finally {
       this.#syncing = false;
@@ -455,7 +466,9 @@ export class SyncStore {
     wire: Partial<Record<SyncEntity, Array<Omit<PendingPush, 'attempts'>>>>;
     blocked: PendingPush[];
   }> {
-    const wire: Partial<Record<SyncEntity, Array<Omit<PendingPush, 'attempts'>>>> = {};
+    const wire: Partial<
+      Record<SyncEntity, Array<Omit<PendingPush, 'attempts'>>>
+    > = {};
     const blocked: PendingPush[] = [];
 
     for (const [entity, table] of Object.entries(this.options.tables) as Array<
@@ -486,7 +499,10 @@ export class SyncStore {
    * server's own version, and clearing pending markers before the rejections
    * are read would clear the marker on a row that was refused.
    */
-  async #apply(response: SyncResponse, blocked: PendingPush[]): Promise<SyncOutcome> {
+  async #apply(
+    response: SyncResponse,
+    blocked: PendingPush[],
+  ): Promise<SyncOutcome> {
     const rejections = response.rejections ?? [];
 
     // 1. Rejections, branching on `entity` first. An unknown entity is skipped
@@ -505,7 +521,9 @@ export class SyncStore {
       // it in the other order costs the count silently: the push comes back on
       // the next pass with `attempts` at zero, and a row the server refuses
       // forever is re-sent forever without ever reaching `blocked`.
-      const queued = (await table.pending()).find((push) => push.id === rejection.id);
+      const queued = (await table.pending()).find(
+        (push) => push.id === rejection.id,
+      );
 
       if (rejection.server) {
         // The server has a row: take it. `applyServerRows` is the same path a
@@ -526,15 +544,16 @@ export class SyncStore {
       if (queued) {
         const attempted = { ...queued, attempts: queued.attempts + 1 };
         await table.enqueue(attempted);
-        if (attempted.attempts >= MAX_PUSH_ATTEMPTS) stillBlocked.push(attempted);
+        if (attempted.attempts >= MAX_PUSH_ATTEMPTS)
+          stillBlocked.push(attempted);
       }
     }
 
     // 2. `pendingOp` cleared for exactly the accepted ids, and nothing else.
     let accepted = 0;
-    for (const [entity, ids] of Object.entries(response.accepted ?? {}) as Array<
-      [SyncEntity, string[]]
-    >) {
+    for (const [entity, ids] of Object.entries(
+      response.accepted ?? {},
+    ) as Array<[SyncEntity, string[]]>) {
       const table = this.options.tables[entity];
       if (!table || !ids?.length) continue;
       await table.clearPending(ids);
@@ -580,7 +599,9 @@ export class SyncStore {
         if (!keep) continue;
 
         const keepIds = new Set(keep);
-        const pendingIds = new Set((await table.pending()).map((push) => push.id));
+        const pendingIds = new Set(
+          (await table.pending()).map((push) => push.id),
+        );
         const doomed = (await table.heldIds()).filter(
           (id) => !keepIds.has(id) && !pendingIds.has(id),
         );
@@ -628,7 +649,9 @@ export class SyncStore {
  * server row, `pendingOp` cleared only when accepted — are implemented once
  * here instead of once per entity.
  */
-export class MemorySyncTable<Row extends SyncedRow = SyncedRow> implements SyncTable<Row> {
+export class MemorySyncTable<
+  Row extends SyncedRow = SyncedRow,
+> implements SyncTable<Row> {
   #rows = new Map<string, Row>();
   #queue = new Map<string, PendingPush>();
   #listeners = new Set<() => void>();
@@ -690,7 +713,11 @@ export class MemorySyncTable<Row extends SyncedRow = SyncedRow> implements SyncT
       // `baseUpdatedAt` is the row's own `updatedAt`, always. This is the only
       // place it is ever written, which is the point: one writer means it
       // cannot be a local time by accident.
-      this.#rows.set(row.id, { ...row, baseUpdatedAt: row.updatedAt, pendingOp: null });
+      this.#rows.set(row.id, {
+        ...row,
+        baseUpdatedAt: row.updatedAt,
+        pendingOp: null,
+      });
       this.#queue.delete(row.id);
     }
     this.#announce();

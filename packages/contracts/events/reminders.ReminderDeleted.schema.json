@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reminders.ReminderDeleted",
+  "description": "Payload of reminders.ReminderDeleted. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "reminderId": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "required": [
+    "reminderId"
+  ],
+  "additionalProperties": false
+}

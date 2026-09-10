@@ -49,7 +49,12 @@ export interface HealthReport {
   pushConfigured: boolean;
   /** The seeded administrator still has its published default password. */
   defaultAdminPassword: boolean;
-  jobs: Array<{ job: string; lastOkAt: string | null; lastError: string | null; stale: boolean }>;
+  jobs: Array<{
+    job: string;
+    lastOkAt: string | null;
+    lastError: string | null;
+    stale: boolean;
+  }>;
   version: string;
 }
 
@@ -103,11 +108,18 @@ export class AdminStore {
   }
 
   async setRole(userId: string, role: Role): Promise<void> {
-    await this.client.rest('PATCH', `/admin/users/${encodeURIComponent(userId)}/role`, { role });
+    await this.client.rest(
+      'PATCH',
+      `/admin/users/${encodeURIComponent(userId)}/role`,
+      { role },
+    );
     this.#patchMember(userId, { role });
   }
 
-  async ban(userId: string, reason?: string): Promise<{ sessionsEnded: number }> {
+  async ban(
+    userId: string,
+    reason?: string,
+  ): Promise<{ sessionsEnded: number }> {
     const result = await this.client.rest<{ sessionsEnded: number }>(
       'POST',
       `/admin/users/${encodeURIComponent(userId)}/ban`,
@@ -118,7 +130,10 @@ export class AdminStore {
   }
 
   async unban(userId: string): Promise<void> {
-    await this.client.rest('POST', `/admin/users/${encodeURIComponent(userId)}/unban`);
+    await this.client.rest(
+      'POST',
+      `/admin/users/${encodeURIComponent(userId)}/unban`,
+    );
     this.#patchMember(userId, { status: 'active' });
   }
 
@@ -142,7 +157,10 @@ export class AdminStore {
   }
 
   async revokeServiceClient(name: string): Promise<void> {
-    await this.client.rest('DELETE', `/admin/service-clients/${encodeURIComponent(name)}`);
+    await this.client.rest(
+      'DELETE',
+      `/admin/service-clients/${encodeURIComponent(name)}`,
+    );
   }
 
   async settings(): Promise<SettingEntry[]> {
@@ -158,7 +176,11 @@ export class AdminStore {
   }
 
   async patchSetting(key: string, value: unknown): Promise<void> {
-    await this.client.rest('PATCH', `/admin/settings/${encodeURIComponent(key)}`, { value });
+    await this.client.rest(
+      'PATCH',
+      `/admin/settings/${encodeURIComponent(key)}`,
+      { value },
+    );
   }
 
   /**
@@ -184,7 +206,10 @@ export class AdminStore {
     this.#announce();
   }
 
-  async #fetchMembers(filter: MemberFilter, cursor: string | null): Promise<MemberPage> {
+  async #fetchMembers(
+    filter: MemberFilter,
+    cursor: string | null,
+  ): Promise<MemberPage> {
     const { users } = await this.client.query<{
       users: { nodes: MemberPage['members']; endCursor: string | null };
     }>(
