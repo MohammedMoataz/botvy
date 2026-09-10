@@ -31,3 +31,5 @@ pagination cursor — and none of them is in this directory.
 | [E-006](E-006-optimistic-check-is-not-strict.md) | The optimistic write check admits an equal timestamp | persistence | Two edits in the same millisecond can both win |
 | [E-007](E-007-undated-tasks-sort-first-by-label.md) | Undated tasks sort first in the by-label view | product | A cosmetic ordering nobody chose |
 | [E-008](E-008-recurrence-text-is-english-only.md) | `recurrenceText` is English only | product | An Arabic-reading member gets an English rule from the server |
+| [E-009](E-009-no-gate-imports-the-built-output.md) | No gate imports the built output | build | The third runtime-only defect a green suite has hidden |
+| [E-010](E-010-the-typecheck-gate-was-weaker-than-the-build.md) | The typecheck command is weaker than the build | build | "Typecheck clean" does not mean what it sounds like |

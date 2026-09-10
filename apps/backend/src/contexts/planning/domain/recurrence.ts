@@ -1,9 +1,35 @@
-import { RRule, rrulestr } from 'rrule';
+import rrule from 'rrule';
+import type { RRule as RRuleClass } from 'rrule';
 import {
   localDate,
   localHhMm,
   wallClockToUtc,
 } from '../../../shared/time/time.js';
+
+/**
+ * `rrule` is CommonJS, and this package is `"type": "module"`.
+ *
+ * So `import { RRule } from 'rrule'` type-checks, passes every test, and is
+ * `undefined` at runtime: Node's CJS-ESM interop exposes the module's exports
+ * on `default` and synthesises named exports only where it can statically find
+ * them, which it cannot in rrule's UMD bundle. Vitest has its own interop and
+ * papers over the difference entirely, so the whole suite was green while
+ * `node dist/main.js` could not boot — the same species of defect as the
+ * generated Prisma client missing from the runtime image, and invisible for the
+ * same reason.
+ *
+ * Destructuring off the default is what actually works in both. Verified by
+ * importing the built file with plain `node`, not by reading the types.
+ */
+const { RRule, rrulestr } = rrule;
+
+/**
+ * The value comes off the default export; the *type* comes from a type-only
+ * named import, which is erased at compile time and so is unaffected by the
+ * interop problem above. Two imports for one library, and the pair is the
+ * honest way to use a CommonJS package from an ES module.
+ */
+type ParsedRule = RRuleClass;
 
 export type RecurrenceMode = 'schedule' | 'completion';
 
@@ -105,7 +131,7 @@ interface CalendarStep {
   count: number;
 }
 
-function stepOf(rule: RRule): CalendarStep {
+function stepOf(rule: ParsedRule): CalendarStep {
   const count = rule.options.interval || 1;
   switch (rule.options.freq) {
     case RRule.YEARLY:
@@ -181,7 +207,7 @@ function isoDate(at: Date): string {
  */
 export class Recurrence {
   private constructor(
-    private readonly rule: RRule,
+    private readonly rule: ParsedRule,
     readonly spec: RecurrenceRule,
   ) {}
 
@@ -287,9 +313,9 @@ export class Recurrence {
 
     return this.rule
       .between(toFloating(from, timezone), toFloating(to, timezone), true)
-      .map((occurrence) => fromFloating(occurrence, timezone))
+      .map((occurrence: Date) => fromFloating(occurrence, timezone))
       .filter(
-        (instant): instant is Date =>
+        (instant: Date | null): instant is Date =>
           instant !== null && !this.isExcluded(instant),
       );
   }
