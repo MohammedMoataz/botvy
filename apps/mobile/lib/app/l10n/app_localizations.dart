@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// English and Arabic, by hand.
@@ -219,6 +220,17 @@ class AppLocalizations {
       _f('reminderSnoozedFrom', {'moment': moment});
   String reminderDeletedMessage(String title) =>
       _f('reminderDeletedMessage', {'title': title});
+
+  /// The tables, for the parity test and nothing else.
+  ///
+  /// Every key must exist in every locale, because `_t` falls back to English
+  /// on a miss — which does not fail, it just puts an English sentence in the
+  /// middle of an Arabic screen. That is a defect nobody notices until a member
+  /// reports it, so a test enumerates these rather than a person enumerating
+  /// getters: the hand-written list in `gateway_url_test` could only ever cover
+  /// the keys somebody remembered to add to it.
+  @visibleForTesting
+  static Map<String, Map<String, String>> get tables => _strings;
 
   static const Map<String, Map<String, String>> _strings = {
     'en': {
@@ -477,6 +489,72 @@ class AppLocalizations {
       'serverDegraded':
           'تم الاتصال ببوتفي {version}، لكنه يبلّغ عن مشكلة. لا يزال بإمكانك '
           'تسجيل الدخول.',
+
+    // ---- P2: tasks, labels and reminders ----------------------------
+    'taskToday': 'اليوم',
+    'taskToDoToday': 'المطلوب — اليوم',
+    'taskUpcoming': 'القادمة',
+    'taskOverdue': 'متأخرة',
+    'taskCompleted': 'المنجزة',
+    'taskCancelled': 'ملغاة',
+    'taskOpen': 'مفتوحة',
+    'taskDeleted': 'المحذوفة',
+    'taskByLabel': 'حسب التصنيف',
+    'taskNothingHere': 'لا يوجد شيء هنا.',
+    'taskNothingToday': 'لا شيء مستحق اليوم.',
+    'taskComplete': 'إنجاز',
+    'taskCancel': 'إلغاء',
+    'taskRestore': 'استعادة',
+    'taskEraseForGood': 'حذف نهائي',
+    'taskRepeats': 'تتكرر',
+    'taskNotSyncedYet': 'لم تُرسل بعد',
+    'taskTitle': 'ما المطلوب عمله',
+    'taskNotes': 'ملاحظات',
+    'taskNoDate': 'بدون تاريخ',
+    'taskAllDay': 'طوال اليوم',
+    'taskClearDate': 'إزالة التاريخ',
+    'taskPriority': 'الأولوية',
+    'taskNoLabel': 'بدون تصنيف',
+    'taskRepeat': 'التكرار',
+    'taskNoRepeat': 'لا يتكرر',
+    'taskEstimate': 'الوقت المتوقع (دقائق)',
+    'taskNoEstimate': 'بدون',
+    'taskCarriedOver': 'مُرحَّلة {times}×',
+    'taskDeletedMessage': 'تم حذف «{title}»',
+    'priorityHighest': 'الأعلى',
+    'priorityHigh': 'عالية',
+    'priorityNormal': 'عادية',
+    'priorityNone': 'بدون',
+    'labels': 'التصنيفات',
+    'labelName': 'اسم التصنيف',
+    'labelNoneYet': 'لا توجد تصنيفات بعد.',
+    'labelOwnColour': 'لون من اختيارك',
+    'labelOpenCount': '{count} مفتوحة',
+    'undo': 'تراجع',
+    'delete': 'حذف',
+    'remindersTitle': 'التذكيرات',
+    'reminderUpcoming': 'القادمة',
+    'reminderOverdue': 'متأخرة',
+    'reminderDone': 'تم',
+    'reminderCancelled': 'ملغاة',
+    'reminderActive': 'نشطة',
+    'reminderDeleted': 'المحذوفة',
+    'reminderNothingHere': 'لا يوجد شيء هنا.',
+    'reminderTitle': 'ذكّرني بأن',
+    'reminderSnooze': 'تأجيل',
+    'reminderComplete': 'تم',
+    'reminderRestore': 'استعادة',
+    'reminderReactivate': 'تحديد وقت جديد',
+    'reminderErase': 'حذف نهائي',
+    'reminderSnoozedFrom': 'مؤجَّل من {moment}',
+    'reminderDeletedMessage': 'تم حذف «{title}»',
+    'syncNotSaved': 'لم يُحفظ — اضغط للمحاولة مرة أخرى',
+    'reminderLeadsHelp':
+        'اتركها فارغة لاستخدام إعداداتك الافتراضية، فأي تغيير فيها '
+        'لاحقًا يسري على هذا التذكير أيضًا.',
+    'labelNoPalette':
+        'مجموعة الألوان يحدّدها من يدير هذه النسخة من Botvy، وهذا '
+        'الحساب لا يستطيع قراءتها. اكتب لونًا بنفسك.',
     },
   };
 }

@@ -63,9 +63,9 @@ mirroring the server's.
 ## Phase 7 — Retire the demo and polish
 
 - [X] T260 Remove the `ping` slice, `pings` collection migration, `ping_echo.json` and the default subscription; the spine is now proven by `planning.TaskScheduled` (`014-foundation` F-13)
-- [ ] T262 [P] Arabic strings for tasks and reminders; RTL screenshots
+- [X] T262 [P] Arabic strings for tasks and reminders (59 keys, plus a parity test that reads the tables rather than a hand-written list of getters — the previous locale test enumerated eleven and so could never notice a key nobody added to it). **RTL screenshots outstanding: they need a device, which is `docs/for-you/inputs-016-to-025.md` I3.**
 - [X] T263 [P] `purge-on-deleted` handlers for `tasks`, `labels`, `reminders` (Planning, Reminders) and unsent `alerts` (Notifications) on `identity.UserDeleted`; spec: two deliveries, one purge
-- [ ] T264 Record gate evidence; open `017-daily-rhythm`
+- [X] T264 Record gate evidence; open `017-daily-rhythm`
 
 ## Dependencies
 
@@ -98,3 +98,65 @@ T260 last.
    the Planning and Reminders `PurgeTombstones` handlers reported back, not a count
    of rows Notifications deleted itself.
 5. `ping` gone: `POST /api/v1/ping` → 404, and n8n has no `ping_echo` workflow.
+
+## Gate evidence — 10 September 2026
+
+Run against the live stack after a **clean** image rebuild, with the compiled
+code confirmed present in the container (`dist/contexts/{planning,reminders,notifications,sync}`
+there, `dist/contexts/operations/features/ping` gone).
+
+| Gate | Result | Note |
+|---|---|---|
+| `node infra/verify.mjs` (P0) | **4/5** | The fifth is the n8n API key, which only n8n's UI can mint — I1 |
+| `node infra/verify-p1.mjs` | **13/13** | Identity and Profile, unaffected by P2 |
+| `node infra/verify-p2.mjs` | **14/14** | New this phase |
+| `pnpm --filter @botvy/backend test` | **635 pass** | 45 files |
+| `cd apps/mobile && flutter test` | **138 pass** | including SC-005 and the two regressions |
+| `flutter analyze` | clean | |
+| `packages/sdk` tests | **78 pass** | |
+| `npx wxt build` (extension) | clean | 632 kB |
+| `npx oxlint` | 0 warnings, 0 errors | 280 files |
+| `npm run build:clean` (backend) | clean | not incremental — see below |
+| `node infra/verify-esm.mjs` | **3/3** | both compiled roles load under plain `node` |
+
+Logs: `T264-verify-p0-20260910T112305Z.log`, `T264-verify-p1-20260910T112305Z.log`, `T264-verify-p2-20260910T112305Z.log`
+
+### What running it actually found
+
+Five defects, none of them visible to a green unit suite, and three of them
+already shipped in this phase's own earlier commits:
+
+1. **`AlertSchema` had no `updatedAt`.** Mongoose's `strict: true` rejected
+   every alert upsert, so **no alert had ever been created** — the whole
+   notification pipeline was dead while 38 unit tests passed, because the
+   in-memory adapter has no schema. The evidence was four undelivered outbox
+   rows carrying the exact message.
+2. **A tombstoned label did not free its name.** The mapper omitted
+   `nameLower`, and `$set` leaves fields it is not given alone, so the partial
+   unique index kept holding the name. `MongoRepositoryBase` now reads
+   `undefined` as `$unset`.
+3. **`import { RRule } from 'rrule'`** was `undefined` at runtime — CommonJS
+   package, ESM consumer, vitest's own interop hiding it. `node dist/main.js`
+   could not boot.
+4. **`PREFERENCE_FIELDS` imported from a module that imports without
+   re-exporting it.** Compiles, because TypeScript follows the import graph;
+   fails at load, because an ES module exports only what it declares.
+5. **`nest build` was incremental and therefore vacuous.** A stale
+   `tsconfig.build.tsbuildinfo` meant two real type errors were invisible
+   locally and surfaced only in the container's clean build. Hence
+   `npm run build:clean`.
+
+The gate's own first run scored 8/13, and two of those five failures were the
+gate being wrong rather than the code: it called `/internal/notifications/sweep`
+through the edge, which Caddy deliberately does not route (constitution V), and
+it asserted that deleting an account stops an access token already issued,
+which a JWT cannot promise. Both corrected, with the reasoning in the file.
+
+### Still outstanding
+
+- **RTL screenshots** (T262) — needs a physical device, I3.
+- **The n8n workflow import** — needs the API key, I1. `notifications_sweep.json`
+  is committed and `bootstrap.mjs` will import it the moment the key is set.
+- **The manual gate steps** in the phase's own verification list: the
+  airplane-mode alarm, the extension-to-phone propagation timing, and the
+  15-second Deleted-view recovery (SC-006). All three need a handset.
