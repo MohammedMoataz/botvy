@@ -25,6 +25,7 @@ import {
   TombstonePurgePort,
 } from './domain/notification.ports.js';
 import { PendingAlertsQueryHandler } from './features/pending-alerts/pending-alerts.query.js';
+import { NotificationsPurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-deleted.handler.js';
 import {
   ALERT_ID,
   PlanAlertsSaga,
@@ -147,10 +148,12 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
         ),
     },
     PendingAlertsQueryHandler,
+    NotificationsPurgeOnDeletedHandler,
     MongoUnitOfWork,
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
   exports: [
+    NotificationsPurgeOnDeletedHandler,
     AlertRepository,
     PlanAlertsSaga,
     SweepHandler,

@@ -23,6 +23,7 @@ import { DeferTaskHandler } from './features/defer-task/defer-task.handler.js';
 import { DeleteLabelHandler } from './features/delete-label/delete-label.handler.js';
 import { DeleteTaskHandler } from './features/delete-task/delete-task.handler.js';
 import { LabelSnapshotHandler } from './features/label-snapshot/label-snapshot.handler.js';
+import { PlanningPurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PurgeTaskHandler } from './features/purge-task/purge-task.handler.js';
 import { ReopenTaskHandler } from './features/reopen-task/reopen-task.handler.js';
 import { RestoreTaskHandler } from './features/restore-task/restore-task.handler.js';
@@ -110,6 +111,7 @@ import { MongoTaskReadRepository } from './infrastructure/mongo-task-read.reposi
     DeleteTaskHandler,
     RestoreTaskHandler,
     PurgeTaskHandler,
+    PlanningPurgeOnDeletedHandler,
     SkipOccurrenceHandler,
     RolloverHandler,
     CreateLabelHandler,
@@ -122,6 +124,7 @@ import { MongoTaskReadRepository } from './infrastructure/mongo-task-read.reposi
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
   exports: [
+    PlanningPurgeOnDeletedHandler,
     TaskRepository,
     LabelRepository,
     TASK_READ_REPOSITORY,

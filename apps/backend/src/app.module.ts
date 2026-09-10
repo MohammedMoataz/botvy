@@ -13,6 +13,8 @@ import { NotificationsModule } from './contexts/notifications/notifications.modu
 import { InternalSweepController } from './contexts/notifications/features/sweep/internal-sweep.controller.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
 import { RemindersModule } from './contexts/reminders/reminders.module.js';
+import { SyncModule } from './contexts/sync/sync.module.js';
+import { SyncController } from './contexts/sync/features/sync/sync.controller.js';
 import { RemindersController } from './contexts/reminders/features/manage-reminder/reminders.controller.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
 import { TasksController } from './contexts/planning/features/create-task/tasks.controller.js';
@@ -61,6 +63,7 @@ import { WsModule } from './ws/ws.module.js';
     PlanningModule,
     RemindersModule,
     NotificationsModule,
+    SyncModule,
     HealthModule,
 
     // The other two edges. Commands are REST above; these are the reads and the
@@ -81,6 +84,7 @@ import { WsModule } from './ws/ws.module.js';
     TasksController,
     RemindersController,
     InternalSweepController,
+    SyncController,
     InternalAlertsController,
     InternalHeartbeatController,
   ],

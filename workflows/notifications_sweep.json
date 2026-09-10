@@ -1,0 +1,173 @@
+{
+  "name": "Botvy Notifications Sweep",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000001",
+      "name": "Every Five Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -420,
+        -100
+      ],
+      "notes": "Five minutes is the sweep's resolution, and it is a deliberate ceiling on how late a fallback notification can be rather than a guess. The device schedules its own alarms to the minute, so this only matters for a phone that has not synced -- for which five minutes late is unnoticeable, and every minute of polling would be a cost paid for ever."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "botvy/notifications-sweep",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000002",
+      "name": "Run Now",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        100
+      ],
+      "webhookId": "botvy-notifications-sweep",
+      "notes": "The admin portal's Run button, and the way a person tests the sweep without waiting for the cron. Unconditional on purpose: it takes no input and the sweep is idempotent, because every row is claimed before it is sent -- so running it twice by hand sends nothing twice."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOTVY_API_BASE }}/internal/notifications/sweep",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.BOTVY_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000003",
+      "name": "Sweep",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "Three tries, five seconds apart. Retrying is safe for the same reason the manual trigger is: the claim is atomic, so a retry after a timeout cannot double-send a row the first attempt already took.\n\n`neverError` is off deliberately. A 401 between n8n and the gateway has to FAIL here so the error workflow fires and the heartbeat goes stale -- exactly that silent 401 once went unnoticed for days, which is why every job writes a heartbeat and /health reports it stale after fifteen minutes."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "claimed",
+              "value": "={{ $json.claimed }}",
+              "type": "number"
+            },
+            {
+              "id": "a2",
+              "name": "sent",
+              "value": "={{ $json.sent }}",
+              "type": "number"
+            },
+            {
+              "id": "a3",
+              "name": "skippedLocal",
+              "value": "={{ $json.skippedLocal }}",
+              "type": "number"
+            },
+            {
+              "id": "a4",
+              "name": "expired",
+              "value": "={{ $json.expired }}",
+              "type": "number"
+            },
+            {
+              "id": "a5",
+              "name": "purged",
+              "value": "={{ $json.purged }}",
+              "type": "number"
+            },
+            {
+              "id": "a6",
+              "name": "failed",
+              "value": "={{ $json.failed }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000004",
+      "name": "Counts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        0
+      ],
+      "notes": "The counts are kept as the execution's output so n8n's own log is the record of what each sweep did. A bare acknowledgement would make 'ran and sent nothing' and 'ran and sent four hundred' the same line -- and this log is the only thing anybody has when asking why a 03:00 notification did not arrive."
+    }
+  ],
+  "connections": {
+    "Every Five Minutes": {
+      "main": [
+        [
+          {
+            "node": "Sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Now": {
+      "main": [
+        [
+          {
+            "node": "Sweep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sweep": {
+      "main": [
+        [
+          {
+            "node": "Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": "Botvy Error Handler"
+  }
+}

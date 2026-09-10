@@ -8,6 +8,12 @@ import { BootstrapOnRegisteredHandler } from '../../contexts/profile/features/bo
 import { PurgeOnDeletedHandler } from '../../contexts/profile/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PingedHandler } from '../../contexts/operations/features/ping/pinged.handler.js';
 import { PlanAlertsSaga } from '../../contexts/notifications/features/plan-alerts-saga/plan-alerts.saga.js';
+import { NotificationsPurgeOnDeletedHandler } from '../../contexts/notifications/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { PlanningPurgeOnDeletedHandler } from '../../contexts/planning/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { RemindersPurgeOnDeletedHandler } from '../../contexts/reminders/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { RemindersModule } from '../../contexts/reminders/reminders.module.js';
+import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
+import { SyncModule } from '../../contexts/sync/sync.module.js';
 import { NotificationsModule } from '../../contexts/notifications/notifications.module.js';
 import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
 import { PlanningModule } from '../../contexts/planning/planning.module.js';
@@ -68,7 +74,9 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     OperationsModule,
     ProfileModule,
     PlanningModule,
+    RemindersModule,
     NotificationsModule,
+    SyncModule,
   ],
   providers: [
     {
@@ -110,6 +118,10 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         PurgeOnDeletedHandler,
         LabelSnapshotHandler,
         PlanAlertsSaga,
+        NudgeOnChangesHandler,
+        PlanningPurgeOnDeletedHandler,
+        RemindersPurgeOnDeletedHandler,
+        NotificationsPurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -122,6 +134,10 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         profilePurge: PurgeOnDeletedHandler,
         labelSnapshots: LabelSnapshotHandler,
         alertPlanning: PlanAlertsSaga,
+        syncNudges: NudgeOnChangesHandler,
+        planningPurge: PlanningPurgeOnDeletedHandler,
+        remindersPurge: RemindersPurgeOnDeletedHandler,
+        notificationsPurge: NotificationsPurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -157,8 +173,25 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               case 'identity.UserRegistered':
                 await profileBootstrap.handle(event);
                 return;
+              /*
+               * Four contexts hold something about a member, and all four are
+               * called here — sequentially, so one failing does not silently
+               * skip the rest, and the relay's own retry brings the whole
+               * event back rather than a fragment of it. Every handler is
+               * idempotent, which is what makes replaying all four after a
+               * partial failure the correct recovery rather than a second
+               * problem.
+               *
+               * The list growing is the point of the table. A context added in
+               * P5 that forgets this line leaves a deleted member's meetings on
+               * disk for ever, and nothing fails — which is E-005's whole
+               * argument.
+               */
               case 'identity.UserDeleted':
                 await profilePurge.handle(event);
+                await planningPurge.handle(event);
+                await remindersPurge.handle(event);
+                await notificationsPurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -229,6 +262,13 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               case 'identity.DeviceRegistered':
               case 'identity.DeviceRemoved':
                 await alertPlanning.onDevicesChanged(event);
+                return;
+
+              // One device pushed; the member's others are told. This is what
+              // makes a task completed in the extension reach the phone in
+              // seconds without either of them polling.
+              case 'sync.ChangesApplied':
+                await syncNudges.handle(event);
                 return;
               default:
                 return;

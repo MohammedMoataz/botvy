@@ -17,6 +17,7 @@ import {
 } from './domain/reminder.repository.js';
 import { ManageReminderHandler } from './features/manage-reminder/manage-reminder.handler.js';
 import { ReminderLifecycleHandler } from './features/reminder-lifecycle/reminder-lifecycle.handler.js';
+import { RemindersPurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RemindersQueryHandler } from './features/reminders-query/reminders.query.js';
 import {
   MongoReminderReadRepository,
@@ -66,10 +67,12 @@ import {
     ManageReminderHandler,
     ReminderLifecycleHandler,
     RemindersQueryHandler,
+    RemindersPurgeOnDeletedHandler,
     MongoUnitOfWork,
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
   exports: [
+    RemindersPurgeOnDeletedHandler,
     ReminderRepository,
     REMINDER_READ_REPOSITORY,
     ManageReminderHandler,
