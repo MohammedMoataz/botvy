@@ -162,16 +162,24 @@ YOUR CHOICE:  (leave blank for my default)
 Labels get a fixed palette to pick from, plus a custom colour. Nobody sees the
 hex values but you, so this is purely taste.
 
-**My default** — eight, readable on both light and dark, spaced far enough
-apart that two labels never look alike at a glance:
+**Correction to what this file said first.** I described a default I was going to
+pick. There was no need: `labels.palette` was already registered in P0 with
+twelve colours, and P2 reads that key rather than any literal — a hard-coded
+default is a bug by constitution XII. So the palette exists, and the question is
+only whether you want it changed:
 
-| | | |
-|---|---|---|
-| `#0F766E` teal | `#B45309` amber | `#1D4ED8` blue |
-| `#B91C1C` red | `#15803D` green | `#7E22CE` purple |
-| `#BE185D` pink | `#475569` slate | |
+| | | | |
+|---|---|---|---|
+| `#ef4444` red | `#f97316` orange | `#f59e0b` amber | `#eab308` yellow |
+| `#84cc16` lime | `#22c55e` green | `#14b8a6` teal | `#06b6d4` cyan |
+| `#3b82f6` blue | `#6366f1` indigo | `#a855f7` purple | `#ec4899` pink |
 
-Say "more", "fewer", or name colours you want in and I will swap them.
+A new label takes the first of these you are not already using, and cycles once
+you have used all twelve. Any `#rrggbb` you type is accepted too.
+
+Leave this blank and it stays as above. It is an operator setting, so you can
+also change it later in the admin portal without a deploy — which is the whole
+reason it is a registry key and not a constant.
 
 ---
 

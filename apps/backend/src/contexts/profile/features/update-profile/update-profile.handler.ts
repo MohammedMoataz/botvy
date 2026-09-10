@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { isValidTimezone } from '../../../../shared/time/time.js';
 import type { BodyMetric } from '../../domain/profile.aggregate.js';
-import { PhotoStore, ProfileRepository } from '../../domain/profile.repository.js';
+import {
+  PhotoStore,
+  ProfileRepository,
+} from '../../domain/profile.repository.js';
 
 export class ProfileNotFound extends Error {
   constructor() {
@@ -33,7 +36,11 @@ export interface UpdateProfileCommand {
 
 /** What a photo may be. Anything larger or otherwise typed is refused. */
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-export const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const ACCEPTED_PHOTO_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
 
 /**
  * Everything a member changes about themselves.
@@ -55,7 +62,10 @@ export class UpdateProfileHandler {
     private readonly photos: PhotoStore,
   ) {}
 
-  async handle(userId: string, command: UpdateProfileCommand): Promise<{ changed: string[] }> {
+  async handle(
+    userId: string,
+    command: UpdateProfileCommand,
+  ): Promise<{ changed: string[] }> {
     if (command.timezone !== undefined && !isValidTimezone(command.timezone)) {
       throw new InvalidTimezone(command.timezone);
     }
@@ -79,7 +89,8 @@ export class UpdateProfileHandler {
 
     // A patch that changed nothing is not saved and raises nothing: an idle
     // save from a client should not wake five contexts.
-    if (changed.length > 0) await this.uow.run(() => this.profiles.save(profile));
+    if (changed.length > 0)
+      await this.uow.run(() => this.profiles.save(profile));
     return { changed };
   }
 
@@ -115,9 +126,15 @@ export class UpdateProfileHandler {
     mimeType: string,
   ): Promise<{ photoPath: string }> {
     if (bytes.length > MAX_PHOTO_BYTES) {
-      throw new PhotoRejected(`a photo may be at most ${MAX_PHOTO_BYTES / (1024 * 1024)} MB`);
+      throw new PhotoRejected(
+        `a photo may be at most ${MAX_PHOTO_BYTES / (1024 * 1024)} MB`,
+      );
     }
-    if (!ACCEPTED_PHOTO_TYPES.includes(mimeType as (typeof ACCEPTED_PHOTO_TYPES)[number])) {
+    if (
+      !ACCEPTED_PHOTO_TYPES.includes(
+        mimeType as (typeof ACCEPTED_PHOTO_TYPES)[number],
+      )
+    ) {
       throw new PhotoRejected(`${mimeType} is not an accepted image type`);
     }
 
@@ -136,7 +153,9 @@ export class UpdateProfileHandler {
       // member their photo; a rolled-back transaction is that same argument
       // with a worse ending, since the row would still point at the old path.
       if (previous && previous !== photoPath) {
-        this.uow.onCommit(() => this.photos.remove(previous).catch(() => undefined));
+        this.uow.onCommit(() =>
+          this.photos.remove(previous).catch(() => undefined),
+        );
       }
     });
 

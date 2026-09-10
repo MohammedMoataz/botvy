@@ -1,6 +1,18 @@
 import { NotFoundException } from '@nestjs/common';
-import { Args, Field, Float, ID, Int, ObjectType, Query, Resolver } from '@nestjs/graphql';
-import { CurrentPrincipal, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  Args,
+  Field,
+  Float,
+  ID,
+  Int,
+  ObjectType,
+  Query,
+  Resolver,
+} from '@nestjs/graphql';
+import {
+  CurrentPrincipal,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { DateTimeScalar } from '../../../../graphql/scalars.js';
 import { ProfileQueryHandler } from './profile.query.js';
@@ -151,7 +163,9 @@ export class ProfileResolver {
 
   @Query(() => ProfileType, { description: "The caller's own profile." })
   @UsersOnly()
-  async profile(@CurrentPrincipal() principal: Principal): Promise<ProfileType> {
+  async profile(
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<ProfileType> {
     const view = await this.profiles.profile(principal.id);
     // Bootstrapped from `identity.UserRegistered`, so its absence means the
     // relay has not delivered yet rather than that the member is unknown. A
@@ -174,11 +188,14 @@ export class ProfileResolver {
    * Argued rather than always-all: a member weighing in daily for two years is
    * seven hundred rows, and a chart shows thirty.
    */
-  @Query(() => [BodyMetricType], { description: "The caller's body metric history." })
+  @Query(() => [BodyMetricType], {
+    description: "The caller's body metric history.",
+  })
   @UsersOnly()
   async bodyMetrics(
     @CurrentPrincipal() principal: Principal,
-    @Args('last', { type: () => Int, nullable: true, defaultValue: 30 }) last?: number,
+    @Args('last', { type: () => Int, nullable: true, defaultValue: 30 })
+    last?: number,
   ): Promise<BodyMetricType[]> {
     const view = await this.profiles.profile(principal.id);
     if (!view) throw new NotFoundException('no profile yet');
@@ -187,9 +204,13 @@ export class ProfileResolver {
     return view.metrics.slice(-window) as unknown as BodyMetricType[];
   }
 
-  @Query(() => PreferencesType, { description: "The caller's own preferences." })
+  @Query(() => PreferencesType, {
+    description: "The caller's own preferences.",
+  })
   @UsersOnly()
-  async preferences(@CurrentPrincipal() principal: Principal): Promise<PreferencesType> {
+  async preferences(
+    @CurrentPrincipal() principal: Principal,
+  ): Promise<PreferencesType> {
     const view = await this.profiles.preferencesFor(principal.id);
     if (!view) throw new NotFoundException('no preferences yet');
     return view as PreferencesType;

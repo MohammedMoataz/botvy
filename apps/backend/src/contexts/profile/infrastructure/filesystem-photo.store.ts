@@ -38,7 +38,10 @@ export class FilesystemPhotoStore extends PhotoStore {
   async put(userId: string, bytes: Buffer): Promise<string> {
     const webp = await sharp(bytes)
       .rotate() // Applies the EXIF orientation before the metadata is dropped.
-      .resize(PHOTO_EDGE_PX, PHOTO_EDGE_PX, { fit: 'cover', position: 'centre' })
+      .resize(PHOTO_EDGE_PX, PHOTO_EDGE_PX, {
+        fit: 'cover',
+        position: 'centre',
+      })
       .webp({ quality: 82 })
       .toBuffer();
 

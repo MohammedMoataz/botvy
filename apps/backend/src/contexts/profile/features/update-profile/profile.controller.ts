@@ -6,7 +6,6 @@ import {
   HttpCode,
   NotFoundException,
   Patch,
-
   Post,
   Res,
   StreamableFile,
@@ -26,16 +25,17 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { CurrentPrincipal, UsersOnly } from '../../../../shared/auth/decorators.js';
+import {
+  CurrentPrincipal,
+  UsersOnly,
+} from '../../../../shared/auth/decorators.js';
 import {
   toProfileResponse,
   type ProfileResponse,
 } from '../profile-query/profile.response.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
 import { PhotoStore } from '../../domain/profile.repository.js';
-import {
-  ProfileQueryHandler,
-} from '../profile-query/profile.query.js';
+import { ProfileQueryHandler } from '../profile-query/profile.query.js';
 import {
   InvalidPreference,
   PreferencesNotFound,
@@ -156,7 +156,9 @@ export class ProfileController {
    * answer with the stored profile rather than the change, and that is a
    * command's own result rather than a read.
    */
-  private async profileResponse(principal: Principal): Promise<ProfileResponse> {
+  private async profileResponse(
+    principal: Principal,
+  ): Promise<ProfileResponse> {
     const view = await this.queries.profile(principal.id);
     if (!view) throw new NotFoundException('this account has no profile yet');
     // Through the mapper the GraphQL resolver uses, so both edges answer with
@@ -182,7 +184,9 @@ export class ProfileController {
           ? {}
           : {
               onboardingCompletedAt:
-                onboardingCompletedAt === null ? null : new Date(onboardingCompletedAt),
+                onboardingCompletedAt === null
+                  ? null
+                  : new Date(onboardingCompletedAt),
             }),
       });
     } catch (error) {
@@ -204,7 +208,9 @@ export class ProfileController {
         recordedAt: body.recordedAt ? new Date(body.recordedAt) : new Date(),
         ...(body.weightKg === undefined ? {} : { weightKg: body.weightKg }),
         ...(body.heightCm === undefined ? {} : { heightCm: body.heightCm }),
-        ...(body.bodyFatPct === undefined ? {} : { bodyFatPct: body.bodyFatPct }),
+        ...(body.bodyFatPct === undefined
+          ? {}
+          : { bodyFatPct: body.bodyFatPct }),
         ...(body.note === undefined ? {} : { note: body.note }),
       });
     } catch (error) {
@@ -248,7 +254,8 @@ export class ProfileController {
   @Get('profile/photo')
   async photo(
     @CurrentPrincipal() principal: Principal,
-    @Res({ passthrough: true }) response: { setHeader(name: string, value: string): void },
+    @Res({ passthrough: true })
+    response: { setHeader(name: string, value: string): void },
   ): Promise<StreamableFile> {
     const view = await this.queries.profile(principal.id);
     if (!view?.photoPath) throw new NotFoundException('no photo');
@@ -270,12 +277,11 @@ export class ProfileController {
     return new StreamableFile(bytes, { type: 'image/webp' });
   }
 
-// GET /preferences was here. It is a read, and constitution X puts reads on GraphQL:
+  // GET /preferences was here. It is a read, and constitution X puts reads on GraphQL:
   // `preferences` at /graphql answers it. Removed rather than left beside the
   // resolver, because two paths to one answer is the drift this rewrite exists
   // to remove - and the REST one leaked nothing, but drifted anyway.
 
-  
   /**
    * Patches preferences. The body is deliberately untyped beyond "an object":
    * the handler validates every field against the zod schema of its own
@@ -296,7 +302,10 @@ export class ProfileController {
   }
 
   private translate(error: unknown): Error {
-    if (error instanceof ProfileNotFound || error instanceof PreferencesNotFound) {
+    if (
+      error instanceof ProfileNotFound ||
+      error instanceof PreferencesNotFound
+    ) {
       return new NotFoundException(error.message);
     }
     if (

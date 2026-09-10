@@ -23,6 +23,7 @@ consumer needs — never whole documents (consumers query their own read side).
 | `profile.ProfileUpdated` | Profile | `{ changed: ['timezone','allergies',…] }` | Notifications → re-plan alert times when `timezone` changed; Nutrition → regenerate today's meal line when allergies/foods changed; Rhythm → nothing (reads live) |
 | `profile.PreferencesChanged` | Profile | `{ changed: [...] }` | Rhythm → re-evaluate today's claims when times changed; Training → re-materialise when cutoff changed; Reminders → default lead times |
 | `planning.TaskScheduled` | Planning | `{ taskId, dueAt, allDay, priority }` | Notifications → plan alerts (`0m`, and default lead times when timed); Rhythm → if `dueAt` is tomorrow and a draft exists, mark draft stale |
+| | | | **Also raised by reopen, restore and the second half of completing a repeating task.** Its meaning is "this task now has a moment that wants alerts planned", and all four make that true — so there is no `TaskReopened` or `TaskRestored`. Two names with one identical handler is how a catalogue starts to lie. |
 | `planning.TaskRescheduled` | Planning | `{ taskId, dueAt }` | Notifications → re-plan |
 | `planning.TaskCompleted` / `TaskCancelled` / `TaskDeleted` | Planning | `{ taskId, at, recurrenceAdvancedTo? }` | Notifications → drop unsent alerts; Rhythm → update today's plan snapshot status; Conversations → nothing |
 | `planning.TaskDeferred` | Planning | `{ taskId, fromDate, toDate, deferCount }` | Rhythm → surface "carried over ×N" in the evening prompt |

@@ -7,6 +7,8 @@ import { AdminPasswordFlagHandler } from '../../contexts/operations/features/adm
 import { BootstrapOnRegisteredHandler } from '../../contexts/profile/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { PurgeOnDeletedHandler } from '../../contexts/profile/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PingedHandler } from '../../contexts/operations/features/ping/pinged.handler.js';
+import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
+import { PlanningModule } from '../../contexts/planning/planning.module.js';
 import { OperationsModule } from '../../contexts/operations/operations.module.js';
 import { ProfileModule } from '../../contexts/profile/profile.module.js';
 import { ENV } from '../config/config.module.js';
@@ -17,7 +19,11 @@ import { RELAY_LIVENESS } from '../health/healthz.controller.js';
 import { MODEL_NAMES } from '../persistence/mongo/schemas.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { IdentityOutboxForwarder } from './identity-outbox-forwarder.js';
-import { MongoOutboxStore, type OutboxDoc, type RelayStateDoc } from './mongo-outbox.store.js';
+import {
+  MongoOutboxStore,
+  type OutboxDoc,
+  type RelayStateDoc,
+} from './mongo-outbox.store.js';
 import { OutboxModule } from './outbox.module.js';
 import { OutboxRelay } from './outbox-relay.js';
 import { OutboxWriter } from './outbox-writer.js';
@@ -37,11 +43,20 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
  * row per handler until a phase shows it should become one.
  */
 @Module({
-  imports: [OutboxModule, IdentityModule, OperationsModule, ProfileModule],
+  imports: [
+    OutboxModule,
+    IdentityModule,
+    OperationsModule,
+    ProfileModule,
+    PlanningModule,
+  ],
   providers: [
     {
       provide: MongoOutboxStore,
-      inject: [getModelToken(MODEL_NAMES.outbox), getModelToken(MODEL_NAMES.relayState)],
+      inject: [
+        getModelToken(MODEL_NAMES.outbox),
+        getModelToken(MODEL_NAMES.relayState),
+      ],
       useFactory: (outbox: Model<OutboxDoc>, state: Model<RelayStateDoc>) =>
         new MongoOutboxStore(outbox, state),
     },
@@ -60,7 +75,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     {
       provide: WebhookFanout,
       inject: [ENV, HTTP_POST],
-      useFactory: (env: Env, post: HttpPost) => new WebhookFanout(env.AUTOMATION_WEBHOOK_SECRET, post),
+      useFactory: (env: Env, post: HttpPost) =>
+        new WebhookFanout(env.AUTOMATION_WEBHOOK_SECRET, post),
     },
     {
       provide: OutboxRelay,
@@ -72,6 +88,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         AdminPasswordFlagHandler,
         BootstrapOnRegisteredHandler,
         PurgeOnDeletedHandler,
+        LabelSnapshotHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -82,6 +99,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         passwordFlag: AdminPasswordFlagHandler,
         profileBootstrap: BootstrapOnRegisteredHandler,
         profilePurge: PurgeOnDeletedHandler,
+        labelSnapshots: LabelSnapshotHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -121,12 +139,24 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await profilePurge.handle(event);
                 return;
               case 'operations.SettingChanged':
-                settings.invalidate(String((event.payload as { key?: string })?.key ?? ''));
+                settings.invalidate(
+                  String((event.payload as { key?: string })?.key ?? ''),
+                );
                 return;
               // Identity raises it, Operations owns the key. The event is how
               // the two meet without either opening the other's store.
               case 'identity.PasswordChanged':
                 await passwordFlag.onPasswordChanged(event);
+                return;
+              // Planning reacting to Planning. The boundary is not the reason
+              // for the hop — the rename writes one row and returns, and the
+              // several hundred tasks that show the label are caught up here in
+              // one bulk write rather than inline while the member waits.
+              case 'planning.LabelUpdated':
+                await labelSnapshots.onUpdated(event);
+                return;
+              case 'planning.LabelDeleted':
+                await labelSnapshots.onDeleted(event);
                 return;
               default:
                 return;
@@ -143,7 +173,12 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     },
     {
       provide: RelayRuntime,
-      inject: [OutboxRelay, IdentityOutboxForwarder, MongoOutboxStore, HeartbeatService],
+      inject: [
+        OutboxRelay,
+        IdentityOutboxForwarder,
+        MongoOutboxStore,
+        HeartbeatService,
+      ],
       useFactory: (
         relay: OutboxRelay,
         forwarder: IdentityOutboxForwarder,

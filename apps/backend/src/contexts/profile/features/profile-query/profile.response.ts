@@ -6,7 +6,9 @@ import type { ProfileView } from './profile.query.js';
 export const PHOTO_URL = '/api/v1/profile/photo';
 
 /** A profile as a client sees it: the same shape from REST and from GraphQL. */
-export type ProfileResponse = Omit<ProfileView, 'photoPath'> & { photoUrl?: string };
+export type ProfileResponse = Omit<ProfileView, 'photoPath'> & {
+  photoUrl?: string;
+};
 
 /**
  * The one definition of what a profile looks like on the wire.

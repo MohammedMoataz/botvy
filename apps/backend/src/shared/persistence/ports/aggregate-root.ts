@@ -1,4 +1,8 @@
-import { EVENT_SCHEMA_VERSION, contextOf, type DomainEvent } from '../../cqrs/domain-event.js';
+import {
+  EVENT_SCHEMA_VERSION,
+  contextOf,
+  type DomainEvent,
+} from '../../cqrs/domain-event.js';
 import { newId } from '../../cqrs/ids.js';
 
 /**

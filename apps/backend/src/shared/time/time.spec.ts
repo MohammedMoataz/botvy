@@ -12,9 +12,9 @@ import { formatInTz, localDate, localHhMm, wallClockToUtc } from './time.js';
 describe('wallClockToUtc', () => {
   it('reads a wall-clock time as the zone the user is in', () => {
     // Cairo runs UTC+3 in September.
-    expect(wallClockToUtc('2026-09-02T18:00', 'Africa/Cairo')?.toISOString()).toBe(
-      '2026-09-02T15:00:00.000Z',
-    );
+    expect(
+      wallClockToUtc('2026-09-02T18:00', 'Africa/Cairo')?.toISOString(),
+    ).toBe('2026-09-02T15:00:00.000Z');
   });
 
   it('is the identity in UTC', () => {
@@ -25,9 +25,9 @@ describe('wallClockToUtc', () => {
 
   it('handles a zone behind UTC', () => {
     // New York is UTC-4 in September.
-    expect(wallClockToUtc('2026-09-02T18:00', 'America/New_York')?.toISOString()).toBe(
-      '2026-09-02T22:00:00.000Z',
-    );
+    expect(
+      wallClockToUtc('2026-09-02T18:00', 'America/New_York')?.toISOString(),
+    ).toBe('2026-09-02T22:00:00.000Z');
   });
 
   it('uses the offset in force on the day, not today', () => {
@@ -63,6 +63,28 @@ describe('wallClockToUtc', () => {
     expect(formatInTz(instant!, 'America/New_York')).toContain('03:30');
   });
 
+  it('lands after a spring-forward gap in a zone ahead of UTC too', () => {
+    // The same rule, east of Greenwich, and this is the case the New York test
+    // above could not catch. Which of the two candidate instants falls after
+    // the gap depends on the sign of the zone's offset, and the resolver used
+    // to assume the western answer — so this passed in New York and returned
+    // 01:30 in Berlin, an hour *before* the hour the member asked for.
+    //
+    // 02:30 on 29 March 2026 does not exist in Berlin: 02:00 jumps to 03:00.
+    const berlin = wallClockToUtc('2026-03-29T02:30', 'Europe/Berlin');
+    expect(berlin?.toISOString()).toBe('2026-03-29T01:30:00.000Z');
+    expect(formatInTz(berlin!, 'Europe/Berlin')).toContain('03:30');
+
+    // And in this installation's own default zone, which is the reason the bug
+    // mattered rather than merely existed. Cairo has observed daylight saving
+    // again since 2023 and moves on the last Friday in April.
+    const cairo = wallClockToUtc('2026-04-24T00:30', 'Africa/Cairo');
+    expect(cairo).not.toBeNull();
+    // Whatever the offset works out to, the one thing that must not happen is
+    // reading back as an earlier hour than was asked for.
+    expect(formatInTz(cairo!, 'Africa/Cairo')).not.toContain('23:30');
+  });
+
   it('picks the first of the two occurrences in a fall-back hour', () => {
     // 01:30 happens twice on 1 November 2026; the earlier one is EDT (UTC-4).
     const instant = wallClockToUtc('2026-11-01T01:30', 'America/New_York');
@@ -80,9 +102,9 @@ describe('wallClockToUtc', () => {
   it('ignores a trailing zone marker instead of double-converting', () => {
     // The model sometimes appends a Z out of habit; the time it wrote is still
     // the user's wall clock, so it must not be read as UTC.
-    expect(wallClockToUtc('2026-09-02T18:00:00Z', 'Africa/Cairo')?.toISOString()).toBe(
-      '2026-09-02T15:00:00.000Z',
-    );
+    expect(
+      wallClockToUtc('2026-09-02T18:00:00Z', 'Africa/Cairo')?.toISOString(),
+    ).toBe('2026-09-02T15:00:00.000Z');
   });
 });
 

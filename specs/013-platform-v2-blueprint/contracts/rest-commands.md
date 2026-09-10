@@ -44,6 +44,7 @@ duplicate), `422` domain rule (e.g. allergen), `429` throttled.
 | `POST /tasks/:id/complete` · `/reopen` · `/cancel` | user | `{ at? }` |
 | `POST /tasks/:id/defer` | user | `{ toDate }` → increments `deferCount` |
 | `DELETE /tasks/:id` · `POST /tasks/:id/restore` · `POST /tasks/:id/purge` | user | tombstone / clear / hard-delete (tombstones only) |
+| `POST /tasks/:id/occurrences/:occurrence/skip` | user | adds an exdate and moves the series to the next occurrence |
 | `POST /tasks/rollover` | user | `{ fromDate, toDate, taskIds? }` — explicit carry-over run by the end-of-day touch |
 | `POST /labels` · `PATCH /labels/:id` · `DELETE /labels/:id` | user | `{ id, name, color?, sortOrder? }` |
 

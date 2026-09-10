@@ -5,9 +5,15 @@ import {
   type OutboxInsert,
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
-import { Preferences, type PreferencesState } from '../domain/preferences.aggregate.js';
+import {
+  Preferences,
+  type PreferencesState,
+} from '../domain/preferences.aggregate.js';
 import { Profile, type ProfileState } from '../domain/profile.aggregate.js';
-import { PreferencesRepository, ProfileRepository } from '../domain/profile.repository.js';
+import {
+  PreferencesRepository,
+  ProfileRepository,
+} from '../domain/profile.repository.js';
 
 export interface ProfileDoc extends ProfileState {
   _id: string;
@@ -171,7 +177,10 @@ export class MongoPreferencesRepository extends PreferencesRepository {
   }
 }
 
-class InnerPreferencesRepository extends MongoRepositoryBase<Preferences, PreferencesDoc> {
+class InnerPreferencesRepository extends MongoRepositoryBase<
+  Preferences,
+  PreferencesDoc
+> {
   protected readonly mapper = preferencesMapper;
 
   constructor(

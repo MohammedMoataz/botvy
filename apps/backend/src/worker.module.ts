@@ -4,6 +4,7 @@ import { PlatformModule } from './shared/platform/platform.module.js';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
+import { PlanningModule } from './contexts/planning/planning.module.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
 import { ConfigModule } from './shared/config/config.module.js';
 import { HealthzController } from './shared/health/healthz.controller.js';
@@ -35,6 +36,10 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     OutboxModule,
     OperationsModule,
     ProfileModule,
+    // For `LabelSnapshotHandler`, which reacts to `planning.LabelUpdated` in
+    // the relay, and for `PurgeTaskHandler.purgeTombstones`, which the sweep
+    // dispatches. Neither has an HTTP surface, which is why they belong here.
+    PlanningModule,
     RelayModule,
   ],
   controllers: [HealthzController],

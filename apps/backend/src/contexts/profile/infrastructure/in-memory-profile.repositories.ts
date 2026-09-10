@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { InMemoryUnitOfWork } from '../../../shared/persistence/memory/in-memory-unit-of-work.js';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
-import { Preferences, type PreferencesState } from '../domain/preferences.aggregate.js';
+import {
+  Preferences,
+  type PreferencesState,
+} from '../domain/preferences.aggregate.js';
 import { Profile, type ProfileState } from '../domain/profile.aggregate.js';
 import {
   PhotoStore,

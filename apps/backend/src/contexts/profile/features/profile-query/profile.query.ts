@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import type { BodyMetric } from '../../domain/profile.aggregate.js';
-import { PreferencesRepository, ProfileRepository } from '../../domain/profile.repository.js';
+import {
+  PreferencesRepository,
+  ProfileRepository,
+} from '../../domain/profile.repository.js';
 
 export interface ProfileView {
   userId: string;
@@ -117,15 +120,21 @@ export class ProfileQueryHandler {
     const parts: string[] = [];
     if (profile.displayName) parts.push(`Name: ${profile.displayName}`);
     parts.push(`Time zone: ${profile.timezone}`);
-    if (profile.latestWeightKg !== undefined) parts.push(`Weight: ${profile.latestWeightKg} kg`);
-    if (profile.latestHeightCm !== undefined) parts.push(`Height: ${profile.latestHeightCm} cm`);
+    if (profile.latestWeightKg !== undefined)
+      parts.push(`Weight: ${profile.latestWeightKg} kg`);
+    if (profile.latestHeightCm !== undefined)
+      parts.push(`Height: ${profile.latestHeightCm} cm`);
     if (profile.bmi !== undefined) parts.push(`BMI: ${profile.bmi}`);
-    if (profile.foodLikes.length > 0) parts.push(`Likes: ${profile.foodLikes.join(', ')}`);
-    if (profile.foodDislikes.length > 0) parts.push(`Dislikes: ${profile.foodDislikes.join(', ')}`);
+    if (profile.foodLikes.length > 0)
+      parts.push(`Likes: ${profile.foodLikes.join(', ')}`);
+    if (profile.foodDislikes.length > 0)
+      parts.push(`Dislikes: ${profile.foodDislikes.join(', ')}`);
     // Always spelled out when present, and never abbreviated: this is the line
     // that keeps a suggestion from harming someone.
-    if (profile.allergies.length > 0) parts.push(`Allergies: ${profile.allergies.join(', ')}`);
-    if (profile.symptoms.length > 0) parts.push(`Symptoms: ${profile.symptoms.join(', ')}`);
+    if (profile.allergies.length > 0)
+      parts.push(`Allergies: ${profile.allergies.join(', ')}`);
+    if (profile.symptoms.length > 0)
+      parts.push(`Symptoms: ${profile.symptoms.join(', ')}`);
 
     return parts.join('\n');
   }
@@ -149,7 +158,9 @@ function omitEmpty<T extends Record<string, unknown>>(
   return out as { [K in keyof T]?: Exclude<T[K], null | undefined> };
 }
 
-function omitEmptyLists(fields: Record<string, string[]>): Record<string, string[]> {
+function omitEmptyLists(
+  fields: Record<string, string[]>,
+): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(fields)) {
     if (value.length > 0) out[key] = value;

@@ -25,7 +25,7 @@
   },
   "overrides": [
     {
-      "comment": "A Nest module is a class with nothing in it by design \u2014 the decorator is the whole declaration. Scoped to module files so an accidentally empty class anywhere else is still caught.",
+      "comment": "A Nest module is a class with nothing in it by design — the decorator is the whole declaration. Scoped to module files so an accidentally empty class anywhere else is still caught.",
       "files": [
         "**/*.module.ts"
       ],
@@ -64,7 +64,7 @@
       }
     },
     {
-      "comment": "A context's domain/ and features/ may not reach into another context, and still may not import a driver. Both are repeated here rather than left to the override above, because two overrides setting the same rule may replace rather than merge, and a config change that silently switched the driver rule off would be worse than the gap it closed. This is the rule that was missing when Identity imported Operations' AuditPort while OperationsModule imported IdentityModule back: the graph stopped resolving in both roles and nothing but a boot failure said why. infrastructure/ is deliberately absent from the file list - an adapter binding a local port to another context is the sanctioned seam, and admin-device.lookup.ts and admin-password.probe.ts are exactly that.",
+      "comment": "A context's domain/ and features/ may not reach into another context, and still may not import a driver. Both are repeated here rather than left to the override above, because two overrides setting the same rule may replace rather than merge, and a config change that silently switched the driver rule off would be worse than the gap it closed. This is the rule that was missing when Identity imported Operations' AuditPort while OperationsModule imported IdentityModule back: the graph stopped resolving in both roles and nothing but a boot failure said why. infrastructure/ is deliberately absent from the file list - an adapter binding a local port to another context is the sanctioned seam, and admin-device.lookup.ts and admin-password.probe.ts are exactly that. The context names are enumerated rather than matched with a wildcard, and that is not laziness in the config - the depth that means \"a sibling context\" differs by where the file sits (`../../Y` from domain/, `../../../Y` from features/<slice>/), so a blanket `../../*` would also forbid a slice importing its own context's domain/. Enumerating costs a dozen patterns per context and is provably right; the wildcard is shorter and wrong. Every new context adds its name here in the same change that creates it, and the rule is probed by writing a file that should fail and checking it does.",
       "files": [
         "apps/backend/src/contexts/*/domain/**",
         "apps/backend/src/contexts/*/features/**"
@@ -122,7 +122,55 @@
                   "../../../../contexts/profile",
                   "../../../../contexts/profile/**",
                   "../../../../../contexts/profile",
-                  "../../../../../contexts/profile/**"
+                  "../../../../../contexts/profile/**",
+                  "../../planning",
+                  "../../planning/**",
+                  "../../../planning",
+                  "../../../planning/**",
+                  "../../../../planning",
+                  "../../../../planning/**",
+                  "../../../contexts/planning",
+                  "../../../contexts/planning/**",
+                  "../../../../contexts/planning",
+                  "../../../../contexts/planning/**",
+                  "../../../../../contexts/planning",
+                  "../../../../../contexts/planning/**",
+                  "../../reminders",
+                  "../../reminders/**",
+                  "../../../reminders",
+                  "../../../reminders/**",
+                  "../../../../reminders",
+                  "../../../../reminders/**",
+                  "../../../contexts/reminders",
+                  "../../../contexts/reminders/**",
+                  "../../../../contexts/reminders",
+                  "../../../../contexts/reminders/**",
+                  "../../../../../contexts/reminders",
+                  "../../../../../contexts/reminders/**",
+                  "../../notifications",
+                  "../../notifications/**",
+                  "../../../notifications",
+                  "../../../notifications/**",
+                  "../../../../notifications",
+                  "../../../../notifications/**",
+                  "../../../contexts/notifications",
+                  "../../../contexts/notifications/**",
+                  "../../../../contexts/notifications",
+                  "../../../../contexts/notifications/**",
+                  "../../../../../contexts/notifications",
+                  "../../../../../contexts/notifications/**",
+                  "../../sync",
+                  "../../sync/**",
+                  "../../../sync",
+                  "../../../sync/**",
+                  "../../../../sync",
+                  "../../../../sync/**",
+                  "../../../contexts/sync",
+                  "../../../contexts/sync/**",
+                  "../../../../contexts/sync",
+                  "../../../../contexts/sync/**",
+                  "../../../../../contexts/sync",
+                  "../../../../../contexts/sync/**"
                 ],
                 "message": "Constitution IX: a context may not import another context. Cross-context needs go through a QueryBus call, an outbox event, or a port declared here and bound to an adapter in this context's own infrastructure/ - the one layer allowed to know another context exists. A helper three contexts want belongs in shared/."
               }

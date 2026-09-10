@@ -9,7 +9,9 @@ import { AdminController } from './contexts/identity/features/admin-members/admi
 import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
 import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
+import { PlanningModule } from './contexts/planning/planning.module.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
+import { TasksController } from './contexts/planning/features/create-task/tasks.controller.js';
 import { SettingsController } from './contexts/operations/features/patch-setting/settings.controller.js';
 import { ProfileController } from './contexts/profile/features/update-profile/profile.controller.js';
 import { AuthModule } from './shared/auth/auth.module.js';
@@ -52,6 +54,7 @@ import { WsModule } from './ws/ws.module.js';
     OutboxModule,
     OperationsModule,
     ProfileModule,
+    PlanningModule,
     HealthModule,
 
     // The other two edges. Commands are REST above; these are the reads and the
@@ -69,6 +72,7 @@ import { WsModule } from './ws/ws.module.js';
     ProfileController,
     SettingsController,
     PingController,
+    TasksController,
     InternalAlertsController,
     InternalHeartbeatController,
   ],

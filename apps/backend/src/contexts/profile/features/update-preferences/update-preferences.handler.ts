@@ -87,7 +87,8 @@ export class UpdatePreferencesHandler {
     if (!current) throw new PreferencesNotFound();
 
     const changed = current.patch(validated);
-    if (changed.length > 0) await this.uow.run(() => this.preferences.save(current));
+    if (changed.length > 0)
+      await this.uow.run(() => this.preferences.save(current));
 
     return { changed };
   }

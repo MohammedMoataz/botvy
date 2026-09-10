@@ -126,7 +126,10 @@ export class Preferences extends AggregateRoot<string> {
    * reschedules a member's touches when `endOfDayTime` moves and must not
    * reschedule them when `mealMode` does.
    */
-  patch(values: Partial<Record<PreferenceField, unknown>>, at: Date = new Date()): string[] {
+  patch(
+    values: Partial<Record<PreferenceField, unknown>>,
+    at: Date = new Date(),
+  ): string[] {
     const changed: string[] = [];
 
     for (const field of PREFERENCE_FIELDS) {
@@ -157,9 +160,17 @@ export class Preferences extends AggregateRoot<string> {
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, index) => deepEqual(item, b[index]));
+    return (
+      a.length === b.length &&
+      a.every((item, index) => deepEqual(item, b[index]))
+    );
   }
-  if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
+  if (
+    typeof a === 'object' &&
+    typeof b === 'object' &&
+    a !== null &&
+    b !== null
+  ) {
     const left = a as Record<string, unknown>;
     const right = b as Record<string, unknown>;
     const keys = Object.keys(left);

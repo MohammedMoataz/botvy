@@ -11,6 +11,7 @@ import {
   PreferencesSchema,
   ProfileSchema,
 } from '../../shared/persistence/mongo/schemas.js';
+import { MemberContextPort } from '../../shared/member/member-context.port.js';
 import { OutboxModule } from '../../shared/outbox/outbox.module.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { OperationsModule } from '../operations/operations.module.js';
@@ -25,6 +26,7 @@ import { PurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-dele
 import { UpdatePreferencesHandler } from './features/update-preferences/update-preferences.handler.js';
 import { UpdateProfileHandler } from './features/update-profile/update-profile.handler.js';
 import { FilesystemPhotoStore } from './infrastructure/filesystem-photo.store.js';
+import { ProfileMemberContext } from './infrastructure/profile-member-context.adapter.js';
 import {
   MongoPreferencesRepository,
   MongoProfileRepository,
@@ -58,13 +60,19 @@ import {
   providers: [
     {
       provide: ProfileRepository,
-      inject: [getModelToken(MODEL_NAMES.profile), getModelToken(MODEL_NAMES.outbox)],
+      inject: [
+        getModelToken(MODEL_NAMES.profile),
+        getModelToken(MODEL_NAMES.outbox),
+      ],
       useFactory: (model: Model<ProfileDoc>, outbox: Model<OutboxInsert>) =>
         new MongoProfileRepository(model, outbox),
     },
     {
       provide: PreferencesRepository,
-      inject: [getModelToken(MODEL_NAMES.preferences), getModelToken(MODEL_NAMES.outbox)],
+      inject: [
+        getModelToken(MODEL_NAMES.preferences),
+        getModelToken(MODEL_NAMES.outbox),
+      ],
       useFactory: (model: Model<PreferencesDoc>, outbox: Model<OutboxInsert>) =>
         new MongoPreferencesRepository(model, outbox),
     },
@@ -77,18 +85,36 @@ import {
     },
     {
       provide: BootstrapOnRegisteredHandler,
-      inject: [UnitOfWork, ProfileRepository, PreferencesRepository, SettingsService],
+      inject: [
+        UnitOfWork,
+        ProfileRepository,
+        PreferencesRepository,
+        SettingsService,
+      ],
       useFactory: (
         uow: UnitOfWork,
         profiles: ProfileRepository,
         preferences: PreferencesRepository,
         settings: SettingsService,
-      ) => new BootstrapOnRegisteredHandler(uow, profiles, preferences, settings),
+      ) =>
+        new BootstrapOnRegisteredHandler(uow, profiles, preferences, settings),
     },
     UpdateProfileHandler,
     UpdatePreferencesHandler,
     ProfileQueryHandler,
     PurgeOnDeletedHandler,
+    {
+      // Profile owns the facts; the port lives in `shared/` so that Planning,
+      // Reminders and Notifications can ask the scheduling questions without
+      // any of them importing this context. See `member-context.port.ts`.
+      provide: MemberContextPort,
+      inject: [ProfileRepository, PreferencesRepository, SettingsService],
+      useFactory: (
+        profiles: ProfileRepository,
+        preferences: PreferencesRepository,
+        settings: SettingsService,
+      ) => new ProfileMemberContext(profiles, preferences, settings),
+    },
     MongoUnitOfWork,
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
@@ -101,6 +127,7 @@ import {
     UpdatePreferencesHandler,
     BootstrapOnRegisteredHandler,
     PurgeOnDeletedHandler,
+    MemberContextPort,
   ],
 })
 export class ProfileModule {}

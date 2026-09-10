@@ -125,7 +125,10 @@ export class Profile extends AggregateRoot<string> {
   private applyDetails(details: ProfileDetails): string[] {
     const changed: string[] = [];
 
-    const set = <K extends keyof ProfileDetails>(field: K, value: ProfileDetails[K]): void => {
+    const set = <K extends keyof ProfileDetails>(
+      field: K,
+      value: ProfileDetails[K],
+    ): void => {
       if (value === undefined) return;
 
       if (field === 'onboardingCompletedAt') {
@@ -147,7 +150,9 @@ export class Profile extends AggregateRoot<string> {
 
     set(
       'displayName',
-      details.displayName === undefined ? undefined : trimToNull(details.displayName),
+      details.displayName === undefined
+        ? undefined
+        : trimToNull(details.displayName),
     );
     set('photoPath', details.photoPath);
     set('timezone', details.timezone);
@@ -157,8 +162,14 @@ export class Profile extends AggregateRoot<string> {
     return changed;
   }
 
-  private applyFoods(likes: string[] | undefined, dislikes: string[] | undefined): string[] {
-    return [...this.applyList('foodLikes', likes), ...this.applyList('foodDislikes', dislikes)];
+  private applyFoods(
+    likes: string[] | undefined,
+    dislikes: string[] | undefined,
+  ): string[] {
+    return [
+      ...this.applyList('foodLikes', likes),
+      ...this.applyList('foodDislikes', dislikes),
+    ];
   }
 
   /**
@@ -222,7 +233,8 @@ export class Profile extends AggregateRoot<string> {
   get bmi(): number | undefined {
     const weight = this.latestWeightKg;
     const height = this.latestHeightCm;
-    if (weight === undefined || height === undefined || height <= 0) return undefined;
+    if (weight === undefined || height === undefined || height <= 0)
+      return undefined;
 
     const metres = height / 100;
     return Math.round((weight / (metres * metres)) * 10) / 10;

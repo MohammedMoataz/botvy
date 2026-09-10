@@ -4,7 +4,10 @@ import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import { Preferences } from '../../domain/preferences.aggregate.js';
 import { Profile } from '../../domain/profile.aggregate.js';
-import { PreferencesRepository, ProfileRepository } from '../../domain/profile.repository.js';
+import {
+  PreferencesRepository,
+  ProfileRepository,
+} from '../../domain/profile.repository.js';
 
 interface UserRegisteredPayload {
   email?: string;
@@ -46,7 +49,9 @@ export class BootstrapOnRegisteredHandler {
   async handle(event: DomainEvent): Promise<'created' | 'already-there'> {
     const userId = event.userId;
     if (!userId) {
-      this.logger.warn(`${event.name} ${event.eventId} carries no userId; nothing to bootstrap`);
+      this.logger.warn(
+        `${event.name} ${event.eventId} carries no userId; nothing to bootstrap`,
+      );
       return 'already-there';
     }
 
@@ -102,13 +107,19 @@ export class BootstrapOnRegisteredHandler {
       const defaults = {
         planTomorrowTime: await this.settings.get('defaults.planTomorrowTime'),
         endOfDayTime: await this.settings.get('defaults.endOfDayTime'),
-        morningBriefingTime: await this.settings.get('defaults.morningBriefingTime'),
-        nextPracticeCutoff: await this.settings.get('defaults.nextPracticeCutoff'),
+        morningBriefingTime: await this.settings.get(
+          'defaults.morningBriefingTime',
+        ),
+        nextPracticeCutoff: await this.settings.get(
+          'defaults.nextPracticeCutoff',
+        ),
         leadTimes: await this.settings.get('defaults.leadTimes'),
         quietHours: await this.settings.get('defaults.quietHours'),
         weekStartsOn: await this.settings.get('defaults.weekStartsOn'),
         checkinEnabled: await this.settings.get('defaults.checkinEnabled'),
-        meetingDurationMin: await this.settings.get('defaults.meetingDurationMin'),
+        meetingDurationMin: await this.settings.get(
+          'defaults.meetingDurationMin',
+        ),
         mealMode: await this.settings.get('defaults.mealMode'),
         aiSuggestions: await this.settings.get('defaults.aiSuggestions'),
       };

@@ -33,7 +33,10 @@ let uow: InMemoryUnitOfWork;
 const NOW = new Date('2026-09-09T10:00:00.000Z');
 const OWNER = { kind: 'user', id: 'admin-1', role: 'admin' } as const;
 
-function registered(userId: string, payload: Record<string, unknown> = {}): DomainEvent {
+function registered(
+  userId: string,
+  payload: Record<string, unknown> = {},
+): DomainEvent {
   return {
     eventId: newId(),
     name: 'identity.UserRegistered',
@@ -41,13 +44,23 @@ function registered(userId: string, payload: Record<string, unknown> = {}): Doma
     aggregate: { type: 'user', id: userId },
     userId,
     occurredAt: NOW,
-    payload: { email: `${userId}@example.test`, locale: null, timezone: null, ...payload },
+    payload: {
+      email: `${userId}@example.test`,
+      locale: null,
+      timezone: null,
+      ...payload,
+    },
     schemaVersion: 1,
   };
 }
 
 function deleted(userId: string): DomainEvent {
-  return { ...registered(userId), eventId: newId(), name: 'identity.UserDeleted', payload: {} };
+  return {
+    ...registered(userId),
+    eventId: newId(),
+    name: 'identity.UserDeleted',
+    payload: {},
+  };
 }
 
 describe('bootstrap on registered', () => {
@@ -60,8 +73,16 @@ describe('bootstrap on registered', () => {
     uow = new InMemoryUnitOfWork();
     profiles = new InMemoryProfileRepository(uow);
     preferences = new InMemoryPreferencesRepository(uow);
-    settings = new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter());
-    handler = new BootstrapOnRegisteredHandler(uow, profiles, preferences, settings);
+    settings = new SettingsService(
+      new InMemorySettingsStore(),
+      new InMemoryAuditAdapter(),
+    );
+    handler = new BootstrapOnRegisteredHandler(
+      uow,
+      profiles,
+      preferences,
+      settings,
+    );
   });
 
   it('creates a profile and preferences from the registry defaults', async () => {
@@ -96,12 +117,16 @@ describe('bootstrap on registered', () => {
 
     await handler.handle(registered('user-1'));
 
-    expect((await preferences.find('user-1'))?.morningBriefingTime).toBe('06:30');
+    expect((await preferences.find('user-1'))?.morningBriefingTime).toBe(
+      '06:30',
+    );
   });
 
   /** A member who told us their time zone should not be given the host's. */
   it('prefers what registration supplied over the default', async () => {
-    await handler.handle(registered('user-1', { timezone: 'Europe/Berlin', locale: 'ar' }));
+    await handler.handle(
+      registered('user-1', { timezone: 'Europe/Berlin', locale: 'ar' }),
+    );
 
     const profile = await profiles.find('user-1');
     expect(profile?.timezone).toBe('Europe/Berlin');
@@ -118,8 +143,12 @@ describe('bootstrap on registered', () => {
 
     await handler.handle(registered('later-member'));
 
-    expect((await preferences.find('early-member'))?.morningBriefingTime).toBe('08:00');
-    expect((await preferences.find('later-member'))?.morningBriefingTime).toBe('07:15');
+    expect((await preferences.find('early-member'))?.morningBriefingTime).toBe(
+      '08:00',
+    );
+    expect((await preferences.find('later-member'))?.morningBriefingTime).toBe(
+      '07:15',
+    );
   });
 
   /** The list must be the member's own, not a reference into the settings cache. */
@@ -181,12 +210,16 @@ describe('update profile', () => {
 
   const names = () => profiles.events.map((event) => event.name);
   const changedIn = () =>
-    profiles.events.flatMap((event) => (event.payload as { changed: string[] }).changed);
+    profiles.events.flatMap(
+      (event) => (event.payload as { changed: string[] }).changed,
+    );
 
   /** Consumers key off the field name: a time-zone change reschedules
    * everything the member has, and a locale change reschedules nothing. */
   it('names only the fields that moved', async () => {
-    const result = await handler.handle('user-1', { timezone: 'Europe/Berlin' });
+    const result = await handler.handle('user-1', {
+      timezone: 'Europe/Berlin',
+    });
 
     expect(result.changed).toEqual(['timezone']);
     expect(names()).toEqual(['profile.ProfileUpdated']);
@@ -210,19 +243,25 @@ describe('update profile', () => {
     });
 
     expect(names()).toEqual(['profile.ProfileUpdated']);
-    expect(changedIn().sort()).toEqual(['allergies', 'displayName', 'timezone']);
+    expect(changedIn().sort()).toEqual([
+      'allergies',
+      'displayName',
+      'timezone',
+    ]);
   });
 
   it('refuses a time zone Intl does not recognise', async () => {
-    await expect(handler.handle('user-1', { timezone: 'Cairo' })).rejects.toBeInstanceOf(
-      InvalidTimezone,
-    );
+    await expect(
+      handler.handle('user-1', { timezone: 'Cairo' }),
+    ).rejects.toBeInstanceOf(InvalidTimezone);
   });
 
   it('refuses a patch for a member with no profile', async () => {
     await profiles.remove('user-1');
 
-    await expect(handler.handle('user-1', { locale: 'ar' })).rejects.toBeInstanceOf(ProfileNotFound);
+    await expect(
+      handler.handle('user-1', { locale: 'ar' }),
+    ).rejects.toBeInstanceOf(ProfileNotFound);
   });
 
   /**
@@ -231,9 +270,14 @@ describe('update profile', () => {
    * get withheld.
    */
   it('normalises allergies, and treats a re-ordering as no change', async () => {
-    await handler.handle('user-1', { allergies: ['  Peanuts ', 'SHELLFISH', 'peanuts'] });
+    await handler.handle('user-1', {
+      allergies: ['  Peanuts ', 'SHELLFISH', 'peanuts'],
+    });
 
-    expect((await profiles.find('user-1'))?.allergies).toEqual(['peanuts', 'shellfish']);
+    expect((await profiles.find('user-1'))?.allergies).toEqual([
+      'peanuts',
+      'shellfish',
+    ]);
 
     profiles.events.length = 0;
     await handler.handle('user-1', { allergies: ['peanuts', 'shellfish'] });
@@ -265,7 +309,11 @@ describe('update profile', () => {
   });
 
   it('stores a photo and points the profile at it', async () => {
-    const result = await handler.setPhoto('user-1', Buffer.from('image-bytes'), 'image/png');
+    const result = await handler.setPhoto(
+      'user-1',
+      Buffer.from('image-bytes'),
+      'image/png',
+    );
 
     expect((await profiles.find('user-1'))?.photoPath).toBe(result.photoPath);
   });
@@ -273,7 +321,11 @@ describe('update profile', () => {
   /** Deleted after the new path is saved: the other order loses the member
    * their photo if the process dies in between. */
   it('removes the previous photo once the new one is recorded', async () => {
-    const first = await handler.setPhoto('user-1', Buffer.from('one'), 'image/png');
+    const first = await handler.setPhoto(
+      'user-1',
+      Buffer.from('one'),
+      'image/png',
+    );
     await handler.setPhoto('user-1', Buffer.from('two'), 'image/png');
 
     expect(await photos.read(first.photoPath)).toBeNull();
@@ -282,9 +334,9 @@ describe('update profile', () => {
   it('refuses a photo that is too large', async () => {
     const big = Buffer.alloc(6 * 1024 * 1024);
 
-    await expect(handler.setPhoto('user-1', big, 'image/png')).rejects.toBeInstanceOf(
-      PhotoRejected,
-    );
+    await expect(
+      handler.setPhoto('user-1', big, 'image/png'),
+    ).rejects.toBeInstanceOf(PhotoRejected);
   });
 
   it('refuses a type that is not an accepted image', async () => {
@@ -306,7 +358,10 @@ describe('update preferences', () => {
       uow,
       new InMemoryProfileRepository(uow),
       preferences,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     ).handle(registered('user-1'));
     preferences.events.length = 0;
   });
@@ -343,9 +398,9 @@ describe('update preferences', () => {
   });
 
   it('refuses a value outside an enum', async () => {
-    await expect(handler.handle('user-1', { weekStartsOn: 'tuesday' })).rejects.toBeInstanceOf(
-      InvalidPreference,
-    );
+    await expect(
+      handler.handle('user-1', { weekStartsOn: 'tuesday' }),
+    ).rejects.toBeInstanceOf(InvalidPreference);
   });
 
   it('refuses a malformed quiet-hours object', async () => {
@@ -373,7 +428,10 @@ describe('update preferences', () => {
   /** `leadTimes` and `quietHours` are not scalars: comparing them by reference
    * would report a change on every save and reschedule the whole day. */
   it('compares the structured fields by value', async () => {
-    await handler.handle('user-1', { leadTimes: ['1h', '0m'], quietHours: { from: '22:00', to: '07:00' } });
+    await handler.handle('user-1', {
+      leadTimes: ['1h', '0m'],
+      quietHours: { from: '22:00', to: '07:00' },
+    });
 
     expect(preferences.events).toEqual([]);
   });
@@ -399,7 +457,10 @@ describe('profile query', () => {
       uow,
       profiles,
       preferences,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     ).handle(registered('user-1'));
   });
 
@@ -445,7 +506,9 @@ describe('profile query', () => {
     profile?.update({ allergies: ['peanuts', 'shellfish'] });
     if (profile) await uow.run(() => profiles.save(profile));
 
-    expect(await query.summary('user-1')).toContain('Allergies: peanuts, shellfish');
+    expect(await query.summary('user-1')).toContain(
+      'Allergies: peanuts, shellfish',
+    );
   });
 
   it('leaves out of the summary what the member never said', async () => {
@@ -473,7 +536,10 @@ describe('purge on deleted', () => {
       uow,
       profiles,
       preferences,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     ).handle(registered('user-1'));
   });
 
@@ -512,7 +578,10 @@ describe('purge on deleted', () => {
       uow,
       profiles,
       preferences,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     ).handle(registered('user-2'));
 
     await handler.handle(deleted('user-1'));

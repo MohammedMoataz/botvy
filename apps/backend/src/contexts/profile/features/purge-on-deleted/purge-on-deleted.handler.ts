@@ -36,21 +36,28 @@ export class PurgeOnDeletedHandler {
   async handle(event: DomainEvent): Promise<'purged' | 'nothing-to-do'> {
     const userId = event.userId;
     if (!userId) {
-      this.logger.warn(`${event.name} ${event.eventId} carries no userId; nothing to purge`);
+      this.logger.warn(
+        `${event.name} ${event.eventId} carries no userId; nothing to purge`,
+      );
       return 'nothing-to-do';
     }
 
-    const [profileRemoved, preferencesRemoved] = await this.uow.run(async () => {
-      const profile = await this.profiles.find(userId);
-      const photoPath = profile?.photoPath ?? null;
+    const [profileRemoved, preferencesRemoved] = await this.uow.run(
+      async () => {
+        const profile = await this.profiles.find(userId);
+        const photoPath = profile?.photoPath ?? null;
 
-      // After the commit, not inside it. Deleting the file is the one step here
-      // that cannot be rolled back, so it must not happen for a transaction
-      // that then fails - the member would keep their row and lose their photo.
-      if (photoPath) this.uow.onCommit(() => this.photos.remove(photoPath));
+        // After the commit, not inside it. Deleting the file is the one step here
+        // that cannot be rolled back, so it must not happen for a transaction
+        // that then fails - the member would keep their row and lose their photo.
+        if (photoPath) this.uow.onCommit(() => this.photos.remove(photoPath));
 
-      return Promise.all([this.profiles.remove(userId), this.preferences.remove(userId)]);
-    });
+        return Promise.all([
+          this.profiles.remove(userId),
+          this.preferences.remove(userId),
+        ]);
+      },
+    );
 
     if (!profileRemoved && !preferencesRemoved) return 'nothing-to-do';
 
