@@ -57,8 +57,8 @@ mirroring the server's.
 ## Phase 6 — Extension and packages
 
 - [ ] T250 [P] Extension: Dexie `tasks`, `labels`, `pending_ops`; sync round trip with the entity subset; Today list with complete/undo; quick add; sync indicator
-- [ ] T251 [P] `packages/sdk`: `TasksStore`, `LabelsStore`, `SyncStore` (cursor, push queue, rejection handling) shared by the extension and the frontend
-- [ ] T252 [P] `pnpm gen:contracts` regenerated; mobile REST models regenerated
+- [X] T251 [P] `packages/sdk`: `TasksStore`, `LabelsStore`, `SyncStore` (cursor, push queue, rejection handling) shared by the extension and the frontend
+- [X] T252 [P] `pnpm gen:contracts` regenerated; mobile REST models regenerated
 
 ## Phase 7 — Retire the demo and polish
 

@@ -30,7 +30,11 @@ describe('the cursor round trip', () => {
     // The caller treats null as "start at the beginning". A client with a
     // mangled cursor gets the first page, which is recoverable; an exception
     // gets them a screen that will not load until they clear their storage.
-    for (const bad of ['', 'not-base64', encodeCursor({ values: [], id: '' }).slice(0, 4)]) {
+    for (const bad of [
+      '',
+      'not-base64',
+      encodeCursor({ values: [], id: '' }).slice(0, 4),
+    ]) {
       expect(decodeCursor(bad)).not.toBe(undefined);
     }
     expect(decodeCursor('%%%')).toBeNull();
@@ -38,7 +42,10 @@ describe('the cursor round trip', () => {
 
   it('reads a position off a row', () => {
     const row = { dueAt: at(1000), priority: 2, title: 'x' };
-    expect(positionOf(BY_DUE, row, 'task-1')).toEqual({ values: [1000, 2], id: 'task-1' });
+    expect(positionOf(BY_DUE, row, 'task-1')).toEqual({
+      values: [1000, 2],
+      id: 'task-1',
+    });
   });
 });
 
@@ -68,8 +75,12 @@ describe('the order is total, so a page boundary is unambiguous', () => {
     // Page through two at a time until the list is exhausted.
     for (let guard = 0; guard < 10; guard += 1) {
       const remaining = rows
-        .filter((row) => (position ? isAfter(BY_DUE, position, row.doc, row.id) : true))
-        .sort((left, right) => compareRows(BY_DUE, left.doc, left.id, right.doc, right.id));
+        .filter((row) =>
+          position ? isAfter(BY_DUE, position, row.doc, row.id) : true,
+        )
+        .sort((left, right) =>
+          compareRows(BY_DUE, left.doc, left.id, right.doc, right.id),
+        );
       if (remaining.length === 0) break;
 
       const page = remaining.slice(0, 2);
@@ -97,8 +108,14 @@ describe('the order is total, so a page boundary is unambiguous', () => {
       .slice(0, 2);
     expect(first.map((row) => row.id)).toEqual(['x', 'y']);
 
-    const position = positionOf(NEWEST_FIRST, first.at(-1)!.doc, first.at(-1)!.id);
-    const next = rows.filter((row) => isAfter(NEWEST_FIRST, position, row.doc, row.id));
+    const position = positionOf(
+      NEWEST_FIRST,
+      first.at(-1)!.doc,
+      first.at(-1)!.id,
+    );
+    const next = rows.filter((row) =>
+      isAfter(NEWEST_FIRST, position, row.doc, row.id),
+    );
     // Only the oldest is left. Not `x` again.
     expect(next.map((row) => row.id)).toEqual(['z']);
   });
@@ -124,7 +141,11 @@ describe('the Mongo filter mirrors the in-memory comparison', () => {
     expect(filter.$or).toHaveLength(3);
     expect(filter.$or[0]).toEqual({ dueAt: { $gt: at(5000) } });
     expect(filter.$or[1]).toEqual({ dueAt: at(5000), priority: { $gt: 2 } });
-    expect(filter.$or[2]).toEqual({ dueAt: at(5000), priority: 2, _id: { $gt: 'task-1' } });
+    expect(filter.$or[2]).toEqual({
+      dueAt: at(5000),
+      priority: 2,
+      _id: { $gt: 'task-1' },
+    });
   });
 
   it('restores a date field as a Date, not the raw milliseconds', () => {

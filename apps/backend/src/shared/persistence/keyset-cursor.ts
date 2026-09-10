@@ -62,7 +62,9 @@ export function encodeCursor(position: CursorPosition): string {
  */
 export function decodeCursor(cursor: string): CursorPosition | null {
   try {
-    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8'),
+    ) as unknown;
     if (
       typeof parsed !== 'object' ||
       parsed === null ||
@@ -114,17 +116,26 @@ export function mongoSort(keys: SortKey[]): Record<string, 1 | -1> {
  * is the nicer reading. Where it shows on screen (undated tasks at the top of a
  * label's group) it is a deliberate, documented consequence.
  */
-export function mongoAfter(keys: SortKey[], position: CursorPosition): Record<string, unknown> {
+export function mongoAfter(
+  keys: SortKey[],
+  position: CursorPosition,
+): Record<string, unknown> {
   const branches: Array<Record<string, unknown>> = [];
 
   for (let i = 0; i < keys.length; i += 1) {
     const branch: Record<string, unknown> = {};
     for (let j = 0; j < i; j += 1) {
-      branch[keys[j]!.field] = restore(position.values[j] ?? null, keys[j]!.field);
+      branch[keys[j]!.field] = restore(
+        position.values[j] ?? null,
+        keys[j]!.field,
+      );
     }
     const key = keys[i]!;
     branch[key.field] = {
-      [key.direction === 'asc' ? '$gt' : '$lt']: restore(position.values[i] ?? null, key.field),
+      [key.direction === 'asc' ? '$gt' : '$lt']: restore(
+        position.values[i] ?? null,
+        key.field,
+      ),
     };
     branches.push(branch);
   }
@@ -133,7 +144,10 @@ export function mongoAfter(keys: SortKey[], position: CursorPosition): Record<st
   // unique.
   const tiebreak: Record<string, unknown> = {};
   for (let j = 0; j < keys.length; j += 1) {
-    tiebreak[keys[j]!.field] = restore(position.values[j] ?? null, keys[j]!.field);
+    tiebreak[keys[j]!.field] = restore(
+      position.values[j] ?? null,
+      keys[j]!.field,
+    );
   }
   tiebreak._id = { $gt: position.id };
   branches.push(tiebreak);
@@ -164,7 +178,8 @@ const DATE_FIELDS = new Set([
 
 function restore(value: string | number | null, field: string): unknown {
   if (value === null) return null;
-  if (DATE_FIELDS.has(field) && typeof value === 'number') return new Date(value);
+  if (DATE_FIELDS.has(field) && typeof value === 'number')
+    return new Date(value);
   return value;
 }
 
@@ -199,14 +214,20 @@ export function isAfter(
 ): boolean {
   for (let i = 0; i < keys.length; i += 1) {
     const key = keys[i]!;
-    const order = compareValues(sortValue(row[key.field]), position.values[i] ?? null);
+    const order = compareValues(
+      sortValue(row[key.field]),
+      position.values[i] ?? null,
+    );
     const directed = key.direction === 'asc' ? order : -order;
     if (directed !== 0) return directed > 0;
   }
   return id > position.id;
 }
 
-function compareValues(a: string | number | null, b: string | number | null): number {
+function compareValues(
+  a: string | number | null,
+  b: string | number | null,
+): number {
   // Null below everything, as Mongo orders it.
   if (a === null && b === null) return 0;
   if (a === null) return -1;

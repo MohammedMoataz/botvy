@@ -423,9 +423,21 @@ export class TasksStore {
   }
 }
 
-/** Milliseconds, with a null sorting last rather than to 1970. */
+/**
+ * Milliseconds, with a null sorting **first** — deliberately, and not because
+ * it is nicer.
+ *
+ * MongoDB orders null below every date, so the server's two adapters both put
+ * an undated task above everything with a deadline; `label` is the only view
+ * that carries one, and `enhancements/E-007` records that ordering as a known
+ * cost rather than a defect. This is the third adapter of the same list, so it
+ * agrees with the other two. A client that quietly sorted nulls last would put
+ * the extension's by-label list in a different order from the phone's, which is
+ * exactly the silent disagreement the server's two adapters were reconciled to
+ * end. If E-007 is ever taken, this line changes with it.
+ */
 function time(value: string | null): number {
-  return value ? new Date(value).getTime() : Number.MAX_SAFE_INTEGER;
+  return value ? new Date(value).getTime() : 0;
 }
 
 /**

@@ -203,7 +203,7 @@ export class LabelsStore {
       sortOrder: 0,
       openTaskCount: 0,
       deletedAt: null,
-      ...(existing ?? {}),
+      ...existing,
       ...patch,
       updatedAt,
     };

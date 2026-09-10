@@ -498,6 +498,15 @@ export class SyncStore {
       const table = this.options.tables[rejection.entity];
       if (!table) continue;
 
+      // Read the queued push **before** the row is touched. Both branches
+      // below drop the queue entry for the id as a side effect of writing the
+      // row — which is right for an accepted change and wrong here, because
+      // this change was refused and its attempt still has to be counted. Doing
+      // it in the other order costs the count silently: the push comes back on
+      // the next pass with `attempts` at zero, and a row the server refuses
+      // forever is re-sent forever without ever reaching `blocked`.
+      const queued = (await table.pending()).find((push) => push.id === rejection.id);
+
       if (rejection.server) {
         // The server has a row: take it. `applyServerRows` is the same path a
         // pull uses, so `baseUpdatedAt` comes out of the server's own
@@ -514,7 +523,6 @@ export class SyncStore {
       // stays queued: the member may still be able to do something about it,
       // and dropping their edit because the server said no once is the failure
       // the cap exists to avoid rather than to cause.
-      const queued = (await table.pending()).find((push) => push.id === rejection.id);
       if (queued) {
         const attempted = { ...queued, attempts: queued.attempts + 1 };
         await table.enqueue(attempted);
