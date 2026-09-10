@@ -3,10 +3,7 @@ import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
 import type { InMemoryUnitOfWork } from '../../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { hashesMatch } from '../../../shared/auth/service-token.guard.js';
 import { Device as DeviceAggregate } from '../domain/device.aggregate.js';
-import {
-  DeviceRepository,
-  type Device,
-} from '../domain/device.repository.js';
+import { DeviceRepository, type Device } from '../domain/device.repository.js';
 import {
   IdentityOutboxRepository,
   type PendingIdentityEvent,
@@ -82,7 +79,8 @@ export class InMemoryUserRepository extends UserRepository {
   async countAdminsExcept(userId: string): Promise<number> {
     let count = 0;
     for (const user of this.byId.values()) {
-      if (user.id !== userId && user.role === 'admin' && user.isActive) count += 1;
+      if (user.id !== userId && user.role === 'admin' && user.isActive)
+        count += 1;
     }
     return count;
   }
@@ -116,7 +114,8 @@ export class InMemoryUserRepository extends UserRepository {
         lastLoginAt: user.lastLoginAt,
         deviceCount: 0,
       })),
-      nextCursor: matched.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
+      nextCursor:
+        matched.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
     };
   }
 }
@@ -163,7 +162,9 @@ export class InMemoryServiceClientRepository extends ServiceClientRepository {
   }
 
   async listAll(): Promise<ServiceClient[]> {
-    return [...this.byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...this.byName.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }
 
   async revoke(id: string): Promise<boolean> {
@@ -196,12 +197,21 @@ export class InMemoryDeviceRepository extends DeviceRepository {
   }
 
   async findById(userId: string, id: string): Promise<DeviceAggregate | null> {
-    const row = this.rows.find((candidate) => candidate.id === id && candidate.userId === userId);
+    const row = this.rows.find(
+      (candidate) => candidate.id === id && candidate.userId === userId,
+    );
     return row ? this.#hydrate(row) : null;
   }
 
   async findByInstallId(installId: string): Promise<DeviceAggregate | null> {
-    const row = this.rows.find((candidate) => candidate.installId === installId);
+    const row = this.rows.find(
+      (candidate) => candidate.installId === installId,
+    );
+    return row ? this.#hydrate(row) : null;
+  }
+
+  async findByPushToken(token: string): Promise<DeviceAggregate | null> {
+    const row = this.rows.find((candidate) => candidate.pushToken === token);
     return row ? this.#hydrate(row) : null;
   }
 
@@ -281,7 +291,11 @@ export class InMemoryRefreshTokenRepository extends RefreshTokenRepository {
     // rotated unconditionally would let a handler spec pass while the real
     // store handed out two live tokens — which is the whole reason the
     // contract test exists.
-    if (!previous || previous.revokedAt !== null || previous.replacedBy !== null) {
+    if (
+      !previous ||
+      previous.revokedAt !== null ||
+      previous.replacedBy !== null
+    ) {
       return null;
     }
     previous.revokedAt = new Date();
@@ -307,7 +321,9 @@ export class InMemoryRefreshTokenRepository extends RefreshTokenRepository {
   }
 
   async deleteExpired(before: Date): Promise<number> {
-    const doomed = this.rows.filter((row) => row.expiresAt.getTime() < before.getTime());
+    const doomed = this.rows.filter(
+      (row) => row.expiresAt.getTime() < before.getTime(),
+    );
     for (const row of doomed) this.rows.splice(this.rows.indexOf(row), 1);
     return doomed.length;
   }
@@ -327,7 +343,8 @@ export class InMemoryRefreshTokenRepository extends RefreshTokenRepository {
 
 @Injectable()
 export class InMemoryIdentityOutboxRepository extends IdentityOutboxRepository {
-  readonly rows: Array<PendingIdentityEvent & { forwardedAt: Date | null }> = [];
+  readonly rows: Array<PendingIdentityEvent & { forwardedAt: Date | null }> =
+    [];
 
   async append(events: DomainEvent[]): Promise<void> {
     for (const event of events) {

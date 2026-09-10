@@ -4,6 +4,7 @@ import { PlatformModule } from './shared/platform/platform.module.js';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
+import { NotificationsModule } from './contexts/notifications/notifications.module.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
 import { RemindersModule } from './contexts/reminders/reminders.module.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
@@ -44,6 +45,9 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     // For `ReminderLifecycleHandler.purgeTombstones`, the other half of the
     // command the sweep dispatches rather than doing itself.
     RemindersModule,
+    // The alert planning saga reacts to events from four contexts, so it runs
+    // where the relay runs. The sweep's own route stays with the backend.
+    NotificationsModule,
     RelayModule,
   ],
   controllers: [HealthzController],

@@ -7,6 +7,8 @@ import { AdminPasswordFlagHandler } from '../../contexts/operations/features/adm
 import { BootstrapOnRegisteredHandler } from '../../contexts/profile/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { PurgeOnDeletedHandler } from '../../contexts/profile/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PingedHandler } from '../../contexts/operations/features/ping/pinged.handler.js';
+import { PlanAlertsSaga } from '../../contexts/notifications/features/plan-alerts-saga/plan-alerts.saga.js';
+import { NotificationsModule } from '../../contexts/notifications/notifications.module.js';
 import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
 import { PlanningModule } from '../../contexts/planning/planning.module.js';
 import { OperationsModule } from '../../contexts/operations/operations.module.js';
@@ -31,6 +33,23 @@ import { RelayRuntime } from './relay.runtime.js';
 import { HTTP_POST, WebhookFanout, type HttpPost } from './webhook-fanout.js';
 
 export const RELAY_JOB = 'outbox.relay';
+
+/**
+ * `profile.ProfileUpdated` has more than one reaction in this table, and this
+ * is the seam where a second one would be added.
+ *
+ * Kept as a named function rather than inlined so that adding the next
+ * subscriber is an edit to one place with an obvious ordering, instead of a
+ * second `case` for a name that already has one — which the language would
+ * accept as a duplicate-case error only if they were literally adjacent, and
+ * otherwise silently prefer the first.
+ */
+async function profileTimezone(
+  event: DomainEvent,
+  alertPlanning: { onProfileUpdated(event: DomainEvent): Promise<void> },
+): Promise<void> {
+  await alertPlanning.onProfileUpdated(event);
+}
 const WEBHOOK_TIMEOUT_MS = 10_000;
 
 /**
@@ -49,6 +68,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     OperationsModule,
     ProfileModule,
     PlanningModule,
+    NotificationsModule,
   ],
   providers: [
     {
@@ -89,6 +109,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         BootstrapOnRegisteredHandler,
         PurgeOnDeletedHandler,
         LabelSnapshotHandler,
+        PlanAlertsSaga,
         HeartbeatService,
       ],
       useFactory: (
@@ -100,6 +121,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         profileBootstrap: BootstrapOnRegisteredHandler,
         profilePurge: PurgeOnDeletedHandler,
         labelSnapshots: LabelSnapshotHandler,
+        alertPlanning: PlanAlertsSaga,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -157,6 +179,56 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 return;
               case 'planning.LabelDeleted':
                 await labelSnapshots.onDeleted(event);
+                return;
+
+              // ---- the alert pipeline ------------------------------------
+              //
+              // Thirteen names, and every one of them is a case in this switch
+              // rather than a decorator, which is the trade this table makes:
+              // the whole subscription list is readable in one place, at the
+              // cost of a handler being silently inert if somebody forgets a
+              // row. E-005 in `enhancements/` proposes closing that half
+              // without giving up the readability.
+              case 'planning.TaskScheduled':
+              case 'planning.TaskRescheduled':
+                await alertPlanning.onTaskScheduled(event);
+                return;
+              case 'planning.TaskCompleted':
+              case 'planning.TaskCancelled':
+              case 'planning.TaskDeleted':
+                await alertPlanning.onTaskClosed(event);
+                return;
+              case 'reminders.ReminderScheduled':
+              case 'reminders.ReminderRescheduled':
+              case 'reminders.ReminderSnoozed':
+                await alertPlanning.onReminderScheduled(event);
+                return;
+              case 'reminders.ReminderCompleted':
+              case 'reminders.ReminderCancelled':
+              case 'reminders.ReminderDeleted':
+              case 'reminders.ReminderPurged':
+                await alertPlanning.onReminderClosed(event);
+                return;
+
+              // The events from outside Planning and Reminders. An alert's
+              // correct instant depends on facts those contexts do not own:
+              // the member's zone is Profile's, and whether they are banned or
+              // have a phone at all is Identity's.
+              case 'profile.ProfileUpdated':
+                await profileTimezone(event, alertPlanning);
+                return;
+              case 'profile.PreferencesChanged':
+                await alertPlanning.onPreferencesChanged(event);
+                return;
+              case 'identity.UserBanned':
+                await alertPlanning.onUserBanned(event);
+                return;
+              case 'identity.UserUnbanned':
+                await alertPlanning.onUserUnbanned(event);
+                return;
+              case 'identity.DeviceRegistered':
+              case 'identity.DeviceRemoved':
+                await alertPlanning.onDevicesChanged(event);
                 return;
               default:
                 return;

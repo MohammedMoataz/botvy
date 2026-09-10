@@ -59,7 +59,11 @@ export class Device extends AggregateRoot<string> {
     device.raise(
       'identity.DeviceRegistered',
       'device',
-      { deviceId: state.id, kind: state.kind, hasPush: state.pushToken !== null },
+      {
+        deviceId: state.id,
+        kind: state.kind,
+        hasPush: state.pushToken !== null,
+      },
       state.createdAt,
     );
     return device;
@@ -71,10 +75,18 @@ export class Device extends AggregateRoot<string> {
    * not wake the notification context.
    */
   reregister(
-    changes: { kind?: DeviceKind; name?: string | null; pushToken?: string | null },
+    changes: {
+      kind?: DeviceKind;
+      name?: string | null;
+      pushToken?: string | null;
+    },
     at: Date = new Date(),
   ): void {
-    const before = { kind: this.kind, name: this.name, pushToken: this.pushToken };
+    const before = {
+      kind: this.kind,
+      name: this.name,
+      pushToken: this.pushToken,
+    };
 
     if (changes.kind !== undefined) this.kind = changes.kind;
     if (changes.name !== undefined) this.name = changes.name;
@@ -88,10 +100,47 @@ export class Device extends AggregateRoot<string> {
       this.raise(
         'identity.DeviceRegistered',
         'device',
-        { deviceId: this.id, kind: this.kind, hasPush: this.pushToken !== null },
+        {
+          deviceId: this.id,
+          kind: this.kind,
+          hasPush: this.pushToken !== null,
+        },
         at,
       );
     }
+  }
+
+  /**
+   * The push service has told us this token is no longer deliverable.
+   *
+   * A separate operation from `reregister`, and the difference is one line:
+   * this does **not** stamp `lastSeenAt`. `reregister` means "the app launched
+   * and told us its token", which is genuine evidence the device is alive and
+   * has synced. This means "a third party told us the token is dead", which is
+   * evidence of the opposite.
+   *
+   * Calling `reregister` here would be the expensive mistake: `lastSeenAt`
+   * would jump to now, and the notification sweep skips any device whose
+   * `lastSeenAt` is at or after an alert's `plannedAt` — on the grounds that
+   * such a device has synced and holds its own local alarm. A device that has
+   * not synced for a week would suddenly qualify, so every alert would be
+   * skipped for it and the member would stop being notified entirely.
+   *
+   * Raises `DeviceRemoved` rather than `DeviceRegistered`: from every
+   * consumer's point of view a device that cannot receive a push has left the
+   * set of devices worth planning for, which is exactly what that event means.
+   */
+  losePushToken(at: Date = new Date()): boolean {
+    if (this.pushToken === null) return false;
+    this.pushToken = null;
+    this.updatedAt = at;
+    this.raise(
+      'identity.DeviceRemoved',
+      'device',
+      { deviceId: this.id, kind: this.kind, hasPush: false },
+      at,
+    );
+    return true;
   }
 
   seen(at: Date = new Date()): void {

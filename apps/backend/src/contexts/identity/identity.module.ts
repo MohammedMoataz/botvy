@@ -20,6 +20,7 @@ import { ChangePasswordHandler } from './features/change-password/change-passwor
 import { DeleteAccountHandler } from './features/delete-account/delete-account.handler.js';
 import { GoogleSignInHandler } from './features/google-sign-in/google-sign-in.handler.js';
 import { LogoutHandler } from './features/logout/logout.handler.js';
+import { ReapPushTokenHandler } from './features/register-device/reap-push-token.handler.js';
 import { RegisterDeviceHandler } from './features/register-device/register-device.handler.js';
 import { RefreshHandler } from './features/refresh/refresh.handler.js';
 import { RegisterHandler } from './features/register/register.handler.js';
@@ -56,7 +57,8 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     {
       provide: IdentityOutboxRepository,
       inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => new PrismaIdentityOutboxRepository(prisma),
+      useFactory: (prisma: PrismaService) =>
+        new PrismaIdentityOutboxRepository(prisma),
     },
     {
       provide: UserRepository,
@@ -67,7 +69,8 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     {
       provide: ServiceClientRepository,
       inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => new PrismaServiceClientRepository(prisma),
+      useFactory: (prisma: PrismaService) =>
+        new PrismaServiceClientRepository(prisma),
     },
     {
       provide: DeviceRepository,
@@ -78,7 +81,8 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     {
       provide: RefreshTokenRepository,
       inject: [PrismaService],
-      useFactory: (prisma: PrismaService) => new PrismaRefreshTokenRepository(prisma),
+      useFactory: (prisma: PrismaService) =>
+        new PrismaRefreshTokenRepository(prisma),
     },
     { provide: PASSWORD_HASHER, useClass: ScryptPasswordHasher },
     {
@@ -95,6 +99,7 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
     RegisterHandler,
     RefreshHandler,
     RegisterDeviceHandler,
+    ReapPushTokenHandler,
     LogoutHandler,
     DeleteAccountHandler,
     GoogleSignInHandler,
@@ -111,6 +116,10 @@ import { ScryptPasswordHasher } from './infrastructure/scrypt-password.hasher.js
   // did. What leaves this module is the query handler, the credential guard,
   // and the outbox repository the relay's forwarder needs.
   exports: [
+    // One named operation rather than the device repository: the notification
+    // sweep needs to clear a dead push token and nothing else, and handing it
+    // the repository would hand it every device write there is.
+    ReapPushTokenHandler,
     // Operations' bootstrap asks this whether the seeded password is still the
     // default, because only Identity can answer — and Operations owns the
     // registry key that records it. Exporting the seed service is how that

@@ -29,9 +29,23 @@ export abstract class DeviceRepository {
   /** Batched on purpose: the sweep asks about many members at once. */
   abstract listByUsers(userIds: string[]): Promise<Device[]>;
 
-  abstract findById(userId: string, id: string): Promise<DeviceAggregate | null>;
+  abstract findById(
+    userId: string,
+    id: string,
+  ): Promise<DeviceAggregate | null>;
 
   abstract findByInstallId(installId: string): Promise<DeviceAggregate | null>;
+
+  /**
+   * The device holding a particular push token, if any.
+   *
+   * Added for the notification sweep, which learns from FCM that a token is no
+   * longer valid and knows nothing else about the device — the token is all the
+   * push service reports. Identity clears it through the aggregate rather than
+   * letting anybody write the column, so `DeviceUpdated` still goes out and the
+   * alert saga still re-plans for a member who has just lost their push route.
+   */
+  abstract findByPushToken(token: string): Promise<DeviceAggregate | null>;
 
   abstract save(device: DeviceAggregate): Promise<void>;
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Device } from './device.aggregate.js';
-import { judgeRefresh, refreshExpiry, type RefreshTokenRecord } from './session-chain.js';
+import {
+  judgeRefresh,
+  refreshExpiry,
+  type RefreshTokenRecord,
+} from './session-chain.js';
 import { GoogleAlreadyLinked, User } from './user.aggregate.js';
 
 const NOW = new Date('2026-09-09T10:00:00.000Z');
@@ -63,7 +67,10 @@ describe('user aggregate', () => {
 
     expect(account.isActive).toBe(false);
     expect(names(account)).toEqual(['identity.UserBanned']);
-    expect(account.pendingEvents[0]?.payload).toMatchObject({ by: 'admin-1', reason: 'spam' });
+    expect(account.pendingEvents[0]?.payload).toMatchObject({
+      by: 'admin-1',
+      reason: 'spam',
+    });
   });
 
   /** An admin clicking twice must not make a consumer count two bans. */
@@ -89,7 +96,10 @@ describe('user aggregate', () => {
 
     account.setRole('admin', 'admin-1');
 
-    expect(account.pendingEvents[0]?.payload).toMatchObject({ from: 'user', to: 'admin' });
+    expect(account.pendingEvents[0]?.payload).toMatchObject({
+      from: 'user',
+      to: 'admin',
+    });
   });
 
   it('raises nothing when the role is already what was asked for', () => {
@@ -141,7 +151,10 @@ describe('device aggregate', () => {
     const device = registered();
 
     expect(names(device)).toEqual(['identity.DeviceRegistered']);
-    expect(device.pendingEvents[0]?.payload).toMatchObject({ kind: 'android', hasPush: true });
+    expect(device.pendingEvents[0]?.payload).toMatchObject({
+      kind: 'android',
+      hasPush: true,
+    });
   });
 
   /**
@@ -186,10 +199,56 @@ describe('device aggregate', () => {
 
     expect(device.lastSeenAt).toEqual(later);
   });
+
+  /**
+   * The other half of that rule, and the reason `losePushToken` exists as its
+   * own operation rather than as `reregister({ pushToken: null })`.
+   *
+   * `reregister` means "the app launched and told us its token", which is
+   * evidence the device is alive — so it stamps `lastSeenAt`. Losing a token
+   * means "the push service told us the token is dead", which is evidence of
+   * the opposite, and stamping `lastSeenAt` would be actively harmful: the
+   * notification sweep skips any device whose `lastSeenAt` is at or after an
+   * alert's `plannedAt`, on the grounds that such a device has synced and holds
+   * its own local alarm. A phone that had not synced for a week would suddenly
+   * qualify, so every alert would be skipped for it and the member would stop
+   * being notified at all.
+   */
+  it('clears a dead push token without stamping lastSeenAt', () => {
+    const device = registered();
+    // `register` leaves its own event pending; drain it so the assertion below
+    // is about what losing the token raised and nothing else.
+    device.pullEvents();
+    const lastSynced = device.lastSeenAt;
+
+    const changed = device.losePushToken(new Date(NOW.getTime() + 3_600_000));
+
+    expect(changed).toBe(true);
+    expect(device.pushToken).toBeNull();
+    // The important assertion: the device is not reported as freshly synced.
+    expect(device.lastSeenAt).toEqual(lastSynced);
+    expect(names(device)).toEqual(['identity.DeviceRemoved']);
+    expect(device.pendingEvents[0]?.payload).toMatchObject({ hasPush: false });
+  });
+
+  it('does nothing, and raises nothing, for a device that had no token', () => {
+    // The sweep can be handed the same token twice in one pass, and a device
+    // already reaped must not raise a second `DeviceRemoved` that re-plans
+    // everybody's alerts again.
+    const device = registered();
+    device.losePushToken();
+    device.pullEvents();
+
+    // Second time round there is nothing left to clear.
+    expect(device.losePushToken()).toBe(false);
+    expect(names(device)).toEqual([]);
+  });
 });
 
 describe('refresh chain', () => {
-  const record = (overrides: Partial<RefreshTokenRecord> = {}): RefreshTokenRecord => ({
+  const record = (
+    overrides: Partial<RefreshTokenRecord> = {},
+  ): RefreshTokenRecord => ({
     id: 'rt-1',
     userId: 'user-1',
     familyId: 'fam-1',
@@ -237,15 +296,24 @@ describe('refresh chain', () => {
    * a family alive by waiting for the token to age out first.
    */
   it('prefers replay over expiry when a token is both', () => {
-    const both = record({ replacedBy: 'rt-2', expiresAt: new Date(NOW.getTime() - 1) });
+    const both = record({
+      replacedBy: 'rt-2',
+      expiresAt: new Date(NOW.getTime() - 1),
+    });
 
     expect(judgeRefresh(both, NOW).outcome).toBe('replayed');
   });
 
   it('reads the configured lifetime', () => {
-    expect(refreshExpiry('30d', NOW)).toEqual(new Date(NOW.getTime() + 30 * 86_400_000));
-    expect(refreshExpiry('12h', NOW)).toEqual(new Date(NOW.getTime() + 12 * 3_600_000));
-    expect(refreshExpiry('45m', NOW)).toEqual(new Date(NOW.getTime() + 45 * 60_000));
+    expect(refreshExpiry('30d', NOW)).toEqual(
+      new Date(NOW.getTime() + 30 * 86_400_000),
+    );
+    expect(refreshExpiry('12h', NOW)).toEqual(
+      new Date(NOW.getTime() + 12 * 3_600_000),
+    );
+    expect(refreshExpiry('45m', NOW)).toEqual(
+      new Date(NOW.getTime() + 45 * 60_000),
+    );
   });
 
   /** A malformed lifetime silently defaulting is a session that never expires. */

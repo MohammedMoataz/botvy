@@ -11,7 +11,11 @@ import {
   toIdentityOutboxRow,
 } from '../../../shared/persistence/prisma/prisma-unit-of-work.js';
 import { Device as DeviceAggregate } from '../domain/device.aggregate.js';
-import { DeviceRepository, type Device, type DeviceKind } from '../domain/device.repository.js';
+import {
+  DeviceRepository,
+  type Device,
+  type DeviceKind,
+} from '../domain/device.repository.js';
 import {
   RefreshTokenRepository,
   type IssueRefreshToken,
@@ -95,7 +99,12 @@ export class PrismaUserRepository extends UserRepository {
 
   async countAdminsExcept(userId: string): Promise<number> {
     return client(this.prisma).user.count({
-      where: { role: 'admin', status: 'active', deletedAt: null, id: { not: userId } },
+      where: {
+        role: 'admin',
+        status: 'active',
+        deletedAt: null,
+        id: { not: userId },
+      },
     });
   }
 
@@ -123,7 +132,8 @@ export class PrismaUserRepository extends UserRepository {
     const page = rows.slice(0, criteria.limit);
     return {
       members: page.map(toMemberSummary),
-      nextCursor: rows.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
+      nextCursor:
+        rows.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
     };
   }
 }
@@ -135,7 +145,9 @@ export class PrismaServiceClientRepository extends ServiceClientRepository {
   }
 
   async findByName(name: string): Promise<ServiceClient | null> {
-    const row = await client(this.prisma).serviceClient.findUnique({ where: { name } });
+    const row = await client(this.prisma).serviceClient.findUnique({
+      where: { name },
+    });
     return row ? toServiceClient(row) : null;
   }
 
@@ -163,7 +175,8 @@ export class PrismaServiceClientRepository extends ServiceClientRepository {
       where: { revokedAt: null },
     });
     for (const row of rows) {
-      if (hashesMatch(presentedTokenHash, row.tokenHash)) return toServiceClient(row);
+      if (hashesMatch(presentedTokenHash, row.tokenHash))
+        return toServiceClient(row);
     }
     return null;
   }
@@ -176,7 +189,9 @@ export class PrismaServiceClientRepository extends ServiceClientRepository {
   }
 
   async listAll(): Promise<ServiceClient[]> {
-    const rows = await client(this.prisma).serviceClient.findMany({ orderBy: { name: 'asc' } });
+    const rows = await client(this.prisma).serviceClient.findMany({
+      orderBy: { name: 'asc' },
+    });
     return rows.map(toServiceClient);
   }
 
@@ -199,7 +214,9 @@ export class PrismaDeviceRepository extends DeviceRepository {
   }
 
   async listByUser(userId: string): Promise<Device[]> {
-    const rows = await client(this.prisma).device.findMany({ where: { userId } });
+    const rows = await client(this.prisma).device.findMany({
+      where: { userId },
+    });
     return rows.map(toDevice);
   }
 
@@ -212,12 +229,32 @@ export class PrismaDeviceRepository extends DeviceRepository {
   }
 
   async findById(userId: string, id: string): Promise<DeviceAggregate | null> {
-    const row = await client(this.prisma).device.findFirst({ where: { id, userId } });
+    const row = await client(this.prisma).device.findFirst({
+      where: { id, userId },
+    });
     return row ? toDeviceAggregate(row) : null;
   }
 
   async findByInstallId(installId: string): Promise<DeviceAggregate | null> {
-    const row = await client(this.prisma).device.findUnique({ where: { installId } });
+    const row = await client(this.prisma).device.findUnique({
+      where: { installId },
+    });
+    return row ? toDeviceAggregate(row) : null;
+  }
+
+  async findByPushToken(token: string): Promise<DeviceAggregate | null> {
+    // `fcmToken` is the column; `pushToken` is what the domain calls it. The
+    // mapper is the only place the two names meet, which is why this query
+    // has to use the storage name rather than the one the rest of the codebase
+    // reads.
+    //
+    // `findFirst`, not `findUnique`: a token is not unique in the schema, and
+    // in practice FCM can hand the same one to a reinstalled app. Taking the
+    // first is right — clearing one stale row per sweep converges, and the
+    // sweep is idempotent.
+    const row = await client(this.prisma).device.findFirst({
+      where: { fcmToken: token },
+    });
     return row ? toDeviceAggregate(row) : null;
   }
 
@@ -271,7 +308,9 @@ export class PrismaRefreshTokenRepository extends RefreshTokenRepository {
   }
 
   async findByHash(tokenHash: string): Promise<RefreshTokenRecord | null> {
-    const row = await client(this.prisma).refreshToken.findFirst({ where: { tokenHash } });
+    const row = await client(this.prisma).refreshToken.findFirst({
+      where: { tokenHash },
+    });
     return row ? toRefreshRecord(row) : null;
   }
 
@@ -464,7 +503,7 @@ function toMemberSummary(row: Record<string, unknown>): MemberSummary {
     status: row.status === 'banned' ? 'banned' : 'active',
     createdAt: row.createdAt as Date,
     lastLoginAt: (row.lastLoginAt as Date | null) ?? null,
-    deviceCount: ((row._count as { devices?: number } | undefined)?.devices) ?? 0,
+    deviceCount: (row._count as { devices?: number } | undefined)?.devices ?? 0,
   };
 }
 
