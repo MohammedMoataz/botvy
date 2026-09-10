@@ -13,15 +13,14 @@ the extension (tasks, labels, meetings, calendar events).
   "lastSeq": 1842 | null,                              // last message seq held
   "entities": ["tasks","labels","reminders","meetings","calendar_events","sessions","programs",
                "workouts","meals","links","conversations","messages","daily_plans","checkins",
-               "profile","preferences","athlete_profile"],   // subset allowed
+               "rhythm_state","profile","preferences","athlete_profile"],   // subset allowed
   "push": {
     "tasks":        [ { "op": "create"|"update"|"delete"|"restore"|"purge", "id": "uuidv7", "baseUpdatedAt": ISO|null, "updatedAt": ISO, "data": {…} } ],
     "labels":       [ … ], "reminders": [ … ], "meetings": [ … ], "calendar_events": [ … ],
     "sessions":     [ … ], "programs": [ … ], "workouts": [ … ], "meals": [ … ],
     "links":        [ { "op": "create"|"delete", … } ],
     "conversations":[ { "op": "upsert"|"delete"|"clear", … } ],
-    "daily_plans":  [ { "op": "confirm"|"skip", "date": "YYYY-MM-DD", "taskIds": [] } ],
-    "checkins":     [ { "op": "record", "date": "YYYY-MM-DD", "mood": 70, "adhered": true, "note": null } ],
+    // daily_plans, checkins and rhythm_state are PULL-ONLY -- see below
     "profile":      { "patch": { … allowlisted fields … } },
     "preferences":  { "patch": { … } },
     "athlete_profile": { "patch": { … } }
@@ -75,6 +74,7 @@ Deletes set `deletedAt` only; `status` is never rewritten by a delete.
     "tasks": [ …full rows incl. tombstones… ], "labels": [ … ], "reminders": [ … ], "meetings": [ … ],
     "calendar_events": [ … ], "sessions": [ … ], "programs": [ … ], "workouts": [ … ], "meals": [ … ],
     "links": [ … ], "conversations": [ … ], "daily_plans": [ … ], "checkins": [ … ],
+    "rhythm_state": { … } | null,                     // singleton, patch-shaped like profile
     "profile": { … } | null, "preferences": { … } | null, "athlete_profile": { … } | null,
     "messages": [ { "seq": 1843, "conversationId": "…", "role": "assistant", "content": "…", "clientId": null, "composedAt": null, "createdAt": "…" } ],
     "moreMessages": false
@@ -104,6 +104,61 @@ Deletes set `deletedAt` only; `status` is never rewritten by a delete.
   transaction.
 
 ## Extension subset
+
+## The rhythm's three entities are pull-only
+
+Added in P3, and none of them accepts a push — which is a correction to what
+this file first said, so the reasoning is here rather than in a commit message.
+
+| Entity | Shape | Pull | Push |
+|---|---|---|---|
+| `daily_plans` | row | changed since the cursor | **refused** (`invalid`) |
+| `checkins` | row | changed since the cursor | **refused** (`invalid`) |
+| `rhythm_state` | singleton patch, like `profile` | the one row, or null | **refused** (`invalid`) |
+
+The two writes go over REST instead: `POST /rhythm/plans/:date/confirm`,
+`POST /rhythm/plans/:date/skip` and `POST /rhythm/checkins`.
+
+**Why not a push.** This file originally gave `daily_plans` and `checkins` a
+push of named commands — `{ op: 'confirm' }`, `{ op: 'record' }` — which would
+have needed a third protocol beside the row protocol and the patch protocol,
+because those ops are not the five the conflict rule branches on. The thing a
+third protocol buys is atomicity across entities in one round trip, and neither
+of these needs it: confirming a plan adds and removes ids *within the plan* and
+touches no task, and a check-in is one row of its own. So the push would have
+been a protocol carrying no weight, and `plan.md` had already named REST "the
+permanent path for the notification action" for the check-in — which is the same
+call, made once.
+
+They are still in `entities` and still in `pull`, because the phone holds a copy
+and reads it offline. That is the whole point of them being here.
+
+**A push to any of the three is refused with `invalid`, never `stale`.**
+Retrying unchanged will fail again, and a stale verdict tells the phone to
+overwrite its copy and retry — against a rule that is never going to accept it,
+it would retry for ever. `rhythm_state` matters most: the three claim dates are
+the server's once-a-day guarantee, and a phone that could write them could
+suppress or re-fire its own member's evening.
+
+**Neither `daily_plans` nor `checkins` carries a tombstone.** Neither aggregate
+has a `deletedAt` and neither is ever deleted individually — they go only when
+the account does. So the delete-sweep on a full snapshot must not read a missing
+plan as a deletion, and the wire carries no `deletedAt` key for the phone to
+branch on.
+
+**Their `_id` is composite and server-shaped** (`"<userId>:<YYYY-MM-DD>"`), which
+is the one place the phone must *not* mint a UUIDv7. The date is the identity,
+so two devices that confirm the same day converge on one row by construction.
+
+**`mood` and `adhered` are sent explicitly as `null`, never omitted.** A mood of
+0 is a member having a terrible day and an absent mood is an unanswered half of
+the question; an omitted key reads as "unchanged" to the phone's upsert, so a
+member who cleared a mood would keep the old one for ever.
+
+**Apply order** is 40 (`daily_plans`), 41 (`checkins`), 42 (`rhythm_state`) —
+after tasks at 20. It has no consequence while all three are pull-only, and it
+is stated so the ordering is a decision on the record rather than whatever the
+module's provider list happened to be.
 
 The extension sends `entities: ["tasks","labels","meetings","calendar_events"]`
 and `installId` of kind `chrome_extension`; everything else is identical.

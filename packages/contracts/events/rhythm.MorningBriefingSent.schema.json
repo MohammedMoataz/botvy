@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rhythm.MorningBriefingSent",
+  "description": "Payload of rhythm.MorningBriefingSent. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "taskIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    }
+  },
+  "required": [
+    "date",
+    "taskIds"
+  ],
+  "additionalProperties": false
+}

@@ -4,6 +4,7 @@ import {
   MongoRepositoryBase,
   type OutboxInsert,
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
+import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
 import {
   Preferences,
@@ -120,13 +121,43 @@ const preferencesMapper: Mapper<Preferences, PreferencesDoc> = {
 export class MongoProfileRepository extends ProfileRepository {
   readonly #inner: InnerProfileRepository;
 
-  constructor(model: Model<ProfileDoc>, outbox: Model<OutboxInsert>) {
+  constructor(
+    private readonly model: Model<ProfileDoc>,
+    outbox: Model<OutboxInsert>,
+  ) {
     super();
     this.#inner = new InnerProfileRepository(model, outbox);
   }
 
   async find(userId: string): Promise<Profile | null> {
     return this.#inner.findById(userId, userId);
+  }
+
+  /**
+   * One query for the whole batch.
+   *
+   * It goes to the model directly rather than through the base, because the
+   * base's surface is one document at a time — `findById` filters on `_id` and
+   * `userId` together, which is exactly right for a single lookup and has no
+   * batched form. The filter here is `_id: { $in }` and not `userId: { $in }`
+   * even though the two fields carry the same value: `_id` is the collection's
+   * own index and always present, whereas an index on `userId` is something a
+   * migration has to have declared. Same rows, one that cannot be
+   * accidentally un-indexed.
+   *
+   * The session is joined so a batched read inside a transaction sees that
+   * transaction's own writes, the same as every other read in this file.
+   * `MongoUnitOfWork.currentSession()` returns null outside one, and `.session(null)`
+   * is how the driver spells "no session".
+   */
+  async findMany(userIds: string[]): Promise<Profile[]> {
+    if (userIds.length === 0) return [];
+    const docs = await this.model
+      .find({ _id: { $in: userIds } })
+      .session(MongoUnitOfWork.currentSession())
+      .lean<ProfileDoc[]>()
+      .exec();
+    return docs.map((doc) => profileMapper.toDomain(doc));
   }
 
   async save(profile: Profile): Promise<void> {
@@ -156,13 +187,27 @@ class InnerProfileRepository extends MongoRepositoryBase<Profile, ProfileDoc> {
 export class MongoPreferencesRepository extends PreferencesRepository {
   readonly #inner: InnerPreferencesRepository;
 
-  constructor(model: Model<PreferencesDoc>, outbox: Model<OutboxInsert>) {
+  constructor(
+    private readonly model: Model<PreferencesDoc>,
+    outbox: Model<OutboxInsert>,
+  ) {
     super();
     this.#inner = new InnerPreferencesRepository(model, outbox);
   }
 
   async find(userId: string): Promise<Preferences | null> {
     return this.#inner.findById(userId, userId);
+  }
+
+  /** Same batched read, same reasoning as the profile one above. */
+  async findMany(userIds: string[]): Promise<Preferences[]> {
+    if (userIds.length === 0) return [];
+    const docs = await this.model
+      .find({ _id: { $in: userIds } })
+      .session(MongoUnitOfWork.currentSession())
+      .lean<PreferencesDoc[]>()
+      .exec();
+    return docs.map((doc) => preferencesMapper.toDomain(doc));
   }
 
   async save(preferences: Preferences): Promise<void> {

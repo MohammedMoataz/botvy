@@ -409,6 +409,32 @@ tz.Location memberZone(String? timezone) {
   }
 }
 
+/// The member's own calendar date for an instant, as `YYYY-MM-DD`.
+///
+/// The key the rhythm is filed under: `daily_plans`, `checkins` and the tick's
+/// three claim dates are all keyed on a *local date*, and the server resolves
+/// every one of them against the profile's zone. So the phone has to resolve it
+/// the same way or it reads the wrong day's plan — a member in Cairo asking for
+/// "today" at 01:00 gets yesterday's row if the date is taken from a UTC
+/// instant, and the whole Home screen is then a day behind for the first three
+/// hours of every morning.
+///
+/// It lives next to [memberZone] because it is the same principle wearing a
+/// different hat, and both are wanted by every feature that reads a date.
+/// [addDays] shifts by whole *calendar* days rather than by 24 hours, which is
+/// not the same thing twice a year: `TZDateTime.add(Duration(days: 1))` on the
+/// evening the clock goes back lands at 23:00 the same date, so "tomorrow"
+/// would be today. Rebuilding the date and letting the constructor normalise
+/// `day + n` is what makes the DST day behave — the same reason the task
+/// queries build their day boundaries this way.
+String memberDate(DateTime instant, tz.Location zone, {int addDays = 0}) {
+  final now = tz.TZDateTime.from(instant, zone);
+  final local = tz.TZDateTime(zone, now.year, now.month, now.day + addDays);
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  return '${local.year}-$month-$day';
+}
+
 /// The offsets the member's rows are stored as, or the defaults if the JSON is
 /// unreadable. A member with a corrupt preferences row still gets reminded.
 List<String> decodeStringList(String encoded) {

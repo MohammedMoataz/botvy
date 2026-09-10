@@ -330,6 +330,239 @@ export const AlertSchema = new Schema(
   { collection: 'alerts', versionKey: false },
 );
 
+/**
+ * The daily rhythm's three collections, and the conversation the touches are
+ * written into.
+ *
+ * `_id` is composite for two of them — `"<userId>:<YYYY-MM-DD>"` — which is the
+ * whole idempotency story for a job that runs every five minutes: there is one
+ * plan per member per day by construction, so a tick that fires twice writes
+ * the same document twice rather than creating two. The date in the key is the
+ * member's *local* date, resolved through `shared/time`; a server-side date
+ * here would give a member in Cairo the wrong day for three hours every
+ * evening, which is precisely the failure principle XI exists for.
+ */
+export const DailyPlanSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    date: { type: String, required: true },
+    status: { type: String, required: true, default: 'draft' },
+    /** True when the end-of-day touch set the plan the member never answered. */
+    autoConfirmed: { type: Boolean, required: true, default: false },
+    /**
+     * A snapshot, not a reference list.
+     *
+     * The plan records what the member was *shown* and agreed to, so a task
+     * renamed or deleted afterwards does not rewrite last Tuesday's plan. The
+     * live status comes from Planning when the plan is read; these fields are
+     * what the evening prompt actually said.
+     */
+    tasks: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },
+          title: { type: String, required: true },
+          priority: { type: Number, required: true },
+          dueAt: { type: Date, default: null },
+          deferCount: { type: Number, required: true, default: 0 },
+        },
+      ],
+      default: [],
+    },
+    training: {
+      type: {
+        _id: false,
+        sessionId: { type: String, required: true },
+        title: { type: String, required: true },
+        sport: { type: String, required: true },
+        startAt: { type: Date, required: true },
+      },
+      default: null,
+    },
+    workoutLine: { type: String, default: null },
+    mealLine: { type: String, default: null },
+    promptedAt: { type: Date, default: null },
+    confirmedAt: { type: Date, default: null },
+    summarisedAt: { type: Date, default: null },
+    briefedAt: { type: Date, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'daily_plans', versionKey: false, _id: false },
+);
+
+/**
+ * How the day went, by the member's own account.
+ *
+ * `mood` and `adhered` are both nullable because the two arrive separately: a
+ * one-word reply in the coach chat sets `adhered` and knows nothing about a
+ * mood, and the card on the phone can send a mood with no verdict. A zero mood
+ * is a real answer, so absence has to be `null` rather than falsy.
+ */
+export const CheckinSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    date: { type: String, required: true },
+    mood: { type: Number, default: null },
+    adhered: { type: Boolean, default: null },
+    note: { type: String, default: null },
+    source: { type: String, required: true, default: 'app' },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'checkins', versionKey: false, _id: false },
+);
+
+/**
+ * What has already been sent today, and whether an answer is awaited.
+ *
+ * Three claim dates rather than one "evening" date, and that is load-bearing:
+ * the plan prompt and the end-of-day summary are separate touches an hour
+ * apart, so a gateway that was down at 21:00 and up at 21:30 owes the member
+ * the prompt but not yet the summary. One shared date would either send both or
+ * neither.
+ *
+ * `_id` is the member's id: one row per member, written by
+ * `bootstrap-on-registered` so the tick never reads a row nobody created.
+ */
+export const RhythmStateSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    lastPlanPromptDate: { type: String, default: null },
+    lastEndOfDayDate: { type: String, default: null },
+    lastMorningBriefingDate: { type: String, default: null },
+    awaitingCheckin: { type: Boolean, required: true, default: false },
+    awaitingSince: { type: Date, default: null },
+    streak: {
+      type: {
+        _id: false,
+        current: { type: Number, required: true, default: 0 },
+        best: { type: Number, required: true, default: 0 },
+        lastAdheredDate: { type: String, default: null },
+      },
+      required: true,
+      default: () => ({ current: 0, best: 0, lastAdheredDate: null }),
+    },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'rhythm_states', versionKey: false, _id: false },
+);
+
+/**
+ * A chat. Two of them are pinned and created with the account.
+ *
+ * The uniqueness that makes a replayed `UserRegistered` a no-op is a **partial**
+ * index on `{ userId, kind }` limited to `coach` and `planner` — a member may
+ * have any number of `free` chats, and Mongo treats two documents with the same
+ * pair as duplicates whether or not the value is one we care about. The
+ * migration declares the filter; this schema only records that the fields
+ * exist.
+ */
+export const ConversationSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    kind: { type: String, required: true },
+    title: { type: String, required: true },
+    pinned: { type: Boolean, required: true, default: false },
+    archived: { type: Boolean, required: true, default: false },
+    /** Everything at or below this seq is hidden from the member's transcript. */
+    clearedUpToSeq: { type: Number, required: true, default: 0 },
+    lastMessageAt: { type: Date, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'conversations', versionKey: false, _id: false },
+);
+
+/**
+ * One message, immutable, and that immutability is the reason the cursor is
+ * cheap.
+ *
+ * The phone pulls `seq > lastSeq` against a per-user counter. There is no
+ * `updatedAt` and no tombstone, because there is nothing to update: a column
+ * backfilled onto existing rows can never reach a device that already holds
+ * them, so the answer to a schema change here is to mark the cache and re-pull,
+ * never to edit rows in place.
+ *
+ * Server-minted `_id` (ObjectId): P3 only ever writes assistant turns from a
+ * job, and the member's own turn arrives in P4 carrying a `clientId` for the
+ * retry story rather than minting the `_id`.
+ */
+export const MessageSchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    conversationId: { type: String, required: true },
+    seq: { type: Number, required: true },
+    role: { type: String, required: true },
+    content: { type: String, required: true },
+    clientId: { type: String, default: null },
+    composedAt: { type: Date, default: null },
+    intent: { type: Schema.Types.Mixed, default: null },
+    usage: { type: Schema.Types.Mixed, default: null },
+    createdAt: { type: Date, required: true },
+    /**
+     * Declared, equal to `createdAt`, and read by nothing.
+     *
+     * A message is immutable, so a modification timestamp is meaningless here —
+     * and the data model says so explicitly, because that absence is what makes
+     * the sync cursor one number (`seq > lastSeq`) instead of a date. So this
+     * field is not part of the design; it is a **requirement of the write
+     * path**, and leaving it out was a live defect for the length of one
+     * afternoon.
+     *
+     * `MongoRepositoryBase` filters every save on `updatedAt` for its
+     * optimistic check and writes it back. Mongoose runs `strict: true`, and an
+     * upsert naming a path the schema does not declare is *rejected outright*:
+     * `Path "updatedAt" is not in schema, strict mode is 'true', and upsert is
+     * 'true'`. Every rhythm touch therefore saved its plan, raised its event,
+     * planned its alert — and failed to write the sentence into the member's
+     * coach chat, which is the one thing FR-005 is about. All 740 unit tests
+     * passed throughout, because the in-memory adapter has no schema to be
+     * strict about, and the tick's per-member `catch` turned the failure into a
+     * log line nobody was reading.
+     *
+     * This is the *second* time this exact defect has shipped — `AlertSchema`
+     * had it in P2, and the whole notification pipeline was dead for a phase.
+     * So the fix is not only this line: `schemas.spec.ts` now asserts that
+     * every collection written through the repository base declares
+     * `updatedAt`, which is the check that would have caught both.
+     *
+     * Nothing reads it. It must never become a sync cursor for this collection.
+     */
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'messages', versionKey: false },
+);
+
+/**
+ * The per-user sequence, issued by `findOneAndUpdate` with `$inc`.
+ *
+ * A monotonic counter per member rather than one per conversation, because the
+ * phone's cursor is one number for the whole transcript: pulling `seq > 41`
+ * across every chat is one query, where a per-conversation seq would need one
+ * cursor per chat and a client that had never opened a chat would not know
+ * where to start.
+ */
+export const CounterSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    value: { type: Number, required: true, default: 0 },
+  },
+  { collection: 'counters', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -343,4 +576,10 @@ export const MODEL_NAMES = {
   task: 'Task',
   reminder: 'Reminder',
   alert: 'Alert',
+  dailyPlan: 'DailyPlan',
+  checkin: 'Checkin',
+  rhythmState: 'RhythmState',
+  conversation: 'Conversation',
+  message: 'Message',
+  counter: 'Counter',
 } as const;

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rhythm.EndOfDaySummarySent",
+  "description": "Payload of rhythm.EndOfDaySummarySent. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "taskIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "trainingSessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "autoConfirmed": {
+      "type": "boolean"
+    },
+    "checkinAsked": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "date",
+    "taskIds",
+    "trainingSessionId",
+    "autoConfirmed",
+    "checkinAsked"
+  ],
+  "additionalProperties": false
+}

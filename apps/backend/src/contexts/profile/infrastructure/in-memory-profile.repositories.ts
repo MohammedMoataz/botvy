@@ -25,6 +25,20 @@ export class InMemoryProfileRepository extends ProfileRepository {
   readonly rows = new Map<string, ProfileState>();
   readonly events: DomainEvent[] = [];
 
+  /**
+   * How many times the store has been asked, counted so a spec can hold the
+   * batched read to its promise.
+   *
+   * It is here rather than in a bespoke counting fake because the thing worth
+   * asserting is a property of *this* adapter — that `schedulesFor` issues one
+   * read per collection and not one per member — and a separate fake would let
+   * the real adapter grow a loop nobody notices. The tick runs over every
+   * member on a five-minute pulse; the difference between one query and five
+   * hundred is the difference between the phase's ten-second goal and a job
+   * that outlives its own interval.
+   */
+  reads = 0;
+
   constructor(private readonly uow: InMemoryUnitOfWork) {
     super();
     this.uow.enlistState(this.rows, this.events);
@@ -33,6 +47,22 @@ export class InMemoryProfileRepository extends ProfileRepository {
   async find(userId: string): Promise<Profile | null> {
     const row = this.rows.get(userId);
     return row ? Profile.rehydrate(structuredClone(row)) : null;
+  }
+
+  /**
+   * Absent ids are skipped, exactly as the `$in` skips them. The count of
+   * *store reads* is one — `reads` below is what a spec asserts against to
+   * prove the query batched rather than looped, so it has to be incremented
+   * here and nowhere else.
+   */
+  async findMany(userIds: string[]): Promise<Profile[]> {
+    this.reads += 1;
+    const found: Profile[] = [];
+    for (const userId of userIds) {
+      const row = this.rows.get(userId);
+      if (row) found.push(Profile.rehydrate(structuredClone(row)));
+    }
+    return found;
   }
 
   async save(profile: Profile): Promise<void> {
@@ -69,6 +99,9 @@ export class InMemoryPreferencesRepository extends PreferencesRepository {
   readonly rows = new Map<string, PreferencesState>();
   readonly events: DomainEvent[] = [];
 
+  /** See `InMemoryProfileRepository.reads`. */
+  reads = 0;
+
   constructor(private readonly uow: InMemoryUnitOfWork) {
     super();
     this.uow.enlistState(this.rows, this.events);
@@ -77,6 +110,17 @@ export class InMemoryPreferencesRepository extends PreferencesRepository {
   async find(userId: string): Promise<Preferences | null> {
     const row = this.rows.get(userId);
     return row ? Preferences.rehydrate(structuredClone(row)) : null;
+  }
+
+  /** Same as the profile one, and counted the same way. */
+  async findMany(userIds: string[]): Promise<Preferences[]> {
+    this.reads += 1;
+    const found: Preferences[] = [];
+    for (const userId of userIds) {
+      const row = this.rows.get(userId);
+      if (row) found.push(Preferences.rehydrate(structuredClone(row)));
+    }
+    return found;
   }
 
   async save(preferences: Preferences): Promise<void> {

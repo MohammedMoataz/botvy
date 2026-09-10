@@ -1,0 +1,209 @@
+{
+ "name": "Botvy Rhythm Tick",
+ "nodes": [
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "minutes",
+       "minutesInterval": 5
+      }
+     ]
+    }
+   },
+   "id": "7b2f0000-0000-4000-8000-000000000001",
+   "name": "Every Five Minutes",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.2,
+   "position": [
+    -420,
+    -100
+   ],
+   "notes": "Five minutes is the rhythm's resolution, and SC-001 is written against it: each touch arrives within five minutes of the member's chosen time. n8n holds no schedule beyond this pulse -- constitution II -- because a member in Cairo and one in Berlin both want 22:00 and it is not the same instant, so a cron that knew the times would need one entry per zone. The gateway decides whose time it is."
+  },
+  {
+   "parameters": {
+    "httpMethod": "POST",
+    "path": "botvy/rhythm",
+    "responseMode": "lastNode",
+    "options": {}
+   },
+   "id": "7b2f0000-0000-4000-8000-000000000002",
+   "name": "Run Now",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2,
+   "position": [
+    -420,
+    140
+   ],
+   "webhookId": "botvy-rhythm",
+   "notes": "The admin portal's Run button. It reaches /internal/rhythm/prompt, not the tick, and the difference matters: the tick is conditional and idempotent per local date, so pressing Run on it would do nothing once the evening had already fired -- which looks exactly like a broken button. The prompt endpoint is unconditional and ignores the claim, which is what an operator asking 'does this work' actually wants.\n\nBody: { userId?, kind: 'plan' | 'end_of_day' | 'morning' }. Omitting userId reaches every member, so it is the one call here that is not safe to press twice out of curiosity."
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.BOTVY_API_BASE }}/internal/rhythm/tick",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $env.BOTVY_SERVICE_TOKEN }}"
+      }
+     ]
+    },
+    "options": {
+     "timeout": 600000,
+     "response": {
+      "response": {
+       "neverError": false
+      }
+     }
+    }
+   },
+   "id": "7b2f0000-0000-4000-8000-000000000003",
+   "name": "Tick",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    -160,
+    -100
+   ],
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 5000,
+   "notes": "Three tries, five seconds apart. Retrying is safe because every touch claims its local date before it sends: a retry after a timeout finds the date claimed and sends nothing, so the worst a retry costs is a wasted pass.\n\nTen minutes of timeout, not two. A firing tick builds a draft per due member, and from P8 that includes a meal line from the local model -- which measured 39 seconds to first token on a cold load. A two-minute ceiling would abort the evening of whoever happened to be late in the page.\n\n`neverError` is off deliberately. A 401 between n8n and the gateway has to FAIL here so the error workflow fires and the heartbeat goes stale; exactly that silent 401 once went unnoticed for days, which is why every job writes an ops_heartbeats row and /health calls it stale after fifteen minutes."
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "={{ $env.BOTVY_API_BASE }}/internal/rhythm/prompt",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Authorization",
+       "value": "=Bearer {{ $env.BOTVY_SERVICE_TOKEN }}"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify($json.body ?? {}) }}",
+    "options": {
+     "timeout": 600000,
+     "response": {
+      "response": {
+       "neverError": false
+      }
+     }
+    }
+   },
+   "id": "7b2f0000-0000-4000-8000-000000000004",
+   "name": "Prompt Now",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    -160,
+    140
+   ],
+   "retryOnFail": false,
+   "notes": "No retry, and that is the one place this workflow differs from the sweep. The prompt endpoint is unconditional by design, so a retry after a timeout would send a second copy of a touch the first attempt may well have delivered. An operator pressing Run again is a decision; a retry loop doing it for them is not.\n\nThe body is forwarded verbatim from the webhook so the portal chooses the member and the kind."
+  },
+  {
+   "parameters": {
+    "assignments": {
+     "assignments": [
+      {
+       "id": "a1",
+       "name": "users",
+       "value": "={{ $json.users }}",
+       "type": "number"
+      },
+      {
+       "id": "a2",
+       "name": "planPrompts",
+       "value": "={{ $json.planPrompts }}",
+       "type": "number"
+      },
+      {
+       "id": "a3",
+       "name": "endOfDay",
+       "value": "={{ $json.endOfDay }}",
+       "type": "number"
+      },
+      {
+       "id": "a4",
+       "name": "morning",
+       "value": "={{ $json.morning }}",
+       "type": "number"
+      },
+      {
+       "id": "a5",
+       "name": "checkins",
+       "value": "={{ $json.checkins }}",
+       "type": "number"
+      },
+      {
+       "id": "a6",
+       "name": "ms",
+       "value": "={{ $json.ms }}",
+       "type": "number"
+      }
+     ]
+    },
+    "options": {}
+   },
+   "id": "7b2f0000-0000-4000-8000-000000000005",
+   "name": "Counts",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    100,
+    -100
+   ],
+   "notes": "The counts are the execution's output, so n8n's own log is the record of what each pass did. `contracts/internal.md` fixes this shape: { users, planPrompts, endOfDay, morning, checkins, ms }. A bare acknowledgement would make 'ran and nobody was due' and 'ran and sent four hundred briefings' the same line -- and this log is all anybody has when asking why a member's 22:00 summary did not arrive."
+  }
+ ],
+ "connections": {
+  "Every Five Minutes": {
+   "main": [
+    [
+     {
+      "node": "Tick",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Run Now": {
+   "main": [
+    [
+     {
+      "node": "Prompt Now",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Tick": {
+   "main": [
+    [
+     {
+      "node": "Counts",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "saveManualExecutions": true,
+  "errorWorkflow": "Botvy Error Handler"
+ }
+}

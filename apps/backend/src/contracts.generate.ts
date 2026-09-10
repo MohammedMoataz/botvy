@@ -48,15 +48,27 @@ export const eventSchemas = {
   }),
 
   // ---- Planning ---------------------------------------------------------
+  /*
+   * `title` and `allDay` are on both of these because the alert saga *reads*
+   * them, and until P3 neither event carried the title — so `title ?? 'Task
+   * due'` fired every time and every task notification in the product was
+   * titled "Task due". `TaskRescheduled` also carried no `allDay`, so
+   * `allDay === false` came out false on every edit and the reconcile dropped
+   * the member's lead times. A schema that describes what a consumer needs is
+   * the only place either omission was ever going to be visible.
+   */
   'planning.TaskScheduled': z.object({
     taskId: z.string().uuid(),
     dueAt: z.string().datetime().nullable(),
     allDay: z.boolean(),
+    title: z.string(),
     priority: z.number().int(),
   }),
   'planning.TaskRescheduled': z.object({
     taskId: z.string().uuid(),
     dueAt: z.string().datetime().nullable(),
+    allDay: z.boolean(),
+    title: z.string(),
   }),
   'planning.TaskCompleted': z.object({
     taskId: z.string().uuid(),
@@ -134,6 +146,61 @@ export const eventSchemas = {
     }),
     deviceIds: z.array(z.string()),
     error: z.string(),
+  }),
+
+  // ---- Daily Rhythm -----------------------------------------------------
+  //
+  // `date` is the member's *local* calendar date, not an instant, and it is a
+  // string for that reason: an ISO timestamp here would carry an offset and
+  // every consumer would have to decide whose midnight it meant. The rollover
+  // resolves the boundary against the member's zone from this string, which is
+  // the one place that decision belongs.
+  'rhythm.PlanTomorrowPrompted': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    taskIds: z.array(z.string().uuid()),
+    trainingSessionId: z.string().nullable(),
+    mealLine: z.string().nullable(),
+  }),
+  'rhythm.EndOfDaySummarySent': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    taskIds: z.array(z.string().uuid()),
+    trainingSessionId: z.string().nullable(),
+    autoConfirmed: z.boolean(),
+    checkinAsked: z.boolean(),
+  }),
+  'rhythm.MorningBriefingSent': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    taskIds: z.array(z.string().uuid()),
+  }),
+  'rhythm.PlanConfirmed': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    taskIds: z.array(z.string().uuid()),
+    autoConfirmed: z.boolean(),
+  }),
+  'rhythm.PlanSkipped': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    taskIds: z.array(z.string().uuid()),
+    autoConfirmed: z.boolean(),
+  }),
+  // Both nullable, and that is the shape rather than an oversight: the two
+  // halves of a check-in arrive by different routes, so a mood with no verdict
+  // and a verdict with no mood are both complete answers.
+  'rhythm.CheckinRecorded': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    mood: z.number().int().min(0).max(100).nullable(),
+    adhered: z.boolean().nullable(),
+  }),
+
+  // ---- Conversations ----------------------------------------------------
+  'conversations.ConversationCreated': z.object({
+    conversationId: z.string().uuid(),
+    kind: z.enum(['coach', 'planner', 'free']),
+    pinned: z.boolean(),
+  }),
+  'conversations.MessageSent': z.object({
+    conversationId: z.string().uuid(),
+    seq: z.number().int().positive(),
+    role: z.enum(['user', 'assistant', 'system']),
   }),
 
   // ---- Sync -------------------------------------------------------------

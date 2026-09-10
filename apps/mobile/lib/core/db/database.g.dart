@@ -4317,6 +4317,1992 @@ class AlertsLocalCompanion extends UpdateCompanion<LocalAlert> {
   }
 }
 
+class $DailyPlansTable extends DailyPlans
+    with TableInfo<$DailyPlansTable, LocalDailyPlan> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DailyPlansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<String> date = GeneratedColumn<String>(
+      'date', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('draft'));
+  static const VerificationMeta _autoConfirmedMeta =
+      const VerificationMeta('autoConfirmed');
+  @override
+  late final GeneratedColumn<bool> autoConfirmed = GeneratedColumn<bool>(
+      'auto_confirmed', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("auto_confirmed" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _tasksJsonMeta =
+      const VerificationMeta('tasksJson');
+  @override
+  late final GeneratedColumn<String> tasksJson = GeneratedColumn<String>(
+      'tasks_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _trainingJsonMeta =
+      const VerificationMeta('trainingJson');
+  @override
+  late final GeneratedColumn<String> trainingJson = GeneratedColumn<String>(
+      'training_json', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _workoutLineMeta =
+      const VerificationMeta('workoutLine');
+  @override
+  late final GeneratedColumn<String> workoutLine = GeneratedColumn<String>(
+      'workout_line', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _mealLineMeta =
+      const VerificationMeta('mealLine');
+  @override
+  late final GeneratedColumn<String> mealLine = GeneratedColumn<String>(
+      'meal_line', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _promptedAtMeta =
+      const VerificationMeta('promptedAt');
+  @override
+  late final GeneratedColumn<DateTime> promptedAt = GeneratedColumn<DateTime>(
+      'prompted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _confirmedAtMeta =
+      const VerificationMeta('confirmedAt');
+  @override
+  late final GeneratedColumn<DateTime> confirmedAt = GeneratedColumn<DateTime>(
+      'confirmed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _summarisedAtMeta =
+      const VerificationMeta('summarisedAt');
+  @override
+  late final GeneratedColumn<DateTime> summarisedAt = GeneratedColumn<DateTime>(
+      'summarised_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _briefedAtMeta =
+      const VerificationMeta('briefedAt');
+  @override
+  late final GeneratedColumn<DateTime> briefedAt = GeneratedColumn<DateTime>(
+      'briefed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        date,
+        status,
+        autoConfirmed,
+        tasksJson,
+        trainingJson,
+        workoutLine,
+        mealLine,
+        promptedAt,
+        confirmedAt,
+        summarisedAt,
+        briefedAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'daily_plans';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalDailyPlan> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+          _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('auto_confirmed')) {
+      context.handle(
+          _autoConfirmedMeta,
+          autoConfirmed.isAcceptableOrUnknown(
+              data['auto_confirmed']!, _autoConfirmedMeta));
+    }
+    if (data.containsKey('tasks_json')) {
+      context.handle(_tasksJsonMeta,
+          tasksJson.isAcceptableOrUnknown(data['tasks_json']!, _tasksJsonMeta));
+    }
+    if (data.containsKey('training_json')) {
+      context.handle(
+          _trainingJsonMeta,
+          trainingJson.isAcceptableOrUnknown(
+              data['training_json']!, _trainingJsonMeta));
+    }
+    if (data.containsKey('workout_line')) {
+      context.handle(
+          _workoutLineMeta,
+          workoutLine.isAcceptableOrUnknown(
+              data['workout_line']!, _workoutLineMeta));
+    }
+    if (data.containsKey('meal_line')) {
+      context.handle(_mealLineMeta,
+          mealLine.isAcceptableOrUnknown(data['meal_line']!, _mealLineMeta));
+    }
+    if (data.containsKey('prompted_at')) {
+      context.handle(
+          _promptedAtMeta,
+          promptedAt.isAcceptableOrUnknown(
+              data['prompted_at']!, _promptedAtMeta));
+    }
+    if (data.containsKey('confirmed_at')) {
+      context.handle(
+          _confirmedAtMeta,
+          confirmedAt.isAcceptableOrUnknown(
+              data['confirmed_at']!, _confirmedAtMeta));
+    }
+    if (data.containsKey('summarised_at')) {
+      context.handle(
+          _summarisedAtMeta,
+          summarisedAt.isAcceptableOrUnknown(
+              data['summarised_at']!, _summarisedAtMeta));
+    }
+    if (data.containsKey('briefed_at')) {
+      context.handle(_briefedAtMeta,
+          briefedAt.isAcceptableOrUnknown(data['briefed_at']!, _briefedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalDailyPlan map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalDailyPlan(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      date: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}date'])!,
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      autoConfirmed: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}auto_confirmed'])!,
+      tasksJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tasks_json'])!,
+      trainingJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}training_json']),
+      workoutLine: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}workout_line']),
+      mealLine: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}meal_line']),
+      promptedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}prompted_at']),
+      confirmedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}confirmed_at']),
+      summarisedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}summarised_at']),
+      briefedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}briefed_at']),
+    );
+  }
+
+  @override
+  $DailyPlansTable createAlias(String alias) {
+    return $DailyPlansTable(attachedDatabase, alias);
+  }
+}
+
+class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+
+  /// `YYYY-MM-DD` in the **member's** zone, as the server resolved it. A text
+  /// column and not a `DateTimeColumn`: a local date is a date, and storing it
+  /// as an instant would make it a moment in some zone — which is exactly the
+  /// three-hour shift principle XI exists to stop.
+  final String date;
+
+  /// `draft` | `confirmed` | `skipped`.
+  final String status;
+
+  /// True when the end-of-day touch set the plan because the member never
+  /// answered. Kept apart from [status] because "confirmed by me" and
+  /// "confirmed for me at 22:00" are the same status and different sentences,
+  /// and the summary has to say which.
+  final bool autoConfirmed;
+  final String tasksJson;
+
+  /// `{sessionId,title,sport,startAt}`, or null when there is no training —
+  /// which is also what a member who answered "no training tomorrow" leaves
+  /// behind, and what every plan looks like until P6 lands the Training
+  /// context. The card reads correctly without it (spec Assumptions).
+  final String? trainingJson;
+  final String? workoutLine;
+
+  /// Absent until P8's nutrition feature, and absent again whenever the model
+  /// could not draft it — FR-012: a missing meal line never stops the plan
+  /// being sent, so it must never stop the card drawing either.
+  final String? mealLine;
+  final DateTime? promptedAt;
+  final DateTime? confirmedAt;
+  final DateTime? summarisedAt;
+  final DateTime? briefedAt;
+  const LocalDailyPlan(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.date,
+      required this.status,
+      required this.autoConfirmed,
+      required this.tasksJson,
+      this.trainingJson,
+      this.workoutLine,
+      this.mealLine,
+      this.promptedAt,
+      this.confirmedAt,
+      this.summarisedAt,
+      this.briefedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['date'] = Variable<String>(date);
+    map['status'] = Variable<String>(status);
+    map['auto_confirmed'] = Variable<bool>(autoConfirmed);
+    map['tasks_json'] = Variable<String>(tasksJson);
+    if (!nullToAbsent || trainingJson != null) {
+      map['training_json'] = Variable<String>(trainingJson);
+    }
+    if (!nullToAbsent || workoutLine != null) {
+      map['workout_line'] = Variable<String>(workoutLine);
+    }
+    if (!nullToAbsent || mealLine != null) {
+      map['meal_line'] = Variable<String>(mealLine);
+    }
+    if (!nullToAbsent || promptedAt != null) {
+      map['prompted_at'] = Variable<DateTime>(promptedAt);
+    }
+    if (!nullToAbsent || confirmedAt != null) {
+      map['confirmed_at'] = Variable<DateTime>(confirmedAt);
+    }
+    if (!nullToAbsent || summarisedAt != null) {
+      map['summarised_at'] = Variable<DateTime>(summarisedAt);
+    }
+    if (!nullToAbsent || briefedAt != null) {
+      map['briefed_at'] = Variable<DateTime>(briefedAt);
+    }
+    return map;
+  }
+
+  DailyPlansCompanion toCompanion(bool nullToAbsent) {
+    return DailyPlansCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      date: Value(date),
+      status: Value(status),
+      autoConfirmed: Value(autoConfirmed),
+      tasksJson: Value(tasksJson),
+      trainingJson: trainingJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(trainingJson),
+      workoutLine: workoutLine == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workoutLine),
+      mealLine: mealLine == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mealLine),
+      promptedAt: promptedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(promptedAt),
+      confirmedAt: confirmedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(confirmedAt),
+      summarisedAt: summarisedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summarisedAt),
+      briefedAt: briefedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(briefedAt),
+    );
+  }
+
+  factory LocalDailyPlan.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalDailyPlan(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      date: serializer.fromJson<String>(json['date']),
+      status: serializer.fromJson<String>(json['status']),
+      autoConfirmed: serializer.fromJson<bool>(json['autoConfirmed']),
+      tasksJson: serializer.fromJson<String>(json['tasksJson']),
+      trainingJson: serializer.fromJson<String?>(json['trainingJson']),
+      workoutLine: serializer.fromJson<String?>(json['workoutLine']),
+      mealLine: serializer.fromJson<String?>(json['mealLine']),
+      promptedAt: serializer.fromJson<DateTime?>(json['promptedAt']),
+      confirmedAt: serializer.fromJson<DateTime?>(json['confirmedAt']),
+      summarisedAt: serializer.fromJson<DateTime?>(json['summarisedAt']),
+      briefedAt: serializer.fromJson<DateTime?>(json['briefedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'date': serializer.toJson<String>(date),
+      'status': serializer.toJson<String>(status),
+      'autoConfirmed': serializer.toJson<bool>(autoConfirmed),
+      'tasksJson': serializer.toJson<String>(tasksJson),
+      'trainingJson': serializer.toJson<String?>(trainingJson),
+      'workoutLine': serializer.toJson<String?>(workoutLine),
+      'mealLine': serializer.toJson<String?>(mealLine),
+      'promptedAt': serializer.toJson<DateTime?>(promptedAt),
+      'confirmedAt': serializer.toJson<DateTime?>(confirmedAt),
+      'summarisedAt': serializer.toJson<DateTime?>(summarisedAt),
+      'briefedAt': serializer.toJson<DateTime?>(briefedAt),
+    };
+  }
+
+  LocalDailyPlan copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? date,
+          String? status,
+          bool? autoConfirmed,
+          String? tasksJson,
+          Value<String?> trainingJson = const Value.absent(),
+          Value<String?> workoutLine = const Value.absent(),
+          Value<String?> mealLine = const Value.absent(),
+          Value<DateTime?> promptedAt = const Value.absent(),
+          Value<DateTime?> confirmedAt = const Value.absent(),
+          Value<DateTime?> summarisedAt = const Value.absent(),
+          Value<DateTime?> briefedAt = const Value.absent()}) =>
+      LocalDailyPlan(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        date: date ?? this.date,
+        status: status ?? this.status,
+        autoConfirmed: autoConfirmed ?? this.autoConfirmed,
+        tasksJson: tasksJson ?? this.tasksJson,
+        trainingJson:
+            trainingJson.present ? trainingJson.value : this.trainingJson,
+        workoutLine: workoutLine.present ? workoutLine.value : this.workoutLine,
+        mealLine: mealLine.present ? mealLine.value : this.mealLine,
+        promptedAt: promptedAt.present ? promptedAt.value : this.promptedAt,
+        confirmedAt: confirmedAt.present ? confirmedAt.value : this.confirmedAt,
+        summarisedAt:
+            summarisedAt.present ? summarisedAt.value : this.summarisedAt,
+        briefedAt: briefedAt.present ? briefedAt.value : this.briefedAt,
+      );
+  LocalDailyPlan copyWithCompanion(DailyPlansCompanion data) {
+    return LocalDailyPlan(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      date: data.date.present ? data.date.value : this.date,
+      status: data.status.present ? data.status.value : this.status,
+      autoConfirmed: data.autoConfirmed.present
+          ? data.autoConfirmed.value
+          : this.autoConfirmed,
+      tasksJson: data.tasksJson.present ? data.tasksJson.value : this.tasksJson,
+      trainingJson: data.trainingJson.present
+          ? data.trainingJson.value
+          : this.trainingJson,
+      workoutLine:
+          data.workoutLine.present ? data.workoutLine.value : this.workoutLine,
+      mealLine: data.mealLine.present ? data.mealLine.value : this.mealLine,
+      promptedAt:
+          data.promptedAt.present ? data.promptedAt.value : this.promptedAt,
+      confirmedAt:
+          data.confirmedAt.present ? data.confirmedAt.value : this.confirmedAt,
+      summarisedAt: data.summarisedAt.present
+          ? data.summarisedAt.value
+          : this.summarisedAt,
+      briefedAt: data.briefedAt.present ? data.briefedAt.value : this.briefedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalDailyPlan(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('date: $date, ')
+          ..write('status: $status, ')
+          ..write('autoConfirmed: $autoConfirmed, ')
+          ..write('tasksJson: $tasksJson, ')
+          ..write('trainingJson: $trainingJson, ')
+          ..write('workoutLine: $workoutLine, ')
+          ..write('mealLine: $mealLine, ')
+          ..write('promptedAt: $promptedAt, ')
+          ..write('confirmedAt: $confirmedAt, ')
+          ..write('summarisedAt: $summarisedAt, ')
+          ..write('briefedAt: $briefedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      updatedAt,
+      baseUpdatedAt,
+      pendingOp,
+      pushAttempts,
+      deletedAt,
+      date,
+      status,
+      autoConfirmed,
+      tasksJson,
+      trainingJson,
+      workoutLine,
+      mealLine,
+      promptedAt,
+      confirmedAt,
+      summarisedAt,
+      briefedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalDailyPlan &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.date == this.date &&
+          other.status == this.status &&
+          other.autoConfirmed == this.autoConfirmed &&
+          other.tasksJson == this.tasksJson &&
+          other.trainingJson == this.trainingJson &&
+          other.workoutLine == this.workoutLine &&
+          other.mealLine == this.mealLine &&
+          other.promptedAt == this.promptedAt &&
+          other.confirmedAt == this.confirmedAt &&
+          other.summarisedAt == this.summarisedAt &&
+          other.briefedAt == this.briefedAt);
+}
+
+class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> date;
+  final Value<String> status;
+  final Value<bool> autoConfirmed;
+  final Value<String> tasksJson;
+  final Value<String?> trainingJson;
+  final Value<String?> workoutLine;
+  final Value<String?> mealLine;
+  final Value<DateTime?> promptedAt;
+  final Value<DateTime?> confirmedAt;
+  final Value<DateTime?> summarisedAt;
+  final Value<DateTime?> briefedAt;
+  final Value<int> rowid;
+  const DailyPlansCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.date = const Value.absent(),
+    this.status = const Value.absent(),
+    this.autoConfirmed = const Value.absent(),
+    this.tasksJson = const Value.absent(),
+    this.trainingJson = const Value.absent(),
+    this.workoutLine = const Value.absent(),
+    this.mealLine = const Value.absent(),
+    this.promptedAt = const Value.absent(),
+    this.confirmedAt = const Value.absent(),
+    this.summarisedAt = const Value.absent(),
+    this.briefedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DailyPlansCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String date,
+    this.status = const Value.absent(),
+    this.autoConfirmed = const Value.absent(),
+    this.tasksJson = const Value.absent(),
+    this.trainingJson = const Value.absent(),
+    this.workoutLine = const Value.absent(),
+    this.mealLine = const Value.absent(),
+    this.promptedAt = const Value.absent(),
+    this.confirmedAt = const Value.absent(),
+    this.summarisedAt = const Value.absent(),
+    this.briefedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        date = Value(date);
+  static Insertable<LocalDailyPlan> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? date,
+    Expression<String>? status,
+    Expression<bool>? autoConfirmed,
+    Expression<String>? tasksJson,
+    Expression<String>? trainingJson,
+    Expression<String>? workoutLine,
+    Expression<String>? mealLine,
+    Expression<DateTime>? promptedAt,
+    Expression<DateTime>? confirmedAt,
+    Expression<DateTime>? summarisedAt,
+    Expression<DateTime>? briefedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (date != null) 'date': date,
+      if (status != null) 'status': status,
+      if (autoConfirmed != null) 'auto_confirmed': autoConfirmed,
+      if (tasksJson != null) 'tasks_json': tasksJson,
+      if (trainingJson != null) 'training_json': trainingJson,
+      if (workoutLine != null) 'workout_line': workoutLine,
+      if (mealLine != null) 'meal_line': mealLine,
+      if (promptedAt != null) 'prompted_at': promptedAt,
+      if (confirmedAt != null) 'confirmed_at': confirmedAt,
+      if (summarisedAt != null) 'summarised_at': summarisedAt,
+      if (briefedAt != null) 'briefed_at': briefedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DailyPlansCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? date,
+      Value<String>? status,
+      Value<bool>? autoConfirmed,
+      Value<String>? tasksJson,
+      Value<String?>? trainingJson,
+      Value<String?>? workoutLine,
+      Value<String?>? mealLine,
+      Value<DateTime?>? promptedAt,
+      Value<DateTime?>? confirmedAt,
+      Value<DateTime?>? summarisedAt,
+      Value<DateTime?>? briefedAt,
+      Value<int>? rowid}) {
+    return DailyPlansCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      autoConfirmed: autoConfirmed ?? this.autoConfirmed,
+      tasksJson: tasksJson ?? this.tasksJson,
+      trainingJson: trainingJson ?? this.trainingJson,
+      workoutLine: workoutLine ?? this.workoutLine,
+      mealLine: mealLine ?? this.mealLine,
+      promptedAt: promptedAt ?? this.promptedAt,
+      confirmedAt: confirmedAt ?? this.confirmedAt,
+      summarisedAt: summarisedAt ?? this.summarisedAt,
+      briefedAt: briefedAt ?? this.briefedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<String>(date.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (autoConfirmed.present) {
+      map['auto_confirmed'] = Variable<bool>(autoConfirmed.value);
+    }
+    if (tasksJson.present) {
+      map['tasks_json'] = Variable<String>(tasksJson.value);
+    }
+    if (trainingJson.present) {
+      map['training_json'] = Variable<String>(trainingJson.value);
+    }
+    if (workoutLine.present) {
+      map['workout_line'] = Variable<String>(workoutLine.value);
+    }
+    if (mealLine.present) {
+      map['meal_line'] = Variable<String>(mealLine.value);
+    }
+    if (promptedAt.present) {
+      map['prompted_at'] = Variable<DateTime>(promptedAt.value);
+    }
+    if (confirmedAt.present) {
+      map['confirmed_at'] = Variable<DateTime>(confirmedAt.value);
+    }
+    if (summarisedAt.present) {
+      map['summarised_at'] = Variable<DateTime>(summarisedAt.value);
+    }
+    if (briefedAt.present) {
+      map['briefed_at'] = Variable<DateTime>(briefedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DailyPlansCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('date: $date, ')
+          ..write('status: $status, ')
+          ..write('autoConfirmed: $autoConfirmed, ')
+          ..write('tasksJson: $tasksJson, ')
+          ..write('trainingJson: $trainingJson, ')
+          ..write('workoutLine: $workoutLine, ')
+          ..write('mealLine: $mealLine, ')
+          ..write('promptedAt: $promptedAt, ')
+          ..write('confirmedAt: $confirmedAt, ')
+          ..write('summarisedAt: $summarisedAt, ')
+          ..write('briefedAt: $briefedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CheckinsTable extends Checkins
+    with TableInfo<$CheckinsTable, LocalCheckin> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CheckinsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<String> date = GeneratedColumn<String>(
+      'date', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _moodMeta = const VerificationMeta('mood');
+  @override
+  late final GeneratedColumn<int> mood = GeneratedColumn<int>(
+      'mood', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _adheredMeta =
+      const VerificationMeta('adhered');
+  @override
+  late final GeneratedColumn<bool> adhered = GeneratedColumn<bool>(
+      'adhered', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("adhered" IN (0, 1))'));
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+      'note', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('app'));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        date,
+        mood,
+        adhered,
+        note,
+        source
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'checkins';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalCheckin> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+          _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('mood')) {
+      context.handle(
+          _moodMeta, mood.isAcceptableOrUnknown(data['mood']!, _moodMeta));
+    }
+    if (data.containsKey('adhered')) {
+      context.handle(_adheredMeta,
+          adhered.isAcceptableOrUnknown(data['adhered']!, _adheredMeta));
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+          _noteMeta, note.isAcceptableOrUnknown(data['note']!, _noteMeta));
+    }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalCheckin map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalCheckin(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      date: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}date'])!,
+      mood: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}mood']),
+      adhered: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}adhered']),
+      note: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}note']),
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+    );
+  }
+
+  @override
+  $CheckinsTable createAlias(String alias) {
+    return $CheckinsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalCheckin extends DataClass implements Insertable<LocalCheckin> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String date;
+
+  /// 0..100, and **nullable on purpose**. Nought is a real answer — the worst
+  /// day the scale can describe — so "no mood recorded" cannot be represented
+  /// by a zero, and a non-nullable column with a default of 0 would turn every
+  /// unanswered day into the member's worst. The week strip on Home reads the
+  /// same distinction: see [adhered].
+  final int? mood;
+
+  /// Whether the plan was followed, or null for a day that was never answered.
+  ///
+  /// Three states, not two, and the third one is the one that gets lost: a day
+  /// the member did not answer is **not** a missed day. Rendering it as a miss
+  /// tells somebody who was travelling that they broke a streak they never
+  /// broke, which is why nothing on the phone stores this week as a
+  /// `List<bool>`.
+  final bool? adhered;
+  final String? note;
+
+  /// `chat` | `notification` | `app` — where the answer came from.
+  final String source;
+  const LocalCheckin(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.date,
+      this.mood,
+      this.adhered,
+      this.note,
+      required this.source});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['date'] = Variable<String>(date);
+    if (!nullToAbsent || mood != null) {
+      map['mood'] = Variable<int>(mood);
+    }
+    if (!nullToAbsent || adhered != null) {
+      map['adhered'] = Variable<bool>(adhered);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    map['source'] = Variable<String>(source);
+    return map;
+  }
+
+  CheckinsCompanion toCompanion(bool nullToAbsent) {
+    return CheckinsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      date: Value(date),
+      mood: mood == null && nullToAbsent ? const Value.absent() : Value(mood),
+      adhered: adhered == null && nullToAbsent
+          ? const Value.absent()
+          : Value(adhered),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      source: Value(source),
+    );
+  }
+
+  factory LocalCheckin.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalCheckin(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      date: serializer.fromJson<String>(json['date']),
+      mood: serializer.fromJson<int?>(json['mood']),
+      adhered: serializer.fromJson<bool?>(json['adhered']),
+      note: serializer.fromJson<String?>(json['note']),
+      source: serializer.fromJson<String>(json['source']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'date': serializer.toJson<String>(date),
+      'mood': serializer.toJson<int?>(mood),
+      'adhered': serializer.toJson<bool?>(adhered),
+      'note': serializer.toJson<String?>(note),
+      'source': serializer.toJson<String>(source),
+    };
+  }
+
+  LocalCheckin copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? date,
+          Value<int?> mood = const Value.absent(),
+          Value<bool?> adhered = const Value.absent(),
+          Value<String?> note = const Value.absent(),
+          String? source}) =>
+      LocalCheckin(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        date: date ?? this.date,
+        mood: mood.present ? mood.value : this.mood,
+        adhered: adhered.present ? adhered.value : this.adhered,
+        note: note.present ? note.value : this.note,
+        source: source ?? this.source,
+      );
+  LocalCheckin copyWithCompanion(CheckinsCompanion data) {
+    return LocalCheckin(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      date: data.date.present ? data.date.value : this.date,
+      mood: data.mood.present ? data.mood.value : this.mood,
+      adhered: data.adhered.present ? data.adhered.value : this.adhered,
+      note: data.note.present ? data.note.value : this.note,
+      source: data.source.present ? data.source.value : this.source,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalCheckin(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('date: $date, ')
+          ..write('mood: $mood, ')
+          ..write('adhered: $adhered, ')
+          ..write('note: $note, ')
+          ..write('source: $source')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, updatedAt, baseUpdatedAt, pendingOp,
+      pushAttempts, deletedAt, date, mood, adhered, note, source);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalCheckin &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.date == this.date &&
+          other.mood == this.mood &&
+          other.adhered == this.adhered &&
+          other.note == this.note &&
+          other.source == this.source);
+}
+
+class CheckinsCompanion extends UpdateCompanion<LocalCheckin> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> date;
+  final Value<int?> mood;
+  final Value<bool?> adhered;
+  final Value<String?> note;
+  final Value<String> source;
+  final Value<int> rowid;
+  const CheckinsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.date = const Value.absent(),
+    this.mood = const Value.absent(),
+    this.adhered = const Value.absent(),
+    this.note = const Value.absent(),
+    this.source = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CheckinsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String date,
+    this.mood = const Value.absent(),
+    this.adhered = const Value.absent(),
+    this.note = const Value.absent(),
+    this.source = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        date = Value(date);
+  static Insertable<LocalCheckin> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? date,
+    Expression<int>? mood,
+    Expression<bool>? adhered,
+    Expression<String>? note,
+    Expression<String>? source,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (date != null) 'date': date,
+      if (mood != null) 'mood': mood,
+      if (adhered != null) 'adhered': adhered,
+      if (note != null) 'note': note,
+      if (source != null) 'source': source,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CheckinsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? date,
+      Value<int?>? mood,
+      Value<bool?>? adhered,
+      Value<String?>? note,
+      Value<String>? source,
+      Value<int>? rowid}) {
+    return CheckinsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      date: date ?? this.date,
+      mood: mood ?? this.mood,
+      adhered: adhered ?? this.adhered,
+      note: note ?? this.note,
+      source: source ?? this.source,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<String>(date.value);
+    }
+    if (mood.present) {
+      map['mood'] = Variable<int>(mood.value);
+    }
+    if (adhered.present) {
+      map['adhered'] = Variable<bool>(adhered.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CheckinsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('date: $date, ')
+          ..write('mood: $mood, ')
+          ..write('adhered: $adhered, ')
+          ..write('note: $note, ')
+          ..write('source: $source, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RhythmStateTable extends RhythmState
+    with TableInfo<$RhythmStateTable, LocalRhythmState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RhythmStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastPlanPromptDateMeta =
+      const VerificationMeta('lastPlanPromptDate');
+  @override
+  late final GeneratedColumn<String> lastPlanPromptDate =
+      GeneratedColumn<String>('last_plan_prompt_date', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _lastEndOfDayDateMeta =
+      const VerificationMeta('lastEndOfDayDate');
+  @override
+  late final GeneratedColumn<String> lastEndOfDayDate = GeneratedColumn<String>(
+      'last_end_of_day_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _lastMorningBriefingDateMeta =
+      const VerificationMeta('lastMorningBriefingDate');
+  @override
+  late final GeneratedColumn<String> lastMorningBriefingDate =
+      GeneratedColumn<String>('last_morning_briefing_date', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _awaitingCheckinMeta =
+      const VerificationMeta('awaitingCheckin');
+  @override
+  late final GeneratedColumn<bool> awaitingCheckin = GeneratedColumn<bool>(
+      'awaiting_checkin', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("awaiting_checkin" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _awaitingSinceMeta =
+      const VerificationMeta('awaitingSince');
+  @override
+  late final GeneratedColumn<DateTime> awaitingSince =
+      GeneratedColumn<DateTime>('awaiting_since', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _streakCurrentMeta =
+      const VerificationMeta('streakCurrent');
+  @override
+  late final GeneratedColumn<int> streakCurrent = GeneratedColumn<int>(
+      'streak_current', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _streakBestMeta =
+      const VerificationMeta('streakBest');
+  @override
+  late final GeneratedColumn<int> streakBest = GeneratedColumn<int>(
+      'streak_best', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _lastAdheredDateMeta =
+      const VerificationMeta('lastAdheredDate');
+  @override
+  late final GeneratedColumn<String> lastAdheredDate = GeneratedColumn<String>(
+      'last_adhered_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        userId,
+        lastPlanPromptDate,
+        lastEndOfDayDate,
+        lastMorningBriefingDate,
+        awaitingCheckin,
+        awaitingSince,
+        streakCurrent,
+        streakBest,
+        lastAdheredDate
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'rhythm_state';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalRhythmState> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('last_plan_prompt_date')) {
+      context.handle(
+          _lastPlanPromptDateMeta,
+          lastPlanPromptDate.isAcceptableOrUnknown(
+              data['last_plan_prompt_date']!, _lastPlanPromptDateMeta));
+    }
+    if (data.containsKey('last_end_of_day_date')) {
+      context.handle(
+          _lastEndOfDayDateMeta,
+          lastEndOfDayDate.isAcceptableOrUnknown(
+              data['last_end_of_day_date']!, _lastEndOfDayDateMeta));
+    }
+    if (data.containsKey('last_morning_briefing_date')) {
+      context.handle(
+          _lastMorningBriefingDateMeta,
+          lastMorningBriefingDate.isAcceptableOrUnknown(
+              data['last_morning_briefing_date']!,
+              _lastMorningBriefingDateMeta));
+    }
+    if (data.containsKey('awaiting_checkin')) {
+      context.handle(
+          _awaitingCheckinMeta,
+          awaitingCheckin.isAcceptableOrUnknown(
+              data['awaiting_checkin']!, _awaitingCheckinMeta));
+    }
+    if (data.containsKey('awaiting_since')) {
+      context.handle(
+          _awaitingSinceMeta,
+          awaitingSince.isAcceptableOrUnknown(
+              data['awaiting_since']!, _awaitingSinceMeta));
+    }
+    if (data.containsKey('streak_current')) {
+      context.handle(
+          _streakCurrentMeta,
+          streakCurrent.isAcceptableOrUnknown(
+              data['streak_current']!, _streakCurrentMeta));
+    }
+    if (data.containsKey('streak_best')) {
+      context.handle(
+          _streakBestMeta,
+          streakBest.isAcceptableOrUnknown(
+              data['streak_best']!, _streakBestMeta));
+    }
+    if (data.containsKey('last_adhered_date')) {
+      context.handle(
+          _lastAdheredDateMeta,
+          lastAdheredDate.isAcceptableOrUnknown(
+              data['last_adhered_date']!, _lastAdheredDateMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userId};
+  @override
+  LocalRhythmState map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalRhythmState(
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id'])!,
+      lastPlanPromptDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}last_plan_prompt_date']),
+      lastEndOfDayDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}last_end_of_day_date']),
+      lastMorningBriefingDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}last_morning_briefing_date']),
+      awaitingCheckin: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}awaiting_checkin'])!,
+      awaitingSince: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}awaiting_since']),
+      streakCurrent: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}streak_current'])!,
+      streakBest: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}streak_best'])!,
+      lastAdheredDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}last_adhered_date']),
+    );
+  }
+
+  @override
+  $RhythmStateTable createAlias(String alias) {
+    return $RhythmStateTable(attachedDatabase, alias);
+  }
+}
+
+class LocalRhythmState extends DataClass
+    implements Insertable<LocalRhythmState> {
+  final String userId;
+
+  /// The local dates each touch was last claimed for, `YYYY-MM-DD`, null until
+  /// the first one fires. Three columns and not one, for the same reason the
+  /// server has three claim methods: a gateway that came back between the
+  /// 21:00 and 22:00 touches must be able to send the one it missed without
+  /// re-sending the one it did not.
+  final String? lastPlanPromptDate;
+  final String? lastEndOfDayDate;
+  final String? lastMorningBriefingDate;
+
+  /// Whether the end-of-day question is still open. One flag per member, which
+  /// is why the server only ever interprets a reply inside the coach
+  /// conversation — see the check-in note in the root `CLAUDE.md`.
+  final bool awaitingCheckin;
+
+  /// When the question was asked. The window that follows is an operator
+  /// setting (`settings.rhythm.checkinWindowHours`), so it is not stored here:
+  /// a length compiled into the phone would be a hard-coded default, which
+  /// constitution XII calls a bug.
+  final DateTime? awaitingSince;
+  final int streakCurrent;
+
+  /// The best run so far, kept when the current one resets. FR-008: a "no"
+  /// restarts the count and must not erase what the member already managed.
+  final int streakBest;
+  final String? lastAdheredDate;
+  const LocalRhythmState(
+      {required this.userId,
+      this.lastPlanPromptDate,
+      this.lastEndOfDayDate,
+      this.lastMorningBriefingDate,
+      required this.awaitingCheckin,
+      this.awaitingSince,
+      required this.streakCurrent,
+      required this.streakBest,
+      this.lastAdheredDate});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_id'] = Variable<String>(userId);
+    if (!nullToAbsent || lastPlanPromptDate != null) {
+      map['last_plan_prompt_date'] = Variable<String>(lastPlanPromptDate);
+    }
+    if (!nullToAbsent || lastEndOfDayDate != null) {
+      map['last_end_of_day_date'] = Variable<String>(lastEndOfDayDate);
+    }
+    if (!nullToAbsent || lastMorningBriefingDate != null) {
+      map['last_morning_briefing_date'] =
+          Variable<String>(lastMorningBriefingDate);
+    }
+    map['awaiting_checkin'] = Variable<bool>(awaitingCheckin);
+    if (!nullToAbsent || awaitingSince != null) {
+      map['awaiting_since'] = Variable<DateTime>(awaitingSince);
+    }
+    map['streak_current'] = Variable<int>(streakCurrent);
+    map['streak_best'] = Variable<int>(streakBest);
+    if (!nullToAbsent || lastAdheredDate != null) {
+      map['last_adhered_date'] = Variable<String>(lastAdheredDate);
+    }
+    return map;
+  }
+
+  RhythmStateCompanion toCompanion(bool nullToAbsent) {
+    return RhythmStateCompanion(
+      userId: Value(userId),
+      lastPlanPromptDate: lastPlanPromptDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastPlanPromptDate),
+      lastEndOfDayDate: lastEndOfDayDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastEndOfDayDate),
+      lastMorningBriefingDate: lastMorningBriefingDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastMorningBriefingDate),
+      awaitingCheckin: Value(awaitingCheckin),
+      awaitingSince: awaitingSince == null && nullToAbsent
+          ? const Value.absent()
+          : Value(awaitingSince),
+      streakCurrent: Value(streakCurrent),
+      streakBest: Value(streakBest),
+      lastAdheredDate: lastAdheredDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAdheredDate),
+    );
+  }
+
+  factory LocalRhythmState.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalRhythmState(
+      userId: serializer.fromJson<String>(json['userId']),
+      lastPlanPromptDate:
+          serializer.fromJson<String?>(json['lastPlanPromptDate']),
+      lastEndOfDayDate: serializer.fromJson<String?>(json['lastEndOfDayDate']),
+      lastMorningBriefingDate:
+          serializer.fromJson<String?>(json['lastMorningBriefingDate']),
+      awaitingCheckin: serializer.fromJson<bool>(json['awaitingCheckin']),
+      awaitingSince: serializer.fromJson<DateTime?>(json['awaitingSince']),
+      streakCurrent: serializer.fromJson<int>(json['streakCurrent']),
+      streakBest: serializer.fromJson<int>(json['streakBest']),
+      lastAdheredDate: serializer.fromJson<String?>(json['lastAdheredDate']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userId': serializer.toJson<String>(userId),
+      'lastPlanPromptDate': serializer.toJson<String?>(lastPlanPromptDate),
+      'lastEndOfDayDate': serializer.toJson<String?>(lastEndOfDayDate),
+      'lastMorningBriefingDate':
+          serializer.toJson<String?>(lastMorningBriefingDate),
+      'awaitingCheckin': serializer.toJson<bool>(awaitingCheckin),
+      'awaitingSince': serializer.toJson<DateTime?>(awaitingSince),
+      'streakCurrent': serializer.toJson<int>(streakCurrent),
+      'streakBest': serializer.toJson<int>(streakBest),
+      'lastAdheredDate': serializer.toJson<String?>(lastAdheredDate),
+    };
+  }
+
+  LocalRhythmState copyWith(
+          {String? userId,
+          Value<String?> lastPlanPromptDate = const Value.absent(),
+          Value<String?> lastEndOfDayDate = const Value.absent(),
+          Value<String?> lastMorningBriefingDate = const Value.absent(),
+          bool? awaitingCheckin,
+          Value<DateTime?> awaitingSince = const Value.absent(),
+          int? streakCurrent,
+          int? streakBest,
+          Value<String?> lastAdheredDate = const Value.absent()}) =>
+      LocalRhythmState(
+        userId: userId ?? this.userId,
+        lastPlanPromptDate: lastPlanPromptDate.present
+            ? lastPlanPromptDate.value
+            : this.lastPlanPromptDate,
+        lastEndOfDayDate: lastEndOfDayDate.present
+            ? lastEndOfDayDate.value
+            : this.lastEndOfDayDate,
+        lastMorningBriefingDate: lastMorningBriefingDate.present
+            ? lastMorningBriefingDate.value
+            : this.lastMorningBriefingDate,
+        awaitingCheckin: awaitingCheckin ?? this.awaitingCheckin,
+        awaitingSince:
+            awaitingSince.present ? awaitingSince.value : this.awaitingSince,
+        streakCurrent: streakCurrent ?? this.streakCurrent,
+        streakBest: streakBest ?? this.streakBest,
+        lastAdheredDate: lastAdheredDate.present
+            ? lastAdheredDate.value
+            : this.lastAdheredDate,
+      );
+  LocalRhythmState copyWithCompanion(RhythmStateCompanion data) {
+    return LocalRhythmState(
+      userId: data.userId.present ? data.userId.value : this.userId,
+      lastPlanPromptDate: data.lastPlanPromptDate.present
+          ? data.lastPlanPromptDate.value
+          : this.lastPlanPromptDate,
+      lastEndOfDayDate: data.lastEndOfDayDate.present
+          ? data.lastEndOfDayDate.value
+          : this.lastEndOfDayDate,
+      lastMorningBriefingDate: data.lastMorningBriefingDate.present
+          ? data.lastMorningBriefingDate.value
+          : this.lastMorningBriefingDate,
+      awaitingCheckin: data.awaitingCheckin.present
+          ? data.awaitingCheckin.value
+          : this.awaitingCheckin,
+      awaitingSince: data.awaitingSince.present
+          ? data.awaitingSince.value
+          : this.awaitingSince,
+      streakCurrent: data.streakCurrent.present
+          ? data.streakCurrent.value
+          : this.streakCurrent,
+      streakBest:
+          data.streakBest.present ? data.streakBest.value : this.streakBest,
+      lastAdheredDate: data.lastAdheredDate.present
+          ? data.lastAdheredDate.value
+          : this.lastAdheredDate,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalRhythmState(')
+          ..write('userId: $userId, ')
+          ..write('lastPlanPromptDate: $lastPlanPromptDate, ')
+          ..write('lastEndOfDayDate: $lastEndOfDayDate, ')
+          ..write('lastMorningBriefingDate: $lastMorningBriefingDate, ')
+          ..write('awaitingCheckin: $awaitingCheckin, ')
+          ..write('awaitingSince: $awaitingSince, ')
+          ..write('streakCurrent: $streakCurrent, ')
+          ..write('streakBest: $streakBest, ')
+          ..write('lastAdheredDate: $lastAdheredDate')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      userId,
+      lastPlanPromptDate,
+      lastEndOfDayDate,
+      lastMorningBriefingDate,
+      awaitingCheckin,
+      awaitingSince,
+      streakCurrent,
+      streakBest,
+      lastAdheredDate);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalRhythmState &&
+          other.userId == this.userId &&
+          other.lastPlanPromptDate == this.lastPlanPromptDate &&
+          other.lastEndOfDayDate == this.lastEndOfDayDate &&
+          other.lastMorningBriefingDate == this.lastMorningBriefingDate &&
+          other.awaitingCheckin == this.awaitingCheckin &&
+          other.awaitingSince == this.awaitingSince &&
+          other.streakCurrent == this.streakCurrent &&
+          other.streakBest == this.streakBest &&
+          other.lastAdheredDate == this.lastAdheredDate);
+}
+
+class RhythmStateCompanion extends UpdateCompanion<LocalRhythmState> {
+  final Value<String> userId;
+  final Value<String?> lastPlanPromptDate;
+  final Value<String?> lastEndOfDayDate;
+  final Value<String?> lastMorningBriefingDate;
+  final Value<bool> awaitingCheckin;
+  final Value<DateTime?> awaitingSince;
+  final Value<int> streakCurrent;
+  final Value<int> streakBest;
+  final Value<String?> lastAdheredDate;
+  final Value<int> rowid;
+  const RhythmStateCompanion({
+    this.userId = const Value.absent(),
+    this.lastPlanPromptDate = const Value.absent(),
+    this.lastEndOfDayDate = const Value.absent(),
+    this.lastMorningBriefingDate = const Value.absent(),
+    this.awaitingCheckin = const Value.absent(),
+    this.awaitingSince = const Value.absent(),
+    this.streakCurrent = const Value.absent(),
+    this.streakBest = const Value.absent(),
+    this.lastAdheredDate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RhythmStateCompanion.insert({
+    required String userId,
+    this.lastPlanPromptDate = const Value.absent(),
+    this.lastEndOfDayDate = const Value.absent(),
+    this.lastMorningBriefingDate = const Value.absent(),
+    this.awaitingCheckin = const Value.absent(),
+    this.awaitingSince = const Value.absent(),
+    this.streakCurrent = const Value.absent(),
+    this.streakBest = const Value.absent(),
+    this.lastAdheredDate = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : userId = Value(userId);
+  static Insertable<LocalRhythmState> custom({
+    Expression<String>? userId,
+    Expression<String>? lastPlanPromptDate,
+    Expression<String>? lastEndOfDayDate,
+    Expression<String>? lastMorningBriefingDate,
+    Expression<bool>? awaitingCheckin,
+    Expression<DateTime>? awaitingSince,
+    Expression<int>? streakCurrent,
+    Expression<int>? streakBest,
+    Expression<String>? lastAdheredDate,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userId != null) 'user_id': userId,
+      if (lastPlanPromptDate != null)
+        'last_plan_prompt_date': lastPlanPromptDate,
+      if (lastEndOfDayDate != null) 'last_end_of_day_date': lastEndOfDayDate,
+      if (lastMorningBriefingDate != null)
+        'last_morning_briefing_date': lastMorningBriefingDate,
+      if (awaitingCheckin != null) 'awaiting_checkin': awaitingCheckin,
+      if (awaitingSince != null) 'awaiting_since': awaitingSince,
+      if (streakCurrent != null) 'streak_current': streakCurrent,
+      if (streakBest != null) 'streak_best': streakBest,
+      if (lastAdheredDate != null) 'last_adhered_date': lastAdheredDate,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RhythmStateCompanion copyWith(
+      {Value<String>? userId,
+      Value<String?>? lastPlanPromptDate,
+      Value<String?>? lastEndOfDayDate,
+      Value<String?>? lastMorningBriefingDate,
+      Value<bool>? awaitingCheckin,
+      Value<DateTime?>? awaitingSince,
+      Value<int>? streakCurrent,
+      Value<int>? streakBest,
+      Value<String?>? lastAdheredDate,
+      Value<int>? rowid}) {
+    return RhythmStateCompanion(
+      userId: userId ?? this.userId,
+      lastPlanPromptDate: lastPlanPromptDate ?? this.lastPlanPromptDate,
+      lastEndOfDayDate: lastEndOfDayDate ?? this.lastEndOfDayDate,
+      lastMorningBriefingDate:
+          lastMorningBriefingDate ?? this.lastMorningBriefingDate,
+      awaitingCheckin: awaitingCheckin ?? this.awaitingCheckin,
+      awaitingSince: awaitingSince ?? this.awaitingSince,
+      streakCurrent: streakCurrent ?? this.streakCurrent,
+      streakBest: streakBest ?? this.streakBest,
+      lastAdheredDate: lastAdheredDate ?? this.lastAdheredDate,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (lastPlanPromptDate.present) {
+      map['last_plan_prompt_date'] = Variable<String>(lastPlanPromptDate.value);
+    }
+    if (lastEndOfDayDate.present) {
+      map['last_end_of_day_date'] = Variable<String>(lastEndOfDayDate.value);
+    }
+    if (lastMorningBriefingDate.present) {
+      map['last_morning_briefing_date'] =
+          Variable<String>(lastMorningBriefingDate.value);
+    }
+    if (awaitingCheckin.present) {
+      map['awaiting_checkin'] = Variable<bool>(awaitingCheckin.value);
+    }
+    if (awaitingSince.present) {
+      map['awaiting_since'] = Variable<DateTime>(awaitingSince.value);
+    }
+    if (streakCurrent.present) {
+      map['streak_current'] = Variable<int>(streakCurrent.value);
+    }
+    if (streakBest.present) {
+      map['streak_best'] = Variable<int>(streakBest.value);
+    }
+    if (lastAdheredDate.present) {
+      map['last_adhered_date'] = Variable<String>(lastAdheredDate.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RhythmStateCompanion(')
+          ..write('userId: $userId, ')
+          ..write('lastPlanPromptDate: $lastPlanPromptDate, ')
+          ..write('lastEndOfDayDate: $lastEndOfDayDate, ')
+          ..write('lastMorningBriefingDate: $lastMorningBriefingDate, ')
+          ..write('awaitingCheckin: $awaitingCheckin, ')
+          ..write('awaitingSince: $awaitingSince, ')
+          ..write('streakCurrent: $streakCurrent, ')
+          ..write('streakBest: $streakBest, ')
+          ..write('lastAdheredDate: $lastAdheredDate, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4328,6 +6314,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $TasksTable tasks = $TasksTable(this);
   late final $RemindersTable reminders = $RemindersTable(this);
   late final $AlertsLocalTable alertsLocal = $AlertsLocalTable(this);
+  late final $DailyPlansTable dailyPlans = $DailyPlansTable(this);
+  late final $CheckinsTable checkins = $CheckinsTable(this);
+  late final $RhythmStateTable rhythmState = $RhythmStateTable(this);
   late final Index labelsSort =
       Index('labels_sort', 'CREATE INDEX labels_sort ON labels (sort_order)');
   late final Index labelsPending = Index(
@@ -4346,6 +6335,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX reminders_pending ON reminders (pending_op)');
   late final Index alertsLocalNotifyAt = Index('alerts_local_notify_at',
       'CREATE INDEX alerts_local_notify_at ON alerts_local (notify_at)');
+  late final Index dailyPlansDate = Index('daily_plans_date',
+      'CREATE INDEX daily_plans_date ON daily_plans (date)');
+  late final Index dailyPlansPending = Index('daily_plans_pending',
+      'CREATE INDEX daily_plans_pending ON daily_plans (pending_op)');
+  late final Index checkinsDate =
+      Index('checkins_date', 'CREATE INDEX checkins_date ON checkins (date)');
+  late final Index checkinsPending = Index('checkins_pending',
+      'CREATE INDEX checkins_pending ON checkins (pending_op)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4358,6 +6355,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         tasks,
         reminders,
         alertsLocal,
+        dailyPlans,
+        checkins,
+        rhythmState,
         labelsSort,
         labelsPending,
         tasksDue,
@@ -4366,7 +6366,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         tasksPending,
         remindersRemindAt,
         remindersPending,
-        alertsLocalNotifyAt
+        alertsLocalNotifyAt,
+        dailyPlansDate,
+        dailyPlansPending,
+        checkinsDate,
+        checkinsPending
       ];
   @override
   DriftDatabaseOptions get options =>
@@ -6299,6 +8303,864 @@ typedef $$AlertsLocalTableProcessedTableManager = ProcessedTableManager<
     (LocalAlert, BaseReferences<_$AppDatabase, $AlertsLocalTable, LocalAlert>),
     LocalAlert,
     PrefetchHooks Function()>;
+typedef $$DailyPlansTableCreateCompanionBuilder = DailyPlansCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String date,
+  Value<String> status,
+  Value<bool> autoConfirmed,
+  Value<String> tasksJson,
+  Value<String?> trainingJson,
+  Value<String?> workoutLine,
+  Value<String?> mealLine,
+  Value<DateTime?> promptedAt,
+  Value<DateTime?> confirmedAt,
+  Value<DateTime?> summarisedAt,
+  Value<DateTime?> briefedAt,
+  Value<int> rowid,
+});
+typedef $$DailyPlansTableUpdateCompanionBuilder = DailyPlansCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> date,
+  Value<String> status,
+  Value<bool> autoConfirmed,
+  Value<String> tasksJson,
+  Value<String?> trainingJson,
+  Value<String?> workoutLine,
+  Value<String?> mealLine,
+  Value<DateTime?> promptedAt,
+  Value<DateTime?> confirmedAt,
+  Value<DateTime?> summarisedAt,
+  Value<DateTime?> briefedAt,
+  Value<int> rowid,
+});
+
+class $$DailyPlansTableFilterComposer
+    extends Composer<_$AppDatabase, $DailyPlansTable> {
+  $$DailyPlansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get autoConfirmed => $composableBuilder(
+      column: $table.autoConfirmed, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tasksJson => $composableBuilder(
+      column: $table.tasksJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get trainingJson => $composableBuilder(
+      column: $table.trainingJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get workoutLine => $composableBuilder(
+      column: $table.workoutLine, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get mealLine => $composableBuilder(
+      column: $table.mealLine, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get promptedAt => $composableBuilder(
+      column: $table.promptedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get confirmedAt => $composableBuilder(
+      column: $table.confirmedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get summarisedAt => $composableBuilder(
+      column: $table.summarisedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get briefedAt => $composableBuilder(
+      column: $table.briefedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$DailyPlansTableOrderingComposer
+    extends Composer<_$AppDatabase, $DailyPlansTable> {
+  $$DailyPlansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get autoConfirmed => $composableBuilder(
+      column: $table.autoConfirmed,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tasksJson => $composableBuilder(
+      column: $table.tasksJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get trainingJson => $composableBuilder(
+      column: $table.trainingJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get workoutLine => $composableBuilder(
+      column: $table.workoutLine, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get mealLine => $composableBuilder(
+      column: $table.mealLine, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get promptedAt => $composableBuilder(
+      column: $table.promptedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get confirmedAt => $composableBuilder(
+      column: $table.confirmedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get summarisedAt => $composableBuilder(
+      column: $table.summarisedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get briefedAt => $composableBuilder(
+      column: $table.briefedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$DailyPlansTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DailyPlansTable> {
+  $$DailyPlansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<bool> get autoConfirmed => $composableBuilder(
+      column: $table.autoConfirmed, builder: (column) => column);
+
+  GeneratedColumn<String> get tasksJson =>
+      $composableBuilder(column: $table.tasksJson, builder: (column) => column);
+
+  GeneratedColumn<String> get trainingJson => $composableBuilder(
+      column: $table.trainingJson, builder: (column) => column);
+
+  GeneratedColumn<String> get workoutLine => $composableBuilder(
+      column: $table.workoutLine, builder: (column) => column);
+
+  GeneratedColumn<String> get mealLine =>
+      $composableBuilder(column: $table.mealLine, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get promptedAt => $composableBuilder(
+      column: $table.promptedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get confirmedAt => $composableBuilder(
+      column: $table.confirmedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get summarisedAt => $composableBuilder(
+      column: $table.summarisedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get briefedAt =>
+      $composableBuilder(column: $table.briefedAt, builder: (column) => column);
+}
+
+class $$DailyPlansTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $DailyPlansTable,
+    LocalDailyPlan,
+    $$DailyPlansTableFilterComposer,
+    $$DailyPlansTableOrderingComposer,
+    $$DailyPlansTableAnnotationComposer,
+    $$DailyPlansTableCreateCompanionBuilder,
+    $$DailyPlansTableUpdateCompanionBuilder,
+    (
+      LocalDailyPlan,
+      BaseReferences<_$AppDatabase, $DailyPlansTable, LocalDailyPlan>
+    ),
+    LocalDailyPlan,
+    PrefetchHooks Function()> {
+  $$DailyPlansTableTableManager(_$AppDatabase db, $DailyPlansTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DailyPlansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DailyPlansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DailyPlansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> date = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<bool> autoConfirmed = const Value.absent(),
+            Value<String> tasksJson = const Value.absent(),
+            Value<String?> trainingJson = const Value.absent(),
+            Value<String?> workoutLine = const Value.absent(),
+            Value<String?> mealLine = const Value.absent(),
+            Value<DateTime?> promptedAt = const Value.absent(),
+            Value<DateTime?> confirmedAt = const Value.absent(),
+            Value<DateTime?> summarisedAt = const Value.absent(),
+            Value<DateTime?> briefedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              DailyPlansCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            date: date,
+            status: status,
+            autoConfirmed: autoConfirmed,
+            tasksJson: tasksJson,
+            trainingJson: trainingJson,
+            workoutLine: workoutLine,
+            mealLine: mealLine,
+            promptedAt: promptedAt,
+            confirmedAt: confirmedAt,
+            summarisedAt: summarisedAt,
+            briefedAt: briefedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String date,
+            Value<String> status = const Value.absent(),
+            Value<bool> autoConfirmed = const Value.absent(),
+            Value<String> tasksJson = const Value.absent(),
+            Value<String?> trainingJson = const Value.absent(),
+            Value<String?> workoutLine = const Value.absent(),
+            Value<String?> mealLine = const Value.absent(),
+            Value<DateTime?> promptedAt = const Value.absent(),
+            Value<DateTime?> confirmedAt = const Value.absent(),
+            Value<DateTime?> summarisedAt = const Value.absent(),
+            Value<DateTime?> briefedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              DailyPlansCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            date: date,
+            status: status,
+            autoConfirmed: autoConfirmed,
+            tasksJson: tasksJson,
+            trainingJson: trainingJson,
+            workoutLine: workoutLine,
+            mealLine: mealLine,
+            promptedAt: promptedAt,
+            confirmedAt: confirmedAt,
+            summarisedAt: summarisedAt,
+            briefedAt: briefedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$DailyPlansTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $DailyPlansTable,
+    LocalDailyPlan,
+    $$DailyPlansTableFilterComposer,
+    $$DailyPlansTableOrderingComposer,
+    $$DailyPlansTableAnnotationComposer,
+    $$DailyPlansTableCreateCompanionBuilder,
+    $$DailyPlansTableUpdateCompanionBuilder,
+    (
+      LocalDailyPlan,
+      BaseReferences<_$AppDatabase, $DailyPlansTable, LocalDailyPlan>
+    ),
+    LocalDailyPlan,
+    PrefetchHooks Function()>;
+typedef $$CheckinsTableCreateCompanionBuilder = CheckinsCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String date,
+  Value<int?> mood,
+  Value<bool?> adhered,
+  Value<String?> note,
+  Value<String> source,
+  Value<int> rowid,
+});
+typedef $$CheckinsTableUpdateCompanionBuilder = CheckinsCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> date,
+  Value<int?> mood,
+  Value<bool?> adhered,
+  Value<String?> note,
+  Value<String> source,
+  Value<int> rowid,
+});
+
+class $$CheckinsTableFilterComposer
+    extends Composer<_$AppDatabase, $CheckinsTable> {
+  $$CheckinsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get mood => $composableBuilder(
+      column: $table.mood, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get adhered => $composableBuilder(
+      column: $table.adhered, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+}
+
+class $$CheckinsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CheckinsTable> {
+  $$CheckinsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get mood => $composableBuilder(
+      column: $table.mood, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get adhered => $composableBuilder(
+      column: $table.adhered, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get note => $composableBuilder(
+      column: $table.note, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CheckinsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CheckinsTable> {
+  $$CheckinsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get mood =>
+      $composableBuilder(column: $table.mood, builder: (column) => column);
+
+  GeneratedColumn<bool> get adhered =>
+      $composableBuilder(column: $table.adhered, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+}
+
+class $$CheckinsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CheckinsTable,
+    LocalCheckin,
+    $$CheckinsTableFilterComposer,
+    $$CheckinsTableOrderingComposer,
+    $$CheckinsTableAnnotationComposer,
+    $$CheckinsTableCreateCompanionBuilder,
+    $$CheckinsTableUpdateCompanionBuilder,
+    (LocalCheckin, BaseReferences<_$AppDatabase, $CheckinsTable, LocalCheckin>),
+    LocalCheckin,
+    PrefetchHooks Function()> {
+  $$CheckinsTableTableManager(_$AppDatabase db, $CheckinsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CheckinsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CheckinsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CheckinsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> date = const Value.absent(),
+            Value<int?> mood = const Value.absent(),
+            Value<bool?> adhered = const Value.absent(),
+            Value<String?> note = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CheckinsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            date: date,
+            mood: mood,
+            adhered: adhered,
+            note: note,
+            source: source,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String date,
+            Value<int?> mood = const Value.absent(),
+            Value<bool?> adhered = const Value.absent(),
+            Value<String?> note = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CheckinsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            date: date,
+            mood: mood,
+            adhered: adhered,
+            note: note,
+            source: source,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$CheckinsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CheckinsTable,
+    LocalCheckin,
+    $$CheckinsTableFilterComposer,
+    $$CheckinsTableOrderingComposer,
+    $$CheckinsTableAnnotationComposer,
+    $$CheckinsTableCreateCompanionBuilder,
+    $$CheckinsTableUpdateCompanionBuilder,
+    (LocalCheckin, BaseReferences<_$AppDatabase, $CheckinsTable, LocalCheckin>),
+    LocalCheckin,
+    PrefetchHooks Function()>;
+typedef $$RhythmStateTableCreateCompanionBuilder = RhythmStateCompanion
+    Function({
+  required String userId,
+  Value<String?> lastPlanPromptDate,
+  Value<String?> lastEndOfDayDate,
+  Value<String?> lastMorningBriefingDate,
+  Value<bool> awaitingCheckin,
+  Value<DateTime?> awaitingSince,
+  Value<int> streakCurrent,
+  Value<int> streakBest,
+  Value<String?> lastAdheredDate,
+  Value<int> rowid,
+});
+typedef $$RhythmStateTableUpdateCompanionBuilder = RhythmStateCompanion
+    Function({
+  Value<String> userId,
+  Value<String?> lastPlanPromptDate,
+  Value<String?> lastEndOfDayDate,
+  Value<String?> lastMorningBriefingDate,
+  Value<bool> awaitingCheckin,
+  Value<DateTime?> awaitingSince,
+  Value<int> streakCurrent,
+  Value<int> streakBest,
+  Value<String?> lastAdheredDate,
+  Value<int> rowid,
+});
+
+class $$RhythmStateTableFilterComposer
+    extends Composer<_$AppDatabase, $RhythmStateTable> {
+  $$RhythmStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastPlanPromptDate => $composableBuilder(
+      column: $table.lastPlanPromptDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastEndOfDayDate => $composableBuilder(
+      column: $table.lastEndOfDayDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastMorningBriefingDate => $composableBuilder(
+      column: $table.lastMorningBriefingDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get awaitingCheckin => $composableBuilder(
+      column: $table.awaitingCheckin,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get awaitingSince => $composableBuilder(
+      column: $table.awaitingSince, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get streakCurrent => $composableBuilder(
+      column: $table.streakCurrent, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get streakBest => $composableBuilder(
+      column: $table.streakBest, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastAdheredDate => $composableBuilder(
+      column: $table.lastAdheredDate,
+      builder: (column) => ColumnFilters(column));
+}
+
+class $$RhythmStateTableOrderingComposer
+    extends Composer<_$AppDatabase, $RhythmStateTable> {
+  $$RhythmStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastPlanPromptDate => $composableBuilder(
+      column: $table.lastPlanPromptDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastEndOfDayDate => $composableBuilder(
+      column: $table.lastEndOfDayDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastMorningBriefingDate => $composableBuilder(
+      column: $table.lastMorningBriefingDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get awaitingCheckin => $composableBuilder(
+      column: $table.awaitingCheckin,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get awaitingSince => $composableBuilder(
+      column: $table.awaitingSince,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get streakCurrent => $composableBuilder(
+      column: $table.streakCurrent,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get streakBest => $composableBuilder(
+      column: $table.streakBest, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastAdheredDate => $composableBuilder(
+      column: $table.lastAdheredDate,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$RhythmStateTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RhythmStateTable> {
+  $$RhythmStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get lastPlanPromptDate => $composableBuilder(
+      column: $table.lastPlanPromptDate, builder: (column) => column);
+
+  GeneratedColumn<String> get lastEndOfDayDate => $composableBuilder(
+      column: $table.lastEndOfDayDate, builder: (column) => column);
+
+  GeneratedColumn<String> get lastMorningBriefingDate => $composableBuilder(
+      column: $table.lastMorningBriefingDate, builder: (column) => column);
+
+  GeneratedColumn<bool> get awaitingCheckin => $composableBuilder(
+      column: $table.awaitingCheckin, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get awaitingSince => $composableBuilder(
+      column: $table.awaitingSince, builder: (column) => column);
+
+  GeneratedColumn<int> get streakCurrent => $composableBuilder(
+      column: $table.streakCurrent, builder: (column) => column);
+
+  GeneratedColumn<int> get streakBest => $composableBuilder(
+      column: $table.streakBest, builder: (column) => column);
+
+  GeneratedColumn<String> get lastAdheredDate => $composableBuilder(
+      column: $table.lastAdheredDate, builder: (column) => column);
+}
+
+class $$RhythmStateTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $RhythmStateTable,
+    LocalRhythmState,
+    $$RhythmStateTableFilterComposer,
+    $$RhythmStateTableOrderingComposer,
+    $$RhythmStateTableAnnotationComposer,
+    $$RhythmStateTableCreateCompanionBuilder,
+    $$RhythmStateTableUpdateCompanionBuilder,
+    (
+      LocalRhythmState,
+      BaseReferences<_$AppDatabase, $RhythmStateTable, LocalRhythmState>
+    ),
+    LocalRhythmState,
+    PrefetchHooks Function()> {
+  $$RhythmStateTableTableManager(_$AppDatabase db, $RhythmStateTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RhythmStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RhythmStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RhythmStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> userId = const Value.absent(),
+            Value<String?> lastPlanPromptDate = const Value.absent(),
+            Value<String?> lastEndOfDayDate = const Value.absent(),
+            Value<String?> lastMorningBriefingDate = const Value.absent(),
+            Value<bool> awaitingCheckin = const Value.absent(),
+            Value<DateTime?> awaitingSince = const Value.absent(),
+            Value<int> streakCurrent = const Value.absent(),
+            Value<int> streakBest = const Value.absent(),
+            Value<String?> lastAdheredDate = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RhythmStateCompanion(
+            userId: userId,
+            lastPlanPromptDate: lastPlanPromptDate,
+            lastEndOfDayDate: lastEndOfDayDate,
+            lastMorningBriefingDate: lastMorningBriefingDate,
+            awaitingCheckin: awaitingCheckin,
+            awaitingSince: awaitingSince,
+            streakCurrent: streakCurrent,
+            streakBest: streakBest,
+            lastAdheredDate: lastAdheredDate,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String userId,
+            Value<String?> lastPlanPromptDate = const Value.absent(),
+            Value<String?> lastEndOfDayDate = const Value.absent(),
+            Value<String?> lastMorningBriefingDate = const Value.absent(),
+            Value<bool> awaitingCheckin = const Value.absent(),
+            Value<DateTime?> awaitingSince = const Value.absent(),
+            Value<int> streakCurrent = const Value.absent(),
+            Value<int> streakBest = const Value.absent(),
+            Value<String?> lastAdheredDate = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              RhythmStateCompanion.insert(
+            userId: userId,
+            lastPlanPromptDate: lastPlanPromptDate,
+            lastEndOfDayDate: lastEndOfDayDate,
+            lastMorningBriefingDate: lastMorningBriefingDate,
+            awaitingCheckin: awaitingCheckin,
+            awaitingSince: awaitingSince,
+            streakCurrent: streakCurrent,
+            streakBest: streakBest,
+            lastAdheredDate: lastAdheredDate,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$RhythmStateTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $RhythmStateTable,
+    LocalRhythmState,
+    $$RhythmStateTableFilterComposer,
+    $$RhythmStateTableOrderingComposer,
+    $$RhythmStateTableAnnotationComposer,
+    $$RhythmStateTableCreateCompanionBuilder,
+    $$RhythmStateTableUpdateCompanionBuilder,
+    (
+      LocalRhythmState,
+      BaseReferences<_$AppDatabase, $RhythmStateTable, LocalRhythmState>
+    ),
+    LocalRhythmState,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6317,4 +9179,10 @@ class $AppDatabaseManager {
       $$RemindersTableTableManager(_db, _db.reminders);
   $$AlertsLocalTableTableManager get alertsLocal =>
       $$AlertsLocalTableTableManager(_db, _db.alertsLocal);
+  $$DailyPlansTableTableManager get dailyPlans =>
+      $$DailyPlansTableTableManager(_db, _db.dailyPlans);
+  $$CheckinsTableTableManager get checkins =>
+      $$CheckinsTableTableManager(_db, _db.checkins);
+  $$RhythmStateTableTableManager get rhythmState =>
+      $$RhythmStateTableTableManager(_db, _db.rhythmState);
 }

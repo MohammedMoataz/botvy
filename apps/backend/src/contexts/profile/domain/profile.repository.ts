@@ -12,12 +12,35 @@ import type { Profile } from './profile.aggregate.js';
  */
 export abstract class ProfileRepository {
   abstract find(userId: string): Promise<Profile | null>;
+
+  /**
+   * The batched read, added for P3's rhythm tick.
+   *
+   * It is a separate method rather than a loop over `find` at the call site
+   * because the caller is a job that runs over *every* member: the tick asks
+   * what time it is for each of them on a five-minute pulse, and the phase's
+   * performance goal is a pass in under ten seconds when nobody is due. One
+   * `find` per member is one round trip per member — five hundred members
+   * against two collections is a thousand round trips, and a round trip is the
+   * expensive part, not the query. The `$in` form is two.
+   *
+   * Missing ids are simply absent from the result; the order is not promised,
+   * because neither store gives one for an `$in` and a caller that relied on it
+   * would be relying on an accident. `schedulesFor` indexes what comes back and
+   * fills the gaps, which is where the "every id gets an answer" promise lives.
+   */
+  abstract findMany(userIds: string[]): Promise<Profile[]>;
+
   abstract save(profile: Profile): Promise<void>;
   abstract remove(userId: string): Promise<boolean>;
 }
 
 export abstract class PreferencesRepository {
   abstract find(userId: string): Promise<Preferences | null>;
+
+  /** Same batched read, same reasoning as `ProfileRepository.findMany`. */
+  abstract findMany(userIds: string[]): Promise<Preferences[]>;
+
   abstract save(preferences: Preferences): Promise<void>;
   abstract remove(userId: string): Promise<boolean>;
 }

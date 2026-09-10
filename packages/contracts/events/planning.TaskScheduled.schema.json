@@ -22,6 +22,9 @@
     "allDay": {
       "type": "boolean"
     },
+    "title": {
+      "type": "string"
+    },
     "priority": {
       "type": "integer"
     }
@@ -30,6 +33,7 @@
     "taskId",
     "dueAt",
     "allDay",
+    "title",
     "priority"
   ],
   "additionalProperties": false

@@ -13,6 +13,8 @@ export type Scalars = {
   Boolean: { input: boolean; output: boolean; }
   Int: { input: number; output: number; }
   Float: { input: number; output: number; }
+  /** A calendar date in the member's own time zone, as YYYY-MM-DD. */
+  Date: { input: any; output: any; }
   /** An instant in time, serialised as an ISO 8601 string in UTC. */
   DateTime: { input: any; output: any; }
   /** Arbitrary JSON, used for a settings value and an audit entry’s metadata. */
@@ -26,6 +28,29 @@ export type BodyMetric = {
   note?: Maybe<Scalars['String']['output']>;
   recordedAt: Scalars['DateTime']['output'];
   weightKg?: Maybe<Scalars['Float']['output']>;
+};
+
+export type Checkin = {
+  __typename?: 'Checkin';
+  adhered?: Maybe<Scalars['Boolean']['output']>;
+  date: Scalars['Date']['output'];
+  mood?: Maybe<Scalars['Int']['output']>;
+  note?: Maybe<Scalars['String']['output']>;
+};
+
+export type DailyPlan = {
+  __typename?: 'DailyPlan';
+  autoConfirmed: Scalars['Boolean']['output'];
+  briefedAt?: Maybe<Scalars['DateTime']['output']>;
+  confirmedAt?: Maybe<Scalars['DateTime']['output']>;
+  date: Scalars['Date']['output'];
+  mealLine?: Maybe<Scalars['String']['output']>;
+  promptedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: PlanStatus;
+  summarisedAt?: Maybe<Scalars['DateTime']['output']>;
+  tasks: Array<PlanTask>;
+  training?: Maybe<PlanTraining>;
+  workoutLine?: Maybe<Scalars['String']['output']>;
 };
 
 export type Device = {
@@ -58,6 +83,30 @@ export type LabelSnapshot = {
   __typename?: 'LabelSnapshot';
   color: Scalars['String']['output'];
   name: Scalars['String']['output'];
+};
+
+/** What the member decided about a day: proposed and unanswered, agreed, or declined. A day with no plan at all reads as `draft` with no `promptedAt`. */
+export enum PlanStatus {
+  Confirmed = 'confirmed',
+  Draft = 'draft',
+  Skipped = 'skipped'
+}
+
+export type PlanTask = {
+  __typename?: 'PlanTask';
+  deferCount: Scalars['Int']['output'];
+  dueAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['ID']['output'];
+  priority: Scalars['Int']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type PlanTraining = {
+  __typename?: 'PlanTraining';
+  sessionId: Scalars['ID']['output'];
+  sport: Scalars['String']['output'];
+  startAt: Scalars['DateTime']['output'];
+  title: Scalars['String']['output'];
 };
 
 export type Preferences = {
@@ -98,6 +147,7 @@ export type Query = {
   __typename?: 'Query';
   /** The caller's body metric history. */
   bodyMetrics: Array<BodyMetric>;
+  checkins: Array<Checkin>;
   /** A member's devices. Administrators only. */
   devicesOf: Array<Device>;
   labelPalette: Array<Scalars['String']['output']>;
@@ -106,6 +156,7 @@ export type Query = {
   me: User;
   /** The caller's own registered devices. */
   myDevices: Array<Device>;
+  plans: Array<DailyPlan>;
   /** The caller's own preferences. */
   preferences: Preferences;
   /** The caller's own profile. */
@@ -116,8 +167,11 @@ export type Query = {
   serviceClients: Array<ServiceClient>;
   /** The settings registry. Administrators only. */
   settings: Array<Setting>;
+  streak: Streak;
   task?: Maybe<Task>;
   tasks: TaskPage;
+  todayPlan: DailyPlan;
+  tomorrowDraft: DailyPlan;
   /** Every member. Administrators only. */
   users: UserConnection;
 };
@@ -128,6 +182,12 @@ export type QueryBodyMetricsArgs = {
 };
 
 
+export type QueryCheckinsArgs = {
+  from: Scalars['Date']['input'];
+  to: Scalars['Date']['input'];
+};
+
+
 export type QueryDevicesOfArgs = {
   userId: Scalars['ID']['input'];
 };
@@ -135,6 +195,12 @@ export type QueryDevicesOfArgs = {
 
 export type QueryLabelsArgs = {
   includeDeleted?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+export type QueryPlansArgs = {
+  from: Scalars['Date']['input'];
+  to: Scalars['Date']['input'];
 };
 
 
@@ -160,6 +226,11 @@ export type QueryTasksArgs = {
   labelId?: InputMaybe<Scalars['ID']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   view: TaskViewName;
+};
+
+
+export type QueryTodayPlanArgs = {
+  date?: InputMaybe<Scalars['Date']['input']>;
 };
 
 
@@ -227,6 +298,14 @@ export type Setting = {
   key: Scalars['String']['output'];
   readOnly: Scalars['Boolean']['output'];
   value?: Maybe<Scalars['JSON']['output']>;
+};
+
+export type Streak = {
+  __typename?: 'Streak';
+  best: Scalars['Int']['output'];
+  current: Scalars['Int']['output'];
+  lastAdheredDate?: Maybe<Scalars['Date']['output']>;
+  weekAdherence: Array<Maybe<Scalars['Boolean']['output']>>;
 };
 
 export type Task = {

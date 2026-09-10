@@ -558,6 +558,103 @@ describe('deferring', () => {
     expect(event?.payload).toMatchObject({ taskId: id, deferCount: 1 });
   });
 
+  /*
+   * The three regressions below are one defect wearing three hats, and all
+   * three were live until P3 found them while wiring the nightly rollover.
+   *
+   * `PlanAlertsSaga.onTaskScheduled` builds an alert from the event payload
+   * with two fallbacks: `title ?? 'Task due'` and `timed: allDay === false`.
+   * Neither event carried a title, so every task notification in the product
+   * said "Task due"; `TaskRescheduled` carried no `allDay`, so
+   * `undefined === false` was false and the reconcile dropped every lead time
+   * the member had asked for; and `defer` raised nothing Notifications listens
+   * to at all.
+   *
+   * These assert the *payloads*, not the saga, on purpose. A payload is the
+   * published surface between two contexts and it reaches the consumer as
+   * `unknown`, so the type system cannot say a field is missing — a test that
+   * reads the event is the only thing that can.
+   */
+
+  it('TaskScheduled names the task, so the notification is not "Task due"', async () => {
+    const id = newId();
+    await b.create.handle(MEMBER, {
+      id,
+      title: 'Call the dentist',
+      dueAt: new Date(Date.now() + 3_600_000),
+      allDay: false,
+    });
+
+    const event = b.uow.events.find((e) => e.name === 'planning.TaskScheduled');
+    expect(event?.payload).toMatchObject({
+      taskId: id,
+      title: 'Call the dentist',
+      allDay: false,
+    });
+  });
+
+  it('TaskRescheduled carries allDay, or an edit cancels the lead times', async () => {
+    // `timed: payload.allDay === false` in the saga. With `allDay` absent the
+    // comparison is false, the reconcile plans no warnings, and a member with
+    // ['1h', '1d'] who moved a task silently lost both.
+    const id = newId();
+    await b.create.handle(MEMBER, {
+      id,
+      title: 'Dentist',
+      dueAt: new Date(Date.now() + 3_600_000),
+      allDay: false,
+    });
+    b.uow.events.length = 0;
+
+    await b.update.handle(MEMBER, id, {
+      dueAt: new Date(Date.now() + 7_200_000),
+    });
+
+    const event = b.uow.events.find(
+      (e) => e.name === 'planning.TaskRescheduled',
+    );
+    expect(event?.payload).toMatchObject({
+      taskId: id,
+      title: 'Dentist',
+      allDay: false,
+    });
+  });
+
+  it('deferring raises TaskRescheduled as well, or the alert stays behind', async () => {
+    /*
+     * The one that P3 makes nightly.
+     *
+     * `TaskDeferred` says "carried N times" and its only reader is the evening
+     * prompt. Notifications listens to `TaskRescheduled` and to nothing else,
+     * so without the second raise a member who swiped tonight's task to
+     * tomorrow still got tonight's notification — and from this phase on, the
+     * rollover does that to every unfinished task every night.
+     */
+    const id = newId();
+    const wasDue = new Date(Date.now() + 3_600_000);
+    await b.create.handle(MEMBER, {
+      id,
+      title: 'Buy milk',
+      dueAt: wasDue,
+      allDay: false,
+    });
+    b.uow.events.length = 0;
+
+    const tomorrow = new Date(wasDue.getTime() + 86_400_000);
+    await b.defer.handle(MEMBER, id, tomorrow);
+
+    const names = b.uow.events.map((e) => e.name);
+    expect(names).toContain('planning.TaskDeferred');
+    expect(names).toContain('planning.TaskRescheduled');
+
+    // And the reschedule carries the new moment, not the old one.
+    const rescheduled = b.uow.events.find(
+      (e) => e.name === 'planning.TaskRescheduled',
+    );
+    const payload = rescheduled?.payload as { dueAt: Date } | undefined;
+    expect(payload?.dueAt.getTime()).toBe(tomorrow.getTime());
+  });
+
   it('the rollover counts identically to the member’s own swipe', async () => {
     // The count is a property of deferring, not of the nightly job. A rollover
     // that wrote `dueAt` directly would leave the evening prompt unable to say

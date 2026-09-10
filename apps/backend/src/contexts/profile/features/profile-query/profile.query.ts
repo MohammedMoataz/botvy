@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import type { BodyMetric } from '../../domain/profile.aggregate.js';
 import {
   PreferencesRepository,
@@ -38,6 +39,30 @@ export interface PreferencesView {
 }
 
 /**
+ * When each of a member's three daily touches is due, and whether they want the
+ * check-in question — the two halves of the answer joined into one row.
+ *
+ * The zone is on the profile and the three times and the flag are preferences,
+ * which is a split nobody outside this context should have to know about. P3's
+ * rhythm tick asks for a list of these and gets one, rather than asking two
+ * questions per member and reassembling them itself.
+ *
+ * Deliberately *not* the full `PreferencesView`. The tick is a loop over every
+ * member and this is the projection it needs; handing it twelve fields would
+ * invite the eighth of them to grow a use, and then Profile's whole preferences
+ * shape is load-bearing for a job in another context.
+ */
+export interface MemberScheduleView {
+  userId: string;
+  timezone: string;
+  /** `HH:mm` in the member's own zone. */
+  planTomorrowTime: string;
+  endOfDayTime: string;
+  morningBriefingTime: string;
+  checkinEnabled: boolean;
+}
+
+/**
  * What a profile looks like from outside.
  *
  * Empty fields are omitted rather than sent as `null` or `[]`. A member who has
@@ -54,6 +79,7 @@ export class ProfileQueryHandler {
   constructor(
     private readonly profiles: ProfileRepository,
     private readonly preferences: PreferencesRepository,
+    private readonly settings: SettingsService,
   ) {}
 
   async profile(userId: string): Promise<ProfileView | null> {
@@ -104,6 +130,81 @@ export class ProfileQueryHandler {
       mealMode: preferences.mealMode,
       aiSuggestions: preferences.aiSuggestions,
     };
+  }
+
+  /**
+   * The daily-touch schedule for a batch of members, one entry per id asked
+   * for, in the order asked for.
+   *
+   * **Two collections, two queries — never two queries per member.** The caller
+   * is P3's tick: a five-minute pulse that walks every member deciding whose
+   * local plan-prompt, end-of-day or morning time has arrived. A loop of
+   * `find(userId)` here would be one round trip per member per collection, so a
+   * five-hundred-member installation would pay a thousand round trips on a job
+   * whose stated goal is a pass in under ten seconds when nobody is due — and
+   * the round trip is the cost, not the query. Hence `findMany` on both ports,
+   * and hence the `reads` counter on the in-memory adapters, which the spec
+   * asserts is 1 and not 500: a loop reintroduced here would be invisible
+   * otherwise, because every functional assertion would still pass.
+   *
+   * **Every id gets an entry, and none of them is null.** A member whose
+   * profile or preferences row has not been written yet is a real state, not a
+   * defect: `bootstrap-on-registered` reacts to `identity.UserRegistered`
+   * through the relay, which is at-least-once and *eventual*, so for a second
+   * or two after an account is created there is no row. `ProfileMemberContext`
+   * already answers that same window with the installation default, for the
+   * same reason and to better effect than any alternative — the default is the
+   * very value the bootstrap is about to write, so the answer is not merely
+   * safe, it is correct.
+   *
+   * Returning null (or omitting the id) would push a "no profile yet" branch
+   * into the tick, which is the one place it must not be. The tick's loop body
+   * is three claim-then-send decisions against a local clock; a fourth branch
+   * asking whether this member has a time zone yet would sit in that body
+   * forever, would be exercised by nothing (the window is two seconds wide),
+   * and the day somebody wrote it wrong the failure would be a member who is
+   * silently skipped every pass. An entry built from `settings.defaults.*` is
+   * indistinguishable from the row that is about to exist, so there is nothing
+   * for the tick to branch on.
+   *
+   * Order is preserved because it is free here and the alternative — "the order
+   * the store happened to return the `$in` in" — is the kind of detail a caller
+   * starts depending on by accident.
+   */
+  async schedulesFor(userIds: string[]): Promise<MemberScheduleView[]> {
+    if (userIds.length === 0) return [];
+
+    const [profiles, preferences, timezone, planTomorrowTime, endOfDayTime, morningBriefingTime, checkinEnabled] =
+      await Promise.all([
+        this.profiles.findMany(userIds),
+        this.preferences.findMany(userIds),
+        this.settings.get('defaults.timezone'),
+        this.settings.get('defaults.planTomorrowTime'),
+        this.settings.get('defaults.endOfDayTime'),
+        this.settings.get('defaults.morningBriefingTime'),
+        this.settings.get('defaults.checkinEnabled'),
+      ]);
+
+    const profileFor = new Map(profiles.map((row) => [row.userId, row]));
+    const preferencesFor = new Map(preferences.map((row) => [row.userId, row]));
+
+    return userIds.map((userId) => {
+      const profile = profileFor.get(userId);
+      const chosen = preferencesFor.get(userId);
+      return {
+        userId,
+        // The two halves fall back independently. A member can plausibly have
+        // one row and not the other — the bootstrap writes them in sequence —
+        // and treating a missing profile as a reason to ignore the preferences
+        // that *are* there would send that member's touches at the
+        // installation's default hour instead of the one they chose.
+        timezone: profile?.timezone ?? timezone,
+        planTomorrowTime: chosen?.planTomorrowTime ?? planTomorrowTime,
+        endOfDayTime: chosen?.endOfDayTime ?? endOfDayTime,
+        morningBriefingTime: chosen?.morningBriefingTime ?? morningBriefingTime,
+        checkinEnabled: chosen?.checkinEnabled ?? checkinEnabled,
+      };
+    });
   }
 
   /**

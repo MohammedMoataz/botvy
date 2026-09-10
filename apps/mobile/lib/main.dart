@@ -35,6 +35,14 @@ Future<void> main() async {
         // ignore: discarded_futures — fire-and-forget by design: the platform
         // callback must return promptly, and the write re-arms the plan itself.
         unawaited(handleAlertAction(actionId, payload)),
+    // The body of the notification, which is what a rhythm touch is for: the
+    // 21:00 prompt has no buttons, it has a question, and tapping it must open
+    // the sheet that answers it. Registered here for the same reason `onAction`
+    // is — the tap can be delivered on a cold start, before any screen exists.
+    onTap: (payload) =>
+        // ignore: discarded_futures — the platform callback must return
+        // promptly; the navigation happens on the next frame either way.
+        unawaited(handleAlertTap(payload)),
   );
 
   // Before the first frame. The router redirects on the session, so deciding
@@ -42,7 +50,22 @@ Future<void> main() async {
   // appear and vanish.
   await sl<AuthCubit>().restore();
 
-  runApp(BotvyApp(router: buildRouter(sl<AuthCubit>())));
+  // Registered in the container so `handleAlertTap` can reach it. It is built
+  // here rather than in `configureDependencies` because it needs the restored
+  // session to decide its first location.
+  final router = buildRouter(sl<AuthCubit>());
+  sl.registerSingleton<GoRouter>(router);
+
+  // A tap that arrived while there was nothing to navigate — the whole reason
+  // a cold-start notification is worth handling at all. Deferred to after the
+  // first frame so the redirect has settled: navigating before it runs is
+  // navigating into a location the redirect is about to overrule.
+  final pending = takePendingRoute();
+  if (pending != null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => router.go(pending));
+  }
+
+  runApp(BotvyApp(router: router));
 }
 
 class BotvyApp extends StatelessWidget {

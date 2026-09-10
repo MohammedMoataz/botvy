@@ -18,11 +18,19 @@
           "type": "null"
         }
       ]
+    },
+    "allDay": {
+      "type": "boolean"
+    },
+    "title": {
+      "type": "string"
     }
   },
   "required": [
     "taskId",
-    "dueAt"
+    "dueAt",
+    "allDay",
+    "title"
   ],
   "additionalProperties": false
 }

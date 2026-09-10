@@ -49,7 +49,8 @@ Templated confirmations (intents executed in code) still arrive as `chat.token` 
 
 | Event | Payload | Trigger |
 |---|---|---|
-| `chat.message` | `{ conversationId, seq, role: 'assistant', content, kind: 'evening_prompt'\|'morning_briefing'\|'checkin_question'\|'suggestion' }` | Daily Rhythm / Knowledge wrote into the coach chat |
+| `chat.message` | `{ conversationId, messageId, seq, role: 'assistant', content, createdAt, kind: 'evening_prompt'\|'end_of_day_summary'\|'morning_briefing'\|'checkin_question'\|'suggestion' }` | Daily Rhythm / Knowledge wrote into the coach chat |
+| | `end_of_day_summary` was added in P3, when the single 22:00 touch this contract was written against became two — a plan prompt at 21:00 and a summary at 22:00. The summary sends `checkin_question` instead when the check-in question is attached to it, because the discriminator exists to tell a client what to *do* and the thing to do is answer. `kind` is not stored on the row: it is routing for a connected client, and a client that was offline routes from the notification's deep link instead. | |
 | `sync.nudge` | `{ entities: string[], reason: 'remote_edit'\|'server_job' }` | another device of the same user pushed changes, or a server job changed the user's data (plan, alert, suggestion). Clients debounce (2 s) and run a sync |
 | `alert.fired` | `{ alertId, source, title, body, deepLink }` | the sweep sent a push for this user; connected web/extension clients show it locally |
 | `auth.expiring` | `{ inSeconds }` | see handshake |

@@ -632,6 +632,65 @@ class ApiClient {
     return preferences();
   }
 
+  // -- the daily rhythm ------------------------------------------------------
+
+  /// Confirms one day's plan (`rest-commands.md`, Daily Rhythm).
+  ///
+  /// A REST command and deliberately not a sync push, even though the sync
+  /// contract has a `daily_plans: [{op: 'confirm'}]` slot for it: this is the
+  /// path the notification action takes, and the notification action has to
+  /// work from a shade with no screen behind it. One path that always works
+  /// beats two that agree most of the time.
+  ///
+  /// [training] is tri-state on purpose. `null` means "the member did not say",
+  /// which leaves whatever the draft proposed; `false` means "there is no
+  /// training tomorrow", which *clears* the slot the draft proposed rather than
+  /// arguing with the member about it (T322).
+  Future<void> confirmPlan(
+    String date, {
+    required List<String> taskIds,
+    bool? training,
+  }) async {
+    await _guard(
+      () => dio.post<dynamic>(
+        '/rhythm/plans/$date/confirm',
+        data: {'taskIds': taskIds, if (training != null) 'training': training},
+      ),
+    );
+  }
+
+  Future<void> skipPlan(String date) async {
+    await _guard(() => dio.post<dynamic>('/rhythm/plans/$date/skip'));
+  }
+
+  /// Records a check-in.
+  ///
+  /// Every field is optional because the member may answer any part of the
+  /// question and skip the rest — a mood with no verdict is still worth
+  /// keeping, and a `note` on its own is a diary entry. `date` omitted means
+  /// "today in my zone", which the server resolves; the phone sends it
+  /// explicitly only when the member is answering yesterday's question, because
+  /// resolving *which* day "today" is belongs to the profile's zone and not to
+  /// this handset's clock.
+  Future<void> recordCheckin({
+    String? date,
+    int? mood,
+    bool? adhered,
+    String? note,
+  }) async {
+    await _guard(
+      () => dio.post<dynamic>(
+        '/rhythm/checkins',
+        data: {
+          if (date != null) 'date': date,
+          if (mood != null) 'mood': mood,
+          if (adhered != null) 'adhered': adhered,
+          if (note != null && note.isNotEmpty) 'note': note,
+        },
+      ),
+    );
+  }
+
   // -- reads -----------------------------------------------------------------
 
   /// The selections, named once. A GraphQL query asks for exactly the fields it

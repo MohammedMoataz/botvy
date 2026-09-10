@@ -51,7 +51,29 @@ class SyncEngine {
   /// them in this list would have the pull overwrite the mirror with a second
   /// copy of the same record through a second code path. They move here in the
   /// same change that retires those two REST calls.
-  static const List<String> entities = ['labels', 'tasks', 'reminders'];
+  ///
+  /// The order is the apply order, parents before children, and it is a list
+  /// rather than a set for exactly that reason. `daily_plans` sits after
+  /// `tasks` because a plan carries a snapshot of the tasks it chose and the
+  /// completion ring counts them against the live rows: a plan written before
+  /// the tasks it names would draw a ring with a denominator and no numerator
+  /// until something else touched the screen.
+  ///
+  /// `daily_plans`, `checkins` and `rhythm_state` are **pull-only** here (P3).
+  /// The sync contract has push slots for the first two (`op: 'confirm'`,
+  /// `op: 'record'`), but confirming a plan and recording a check-in go out as
+  /// REST commands instead — that is the path a notification action takes, and
+  /// it has to work from a notification shade with no screen behind it.
+  /// `rhythm_state` is the tick's own bookkeeping and the phone never writes it
+  /// at all.
+  static const List<String> entities = [
+    'labels',
+    'tasks',
+    'reminders',
+    'daily_plans',
+    'checkins',
+    'rhythm_state',
+  ];
 
   Future<void>? _inFlight;
   bool _again = false;
@@ -256,7 +278,7 @@ class SyncEngine {
       final seen = <String, Set<String>>{};
       for (final entity in entities) {
         final applier = _appliers[entity]!;
-        final rows = (pull[entity] as List? ?? const []).whereType<Map>();
+        final rows = _rowsOf(pull[entity]);
 
         // A row this device edited again while the push was in flight keeps
         // its local copy: the member's newest edit wins locally and the next
@@ -267,8 +289,13 @@ class SyncEngine {
         final ids = <String>{};
         for (final raw in rows) {
           final row = Map<String, dynamic>.from(raw);
-          final id = row['id'];
-          if (id is! String) continue;
+          // Which field is this entity's primary key is the entity's business,
+          // not the loop's: `rhythm_state` is keyed by `userId` and every other
+          // table by `id`. Read straight from `row['id']` this dropped the
+          // rhythm row silently — no error, no log, just a streak that never
+          // moved.
+          final id = applier.keyOf(row);
+          if (id == null) continue;
           ids.add(id);
           if (stillPending.contains(id)) continue;
           await applier.writeServerRow(_db, row);
@@ -449,6 +476,9 @@ class SyncEngine {
     'labels': _LabelApplier(),
     'tasks': _TaskApplier(),
     'reminders': _ReminderApplier(),
+    'daily_plans': _DailyPlanApplier(),
+    'checkins': _CheckinApplier(),
+    'rhythm_state': _RhythmStateApplier(),
   };
 }
 
@@ -580,6 +610,15 @@ class _PendingRow {
 /// type checking that makes the generated code worth having. Six short
 /// overrides per entity is the cheaper trade.
 abstract class _EntityApplier {
+  /// This row's primary key, or null when the response carried something that
+  /// is not a row of this entity at all.
+  ///
+  /// Overridable because the key is not always called `id`: the rhythm state is
+  /// one row per member and the server keys it `userId`. Defaulted rather than
+  /// abstract, since `id` is what every other entity uses.
+  String? keyOf(Map<String, dynamic> row) =>
+      row['id'] is String ? row['id'] as String : null;
+
   /// Rows with an unsent operation and strikes left.
   Future<List<_PendingRow>> pending(AppDatabase db, int cap);
 
@@ -952,6 +991,221 @@ class _ReminderApplier extends _EntityApplier {
     )).go();
   }
 }
+
+/// Everything an entity the phone only ever *reads* needs, which is a good deal
+/// less than nine methods.
+///
+/// The push half of the protocol is answered once here rather than three times
+/// with the same empty bodies. Not a speculative abstraction: there are three
+/// of these the day it is written — the daily plan, the check-in and the rhythm
+/// state — and the alternative is eighteen no-op overrides in which one
+/// accidentally doing something would be invisible.
+///
+/// The no-ops are honest rather than throwing. `clearPending`, `block` and the
+/// rest are called from the accepted/rejection loops for whatever entity the
+/// *server* names, and a server that names one of these has said something
+/// about a row this build never pushed: the right answer is to do nothing, not
+/// to abort a pass that is also carrying the member's tasks.
+abstract class _PullOnlyApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async => const [];
+
+  /// Empty, and this is the one that has to be empty.
+  ///
+  /// The pull loop skips any id in this set, so a non-empty answer here would
+  /// make the entity unreadable — the server's row would arrive and be
+  /// discarded on the grounds that the phone had a better one, for ever.
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async => const {};
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async => const {};
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async =>
+      const {};
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {}
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {}
+
+  /// Nothing, and deliberately.
+  ///
+  /// `sync.md` marks the delete sweep "n/a" for these: the rhythm keeps every
+  /// day the member has lived through, and a member who was offline for a
+  /// fortnight pulls a delta that mentions none of them. A sweep against that
+  /// would erase the streak's whole history — and the streak is the one number
+  /// on Home that cannot be recomputed from anything else the phone holds.
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {}
+}
+
+/// One day's plan, pulled. Written by the tick and by the confirm command, both
+/// on the server; the phone's copy is a mirror it draws Home from.
+class _DailyPlanApplier extends _PullOnlyApplier {
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.dailyPlans)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+    await db.into(db.dailyPlans).insertOnConflictUpdate(
+      DailyPlansCompanion.insert(
+        id: row['id'] as String,
+        date: row['date'] as String? ?? '',
+        status: Value(row['status'] as String? ?? 'draft'),
+        autoConfirmed: Value(row['autoConfirmed'] == true),
+        // Re-encoded rather than passed through: the column holds text, and
+        // the server sends the snapshot as a real JSON array. `'$list'` would
+        // store Dart's own `[{id: …}]` toString, which is not JSON and cannot
+        // be decoded again.
+        tasksJson: Value(jsonEncode(row['tasks'] ?? const [])),
+        trainingJson: Value(
+          row['training'] == null ? null : jsonEncode(row['training']),
+        ),
+        workoutLine: Value(row['workoutLine'] as String?),
+        mealLine: Value(row['mealLine'] as String?),
+        promptedAt: Value(_date(row['promptedAt'])),
+        confirmedAt: Value(_date(row['confirmedAt'])),
+        summarisedAt: Value(_date(row['summarisedAt'])),
+        briefedAt: Value(_date(row['briefedAt'])),
+        updatedAt: updatedAt,
+        // The server's value, kept apart from any local edit time — the same
+        // rule the pushed entities follow, and it still matters here: a screen
+        // that wrote the confirm optimistically must be able to tell its own
+        // copy from the one the server sent back.
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+}
+
+/// One evening's answer, pulled.
+class _CheckinApplier extends _PullOnlyApplier {
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.checkins)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+    await db.into(db.checkins).insertOnConflictUpdate(
+      CheckinsCompanion.insert(
+        id: row['id'] as String,
+        date: row['date'] as String? ?? '',
+        // `as int?` and not `?? 0`. Nought is the worst mood the scale can
+        // describe and absence is not an answer at all; collapsing them here
+        // would draw a member's unanswered Tuesday as their worst day of the
+        // week. Same for `adhered`: see the column's own note.
+        mood: Value(row['mood'] as int?),
+        adhered: Value(row['adhered'] as bool?),
+        note: Value(row['note'] as String?),
+        source: Value(row['source'] as String? ?? 'app'),
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+}
+
+/// The member's claim dates and streak, pulled.
+///
+/// The one entity here that is a **singleton patch** rather than a row, the
+/// same shape `profile` and `preferences` have: the server holds one per member
+/// and `pull` answers with the record or null, because an array that can never
+/// hold two would be a lie about it (`sync.md`, "The rhythm's three entities
+/// are pull-only").
+///
+/// Which means it arrives carrying **no id at all** — not `id`, not `userId`.
+/// The response is already scoped to the principal, so there is nothing on the
+/// wire to key it by. That is why both [keyOf] and [writeServerRow] are more
+/// than one line: read straight from `row['id']`, the apply loop dropped this
+/// row silently, and the only symptom was a streak on Home that never moved.
+class _RhythmStateApplier extends _PullOnlyApplier {
+  /// The key for a record that has none, so the apply loop has something to put
+  /// in its `seen` set.
+  ///
+  /// A sentinel and not an invented user id, because `seen` is only ever read
+  /// by the delete sweep and this entity's sweep is a deliberate no-op — so the
+  /// value is never compared against anything. The *real* key is resolved in
+  /// [writeServerRow], from the account this install is signed in as.
+  static const String _singleton = 'rhythm_state';
+
+  @override
+  String? keyOf(Map<String, dynamic> row) {
+    // `userId` and `id` are still read first, so a gateway that does send one
+    // is honoured rather than overridden by the local guess.
+    final userId = row['userId'] ?? row['id'];
+    return userId is String && userId.isNotEmpty ? userId : _singleton;
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.rhythmState)..where((r) => r.userId.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    // The signed-in member, written at sign-in. Nothing else on the phone can
+    // supply the key for a patch the server sends unkeyed, and a row keyed by
+    // the sentinel instead would collide with the next account to sign in on
+    // this handset — so a member with no session is skipped rather than
+    // guessed at.
+    final wireId = row['userId'] ?? row['id'];
+    final userId = wireId is String && wireId.isNotEmpty
+        ? wireId
+        : await db.getValue(DbKeys.userId);
+    if (userId == null || userId.isEmpty) return;
+
+    // `streak` is nested on the server (`{current, best, lastAdheredDate}`) and
+    // flat here, because the phone reads all three together and a JSON column
+    // for three integers would be three decodes on every Home build.
+    final streak = _map(row['streak']);
+
+    await db.into(db.rhythmState).insertOnConflictUpdate(
+      RhythmStateCompanion.insert(
+        userId: userId,
+        lastPlanPromptDate: Value(row['lastPlanPromptDate'] as String?),
+        lastEndOfDayDate: Value(row['lastEndOfDayDate'] as String?),
+        lastMorningBriefingDate: Value(
+          row['lastMorningBriefingDate'] as String?,
+        ),
+        awaitingCheckin: Value(row['awaitingCheckin'] == true),
+        awaitingSince: Value(_date(row['awaitingSince'])),
+        streakCurrent: Value(streak['current'] as int? ?? 0),
+        streakBest: Value(streak['best'] as int? ?? 0),
+        lastAdheredDate: Value(streak['lastAdheredDate'] as String?),
+      ),
+    );
+  }
+}
+
+/// The rows one entity's slot in a response carries.
+///
+/// A list for a collection, and a bare object for a mirror the server holds one
+/// of per member — `rhythm_state` is keyed `_id = userId`, so there is nothing
+/// for it to put in a list. Both shapes are accepted here rather than branched
+/// on in the apply loop, because the difference is about an entity's
+/// cardinality and about nothing else the loop cares about.
+Iterable<Map> _rowsOf(Object? slot) => switch (slot) {
+  final List list => list.whereType<Map>(),
+  final Map row => [row],
+  _ => const [],
+};
 
 Map<String, dynamic> _map(Object? raw) =>
     raw is Map ? Map<String, dynamic>.from(raw) : const {};

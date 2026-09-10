@@ -7,6 +7,20 @@ import { SettingsService } from '../../shared/settings/settings.service.js';
 import { WsModule } from '../../ws/ws.module.js';
 import { IdentityModule } from '../identity/identity.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
+import { RhythmModule } from '../rhythm/rhythm.module.js';
+import { ConversationsModule } from '../conversations/conversations.module.js';
+import { ConversationRepository } from '../conversations/domain/conversations.repositories.js';
+import { ConversationSyncAdapter } from '../conversations/infrastructure/conversations-sync.adapter.js';
+import {
+  CheckinRepository,
+  DailyPlanRepository,
+  RhythmStateRepository,
+} from '../rhythm/domain/rhythm.repositories.js';
+import {
+  CheckinSyncAdapter,
+  DailyPlanSyncAdapter,
+  RhythmStateSyncAdapter,
+} from '../rhythm/infrastructure/rhythm-sync.adapters.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { LabelRepository } from '../planning/domain/label.repository.js';
 import { TaskRepository } from '../planning/domain/task.repository.js';
@@ -72,6 +86,8 @@ import {
     PlanningModule,
     RemindersModule,
     NotificationsModule,
+    RhythmModule,
+    ConversationsModule,
     WsModule,
   ],
   providers: [
@@ -98,9 +114,53 @@ import {
       useFactory: (uow: UnitOfWork, reminders: ReminderRepository) =>
         new ReminderSyncAdapter(uow, reminders),
     },
+    /*
+     * The rhythm's two row entities, both **pull-only**.
+     *
+     * They are here so the phone can hold a copy and render Home with the
+     * network off, and their `apply` refuses with `invalid` — the two writes
+     * are REST commands (`/rhythm/plans/:date/confirm`, `/rhythm/checkins`),
+     * because a named-command push would have needed a third protocol beside
+     * the row and patch ones to buy an atomicity neither of them needs.
+     * `contracts/sync.md` carries the full argument.
+     */
+    {
+      provide: DailyPlanSyncAdapter,
+      inject: [DailyPlanRepository],
+      useFactory: (plans: DailyPlanRepository) =>
+        new DailyPlanSyncAdapter(plans),
+    },
+    {
+      provide: CheckinSyncAdapter,
+      inject: [CheckinRepository],
+      useFactory: (checkins: CheckinRepository) =>
+        new CheckinSyncAdapter(checkins),
+    },
+    /*
+     * The chat list, pull-only until P4.
+     *
+     * It is here in P3 because FR-005 requires every member to *have* the coach
+     * conversation from the moment they register, and without a read surface
+     * that requirement is unverifiable from outside the process — while its
+     * failure is silent, because a touch written into a missing conversation
+     * logs and carries on looking successful.
+     */
+    {
+      provide: ConversationSyncAdapter,
+      inject: [ConversationRepository],
+      useFactory: (conversations: ConversationRepository) =>
+        new ConversationSyncAdapter(conversations),
+    },
     {
       provide: SYNCABLE_ENTITIES,
-      inject: [LabelSyncAdapter, TaskSyncAdapter, ReminderSyncAdapter],
+      inject: [
+        LabelSyncAdapter,
+        TaskSyncAdapter,
+        ReminderSyncAdapter,
+        DailyPlanSyncAdapter,
+        CheckinSyncAdapter,
+        ConversationSyncAdapter,
+      ],
       useFactory: (...adapters: SyncableEntity[]) => adapters,
     },
 
@@ -121,9 +181,27 @@ import {
         queries: ProfileQueryHandler,
       ) => new PreferencesPatchAdapter(preferences, queries),
     },
+    /*
+     * `rhythm_state` is patch-shaped rather than row-shaped: one singleton row
+     * per member, so `pull` returning the row or null is the honest signature
+     * and an array of one would be a lie the phone had to unwrap. Its
+     * `applyPatch` refuses — the three claim dates are the server's entire
+     * once-a-day guarantee, and a phone that could write them could suppress
+     * or re-fire its own member's evening.
+     */
+    {
+      provide: RhythmStateSyncAdapter,
+      inject: [RhythmStateRepository],
+      useFactory: (states: RhythmStateRepository) =>
+        new RhythmStateSyncAdapter(states),
+    },
     {
       provide: SYNCABLE_PATCHES,
-      inject: [ProfilePatchAdapter, PreferencesPatchAdapter],
+      inject: [
+        ProfilePatchAdapter,
+        PreferencesPatchAdapter,
+        RhythmStateSyncAdapter,
+      ],
       useFactory: (...adapters: SyncablePatch[]) => adapters,
     },
 

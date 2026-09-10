@@ -34,3 +34,4 @@ pagination cursor — and none of them is in this directory.
 | [E-009](E-009-no-gate-imports-the-built-output.md) | No gate imports the built output | build | The third runtime-only defect a green suite has hidden |
 | [E-010](E-010-the-typecheck-gate-was-weaker-than-the-build.md) | The typecheck command is weaker than the build | build | "Typecheck clean" does not mean what it sounds like |
 | [E-011](E-011-sdk-stores-cannot-use-dexie.md) | The SDK stores cannot use Dexie | architecture | "Today" is now defined in four places |
+| [E-012](E-012-server-composed-messages-are-english-only.md) | Server-composed coach messages are English only | product | An Arabic-reading member gets three English sentences a day from the coach |

@@ -1,0 +1,312 @@
+import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.js';
+
+/**
+ * A task as the plan recorded it, not as it is now.
+ *
+ * The plan is a snapshot of what the member was shown and agreed to. A task
+ * renamed on Thursday must not rewrite Tuesday's plan, and one deleted
+ * afterwards must not make Tuesday's plan unreadable — so the title and
+ * priority are copied in. `deferCount` comes along because the proposal says
+ * "carried over ×3" and that count is what makes the sentence true.
+ */
+export interface PlanTask {
+  id: string;
+  title: string;
+  priority: number;
+  dueAt: Date | null;
+  deferCount: number;
+}
+
+/** The training slot, when Training exists to answer. Null until P6, by design. */
+export interface PlanTraining {
+  sessionId: string;
+  title: string;
+  sport: string;
+  startAt: Date;
+}
+
+export type PlanStatus = 'draft' | 'confirmed' | 'skipped';
+
+export interface DailyPlanState {
+  userId: string;
+  /** The member's own local date, `YYYY-MM-DD`. Never the server's. */
+  date: string;
+  status: PlanStatus;
+  autoConfirmed: boolean;
+  tasks: PlanTask[];
+  training: PlanTraining | null;
+  workoutLine: string | null;
+  mealLine: string | null;
+  promptedAt: Date | null;
+  confirmedAt: Date | null;
+  summarisedAt: Date | null;
+  briefedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * One day, as the member and Botvy agreed it.
+ *
+ * ## Why the four timestamps are separate fields rather than a status
+ *
+ * Because they answer four different questions and three of them are *claims*.
+ * `status` says what the member decided; `promptedAt`, `summarisedAt` and
+ * `briefedAt` say which of the three touches have happened. A single enum would
+ * make "prompted but not yet summarised" and "summarised without a prompt"
+ * — the state of a member who registered at 21:30 — indistinguishable, and the
+ * tick decides what to send by asking exactly that.
+ *
+ * ## The id is composite, and that is the idempotency
+ *
+ * `"<userId>:<date>"`. There is one plan per member per local day by
+ * construction, so a tick that runs twice in the same minute writes the same
+ * document twice instead of creating two. Nothing has to de-duplicate.
+ */
+export class DailyPlan extends AggregateRoot<string> {
+  readonly id: string;
+  readonly userId: string;
+  readonly date: string;
+  status: PlanStatus;
+  autoConfirmed: boolean;
+  tasks: PlanTask[];
+  training: PlanTraining | null;
+  workoutLine: string | null;
+  mealLine: string | null;
+  promptedAt: Date | null;
+  confirmedAt: Date | null;
+  summarisedAt: Date | null;
+  briefedAt: Date | null;
+  readonly createdAt: Date;
+
+  private constructor(state: DailyPlanState) {
+    super();
+    this.id = planId(state.userId, state.date);
+    this.userId = state.userId;
+    this.date = state.date;
+    this.status = state.status;
+    this.autoConfirmed = state.autoConfirmed;
+    this.tasks = state.tasks;
+    this.training = state.training;
+    this.workoutLine = state.workoutLine;
+    this.mealLine = state.mealLine;
+    this.promptedAt = state.promptedAt;
+    this.confirmedAt = state.confirmedAt;
+    this.summarisedAt = state.summarisedAt;
+    this.briefedAt = state.briefedAt;
+    this.createdAt = state.createdAt;
+    this.updatedAt = state.updatedAt;
+  }
+
+  static rehydrate(state: DailyPlanState): DailyPlan {
+    return new DailyPlan(state);
+  }
+
+  /**
+   * The draft the evening prompt proposes.
+   *
+   * No event: the tick raises `PlanTomorrowPrompted` once, after it has both
+   * saved the draft and written the question, because an event raised here
+   * would fire again every time the end-of-day touch rebuilt the draft.
+   */
+  static propose(input: {
+    userId: string;
+    date: string;
+    tasks: PlanTask[];
+    training?: PlanTraining | null;
+    workoutLine?: string | null;
+    mealLine?: string | null;
+    at: Date;
+  }): DailyPlan {
+    return new DailyPlan({
+      userId: input.userId,
+      date: input.date,
+      status: 'draft',
+      autoConfirmed: false,
+      tasks: input.tasks,
+      training: input.training ?? null,
+      workoutLine: input.workoutLine ?? null,
+      mealLine: input.mealLine ?? null,
+      promptedAt: input.at,
+      confirmedAt: null,
+      summarisedAt: null,
+      briefedAt: null,
+      createdAt: input.at,
+      updatedAt: input.at,
+    });
+  }
+
+  /** True when nobody has answered the proposal yet. */
+  get isUnanswered(): boolean {
+    return this.status === 'draft';
+  }
+
+  /**
+   * Replace the draft's contents with what is true now.
+   *
+   * The end-of-day touch calls this before auto-confirming, which is how a task
+   * created at 21:30 reaches the plan that is set at 22:00. It refuses to touch
+   * a plan the member has already answered — a confirmed selection is a
+   * decision, and rebuilding it would quietly overwrite the member's edit with
+   * whatever the algorithm currently prefers.
+   */
+  redraft(input: {
+    tasks: PlanTask[];
+    training?: PlanTraining | null;
+    workoutLine?: string | null;
+    mealLine?: string | null;
+    at: Date;
+  }): boolean {
+    if (!this.isUnanswered) return false;
+    this.tasks = input.tasks;
+    this.training = input.training ?? null;
+    this.workoutLine = input.workoutLine ?? null;
+    if (input.mealLine !== undefined) this.mealLine = input.mealLine;
+    this.updatedAt = input.at;
+    return true;
+  }
+
+  /**
+   * The member said yes — or the end-of-day touch said it for them.
+   *
+   * `training: false` from the member *clears* the slot the draft proposed
+   * rather than being ignored: they were shown a training session and said
+   * there is none, and arguing with them about their own evening is not the
+   * job. `undefined` leaves the draft's answer alone, which is what a client
+   * that only sends task ids means.
+   */
+  confirm(input: {
+    tasks: PlanTask[];
+    training?: boolean;
+    autoConfirmed?: boolean;
+    at: Date;
+  }): void {
+    this.tasks = input.tasks;
+    if (input.training === false) this.training = null;
+    this.status = 'confirmed';
+    this.autoConfirmed = input.autoConfirmed ?? false;
+    this.confirmedAt = input.at;
+    this.updatedAt = input.at;
+    this.raise(
+      'rhythm.PlanConfirmed',
+      'daily_plan',
+      {
+        date: this.date,
+        taskIds: this.tasks.map((task) => task.id),
+        autoConfirmed: this.autoConfirmed,
+      },
+      input.at,
+    );
+  }
+
+  /**
+   * Not tonight.
+   *
+   * A skipped plan keeps its drafted contents. The status is the record of what
+   * the member decided, and the end-of-day summary still names tomorrow's
+   * training from it — telling somebody who skipped planning that they have a
+   * session at seven is useful; pretending the evening did not happen is not.
+   */
+  skip(at: Date): void {
+    this.status = 'skipped';
+    this.autoConfirmed = false;
+    this.updatedAt = at;
+    this.raise(
+      'rhythm.PlanSkipped',
+      'daily_plan',
+      { date: this.date, taskIds: this.tasks.map((task) => task.id), autoConfirmed: false },
+      at,
+    );
+  }
+
+  /**
+   * The three touches, each raising its own event from here rather than from
+   * the tick.
+   *
+   * That is not ceremony. An event raised in a handler and published after the
+   * save is an event that is lost if the process dies in between — and these
+   * three are what Notifications turns into the member's alert and what
+   * Planning's rollover listens for. Raised on the aggregate, they go into the
+   * outbox inside the same transaction as the row, so a touch that was recorded
+   * as sent is a touch whose alert will be planned, and one that was not is
+   * neither.
+   */
+
+  /** The evening prompt went out. */
+  markPrompted(at: Date): void {
+    this.promptedAt = at;
+    this.updatedAt = at;
+    this.raise(
+      'rhythm.PlanTomorrowPrompted',
+      'daily_plan',
+      {
+        date: this.date,
+        taskIds: this.tasks.map((task) => task.id),
+        trainingSessionId: this.training?.sessionId ?? null,
+        mealLine: this.mealLine,
+      },
+      at,
+    );
+  }
+
+  /**
+   * The end-of-day summary went out.
+   *
+   * `checkinAsked` rides on the event because Notifications words the alert
+   * differently when there is a question waiting, and because a spec asserting
+   * "check-ins off means no question" needs something to assert against that is
+   * not the absence of a second event.
+   */
+  markSummarised(at: Date, checkinAsked: boolean): void {
+    this.summarisedAt = at;
+    this.updatedAt = at;
+    this.raise(
+      'rhythm.EndOfDaySummarySent',
+      'daily_plan',
+      {
+        date: this.date,
+        taskIds: this.tasks.map((task) => task.id),
+        trainingSessionId: this.training?.sessionId ?? null,
+        autoConfirmed: this.autoConfirmed,
+        checkinAsked,
+      },
+      at,
+    );
+  }
+
+  /** The morning briefing went out. */
+  markBriefed(at: Date): void {
+    this.briefedAt = at;
+    this.updatedAt = at;
+    this.raise(
+      'rhythm.MorningBriefingSent',
+      'daily_plan',
+      { date: this.date, taskIds: this.tasks.map((task) => task.id) },
+      at,
+    );
+  }
+
+  /**
+   * The meal line, replaced after the fact by Nutrition.
+   *
+   * A member who regenerates their meals at nine in the morning has already had
+   * their briefing, and the card on their phone must follow. Returns whether
+   * anything moved, so an at-least-once redelivery writes nothing.
+   */
+  setMealLine(line: string | null, at: Date): boolean {
+    if (this.mealLine === line) return false;
+    this.mealLine = line;
+    this.updatedAt = at;
+    return true;
+  }
+
+  /** Whether the plan holds nothing to do — the sentence changes when it does. */
+  get isEmpty(): boolean {
+    return this.tasks.length === 0 && this.training === null;
+  }
+}
+
+/** `"<userId>:<date>"`. One plan per member per local day, by construction. */
+export function planId(userId: string, date: string): string {
+  return `${userId}:${date}`;
+}

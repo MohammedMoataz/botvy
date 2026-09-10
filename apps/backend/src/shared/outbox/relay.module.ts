@@ -12,6 +12,15 @@ import { PlanningPurgeOnDeletedHandler } from '../../contexts/planning/features/
 import { RemindersPurgeOnDeletedHandler } from '../../contexts/reminders/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RemindersModule } from '../../contexts/reminders/reminders.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
+import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
+import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { ConversationsModule } from '../../contexts/conversations/conversations.module.js';
+import { RhythmBootstrapHandler } from '../../contexts/rhythm/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
+import { RhythmPreferencesChangedHandler } from '../../contexts/rhythm/features/preferences-changed/preferences-changed.handler.js';
+import { MealLineChangedHandler } from '../../contexts/rhythm/features/meal-line-changed/meal-line-changed.handler.js';
+import { RhythmPurgeOnDeletedHandler } from '../../contexts/rhythm/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { RhythmModule } from '../../contexts/rhythm/rhythm.module.js';
+import { RolloverOnEndOfDaySaga } from '../../contexts/planning/features/rollover/rollover-on-end-of-day.saga.js';
 import { SyncModule } from '../../contexts/sync/sync.module.js';
 import { NotificationsModule } from '../../contexts/notifications/notifications.module.js';
 import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
@@ -75,6 +84,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     PlanningModule,
     RemindersModule,
     NotificationsModule,
+    ConversationsModule,
+    RhythmModule,
     SyncModule,
   ],
   providers: [
@@ -120,6 +131,13 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         PlanningPurgeOnDeletedHandler,
         RemindersPurgeOnDeletedHandler,
         NotificationsPurgeOnDeletedHandler,
+        ConversationsBootstrapHandler,
+        ConversationsPurgeOnDeletedHandler,
+        RhythmBootstrapHandler,
+        RhythmPreferencesChangedHandler,
+        MealLineChangedHandler,
+        RhythmPurgeOnDeletedHandler,
+        RolloverOnEndOfDaySaga,
         HeartbeatService,
       ],
       useFactory: (
@@ -135,6 +153,13 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         planningPurge: PlanningPurgeOnDeletedHandler,
         remindersPurge: RemindersPurgeOnDeletedHandler,
         notificationsPurge: NotificationsPurgeOnDeletedHandler,
+        conversationsBootstrap: ConversationsBootstrapHandler,
+        conversationsPurge: ConversationsPurgeOnDeletedHandler,
+        rhythmBootstrap: RhythmBootstrapHandler,
+        rhythmPreferences: RhythmPreferencesChangedHandler,
+        mealLine: MealLineChangedHandler,
+        rhythmPurge: RhythmPurgeOnDeletedHandler,
+        rollover: RolloverOnEndOfDaySaga,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -164,8 +189,29 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               // Profile reacts to Identity. Two stores, so no transaction can
               // span them — the event is the only way across, and it is why
               // both handlers are idempotent on re-delivery.
+              /*
+               * Three contexts bootstrap from one registration, and the
+               * order is the dependency: Profile writes the preferences the
+               * rhythm reads, and Conversations writes the coach chat the
+               * rhythm's first touch is written into. Sequential, so a
+               * failure in one does not silently skip the rest and the
+               * relay's own retry brings the whole event back rather than a
+               * fragment of it. All three are idempotent, which is what
+               * makes replaying all three after a partial failure the
+               * correct recovery rather than a second problem.
+               *
+               * `RhythmBootstrapHandler` is last for a reason beyond
+               * tidiness: it reads the member's zone and their three times
+               * to decide which of today's touches to suppress, and a
+               * member who registers at 23:00 gets the right answer only if
+               * Profile has already written their preferences. It falls back
+               * to the installation defaults if not, so the order is a
+               * correctness preference and not a correctness requirement.
+               */
               case 'identity.UserRegistered':
                 await profileBootstrap.handle(event);
+                await conversationsBootstrap.handle(event);
+                await rhythmBootstrap.handle(event);
                 return;
               /*
                * Four contexts hold something about a member, and all four are
@@ -186,6 +232,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await planningPurge.handle(event);
                 await remindersPurge.handle(event);
                 await notificationsPurge.handle(event);
+                await rhythmPurge.handle(event);
+                await conversationsPurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -246,6 +294,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 return;
               case 'profile.PreferencesChanged':
                 await alertPlanning.onPreferencesChanged(event);
+                await rhythmPreferences.handle(event);
                 return;
               case 'identity.UserBanned':
                 await alertPlanning.onUserBanned(event);
@@ -256,6 +305,46 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               case 'identity.DeviceRegistered':
               case 'identity.DeviceRemoved':
                 await alertPlanning.onDevicesChanged(event);
+                return;
+
+              /*
+               * ---- the rhythm's three touches --------------------------
+               *
+               * Each becomes one member-chosen alert, at the moment of the
+               * touch, with no lead times and untouched by quiet hours — a
+               * member whose quiet window covers their own 08:00 briefing
+               * asked for that briefing at 08:00 (spec FR-013).
+               *
+               * The end-of-day summary has a second subscriber, and it is
+               * the one that would have been easy to leave out: Planning
+               * carries the day's unfinished tasks into the plan that was
+               * just set. Planning reacting to the rhythm's event rather
+               * than the rhythm dispatching a Planning command is
+               * constitution IX read carefully — a handler that dispatched
+               * another context's command would be the same violation
+               * wearing a bus.
+               */
+              case 'rhythm.PlanTomorrowPrompted':
+              case 'rhythm.MorningBriefingSent':
+                await alertPlanning.onRhythmTouch(event);
+                return;
+              case 'rhythm.EndOfDaySummarySent':
+                await alertPlanning.onRhythmTouch(event);
+                await rollover.handle(event);
+                return;
+
+              /*
+               * Nutrition raises neither of these until P8. The handler
+               * lands here with the rest of the context rather than in that
+               * phase, because "a capability three phases each credit to
+               * another phase is a capability nobody builds" — and because
+               * a member who regenerates their meals at nine in the morning
+               * has already had their briefing, so the plan the Home card
+               * reads has to follow.
+               */
+              case 'nutrition.MealPlanReady':
+              case 'nutrition.MealPlanWithheld':
+                await mealLine.handle(event);
                 return;
 
               // One device pushed; the member's others are told. This is what

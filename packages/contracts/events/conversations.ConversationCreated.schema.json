@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "conversations.ConversationCreated",
+  "description": "Payload of conversations.ConversationCreated. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "conversationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "kind": {},
+    "pinned": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "conversationId",
+    "kind",
+    "pinned"
+  ],
+  "additionalProperties": false
+}

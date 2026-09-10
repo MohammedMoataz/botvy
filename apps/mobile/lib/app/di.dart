@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/api/api_client.dart';
 import '../core/api/socket_client.dart';
@@ -11,11 +12,14 @@ import '../core/notifications/local_notifications.dart';
 import '../core/push.dart';
 import '../core/sync/sync_engine.dart';
 import '../features/auth/application/auth_cubit.dart';
+import '../features/home/application/home_cubit.dart';
 import '../features/onboarding/application/identity_steps.dart';
 import '../features/onboarding/application/onboarding_steps.dart';
 import '../features/profile/data/profile_mirror.dart';
 import '../features/reminders/application/reminders_cubit.dart';
+import '../features/rhythm/application/rhythm_cubit.dart';
 import '../features/tasks/application/tasks_cubit.dart';
+import 'router.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -69,10 +73,20 @@ Future<void> configureDependencies({required String baseUrl}) async {
     ..registerSingleton<RemindersCubit>(
       RemindersCubit(sl<AppDatabase>(), sl<SyncEngine>()),
     )
+    // Home reads the day and writes nothing of its own: ticking a task off goes
+    // through [TasksCubit], so there is one writer for the `tasks` table rather
+    // than two copies of the recurrence and `pendingOp` rules.
+    ..registerSingleton<HomeCubit>(
+      HomeCubit(sl<AppDatabase>(), sl<SyncEngine>(), sl<TasksCubit>()),
+    )
+    ..registerSingleton<RhythmCubit>(
+      RhythmCubit(sl<AppDatabase>(), sl<ApiClient>(), sl<SyncEngine>()),
+    )
     ..registerSingleton<OnboardingRegistry>(OnboardingRegistry());
 
   sl<TasksCubit>().listenToSync();
   sl<RemindersCubit>().listenToSync();
+  sl<HomeCubit>().listenToSync();
 
   // Connectivity and app-resume triggers. The socket's own `connect` is the
   // connectivity signal: what the engine needs to know is not "this handset
@@ -130,4 +144,52 @@ Future<void> handleAlertAction(String actionId, String payload) async {
   // write, which re-arms; this only covers the branches above that did not
   // write anything.
   await sl<NotificationScheduler>().rescheduleAll(sl<AppDatabase>());
+}
+
+/// A notification's body, tapped.
+///
+/// The payload carries the alert's `deepLink` (`encodeAlertPayload`), which the
+/// router turns into a location. Wired at boot in `main`, next to the action
+/// handler and for the same reason: a tap can be delivered on a **cold start**,
+/// before any screen exists, so a handler registered in a widget's `initState`
+/// would miss exactly the case the notification is for.
+///
+/// Which is also why the route can arrive before the router does. `main` builds
+/// the router after `NotificationScheduler.init`, so a cold-start tap is
+/// resolved here and parked; `main` picks it up with [takePendingRoute] once
+/// there is something to navigate. Navigating into a router that does not exist
+/// yet is how this kind of handler usually fails — silently, on the one path
+/// nobody tests by hand.
+Future<void> handleAlertTap(String payload) async {
+  final alert = decodeAlertPayload(payload);
+  final link = alert?.deepLink;
+  if (link == null || link.isEmpty) return;
+
+  final route = routeForDeepLink(link);
+  if (route == null) {
+    // A link for something this build has no screen for — a newer gateway
+    // planning an alert for a later phase's feature. Logged rather than guessed
+    // at: navigating "somewhere near it" drops the member on an unrelated page
+    // with no way to know why.
+    debugPrint('no route for deep link $link');
+    return;
+  }
+
+  if (sl.isRegistered<GoRouter>()) {
+    sl<GoRouter>().go(route);
+  } else {
+    _pendingRoute = route;
+  }
+}
+
+String? _pendingRoute;
+
+/// The route a cold-start notification tap asked for, once and then forgotten.
+///
+/// Cleared on read so a later hot restart does not re-open a sheet the member
+/// has already dealt with.
+String? takePendingRoute() {
+  final route = _pendingRoute;
+  _pendingRoute = null;
+  return route;
 }

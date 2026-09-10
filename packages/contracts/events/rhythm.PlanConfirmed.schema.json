@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rhythm.PlanConfirmed",
+  "description": "Payload of rhythm.PlanConfirmed. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "taskIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "autoConfirmed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "date",
+    "taskIds",
+    "autoConfirmed"
+  ],
+  "additionalProperties": false
+}

@@ -186,6 +186,68 @@ export class PlanAlertsSaga {
     );
   }
 
+  // -------------------------------------------------------------- Daily Rhythm
+
+  /**
+   * The three rhythm touches: `PlanTomorrowPrompted`, `EndOfDaySummarySent`
+   * and `MorningBriefingSent`.
+   *
+   * One alert each, at the moment the touch happened, and **no lead times** —
+   * which `timed: false` gives exactly. Warning somebody an hour before their
+   * own 22:00 summary is warning them about a thing that has already been
+   * written into their chat.
+   *
+   * ## Why these are member-chosen and not system-generated
+   *
+   * `desiredFor` labels the source's own moment `0m` — `MEMBER_CHOSEN_LABEL` —
+   * and `sendAt` returns that one unshifted, where a derived warning inside
+   * quiet hours is held until the window ends. That is the whole reason these
+   * three come through this path rather than getting a bespoke one: **a member
+   * whose quiet hours cover their own 08:00 briefing asked for that briefing at
+   * 08:00.** Holding it back would be Botvy overruling them about their own
+   * morning, and it is spec FR-013. Falling out of an existing rule is better
+   * than a `if (kind === 'rhythm') skipQuietHours` branch somebody would later
+   * "tidy up".
+   *
+   * ## The wording lives here, and the payload is untouched
+   *
+   * `contracts/events.md` fixes these payloads at `{ date, taskIds, … }` with
+   * no title in them, and adding one would put notification copy in the
+   * rhythm's domain events. The event *name* already says which touch it is, so
+   * this context composes its own banner from the name and the date — which is
+   * where notification wording belongs, and it keeps the contract exact.
+   *
+   * ## Idempotent through the source id, like everything else here
+   *
+   * The source id is `"<touch>:<date>"`, so a redelivered event reconciles to
+   * the same single row instead of planning a second. The relay is
+   * at-least-once and this is the only thing standing between that and a member
+   * being notified twice about one evening.
+   */
+  async onRhythmTouch(event: DomainEvent): Promise<void> {
+    const userId = event.userId;
+    const payload = event.payload as { date?: string };
+    if (!userId || !payload.date) return;
+
+    const touch = RHYTHM_TOUCHES[event.name];
+    if (!touch) return;
+
+    await this.plan(userId, {
+      kind: 'rhythm',
+      id: `${touch.slug}:${payload.date}`,
+      // No occurrence: a rhythm touch's instant belongs to the rhythm, not to a
+      // recurring source the member picked. `replanFuture` reads this field to
+      // decide what it may rebuild, and leaving it null is what stops a
+      // time-zone change from recomputing a notification about an evening that
+      // has already happened.
+      occurrenceAt: null,
+      moment: event.occurredAt,
+      title: touch.title,
+      timed: false,
+      deepLink: touch.deepLink(payload.date),
+    });
+  }
+
   // ------------------------------------------------------- Profile and Identity
 
   /**
@@ -430,6 +492,41 @@ export class PlanAlertsSaga {
     return moved;
   }
 }
+
+/**
+ * The three rhythm touches, keyed by event name.
+ *
+ * A table rather than a switch so that adding a fourth touch is a row, and so
+ * that the banner text for all three is readable in one place — the member sees
+ * these three strings more often than any others in the product.
+ *
+ * The deep links match the routes the phone registers. A link the app cannot
+ * resolve is a notification that opens the home screen and loses the thing it
+ * was about, which is worse than no link at all because it looks like it worked.
+ */
+const RHYTHM_TOUCHES: Record<
+  string,
+  { slug: string; title: string; deepLink: (date: string) => string }
+> = {
+  'rhythm.PlanTomorrowPrompted': {
+    slug: 'plan',
+    title: 'Plan tomorrow',
+    deepLink: (date) => `botvy://rhythm/plan/${date}`,
+  },
+  'rhythm.EndOfDaySummarySent': {
+    slug: 'end_of_day',
+    // The check-in is the actionable half, so the banner names it: tapping this
+    // is how most check-ins will be answered, and "Tomorrow's plan is set" on
+    // its own gives the member nothing to do.
+    title: "Tomorrow's plan is set — how did today go?",
+    deepLink: () => 'botvy://rhythm/checkin',
+  },
+  'rhythm.MorningBriefingSent': {
+    slug: 'morning',
+    title: 'Your day',
+    deepLink: () => 'botvy://home',
+  },
+};
 
 /** Mongo hands back Dates; a webhook or a replayed row may hand back strings. */
 function asDate(value: Date | string | null | undefined): Date | null {

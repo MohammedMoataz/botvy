@@ -1,4 +1,7 @@
-import 'package:flutter/foundation.dart';
+// `widgets.dart` re-exports `foundation.dart`, which is where
+// `@visibleForTesting` comes from — importing both is what the analyzer calls
+// an unnecessary import, and it was failing `flutter analyze` on exit code
+// while reading as a harmless info line in the output.
 import 'package:flutter/widgets.dart';
 
 /// English and Arabic, by hand.
@@ -221,6 +224,52 @@ class AppLocalizations {
   String reminderDeletedMessage(String title) =>
       _f('reminderDeletedMessage', {'title': title});
 
+  // -- home ------------------------------------------------------------------
+  String get homeGreetingNoName => _t('homeGreetingNoName');
+  String get homeTodayPlan => _t('homeTodayPlan');
+  String get homeNothingPlanned => _t('homeNothingPlanned');
+  String get homeTraining => _t('homeTraining');
+  String get homeMeals => _t('homeMeals');
+  String get homeStreak => _t('homeStreak');
+  String get homeWeek => _t('homeWeek');
+  String get homeAdhered => _t('homeAdhered');
+  String get homeMissed => _t('homeMissed');
+  String get homeUnanswered => _t('homeUnanswered');
+  String get homePlanTomorrow => _t('homePlanTomorrow');
+  String get homePlanTomorrowBody => _t('homePlanTomorrowBody');
+  String get homeCheckinBody => _t('homeCheckinBody');
+
+  String homeGreeting(String name) => _f('homeGreeting', {'name': name});
+  String homeDoneOfTotal(int done, int total) =>
+      _f('homeDoneOfTotal', {'done': '$done', 'total': '$total'});
+  String homeStreakDays(int count) =>
+      _f('homeStreakDays', {'count': '$count'});
+  String homeStreakBest(int count) =>
+      _f('homeStreakBest', {'count': '$count'});
+
+  // -- the rhythm ------------------------------------------------------------
+  String get rhythmConfirmTitle => _t('rhythmConfirmTitle');
+  String get rhythmConfirmBody => _t('rhythmConfirmBody');
+  String get rhythmConfirmAction => _t('rhythmConfirmAction');
+  String get rhythmSkipAction => _t('rhythmSkipAction');
+  String get rhythmNoCandidates => _t('rhythmNoCandidates');
+  String get rhythmNothingDrafted => _t('rhythmNothingDrafted');
+  String get rhythmTraining => _t('rhythmTraining');
+  String get rhythmTrainingAsProposed => _t('rhythmTrainingAsProposed');
+  String get rhythmTrainingYes => _t('rhythmTrainingYes');
+  String get rhythmTrainingNo => _t('rhythmTrainingNo');
+  String get rhythmPlanConfirmed => _t('rhythmPlanConfirmed');
+  String get rhythmPlanSkipped => _t('rhythmPlanSkipped');
+  String get rhythmCheckinTitle => _t('rhythmCheckinTitle');
+  String get rhythmCheckinSaved => _t('rhythmCheckinSaved');
+  String get rhythmMood => _t('rhythmMood');
+  String get rhythmFollowed => _t('rhythmFollowed');
+  String get rhythmNote => _t('rhythmNote');
+  String get rhythmYes => _t('rhythmYes');
+  String get rhythmNo => _t('rhythmNo');
+  String get rhythmOffline => _t('rhythmOffline');
+  String get rhythmRefused => _t('rhythmRefused');
+
   /// The tables, for the parity test and nothing else.
   ///
   /// Every key must exist in every locale, because `_t` falls back to English
@@ -394,6 +443,49 @@ class AppLocalizations {
       'serverDegraded':
           'Connected to Botvy {version}, but it reports a problem. You can '
           'still sign in.',
+
+      // ---- P3: home and the daily rhythm ------------------------------
+      'homeGreeting': 'Hello, {name}',
+      'homeGreetingNoName': 'Hello',
+      'homeTodayPlan': "Today's plan",
+      'homeNothingPlanned': 'Nothing planned for today, and no training either.',
+      'homeTraining': 'Training',
+      'homeMeals': 'Meals',
+      'homeDoneOfTotal': '{done} of {total} done',
+      'homeStreak': 'Streak',
+      'homeStreakDays': '{count} days',
+      'homeStreakBest': 'Best so far: {count}',
+      'homeWeek': 'The last seven days',
+      'homeAdhered': 'followed the plan',
+      'homeMissed': 'did not follow the plan',
+      // The third state, and the one that must never read as a miss.
+      'homeUnanswered': 'not answered',
+      'homePlanTomorrow': 'Plan tomorrow',
+      'homePlanTomorrowBody': 'Botvy has drafted tomorrow. Confirm it or change it.',
+      'homeCheckinBody': 'Answer and your streak keeps going.',
+      'rhythmConfirmTitle': 'Tomorrow',
+      'rhythmConfirmBody': 'Tick what tomorrow is for. Untick anything that can wait.',
+      'rhythmConfirmAction': 'Confirm tomorrow',
+      'rhythmSkipAction': 'Skip planning tomorrow',
+      'rhythmNoCandidates': 'Nothing open to choose from.',
+      'rhythmNothingDrafted': 'There is nothing drafted for that day.',
+      'rhythmTraining': 'Training tomorrow',
+      'rhythmTrainingAsProposed': 'As proposed',
+      'rhythmTrainingYes': 'Yes',
+      'rhythmTrainingNo': 'No',
+      'rhythmPlanConfirmed': 'Tomorrow is set.',
+      'rhythmPlanSkipped': 'Tomorrow is left as it is.',
+      'rhythmCheckinTitle': 'How did today go?',
+      'rhythmCheckinSaved': 'Recorded.',
+      'rhythmMood': 'How did it feel?',
+      'rhythmFollowed': 'Did you follow the plan?',
+      'rhythmNote': 'Anything to add?',
+      'rhythmYes': 'Yes',
+      'rhythmNo': 'No',
+      'rhythmOffline':
+          'Botvy could not be reached, so this was not saved. Try again when '
+          'you are back online.',
+      'rhythmRefused': 'Botvy refused that. Nothing was saved.',
     },
     'ar': {
       'appTitle': 'بوتفي',
@@ -555,6 +647,48 @@ class AppLocalizations {
     'labelNoPalette':
         'مجموعة الألوان يحدّدها من يدير هذه النسخة من Botvy، وهذا '
         'الحساب لا يستطيع قراءتها. اكتب لونًا بنفسك.',
+
+    // ---- P3: الرئيسية والإيقاع اليومي --------------------------------
+    'homeGreeting': 'مرحبًا، {name}',
+    'homeGreetingNoName': 'مرحبًا',
+    'homeTodayPlan': 'خطة اليوم',
+    'homeNothingPlanned': 'لا شيء مخطط لليوم، ولا تدريب أيضًا.',
+    'homeTraining': 'التدريب',
+    'homeMeals': 'الوجبات',
+    'homeDoneOfTotal': 'أُنجز {done} من {total}',
+    'homeStreak': 'التتابع',
+    'homeStreakDays': '{count} يومًا',
+    'homeStreakBest': 'الأفضل حتى الآن: {count}',
+    'homeWeek': 'الأيام السبعة الماضية',
+    'homeAdhered': 'التزمت بالخطة',
+    'homeMissed': 'لم تلتزم بالخطة',
+    'homeUnanswered': 'بلا إجابة',
+    'homePlanTomorrow': 'خطّط للغد',
+    'homePlanTomorrowBody': 'أعدّ بوتفي مسودة للغد. أكّدها أو غيّرها.',
+    'homeCheckinBody': 'أجب ليستمر تتابعك.',
+    'rhythmConfirmTitle': 'الغد',
+    'rhythmConfirmBody': 'اختر ما الغد مخصص له. أزل ما يمكن أن ينتظر.',
+    'rhythmConfirmAction': 'تأكيد الغد',
+    'rhythmSkipAction': 'تخطّي التخطيط للغد',
+    'rhythmNoCandidates': 'لا توجد مهام مفتوحة للاختيار منها.',
+    'rhythmNothingDrafted': 'لا توجد مسودة لذلك اليوم.',
+    'rhythmTraining': 'تدريب الغد',
+    'rhythmTrainingAsProposed': 'كما هو مقترح',
+    'rhythmTrainingYes': 'نعم',
+    'rhythmTrainingNo': 'لا',
+    'rhythmPlanConfirmed': 'تم تحديد خطة الغد.',
+    'rhythmPlanSkipped': 'تُرك الغد كما هو.',
+    'rhythmCheckinTitle': 'كيف كان يومك؟',
+    'rhythmCheckinSaved': 'تم التسجيل.',
+    'rhythmMood': 'كيف كان شعورك؟',
+    'rhythmFollowed': 'هل التزمت بالخطة؟',
+    'rhythmNote': 'هل تريد إضافة شيء؟',
+    'rhythmYes': 'نعم',
+    'rhythmNo': 'لا',
+    'rhythmOffline':
+        'تعذّر الوصول إلى بوتفي، فلم يُحفظ ذلك. حاول مرة أخرى عند '
+        'عودة الاتصال.',
+    'rhythmRefused': 'رفض بوتفي ذلك. لم يُحفظ شيء.',
     },
   };
 }

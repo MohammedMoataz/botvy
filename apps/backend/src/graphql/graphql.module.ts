@@ -15,6 +15,8 @@ import { PlanningModule } from '../contexts/planning/planning.module.js';
 import { TasksResolver } from '../contexts/planning/features/tasks-query/tasks.resolver.js';
 import { RemindersModule } from '../contexts/reminders/reminders.module.js';
 import { RemindersResolver } from '../contexts/reminders/features/reminders-query/reminders.resolver.js';
+import { RhythmModule } from '../contexts/rhythm/rhythm.module.js';
+import { RhythmResolver } from '../contexts/rhythm/features/today-plan/rhythm.resolver.js';
 
 /**
  * The read edge.
@@ -147,6 +149,7 @@ export const RESOLVERS = [
   AdminSettingsResolver,
   TasksResolver,
   RemindersResolver,
+  RhythmResolver,
 ] as const;
 
 @Module({
@@ -157,6 +160,7 @@ export const RESOLVERS = [
     OperationsModule,
     PlanningModule,
     RemindersModule,
+    RhythmModule,
   ],
   providers: [...RESOLVERS],
 })

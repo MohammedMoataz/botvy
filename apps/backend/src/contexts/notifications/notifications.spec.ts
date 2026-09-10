@@ -564,6 +564,137 @@ describe('the saga reconciles rather than appends', () => {
   });
 });
 
+describe('a rhythm touch is one alert the member asked for', () => {
+  let b: Bench;
+  beforeEach(() => {
+    b = bench();
+    // A member who wants warnings on everything else, so that "no lead times
+    // here" is a property of the branch rather than of the fixture.
+    b.member.leadTimes = ['1h', '1d'];
+  });
+
+  it('plans exactly one alert, at the moment of the touch, with no warnings', async () => {
+    // Warning somebody an hour before their own 22:00 summary is warning them
+    // about a thing that has already been written into their chat.
+    const touch = event('rhythm.EndOfDaySummarySent', {
+      date: '2026-09-12',
+      taskIds: [],
+      trainingSessionId: null,
+      autoConfirmed: true,
+      checkinAsked: true,
+    });
+
+    await b.saga.onRhythmTouch(touch);
+
+    const pending = await b.alerts.pendingForMember(MEMBER, new Date(0));
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.label).toBe('0m');
+    expect(pending[0]!.notifyAt.getTime()).toBe(touch.occurredAt.getTime());
+    expect(pending[0]!.source.kind).toBe('rhythm');
+    expect(pending[0]!.source.id).toBe('end_of_day:2026-09-12');
+  });
+
+  it('is not held back by quiet hours that cover the member’s own morning', async () => {
+    /*
+     * Spec FR-013, and the reason these come through the member-chosen path
+     * rather than a bespoke one.
+     *
+     * A member whose quiet window is 22:00–09:00 and whose briefing time is
+     * 08:00 has asked for a notification inside their own quiet hours. Holding
+     * it until 09:00 would be Botvy overruling them about their own morning.
+     * `sendAt` returns the `0m` label untouched, so this falls out of an
+     * existing rule instead of needing a `kind === 'rhythm'` branch somebody
+     * would later tidy away.
+     */
+    b.member.quietHours = { from: '22:00', to: '09:00' };
+    const at = new Date();
+
+    await b.saga.onRhythmTouch(
+      event('rhythm.MorningBriefingSent', { date: '2026-09-12', taskIds: [] }),
+    );
+
+    const pending = await b.alerts.pendingForMember(MEMBER, new Date(0));
+    expect(pending).toHaveLength(1);
+    // Within a second of "now" — i.e. not shifted to the end of the window.
+    expect(
+      Math.abs(pending[0]!.notifyAt.getTime() - at.getTime()),
+    ).toBeLessThan(2_000);
+  });
+
+  it('reconciles a redelivered touch to the same single row', async () => {
+    // The relay is at-least-once, and this is the only thing between that and
+    // a member being notified twice about one evening.
+    const touch = event('rhythm.PlanTomorrowPrompted', {
+      date: '2026-09-12',
+      taskIds: [],
+      trainingSessionId: null,
+      mealLine: null,
+    });
+
+    await b.saga.onRhythmTouch(touch);
+    await b.saga.onRhythmTouch(touch);
+
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(1);
+  });
+
+  it('keeps the three touches apart, and apart from other days', async () => {
+    // One source id per touch per date, so an evening prompt and a summary on
+    // the same day are two notifications and not one overwritten twice.
+    for (const name of [
+      'rhythm.PlanTomorrowPrompted',
+      'rhythm.EndOfDaySummarySent',
+      'rhythm.MorningBriefingSent',
+    ]) {
+      await b.saga.onRhythmTouch(
+        event(name, { date: '2026-09-12', taskIds: [] }),
+      );
+    }
+    await b.saga.onRhythmTouch(
+      event('rhythm.MorningBriefingSent', { date: '2026-09-13', taskIds: [] }),
+    );
+
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(4);
+  });
+
+  it('ignores an event with no date rather than planning a nameless alert', async () => {
+    await b.saga.onRhythmTouch(event('rhythm.MorningBriefingSent', {}));
+    await b.saga.onRhythmTouch(
+      event('rhythm.SomethingElse', { date: '2026-09-12' }),
+    );
+
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toEqual([]);
+  });
+
+  it('a time-zone change does not rebuild a touch that already happened', async () => {
+    /*
+     * `replanFuture` rebuilds a derived warning from `source.occurrenceAt` —
+     * the moment the member chose — and skips a row that has none. A rhythm
+     * touch deliberately has none, because its instant belongs to the rhythm
+     * and not to a recurring thing the member picked. So a member who flies
+     * somewhere keeps the notification about last night's summary exactly where
+     * it was, which is the only sensible answer: the evening has happened.
+     */
+    await b.saga.onRhythmTouch(
+      event('rhythm.EndOfDaySummarySent', {
+        date: '2026-09-12',
+        taskIds: [],
+        autoConfirmed: false,
+        checkinAsked: false,
+      }),
+    );
+    const before = (await b.alerts.pendingForMember(MEMBER, new Date(0)))[0]!
+      .notifyAt.getTime();
+
+    await b.saga.onProfileUpdated(
+      event('profile.ProfileUpdated', { changed: ['timezone'] }),
+    );
+
+    const after = (await b.alerts.pendingForMember(MEMBER, new Date(0)))[0]!
+      .notifyAt.getTime();
+    expect(after).toBe(before);
+  });
+});
+
 describe('the events from outside Planning and Reminders', () => {
   let b: Bench;
   beforeEach(() => {

@@ -6,6 +6,30 @@ type BodyMetric {
   weightKg: Float
 }
 
+type Checkin {
+  adhered: Boolean
+  date: Date!
+  mood: Int
+  note: String
+}
+
+type DailyPlan {
+  autoConfirmed: Boolean!
+  briefedAt: DateTime
+  confirmedAt: DateTime
+  date: Date!
+  mealLine: String
+  promptedAt: DateTime
+  status: PlanStatus!
+  summarisedAt: DateTime
+  tasks: [PlanTask!]!
+  training: PlanTraining
+  workoutLine: String
+}
+
+"""A calendar date in the member's own time zone, as YYYY-MM-DD."""
+scalar Date
+
 """An instant in time, serialised as an ISO 8601 string in UTC."""
 scalar DateTime
 
@@ -43,6 +67,30 @@ type LabelSnapshot {
   name: String!
 }
 
+"""
+What the member decided about a day: proposed and unanswered, agreed, or declined. A day with no plan at all reads as `draft` with no `promptedAt`.
+"""
+enum PlanStatus {
+  confirmed
+  draft
+  skipped
+}
+
+type PlanTask {
+  deferCount: Int!
+  dueAt: DateTime
+  id: ID!
+  priority: Int!
+  title: String!
+}
+
+type PlanTraining {
+  sessionId: ID!
+  sport: String!
+  startAt: DateTime!
+  title: String!
+}
+
 type Preferences {
   aiSuggestions: Boolean!
   checkinEnabled: Boolean!
@@ -78,6 +126,7 @@ type Profile {
 type Query {
   """The caller's body metric history."""
   bodyMetrics(last: Int = 30): [BodyMetric!]!
+  checkins(from: Date!, to: Date!): [Checkin!]!
 
   """A member's devices. Administrators only."""
   devicesOf(userId: ID!): [Device!]!
@@ -89,6 +138,7 @@ type Query {
 
   """The caller's own registered devices."""
   myDevices: [Device!]!
+  plans(from: Date!, to: Date!): [DailyPlan!]!
 
   """The caller's own preferences."""
   preferences: Preferences!
@@ -103,8 +153,11 @@ type Query {
 
   """The settings registry. Administrators only."""
   settings: [Setting!]!
+  streak: Streak!
   task(id: ID!): Task
   tasks(cursor: String, labelId: ID, limit: Int, view: TaskViewName!): TaskPage!
+  todayPlan(date: Date): DailyPlan!
+  tomorrowDraft: DailyPlan!
 
   """Every member. Administrators only."""
   users(after: String, first: Int = 50, role: Role, search: String, status: UserStatus): UserConnection!
@@ -161,6 +214,13 @@ type Setting {
   key: String!
   readOnly: Boolean!
   value: JSON
+}
+
+type Streak {
+  best: Int!
+  current: Int!
+  lastAdheredDate: Date
+  weekAdherence: [Boolean]!
 }
 
 type Task {

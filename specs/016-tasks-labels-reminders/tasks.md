@@ -115,7 +115,7 @@ there, `dist/contexts/operations/features/ping` gone).
 | `flutter analyze` | clean | |
 | `packages/sdk` tests | **78 pass** | |
 | `npx wxt build` (extension) | clean | 632 kB |
-| `npx oxlint` | 0 warnings, 0 errors | 280 files |
+| `pnpm lint` | 0 warnings, 0 errors | This line first read `npx oxlint`, which is **not** the project's lint: oxlint discovers `.oxlintrc.json` and this repo's config is `oxlint.json`, so the bare command silently ran 99 built-in rules over 476 files — `legacy/` included, since it also lost the ignore list — instead of the 102 rules the config defines. The three `no-restricted-imports` overrides that enforce constitution IX were among the missing three. Corrected in P3, which probed both forms; the rules do fire under `--config`. |
 | `npm run build:clean` (backend) | clean | not incremental — see below |
 | `node infra/verify-esm.mjs` | **3/3** | both compiled roles load under plain `node` |
 

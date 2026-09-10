@@ -452,7 +452,11 @@ describe('profile query', () => {
     uow = new InMemoryUnitOfWork();
     profiles = new InMemoryProfileRepository(uow);
     preferences = new InMemoryPreferencesRepository(uow);
-    query = new ProfileQueryHandler(profiles, preferences);
+    query = new ProfileQueryHandler(
+      profiles,
+      preferences,
+      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+    );
     await new BootstrapOnRegisteredHandler(
       uow,
       profiles,

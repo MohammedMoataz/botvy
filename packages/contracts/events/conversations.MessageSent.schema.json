@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "conversations.MessageSent",
+  "description": "Payload of conversations.MessageSent. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "conversationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "seq": {
+      "type": "integer"
+    },
+    "role": {}
+  },
+  "required": [
+    "conversationId",
+    "seq",
+    "role"
+  ],
+  "additionalProperties": false
+}

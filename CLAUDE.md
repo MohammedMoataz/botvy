@@ -103,7 +103,23 @@ finds it, with a test, and named in the commit; it does not go there.
   at least once.
 - **MongoDB unique indexes treat missing and null as one value.** Any uniqueness
   over an optional field (`clientId`, `nameLower`) needs a partial index with
-  `$exists: true` — Postgres NULL-distinct semantics did not port.
+  `$exists: true` — Postgres NULL-distinct semantics did not port. In P3 it
+  landed on `conversations.kind`: a member has one `coach` and one `planner` and
+  any number of `free` chats, so the index is partial on an `$in` of the two
+  singletons rather than plain unique, which would have refused the second free
+  chat in P4.
+- **Every collection saved through `MongoRepositoryBase` must declare
+  `updatedAt`.** The base writes it on every save for its optimistic filter, and
+  Mongoose's `strict: true` **rejects an upsert naming an undeclared path
+  outright** — the whole write fails. This has shipped twice: `AlertSchema` in
+  P2, where no alert was ever created and the notification pipeline was dead for
+  a phase, and `MessageSchema` in P3, where every rhythm touch saved its plan,
+  raised its event, planned its alert and failed to write the sentence into the
+  member's chat. Both times the unit suite was entirely green, because handler
+  specs bind the in-memory adapter and it has no schema to be strict about.
+  `shared/persistence/mongo/schemas.spec.ts` now asserts it, along with `userId`
+  on member-owned collections and no schema declaring its own indexes. Adding a
+  collection means adding it there or to the exemption list with a reason.
 - **Client-minted UUIDv7 ids for anything the phone can create offline.** The
   server accepts the client's id; a retried create is a no-op. Server-only
   collections use ObjectId.
@@ -181,6 +197,65 @@ finds it, with a test, and named in the commit; it does not go there.
   changed; `POST /api/v1/auth/login` returns a token and
   `POST /api/v1/auth/password` changes it, and `mustChangePassword` on the
   sign-in response is how a client knows to insist.
+- **`npx oxlint` is not this project's lint.** oxlint discovers
+  `.oxlintrc.json`; this repo's config is `oxlint.json`, so the bare command
+  silently runs 99 built-in rules over 476 files — `legacy/` included, since it
+  loses the ignore list too — instead of the 102 the config defines, and the
+  three `no-restricted-imports` overrides that enforce constitution IX are among
+  the missing three. Use `pnpm lint`. A gate that records the bare command has
+  recorded a check that did not check what it says.
+- **A claim date only ever moves forward.** `hasClaimed` is equality and
+  `isDue` is `claimed === null || claimed < date`; the tick and every claim use
+  the second. A member who flies **west** has their local date go backwards, so
+  equality reads yesterday's touch as unclaimed and sends a second copy three
+  hours after the first. The forced prompt an operator triggers claims
+  unconditionally, which is the path that would rewind the date.
+- **A streak is derived from the check-in rows, never folded day by day.** A
+  fold is idempotent for a repeated answer and wrong for a *corrected* one: a
+  "no" changed to a "yes" within the window zeroes the counter and leaves
+  nothing in the store that could rebuild the run. Patching one check-in is the
+  normal case, not an edge one — the row id is `"<userId>:<date>"` precisely so
+  a chat answer and a card tap are one row. `best` is the only part carried
+  forward, because a longer run can sit outside the window.
+- **`adhered` is nullable and a null verdict is not an answer.** A mood with no
+  verdict is half the question answered, so anything asking "was today
+  answered" must check for a real boolean and not for the row's existence — v1's
+  `currentStreak` used `has(today)` because v1's rows could not be null, and
+  ported unchanged it drops a nine-day streak to zero for a member who moves
+  their mood slider and says nothing else. Same for the week strip: three
+  states, never a `boolean[]`.
+- **A rhythm touch's alert is planned for *now*, so the phone can never
+  pre-schedule it.** `pendingAlerts` is `notifyAt >= now` with `sentAt: null`,
+  because its job is handing the device alarms it can set itself — a correct
+  rhythm alert never appears there, and it depends on the server sweep where a
+  task or reminder does not. Two consequences: a gate looking for it in
+  `pendingAlerts` reports a working pipeline as broken, and a gate must sweep
+  **before** it pulls `/sync`, because the pull stamps `lastSeenAt` and the
+  sweep then correctly skips a device that looks up to date.
+- **An event's payload must carry every field its consumer reads.** A payload
+  crosses the boundary as `unknown`, so the type system cannot say a field is
+  missing and the fallback silently wins instead. P2's `TaskScheduled` and
+  `TaskRescheduled` omitted `title`, so **every task notification in the product
+  said "Task due"**; `TaskRescheduled` also omitted `allDay`, so
+  `allDay === false` was false on every edit and the reconcile dropped the
+  member's lead times. Build the payload from one method shared by every raise
+  site, and assert the payload in a spec — asserting the consumer's behaviour
+  passes with the fallback in place.
+- **`defer` raises `TaskRescheduled` as well as `TaskDeferred`.** They say
+  different things to different readers: the count is the rhythm's, the moment is
+  Notifications'. Without both, a task swiped to tomorrow keeps tonight's alarm
+  — and the nightly rollover does that to every unfinished task every night.
+- **drift calls `onUpgrade` once, with the pair it has.** A branch guarded
+  `from >= 2 && from < 3` is skipped entirely by `(from: 1, to: 3)`, so a v1
+  install upgrading two versions came out with none of the tables that branch
+  creates. `createTable` guards are `from < N`; the band shape belongs on
+  `addColumn` alone, where it prevents the duplicate-column failure. Test the
+  ladder from *every* prior version against the current schema, not from one.
+- **The tick's counters are incremented after the touch returns**, so a touch
+  that throws leaves the counter at zero while its earlier saves stand. n8n logs
+  that response and it is the only record of what a 22:00 pass did — read the
+  claim dates or the plan, not the counter, when asking whether a touch
+  happened.
 - **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
   while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
   v2 served v1's live database and neither could run beside the other. Keep the

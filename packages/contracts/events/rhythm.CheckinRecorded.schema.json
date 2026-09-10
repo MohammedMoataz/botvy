@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rhythm.CheckinRecorded",
+  "description": "Payload of rhythm.CheckinRecorded. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "mood": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "adhered": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "date",
+    "mood",
+    "adhered"
+  ],
+  "additionalProperties": false
+}

@@ -13,6 +13,10 @@ import { InternalSweepController } from './contexts/notifications/features/sweep
 import { PlanningModule } from './contexts/planning/planning.module.js';
 import { RemindersModule } from './contexts/reminders/reminders.module.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
+import { RhythmModule } from './contexts/rhythm/rhythm.module.js';
+import { ConversationsModule } from './contexts/conversations/conversations.module.js';
+import { InternalRhythmController } from './contexts/rhythm/features/tick/internal-rhythm.controller.js';
+import { RhythmController } from './contexts/rhythm/features/confirm-plan/rhythm.controller.js';
 import { SyncController } from './contexts/sync/features/sync/sync.controller.js';
 import { RemindersController } from './contexts/reminders/features/manage-reminder/reminders.controller.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
@@ -62,6 +66,8 @@ import { WsModule } from './ws/ws.module.js';
     PlanningModule,
     RemindersModule,
     NotificationsModule,
+    ConversationsModule,
+    RhythmModule,
     SyncModule,
     HealthModule,
 
@@ -82,6 +88,8 @@ import { WsModule } from './ws/ws.module.js';
     TasksController,
     RemindersController,
     InternalSweepController,
+    InternalRhythmController,
+    RhythmController,
     SyncController,
     InternalAlertsController,
     InternalHeartbeatController,

@@ -6,17 +6,23 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_cubit.dart';
 import '../features/auth/presentation/sign_in_page.dart';
+import '../features/home/application/home_cubit.dart';
+import '../features/home/presentation/home_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/preferences/presentation/preferences_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/reminders/application/reminders_cubit.dart';
 import '../features/reminders/presentation/reminders_page.dart';
+import '../features/rhythm/application/rhythm_cubit.dart';
+import '../features/rhythm/presentation/checkin_sheet.dart';
+import '../features/rhythm/presentation/confirm_plan_sheet.dart';
 import '../features/settings/presentation/server_page.dart';
 import '../features/tasks/application/tasks_cubit.dart';
 import '../features/tasks/presentation/tasks_page.dart';
 import 'di.dart';
 
 abstract final class Routes {
+  static const String home = '/home';
   static const String signIn = '/sign-in';
   static const String onboarding = '/welcome';
   static const String profile = '/profile';
@@ -24,9 +30,63 @@ abstract final class Routes {
   static const String tasks = '/tasks';
   static const String reminders = '/reminders';
 
+  /// The two rhythm sheets, as routes.
+  ///
+  /// Routes and not only functions, because a notification tap arrives with no
+  /// screen behind it — on a cold start there is nothing to show a modal sheet
+  /// over — and a route is the only thing `go_router` can be told to open from
+  /// outside the widget tree. A tap from inside the app calls the sheet
+  /// function directly instead; see `_PlanTomorrowCard`.
+  static const String rhythmPlan = '/rhythm/plan';
+  static const String rhythmCheckin = '/rhythm/checkin';
+
   /// Where the gateway's address is set. Reachable signed out, deliberately —
   /// see the redirect below.
   static const String server = '/server';
+}
+
+/// The route one of the server's `deepLink` strings opens, or null.
+///
+/// Two spellings arrive here and both have to work. The alerts this phone
+/// derives for itself carry a bare path (`/tasks/<id>`, `alert_plan.dart`), and
+/// the ones the server plans carry the app's own scheme
+/// (`botvy://rhythm/plan/<date>`) because the same string has to be openable
+/// from an FCM payload and from a browser. Normalising the scheme away first is
+/// what lets one table cover both, rather than two tables that drift.
+///
+/// Unknown links resolve to null and are ignored rather than guessed at. A
+/// newer gateway can plan an alert for a feature this build has no screen for,
+/// and navigating "somewhere near it" would drop the member on an unrelated
+/// page with no way to know why.
+String? routeForDeepLink(String deepLink) {
+  final trimmed = deepLink.trim();
+  if (trimmed.isEmpty) return null;
+
+  // `botvy://rhythm/checkin` parses with `rhythm` as the *host* and `/checkin`
+  // as the path, so the host cannot simply be dropped — it is the first
+  // segment. Read this way the two spellings produce the same segment list.
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null) return null;
+  final segments = [
+    if (uri.host.isNotEmpty) uri.host,
+    ...uri.pathSegments,
+  ].where((segment) => segment.isNotEmpty).toList();
+  if (segments.isEmpty) return null;
+
+  return switch (segments) {
+    // The date is part of the route: a member who reads the 21:00 notification
+    // after midnight must still confirm the day it was about, and a sheet that
+    // worked "tomorrow" out from the moment of the tap would confirm the wrong
+    // one.
+    ['rhythm', 'plan', final String date] => '${Routes.rhythmPlan}/$date',
+    ['rhythm', 'checkin', ...] => Routes.rhythmCheckin,
+    // No per-row route exists for these yet, so the list is where a tap lands.
+    // Better than nowhere, and it is the screen the member was going to have
+    // to reach anyway.
+    ['tasks', ...] => Routes.tasks,
+    ['reminders', ...] => Routes.reminders,
+    _ => null,
+  };
 }
 
 /// Re-runs the redirect whenever the session changes.
@@ -85,12 +145,50 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     }
 
     // Signed in and set up: the sign-in page is no longer somewhere to be.
+    //
+    // Home rather than the profile, which is where P2 landed for want of
+    // anywhere better. Home is the screen this phase exists to build and the
+    // one the member opens the app for; the profile is reachable from its app
+    // bar.
     if (atSignIn || state.matchedLocation == Routes.onboarding) {
-      return Routes.profile;
+      return Routes.home;
     }
     return null;
   },
   routes: [
+    GoRoute(
+      path: Routes.home,
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          // `.value` for both, as the tasks route does: they are singletons
+          // from the container and already listening to the sync engine.
+          // Letting `BlocProvider` construct one here would give this route a
+          // second instance with its own copy of the day, so a task ticked off
+          // on Home would still read as open on the list behind it.
+          BlocProvider<HomeCubit>.value(value: sl<HomeCubit>()),
+          BlocProvider<RhythmCubit>.value(value: sl<RhythmCubit>()),
+        ],
+        child: const HomePage(),
+      ),
+    ),
+    // The rhythm sheets, for a notification tap. Both render Home and open
+    // their sheet over it, so the member lands somewhere they can stay when
+    // the sheet closes rather than on a blank route.
+    GoRoute(
+      path: '${Routes.rhythmPlan}/:date',
+      builder: (context, state) => _SheetOverHome(
+        open: (context, cubit) => showConfirmPlanSheet(
+          context,
+          cubit,
+          date: state.pathParameters['date'],
+        ),
+      ),
+    ),
+    GoRoute(
+      path: Routes.rhythmCheckin,
+      builder: (context, state) =>
+          _SheetOverHome(open: showCheckinSheet),
+    ),
     GoRoute(
       path: Routes.signIn,
       builder: (context, state) => const SignInPage(),
@@ -132,3 +230,47 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     ),
   ],
 );
+
+/// Home, with one of the rhythm sheets opened over it.
+///
+/// What a notification tap lands on. The sheet is opened in a post-frame
+/// callback rather than in `build`, because `showModalBottomSheet` pushes a
+/// route and pushing a route during a build is an assertion failure — and on a
+/// cold start this *is* the first build. Opening it after the frame also means
+/// Home is drawn behind the sheet, so dismissing it leaves the member on a
+/// screen rather than on nothing.
+///
+/// Guarded by [_opened] because a route's `build` runs again for every
+/// dependency change — a theme change, a keyboard appearing, the locale — and
+/// each of those would otherwise stack another copy of the sheet.
+class _SheetOverHome extends StatefulWidget {
+  const _SheetOverHome({required this.open});
+
+  final Future<void> Function(BuildContext context, RhythmCubit cubit) open;
+
+  @override
+  State<_SheetOverHome> createState() => _SheetOverHomeState();
+}
+
+class _SheetOverHomeState extends State<_SheetOverHome> {
+  bool _opened = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_opened || !mounted) return;
+      _opened = true;
+      unawaited(widget.open(context, sl<RhythmCubit>()));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => MultiBlocProvider(
+    providers: [
+      BlocProvider<HomeCubit>.value(value: sl<HomeCubit>()),
+      BlocProvider<RhythmCubit>.value(value: sl<RhythmCubit>()),
+    ],
+    child: const HomePage(),
+  );
+}

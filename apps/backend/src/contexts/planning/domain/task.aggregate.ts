@@ -264,7 +264,7 @@ export class Task extends AggregateRoot<string> {
       this.raise(
         'planning.TaskRescheduled',
         'task',
-        { taskId: this.id, dueAt: this.dueAt },
+        this.alertFacts(),
         at,
       );
     }
@@ -375,6 +375,23 @@ export class Task extends AggregateRoot<string> {
       { taskId: this.id, fromDate, toDate, deferCount: this.deferCount },
       at,
     );
+    /*
+     * And the moment moved, which is a different fact for a different reader.
+     *
+     * `TaskDeferred` says "this has now been carried N times" and its only
+     * consumer is the rhythm's evening prompt, which prints the count.
+     * Notifications listens to `TaskRescheduled` and to nothing else — so
+     * without this second raise, deferring a task moved its due date and left
+     * every alert sitting at the old moment. A member who swiped tonight's
+     * task to tomorrow still got tonight's notification, and from P3 the
+     * nightly rollover does that to every unfinished task every night.
+     *
+     * Two events for one change, deliberately: they are not the same statement,
+     * and collapsing them would mean either the rhythm parsing a reschedule for
+     * a count that is not in it, or Notifications subscribing to an event whose
+     * name is about bookkeeping.
+     */
+    this.raise('planning.TaskRescheduled', 'task', this.alertFacts(), at);
   }
 
   /**
@@ -453,7 +470,7 @@ export class Task extends AggregateRoot<string> {
     this.raise(
       'planning.TaskRescheduled',
       'task',
-      { taskId: this.id, dueAt: next },
+      this.alertFacts(),
       at,
     );
     return next;
@@ -481,14 +498,50 @@ export class Task extends AggregateRoot<string> {
     this.raise(
       'planning.TaskScheduled',
       'task',
-      {
-        taskId: this.id,
-        dueAt: this.dueAt,
-        allDay: this.allDay,
-        priority: this.priority,
-      },
+      { ...this.alertFacts(), priority: this.priority },
       at,
     );
+  }
+
+  /**
+   * Everything Notifications builds an alert out of, in one place.
+   *
+   * This method exists because of three defects that were all the same defect,
+   * and all of them live until this phase found them while wiring the nightly
+   * rollover. `PlanAlertsSaga.onTaskScheduled` reads `dueAt`, `allDay` and
+   * `title` off the payload, with `title ?? 'Task due'` and
+   * `timed: allDay === false` as its fallbacks — and:
+   *
+   * 1. **Neither event carried `title`.** So `?? 'Task due'` fired every time
+   *    and *every task notification in the product said "Task due"* rather
+   *    than naming the task. Nothing failed; the member's lock screen was
+   *    simply useless.
+   * 2. **`TaskRescheduled` carried no `allDay`.** `undefined === false` is
+   *    false, so `timed` came out false and the reconcile dropped every lead
+   *    time — a member with `['1h','1d']` who moved a task lost both warnings
+   *    and kept only the moment itself. Editing a task quietly cancelled the
+   *    warnings the member had asked for.
+   * 3. **`defer` raised no reschedule at all**, so the alerts stayed where they
+   *    were.
+   *
+   * One method, called from all four raise sites, is what stops the fourth
+   * site from being written without them. A payload built inline is a payload
+   * that can omit a field the consumer reads, and the type system cannot say so
+   * because a domain event's payload is `unknown` by the time it reaches a
+   * handler.
+   */
+  private alertFacts(): {
+    taskId: string;
+    dueAt: Date | null;
+    allDay: boolean;
+    title: string;
+  } {
+    return {
+      taskId: this.id,
+      dueAt: this.dueAt,
+      allDay: this.allDay,
+      title: this.title,
+    };
   }
 }
 

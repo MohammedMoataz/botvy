@@ -28,6 +28,7 @@ import { PurgeTaskHandler } from './features/purge-task/purge-task.handler.js';
 import { ReopenTaskHandler } from './features/reopen-task/reopen-task.handler.js';
 import { RestoreTaskHandler } from './features/restore-task/restore-task.handler.js';
 import { RolloverHandler } from './features/rollover/rollover.handler.js';
+import { RolloverOnEndOfDaySaga } from './features/rollover/rollover-on-end-of-day.saga.js';
 import { SkipOccurrenceHandler } from './features/skip-occurrence/skip-occurrence.handler.js';
 import { TasksDueQueryHandler } from './features/tasks-due-query/tasks-due.query.js';
 import { TasksQueryHandler } from './features/tasks-query/tasks.query.js';
@@ -114,6 +115,7 @@ import { MongoTaskReadRepository } from './infrastructure/mongo-task-read.reposi
     PlanningPurgeOnDeletedHandler,
     SkipOccurrenceHandler,
     RolloverHandler,
+    RolloverOnEndOfDaySaga,
     CreateLabelHandler,
     UpdateLabelHandler,
     DeleteLabelHandler,
@@ -139,6 +141,7 @@ import { MongoTaskReadRepository } from './infrastructure/mongo-task-read.reposi
     PurgeTaskHandler,
     SkipOccurrenceHandler,
     RolloverHandler,
+    RolloverOnEndOfDaySaga,
     CreateLabelHandler,
     UpdateLabelHandler,
     DeleteLabelHandler,

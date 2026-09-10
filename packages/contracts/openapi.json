@@ -708,7 +708,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -746,7 +746,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -784,7 +784,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -822,7 +822,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -850,7 +850,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -914,7 +914,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -943,7 +943,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1167,7 +1167,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1195,7 +1195,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1223,7 +1223,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1261,7 +1261,7 @@
           }
         },
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1308,7 +1308,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1355,7 +1355,7 @@
         "operationId": "InternalSweepController_run",
         "parameters": [],
         "responses": {
-          "201": {
+          "200": {
             "description": ""
           }
         },
@@ -1385,6 +1385,139 @@
         },
         "tags": [
           "InternalSweep"
+        ]
+      }
+    },
+    "/internal/rhythm/tick": {
+      "post": {
+        "operationId": "InternalRhythmController_run",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalRhythm"
+        ]
+      }
+    },
+    "/internal/rhythm/prompt": {
+      "post": {
+        "operationId": "InternalRhythmController_promptNow",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromptNowDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalRhythm"
+        ]
+      }
+    },
+    "/api/v1/rhythm/plans/{date}/confirm": {
+      "post": {
+        "operationId": "RhythmController_confirmPlan",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmPlanDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Rhythm"
+        ]
+      }
+    },
+    "/api/v1/rhythm/plans/{date}/skip": {
+      "post": {
+        "operationId": "RhythmController_skipPlan",
+        "parameters": [
+          {
+            "name": "date",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Rhythm"
+        ]
+      }
+    },
+    "/api/v1/rhythm/checkins": {
+      "post": {
+        "operationId": "RhythmController_recordCheckin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordCheckinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Rhythm"
         ]
       }
     },
@@ -1613,6 +1746,18 @@
         "properties": {}
       },
       "SendTestDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "PromptNowDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ConfirmPlanDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RecordCheckinDto": {
         "type": "object",
         "properties": {}
       },

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rhythm.PlanTomorrowPrompted",
+  "description": "Payload of rhythm.PlanTomorrowPrompted. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "taskIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uuid"
+      }
+    },
+    "trainingSessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mealLine": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "date",
+    "taskIds",
+    "trainingSessionId",
+    "mealLine"
+  ],
+  "additionalProperties": false
+}
