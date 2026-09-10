@@ -44,6 +44,53 @@ export {
   type ProfilePatch,
   type ProfileView,
 } from './profile-store.js';
+export { newId } from './ids.js';
+export {
+  MAX_PUSH_ATTEMPTS,
+  MemorySyncTable,
+  SyncStore,
+  inMemoryCursorStorage,
+  type CursorStorage,
+  type PendingAlert,
+  type PendingPush,
+  type PushOp,
+  type RejectionReason,
+  type SyncEntity,
+  type SyncOutcome,
+  type SyncRejection,
+  type SyncResponse,
+  type SyncStoreOptions,
+  type SyncTable,
+  type SyncedRow,
+} from './sync-store.js';
+export {
+  TasksStore,
+  localDay,
+  type CompleteTaskAck,
+  type CreateTaskAck,
+  type LabelSnapshot,
+  type NewTask,
+  type Priority,
+  type RecurrenceMode,
+  type RolloverAck,
+  type TaskAck,
+  type TaskListView,
+  type TaskPatch,
+  type TaskRecurrence,
+  type TaskRow,
+  type TaskSource,
+  type TaskStatus,
+  type TaskViewFilter,
+} from './tasks-store.js';
+export {
+  DuplicateLabelName,
+  LabelsStore,
+  type CreateLabelAck,
+  type LabelAck,
+  type LabelPatch,
+  type LabelRow,
+  type NewLabel,
+} from './labels-store.js';
 
 /** Options the typed client is constructed with. */
 export interface BotvyClientOptions {

@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
 import type { InMemoryUnitOfWork } from '../../../shared/persistence/memory/in-memory-unit-of-work.js';
+import {
+  compareRows,
+  decodeCursor,
+  encodeCursor,
+  isAfter,
+  positionOf,
+} from '../../../shared/persistence/keyset-cursor.js';
 import { StaleWriteError } from '../../../shared/persistence/ports/errors.js';
 import { Reminder, type ReminderState } from '../domain/reminder.aggregate.js';
+import { REMINDER_SORT_KEYS } from './mongo-reminder.repository.js';
 import {
   ReminderRepository,
   type ReminderListFilter,
@@ -111,63 +119,36 @@ export class InMemoryReminderReadRepository implements ReminderReadRepository {
     userId: string,
     filter: ReminderListFilter,
   ): Promise<ReminderPage> {
-    const mine = [...this.store.rows.values()].filter(
-      (row) => row.userId === userId,
+    const keys = REMINDER_SORT_KEYS[filter.view];
+
+    // The store's own predicate, evaluated here rather than restated. The
+    // effective-moment split is the half worth naming: "past" has to mean
+    // "snoozed and past OR not snoozed and past", because `snoozedUntil` is
+    // null for every reminder nobody has snoozed — nearly all of them — and a
+    // filter testing only the snooze would hide the entire list.
+    const matches = [...this.store.rows.values()].filter(
+      (row) => row.userId === userId && matchesReminder(row, filter),
     );
 
-    const matches = mine.filter((row) => {
-      const effective = row.snoozedUntil ?? row.remindAt;
-      switch (filter.view) {
-        case 'upcoming':
-          return (
-            row.deletedAt === null &&
-            row.status === 'active' &&
-            effective >= filter.now
-          );
-        case 'overdue':
-          return (
-            row.deletedAt === null &&
-            row.status === 'active' &&
-            effective < filter.now
-          );
-        case 'done':
-          return (
-            row.deletedAt === null &&
-            (row.status === 'done' || row.status === 'cancelled')
-          );
-        case 'deleted':
-          return row.deletedAt !== null;
-      }
-    });
+    const sorted = matches.sort((a, b) =>
+      compareRows(keys, docOf(a), a.id, docOf(b), b.id),
+    );
 
-    const sorted = matches.sort((a, b) => {
-      if (filter.view === 'done')
-        return b.updatedAt.getTime() - a.updatedAt.getTime();
-      if (filter.view === 'deleted') {
-        return (b.deletedAt?.getTime() ?? 0) - (a.deletedAt?.getTime() ?? 0);
-      }
-      return a.remindAt.getTime() - b.remindAt.getTime();
-    });
-
-    const after = filter.cursor
-      ? Number(Buffer.from(filter.cursor, 'base64url').toString('utf8'))
-      : null;
-    const paged =
-      after === null
-        ? sorted
-        : sorted.filter((row) => row.updatedAt.getTime() > after);
+    const position = filter.cursor ? decodeCursor(filter.cursor) : null;
+    const paged = position
+      ? sorted.filter((row) => isAfter(keys, position, docOf(row), row.id))
+      : sorted;
 
     const hasMore = paged.length > filter.limit;
-    const nodes = (hasMore ? paged.slice(0, filter.limit) : paged).map(viewOf);
+    const page = hasMore ? paged.slice(0, filter.limit) : paged;
+    const last = page.at(-1);
 
     return {
-      nodes,
-      nextCursor: hasMore
-        ? Buffer.from(
-            String(nodes[nodes.length - 1]!.updatedAt.getTime()),
-            'utf8',
-          ).toString('base64url')
-        : null,
+      nodes: page.map(viewOf),
+      nextCursor:
+        hasMore && last
+          ? encodeCursor(positionOf(keys, docOf(last), last.id))
+          : null,
     };
   }
 
@@ -175,6 +156,34 @@ export class InMemoryReminderReadRepository implements ReminderReadRepository {
     const row = this.store.rows.get(id);
     if (!row || row.userId !== userId) return null;
     return viewOf(row);
+  }
+}
+
+/** The stored row as the document shape the shared cursor helper reads. */
+function docOf(row: ReminderState): Record<string, unknown> {
+  return row as unknown as Record<string, unknown>;
+}
+
+/**
+ * The same four views as the store, written against the effective moment.
+ *
+ * Kept as a small explicit function rather than an interpreter for the Mongo
+ * predicate, because two of these predicates contain an `$or` and evaluating
+ * that generically would be more machinery than the four cases are worth. The
+ * risk of drift is real, so the *shape* is asserted by the specs that page
+ * every view.
+ */
+function matchesReminder(row: ReminderState, filter: ReminderListFilter): boolean {
+  const effective = row.snoozedUntil ?? row.remindAt;
+  switch (filter.view) {
+    case 'upcoming':
+      return row.deletedAt === null && row.status === 'active' && effective >= filter.now;
+    case 'overdue':
+      return row.deletedAt === null && row.status === 'active' && effective < filter.now;
+    case 'done':
+      return row.deletedAt === null && (row.status === 'done' || row.status === 'cancelled');
+    case 'deleted':
+      return row.deletedAt !== null;
   }
 }
 

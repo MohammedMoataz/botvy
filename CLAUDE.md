@@ -29,6 +29,11 @@ in the v2 tree imports from it. `infra/verify.mjs` is the phase gate as a comman
 containers healthy, exactly one non-loopback published port, both stores answering,
 and a second `bootstrap.mjs` run that changes nothing.
 
+`enhancements/` holds one file per improvement that is **not** a defect and not
+in any phase's scope — what it is, why it is not simply a bug, what leaving it
+costs, and what fixing it would take. A real defect is fixed in the phase that
+finds it, with a test, and named in the commit; it does not go there.
+
 ## Things that are easy to get wrong here
 
 - **Times belong to the user, not the server.** Resolve every user-facing time

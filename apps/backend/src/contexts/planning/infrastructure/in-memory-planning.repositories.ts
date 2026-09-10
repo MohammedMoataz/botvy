@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
 import type { InMemoryUnitOfWork } from '../../../shared/persistence/memory/in-memory-unit-of-work.js';
+import {
+  compareRows,
+  decodeCursor,
+  encodeCursor,
+  isAfter,
+  positionOf,
+} from '../../../shared/persistence/keyset-cursor.js';
 import { StaleWriteError } from '../../../shared/persistence/ports/errors.js';
 import { Label, type LabelState } from '../domain/label.aggregate.js';
 import { LabelRepository } from '../domain/label.repository.js';
@@ -18,6 +25,7 @@ import {
   type TaskState,
 } from '../domain/task.aggregate.js';
 import { TaskRepository } from '../domain/task.repository.js';
+import { TASK_SORT_KEYS, taskPredicateFor } from './mongo-task-read.repository.js';
 
 /**
  * The adapters every Planning handler spec binds.
@@ -283,76 +291,34 @@ export class InMemoryTaskReadRepository implements TaskReadRepository {
   ) {}
 
   async page(userId: string, filter: TaskListFilter): Promise<TaskPage> {
-    const mine = [...this.taskStore.rows.values()].filter(
-      (row) => row.userId === userId,
+    const keys = TASK_SORT_KEYS[filter.view];
+    const predicate = taskPredicateFor(filter);
+
+    // The Mongo adapter's own predicate table and sort keys, applied here
+    // rather than paraphrased. Paraphrasing is what made this adapter and the
+    // store disagree about where a null `dueAt` sorts, under a comment claiming
+    // they matched.
+    const matches = [...this.taskStore.rows.values()].filter(
+      (row) => row.userId === userId && matchesPredicate(row, predicate),
     );
 
-    // The same predicates as the Mongo adapter, in the same order, because a
-    // view whose definition differs between the two is a view whose spec proves
-    // nothing about production.
-    const matches = mine.filter((row) => {
-      switch (filter.view) {
-        case 'today':
-          return (
-            row.deletedAt === null &&
-            row.status === 'open' &&
-            row.dueAt !== null &&
-            row.dueAt < filter.dayEnd
-          );
-        case 'upcoming':
-          return (
-            row.deletedAt === null &&
-            row.status === 'open' &&
-            row.dueAt !== null &&
-            row.dueAt >= filter.dayEnd
-          );
-        case 'overdue':
-          return (
-            row.deletedAt === null &&
-            row.status === 'open' &&
-            row.dueAt !== null &&
-            row.dueAt < filter.dayStart
-          );
-        case 'label':
-          return (
-            row.deletedAt === null && row.labelId === (filter.labelId ?? null)
-          );
-        case 'completed':
-          return row.deletedAt === null && row.status === 'completed';
-        case 'deleted':
-          return row.deletedAt !== null;
-      }
-    });
+    const sorted = matches.sort((a, b) =>
+      compareRows(keys, docOf(a), a.id, docOf(b), b.id),
+    );
 
-    const sorted = matches.sort((a, b) => {
-      if (filter.view === 'completed')
-        return time(b.completedAt) - time(a.completedAt);
-      if (filter.view === 'deleted')
-        return time(b.deletedAt) - time(a.deletedAt);
-      return time(a.dueAt) - time(b.dueAt) || a.priority - b.priority;
-    });
-
-    const after = filter.cursor
-      ? Number(Buffer.from(filter.cursor, 'base64url').toString('utf8'))
-      : null;
-    const paged =
-      after === null
-        ? sorted
-        : sorted.filter((row) => row.updatedAt.getTime() > after);
+    const position = filter.cursor ? decodeCursor(filter.cursor) : null;
+    const paged = position
+      ? sorted.filter((row) => isAfter(keys, position, docOf(row), row.id))
+      : sorted;
 
     const hasMore = paged.length > filter.limit;
-    const nodes = (hasMore ? paged.slice(0, filter.limit) : paged).map((row) =>
-      viewOf(row, filter.timezone),
-    );
+    const page = hasMore ? paged.slice(0, filter.limit) : paged;
+    const last = page.at(-1);
 
     return {
-      nodes,
-      nextCursor: hasMore
-        ? Buffer.from(
-            String(nodes[nodes.length - 1]!.updatedAt.getTime()),
-            'utf8',
-          ).toString('base64url')
-        : null,
+      nodes: page.map((row) => viewOf(row, filter.timezone)),
+      nextCursor:
+        hasMore && last ? encodeCursor(positionOf(keys, docOf(last), last.id)) : null,
     };
   }
 
@@ -449,10 +415,72 @@ export class InMemoryTaskReadRepository implements TaskReadRepository {
   }
 }
 
+/**
+ * For the three cross-context queries, which all filter to a non-null `dueAt`
+ * before sorting — so where null would sort is moot there, and this stays a
+ * plain numeric comparison rather than borrowing the cursor helper's ordering.
+ */
 function time(at: Date | null): number {
-  // Undated sorts last, matching the Mongo adapter's comment about `null`
-  // dueAt meaning "some day" rather than "right now".
-  return at ? at.getTime() : Number.MAX_SAFE_INTEGER;
+  return at ? at.getTime() : 0;
+}
+
+/**
+ * A stored row as the document shape the shared cursor helper reads.
+ *
+ * The in-memory rows carry `id`; Mongo documents carry `_id`. Everything else
+ * has the same name, which is why one comparator can serve both.
+ */
+function docOf(row: TaskState): Record<string, unknown> {
+  return row as unknown as Record<string, unknown>;
+}
+
+/**
+ * The Mongo predicate objects, evaluated in memory.
+ *
+ * Only the handful of operators the view predicates actually use — `$ne`,
+ * `$lt`, `$gte` — and an unknown operator throws rather than being ignored.
+ * Silently skipping one would make this adapter *more* permissive than the
+ * store, so a spec would pass against rows production would not return, which
+ * is the failure mode this whole exercise is about.
+ */
+function matchesPredicate(row: TaskState, predicate: Record<string, unknown>): boolean {
+  for (const [field, expected] of Object.entries(predicate)) {
+    const actual = docOf(row)[field] ?? null;
+    if (expected === null || expected instanceof Date || typeof expected !== 'object') {
+      if (compare(actual, expected ?? null) !== 0) return false;
+      continue;
+    }
+    for (const [operator, operand] of Object.entries(expected as Record<string, unknown>)) {
+      const order = compare(actual, operand ?? null);
+      switch (operator) {
+        case '$ne':
+          if (order === 0) return false;
+          break;
+        case '$lt':
+          if (!(order < 0)) return false;
+          break;
+        case '$gte':
+          if (!(order >= 0)) return false;
+          break;
+        default:
+          throw new Error(
+            `in-memory adapter cannot evaluate "${operator}"; teach it the operator rather than ignoring it`,
+          );
+      }
+    }
+  }
+  return true;
+}
+
+/** Mongo's own ordering: null below everything, then dates and numbers. */
+function compare(a: unknown, b: unknown): number {
+  const left = a instanceof Date ? a.getTime() : a;
+  const right = b instanceof Date ? b.getTime() : b;
+  if (left === null && right === null) return 0;
+  if (left === null) return -1;
+  if (right === null) return 1;
+  if (typeof left === 'number' && typeof right === 'number') return left - right;
+  return String(left) < String(right) ? -1 : String(left) > String(right) ? 1 : 0;
 }
 
 function viewOf(row: TaskState, timezone: string): TaskView {

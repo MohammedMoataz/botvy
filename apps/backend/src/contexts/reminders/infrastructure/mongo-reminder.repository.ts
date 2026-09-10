@@ -4,6 +4,14 @@ import {
   MongoRepositoryBase,
   type OutboxInsert,
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
+import {
+  decodeCursor,
+  encodeCursor,
+  mongoAfter,
+  mongoSort,
+  positionOf,
+  type SortKey,
+} from '../../../shared/persistence/keyset-cursor.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
 import { Reminder, type ReminderState } from '../domain/reminder.aggregate.js';
@@ -147,47 +155,36 @@ export class MongoReminderReadRepository implements ReminderReadRepository {
     userId: string,
     filter: ReminderListFilter,
   ): Promise<ReminderPage> {
-    const query: Record<string, unknown> = { userId };
-    let sort: Record<string, 1 | -1>;
+    const keys = REMINDER_SORT_KEYS[filter.view];
+    const query: Record<string, unknown> = {
+      userId,
+      ...reminderPredicateFor(filter),
+    };
 
-    switch (filter.view) {
-      case 'upcoming':
-        query.deletedAt = null;
-        query.status = 'active';
-        query.$or = effectiveAtIs('$gte', filter.now);
-        sort = { remindAt: 1 };
-        break;
-
-      case 'overdue':
-        query.deletedAt = null;
-        query.status = 'active';
-        query.$or = effectiveAtIs('$lt', filter.now);
-        sort = { remindAt: 1 };
-        break;
-
-      case 'done':
-        // Cancelled reminders live here too. The member's question is "what
-        // have I dealt with", and deciding against something is dealing with
-        // it — the row still carries which of the two it was.
-        query.deletedAt = null;
-        query.status = { $in: ['done', 'cancelled'] };
-        sort = { updatedAt: -1 };
-        break;
-
-      case 'deleted':
-        query.deletedAt = { $ne: null };
-        sort = { deletedAt: -1 };
-        break;
-    }
-
+    // A position in *this* order. The Done view used to sort `updatedAt: -1`
+    // while its cursor filtered `updatedAt > x` — a descending order walked
+    // with an ascending filter, which returns the wrong page every time.
     if (filter.cursor) {
-      const after = decodeCursor(filter.cursor);
-      if (after) query.updatedAt = { $gt: after };
+      const position = decodeCursor(filter.cursor);
+      if (position) {
+        const after = mongoAfter(keys, position);
+        // The upcoming and overdue predicates already use `$or` for the
+        // effective-moment split, so the two are combined under `$and` rather
+        // than one silently replacing the other — which is exactly what a
+        // second assignment to `$or` would do.
+        const existing = query.$or;
+        if (existing) {
+          delete query.$or;
+          query.$and = [{ $or: existing }, after];
+        } else {
+          Object.assign(query, after);
+        }
+      }
     }
 
     const docs = await this.model
       .find(query)
-      .sort(sort)
+      .sort(mongoSort(keys))
       .limit(filter.limit + 1)
       .session(MongoUnitOfWork.currentSession())
       .lean<ReminderDoc[]>()
@@ -195,12 +192,16 @@ export class MongoReminderReadRepository implements ReminderReadRepository {
 
     const hasMore = docs.length > filter.limit;
     const page = hasMore ? docs.slice(0, filter.limit) : docs;
+    const last = page.at(-1);
 
     return {
       nodes: page.map(toView),
-      nextCursor: hasMore
-        ? encodeCursor(page[page.length - 1]!.updatedAt)
-        : null,
+      nextCursor:
+        hasMore && last
+          ? encodeCursor(
+              positionOf(keys, last as unknown as Record<string, unknown>, last._id),
+            )
+          : null,
     };
   }
 
@@ -233,13 +234,43 @@ function effectiveAtIs(
   ];
 }
 
-function encodeCursor(updatedAt: Date): string {
-  return Buffer.from(String(updatedAt.getTime()), 'utf8').toString('base64url');
-}
+/** The order each view is read in; `mongoSort` appends `_id` as the tiebreak. */
+export const REMINDER_SORT_KEYS: Record<ReminderListFilter['view'], SortKey[]> = {
+  upcoming: [{ field: 'remindAt', direction: 'asc' }],
+  overdue: [{ field: 'remindAt', direction: 'asc' }],
+  done: [{ field: 'updatedAt', direction: 'desc' }],
+  deleted: [{ field: 'deletedAt', direction: 'desc' }],
+};
 
-function decodeCursor(cursor: string): Date | null {
-  const millis = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
-  return Number.isFinite(millis) ? new Date(millis) : null;
+/**
+ * What each view is, as a filter. Exported so the in-memory adapter applies it
+ * rather than restating it in its own words.
+ *
+ * `done` carries cancelled reminders too: the member's question is "what have I
+ * dealt with", and deciding against something is dealing with it — the row
+ * still says which of the two it was.
+ */
+export function reminderPredicateFor(
+  filter: ReminderListFilter,
+): Record<string, unknown> {
+  switch (filter.view) {
+    case 'upcoming':
+      return {
+        deletedAt: null,
+        status: 'active',
+        $or: effectiveAtIs('$gte', filter.now),
+      };
+    case 'overdue':
+      return {
+        deletedAt: null,
+        status: 'active',
+        $or: effectiveAtIs('$lt', filter.now),
+      };
+    case 'done':
+      return { deletedAt: null, status: { $in: ['done', 'cancelled'] } };
+    case 'deleted':
+      return { deletedAt: { $ne: null } };
+  }
 }
 
 function toView(doc: ReminderDoc): ReminderView {

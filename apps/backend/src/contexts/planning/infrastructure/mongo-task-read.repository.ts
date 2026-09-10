@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import type { Model } from 'mongoose';
+import {
+  decodeCursor,
+  encodeCursor,
+  mongoAfter,
+  mongoSort,
+  positionOf,
+  type SortKey,
+} from '../../../shared/persistence/keyset-cursor.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import { Recurrence } from '../domain/recurrence.js';
 import type {
@@ -10,6 +18,76 @@ import type {
   TaskView,
 } from '../domain/task-read.repository.js';
 import type { LabelDoc, TaskDoc } from './mongo-planning.repositories.js';
+
+/**
+ * The order each view is read in, and therefore the order its cursor walks.
+ *
+ * `mongoSort` appends `_id`, so every one of these is a *total* order — which
+ * is what makes a page boundary unambiguous even when two tasks share a due
+ * date to the millisecond.
+ */
+export const TASK_SORT_KEYS: Record<TaskListFilter['view'], SortKey[]> = {
+  // Overdue first, then the rest of today, then by priority: the member's eye
+  // should land on what is late.
+  today: [
+    { field: 'dueAt', direction: 'asc' },
+    { field: 'priority', direction: 'asc' },
+  ],
+  upcoming: [
+    { field: 'dueAt', direction: 'asc' },
+    { field: 'priority', direction: 'asc' },
+  ],
+  overdue: [
+    { field: 'dueAt', direction: 'asc' },
+    { field: 'priority', direction: 'asc' },
+  ],
+  // The one view that carries undated tasks, and `null` sorts *first* here
+  // because that is how Mongo orders it. Sorting them last would need an
+  // aggregation with `$ifNull`, and the in-memory adapter would then have to
+  // reproduce that rather than the store's own ordering — so the ordering
+  // preference is recorded in `enhancements/` and the two adapters agree.
+  label: [
+    { field: 'status', direction: 'asc' },
+    { field: 'dueAt', direction: 'asc' },
+    { field: 'priority', direction: 'asc' },
+  ],
+  completed: [{ field: 'completedAt', direction: 'desc' }],
+  deleted: [{ field: 'deletedAt', direction: 'desc' }],
+};
+
+/**
+ * What each view *is*, as a filter. Exported so the in-memory adapter applies
+ * the same predicates rather than its own paraphrase of them — a view whose
+ * definition differs between the two is a view whose spec proves nothing about
+ * production.
+ *
+ * **Today is not one day.** It is today's tasks *plus* everything still open
+ * whose moment has passed, because a member opening the app at 09:00 needs to
+ * see yesterday's unfinished work more than they need a tidy definition of
+ * "today". A list that hid overdue tasks behind a second tab is a list that
+ * loses them.
+ *
+ * **Every view except `deleted` excludes tombstones**, and `deleted` shows only
+ * tombstones. Those are the same field read two ways, which is why the Deleted
+ * view can report that a removed task had been completed: the delete never
+ * touched the status.
+ */
+export function taskPredicateFor(filter: TaskListFilter): Record<string, unknown> {
+  switch (filter.view) {
+    case 'today':
+      return { deletedAt: null, status: 'open', dueAt: { $ne: null, $lt: filter.dayEnd } };
+    case 'upcoming':
+      return { deletedAt: null, status: 'open', dueAt: { $gte: filter.dayEnd } };
+    case 'overdue':
+      return { deletedAt: null, status: 'open', dueAt: { $ne: null, $lt: filter.dayStart } };
+    case 'label':
+      return { deletedAt: null, labelId: filter.labelId ?? null };
+    case 'completed':
+      return { deletedAt: null, status: 'completed' };
+    case 'deleted':
+      return { deletedAt: { $ne: null } };
+  }
+}
 
 /**
  * The read side against Mongo.
@@ -26,82 +104,21 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     private readonly labelModel: Model<LabelDoc>,
   ) {}
 
-  /**
-   * The six lists, each as its own filter.
-   *
-   * Two of them are worth reading twice:
-   *
-   * **Today is not one day.** It is today's tasks *plus* everything still open
-   * whose moment has passed, because a member opening the app at 09:00 needs to
-   * see yesterday's unfinished work more than they need a tidy definition of
-   * "today". A list that hid overdue tasks behind a second tab is a list that
-   * loses them.
-   *
-   * **Every view except `deleted` excludes tombstones**, and `deleted` shows
-   * only tombstones. Those are the same field read two ways, which is why the
-   * Deleted view can report that a removed task had been completed: the delete
-   * never touched the status.
-   */
   async page(userId: string, filter: TaskListFilter): Promise<TaskPage> {
-    const query: Record<string, unknown> = { userId };
-    let sort: Record<string, 1 | -1>;
+    const query: Record<string, unknown> = { userId, ...taskPredicateFor(filter) };
+    const keys = TASK_SORT_KEYS[filter.view];
 
-    switch (filter.view) {
-      case 'today':
-        query.deletedAt = null;
-        query.status = 'open';
-        query.dueAt = { $ne: null, $lt: filter.dayEnd };
-        // Overdue first, then the rest of today, then by priority. The member's
-        // eye should land on what is late.
-        sort = { dueAt: 1, priority: 1 };
-        break;
-
-      case 'upcoming':
-        query.deletedAt = null;
-        query.status = 'open';
-        query.dueAt = { $gte: filter.dayEnd };
-        sort = { dueAt: 1, priority: 1 };
-        break;
-
-      case 'overdue':
-        query.deletedAt = null;
-        query.status = 'open';
-        query.dueAt = { $ne: null, $lt: filter.dayStart };
-        sort = { dueAt: 1, priority: 1 };
-        break;
-
-      case 'label':
-        query.deletedAt = null;
-        query.labelId = filter.labelId ?? null;
-        // Undated tasks sort last rather than first: a `null` dueAt is "some
-        // day", and Mongo's own null-sorts-low ordering would put every
-        // someday task above the ones with a deadline.
-        sort = { status: 1, dueAt: 1, priority: 1 };
-        break;
-
-      case 'completed':
-        query.deletedAt = null;
-        query.status = 'completed';
-        sort = { completedAt: -1 };
-        break;
-
-      case 'deleted':
-        query.deletedAt = { $ne: null };
-        sort = { deletedAt: -1 };
-        break;
-    }
-
-    // Cursor pagination on `updatedAt` rather than a skip: a skip re-reads
-    // everything before the page and shifts under an edit, so a member
-    // scrolling while the phone syncs sees a row twice or not at all.
+    // The cursor is a position in *this* order, not a value in some unrelated
+    // field. `keyset-cursor.ts` records what was wrong before and why it
+    // survived a green suite.
     if (filter.cursor) {
-      const after = decodeCursor(filter.cursor);
-      if (after) query.updatedAt = { $gt: after };
+      const position = decodeCursor(filter.cursor);
+      if (position) Object.assign(query, mongoAfter(keys, position));
     }
 
     const docs = await this.taskModel
       .find(query)
-      .sort(sort)
+      .sort(mongoSort(keys))
       .limit(filter.limit + 1)
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc[]>()
@@ -111,26 +128,24 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     // second count query against a collection that is being written to.
     const hasMore = docs.length > filter.limit;
     const page = hasMore ? docs.slice(0, filter.limit) : docs;
+    const last = page.at(-1);
 
     return {
-      nodes: page.map((doc) => toView(doc, filter.timezone)),
-      nextCursor: hasMore
-        ? encodeCursor(page[page.length - 1]!.updatedAt)
-        : null,
+      nodes: page.map((doc) => toTaskView(doc, filter.timezone)),
+      nextCursor:
+        hasMore && last
+          ? encodeCursor(positionOf(keys, last as unknown as Record<string, unknown>, last._id))
+          : null,
     };
   }
 
-  async byId(
-    userId: string,
-    id: string,
-    timezone: string,
-  ): Promise<TaskView | null> {
+  async byId(userId: string, id: string, timezone: string): Promise<TaskView | null> {
     const doc = await this.taskModel
       .findOne({ userId, _id: id })
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc>()
       .exec();
-    return doc ? toView(doc, timezone) : null;
+    return doc ? toTaskView(doc, timezone) : null;
   }
 
   /**
@@ -157,14 +172,7 @@ export class MongoTaskReadRepository implements TaskReadRepository {
         .exec(),
       this.taskModel
         .aggregate<{ _id: string | null; count: number }>([
-          {
-            $match: {
-              userId,
-              deletedAt: null,
-              status: 'open',
-              labelId: { $ne: null },
-            },
-          },
+          { $match: { userId, deletedAt: null, status: 'open', labelId: { $ne: null } } },
           { $group: { _id: '$labelId', count: { $sum: 1 } } },
         ])
         .session(session)
@@ -183,52 +191,28 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     }));
   }
 
-  async dueBetween(
-    userId: string,
-    from: Date,
-    to: Date,
-    timezone: string,
-  ): Promise<TaskView[]> {
+  async dueBetween(userId: string, from: Date, to: Date, timezone: string): Promise<TaskView[]> {
     const docs = await this.taskModel
-      .find({
-        userId,
-        deletedAt: null,
-        status: 'open',
-        dueAt: { $gte: from, $lt: to },
-      })
+      .find({ userId, deletedAt: null, status: 'open', dueAt: { $gte: from, $lt: to } })
       .sort({ priority: 1, dueAt: 1 })
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc[]>()
       .exec();
-    return docs.map((doc) => toView(doc, timezone));
+    return docs.map((doc) => toTaskView(doc, timezone));
   }
 
-  async openBefore(
-    userId: string,
-    before: Date,
-    timezone: string,
-  ): Promise<TaskView[]> {
+  async openBefore(userId: string, before: Date, timezone: string): Promise<TaskView[]> {
     const docs = await this.taskModel
-      .find({
-        userId,
-        deletedAt: null,
-        status: 'open',
-        dueAt: { $ne: null, $lt: before },
-      })
+      .find({ userId, deletedAt: null, status: 'open', dueAt: { $ne: null, $lt: before } })
       .sort({ dueAt: 1, priority: 1 })
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc[]>()
       .exec();
-    return docs.map((doc) => toView(doc, timezone));
+    return docs.map((doc) => toTaskView(doc, timezone));
   }
 
   /** `allDay: false` only — an all-day task has no place on an hour grid. */
-  async timedBetween(
-    userId: string,
-    from: Date,
-    to: Date,
-    timezone: string,
-  ): Promise<TaskView[]> {
+  async timedBetween(userId: string, from: Date, to: Date, timezone: string): Promise<TaskView[]> {
     const docs = await this.taskModel
       .find({
         userId,
@@ -241,31 +225,15 @@ export class MongoTaskReadRepository implements TaskReadRepository {
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc[]>()
       .exec();
-    return docs.map((doc) => toView(doc, timezone));
+    return docs.map((doc) => toTaskView(doc, timezone));
   }
 }
 
-/**
- * `updatedAt` as the cursor, base64'd so a client cannot read a timestamp out of
- * it and start doing arithmetic on it. Opaque by construction: the only correct
- * thing to do with a cursor is hand it back.
- */
-function encodeCursor(updatedAt: Date): string {
-  return Buffer.from(String(updatedAt.getTime()), 'utf8').toString('base64url');
-}
-
-function decodeCursor(cursor: string): Date | null {
-  const millis = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
-  return Number.isFinite(millis) ? new Date(millis) : null;
-}
-
-function toView(doc: TaskDoc, timezone: string): TaskView {
+/** Exported so the in-memory adapter renders a view identically. */
+export function toTaskView(doc: TaskDoc, timezone: string): TaskView {
   const recurrence = doc.recurrence ?? null;
   const rule = recurrence
-    ? Recurrence.parse(
-        { ...recurrence, exdates: recurrence.exdates ?? [] },
-        timezone,
-      )
+    ? Recurrence.parse({ ...recurrence, exdates: recurrence.exdates ?? [] }, timezone)
     : null;
 
   return {

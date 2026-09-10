@@ -63,6 +63,178 @@ class KeyValues extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+/// One of the member's labels.
+///
+/// Parent of [Tasks] as far as the sync order goes: labels are applied before
+/// tasks on every pull, because a task carrying a label the device has never
+/// heard of would render a blank chip.
+///
+/// No `userId` column, here or on any other synced table: the phone holds one
+/// account's rows, and signing out clears them. A column that is the same
+/// value on every row is a column every query has to carry and no query can
+/// use.
+@DataClassName('LocalLabel')
+@TableIndex(name: 'labels_sort', columns: {#sortOrder})
+@TableIndex(name: 'labels_pending', columns: {#pendingOp})
+class Labels extends Table with SyncColumns {
+  TextColumn get name => text()();
+
+  /// `#rrggbb`. A palette entry or a colour the member picked themselves —
+  /// which is why this is a string and not an index into the palette: the
+  /// palette is an operator setting (`settings.labels.palette`) and may change
+  /// under a label that was already given one of its colours.
+  TextColumn get color => text()();
+
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// One task, mirroring the server's `tasks` shape (data-model §2.2).
+///
+/// The label is stored twice on purpose: [labelId] is the reference and
+/// [labelName]/[labelColor] are the server's Extended Reference snapshot,
+/// refreshed when the label is renamed. The snapshot is what a list renders,
+/// so Today draws without a join and without a second query per row.
+@DataClassName('LocalTask')
+@TableIndex(name: 'tasks_due', columns: {#dueAt})
+@TableIndex(name: 'tasks_status_due', columns: {#status, #dueAt})
+@TableIndex(name: 'tasks_label', columns: {#labelId})
+@TableIndex(name: 'tasks_pending', columns: {#pendingOp})
+class Tasks extends Table with SyncColumns {
+  TextColumn get title => text()();
+  TextColumn get notes => text().nullable()();
+
+  /// The moment the member chose. Null for a task with no date at all.
+  DateTimeColumn get dueAt => dateTime().nullable()();
+
+  /// An all-day task has a date and no moment, so nothing alarms from it —
+  /// see `core/notifications/alert_plan.dart`, which skips it rather than
+  /// waking somebody at midnight.
+  BoolColumn get allDay => boolean().withDefault(const Constant(false))();
+
+  /// 1 highest … 4 none, exactly as the server numbers them.
+  IntColumn get priority => integer().withDefault(const Constant(4))();
+
+  TextColumn get labelId => text().nullable()();
+  TextColumn get labelName => text().nullable()();
+  TextColumn get labelColor => text().nullable()();
+
+  /// `open` | `completed` | `cancelled`. A delete never touches it: the status
+  /// is the only record of whether the task was done, dropped or still
+  /// waiting, and the Deleted view exists to show exactly that.
+  TextColumn get status => text().withDefault(const Constant('open'))();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+
+  /// The recurrence *rule*, as the JSON the server sent:
+  /// `{ dtstart, rrule, mode, exdates[] }`.
+  ///
+  /// A rule plus its exceptions, never expanded rows — the window is expanded
+  /// on read. Storing occurrences would make a moved one an edit to the series
+  /// instead of an override, and there is no bottom to a series.
+  TextColumn get recurrenceJson => text().nullable()();
+
+  IntColumn get estimatedMinutes => integer().nullable()();
+  IntColumn get deferCount => integer().withDefault(const Constant(0))();
+  DateTimeColumn get deferredFrom => dateTime().nullable()();
+
+  /// `app` | `chat` | `extension` | `rhythm` — who created it.
+  TextColumn get source => text().withDefault(const Constant('app'))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// One reminder, mirroring the server's `reminders` shape (data-model §2.3).
+@DataClassName('LocalReminder')
+@TableIndex(name: 'reminders_remind_at', columns: {#remindAt})
+@TableIndex(name: 'reminders_pending', columns: {#pendingOp})
+class Reminders extends Table with SyncColumns {
+  TextColumn get title => text()();
+
+  /// The moment the member asked for. Never overwritten by a snooze.
+  DateTimeColumn get remindAt => dateTime()();
+
+  /// JSON array of offsets, e.g. `["1h","0m"]`. Empty means "the member's
+  /// defaults", which live in [UserPreferences.leadTimesJson].
+  TextColumn get leadTimesJson =>
+      text().withDefault(const Constant('[]'))();
+
+  /// `active` | `done` | `cancelled`.
+  TextColumn get status => text().withDefault(const Constant('active'))();
+
+  /// "Not now, in ten minutes" — a field of its own rather than a write to
+  /// [remindAt], because the original moment is still the truth about what the
+  /// member asked for. The alarm fires at `snoozedUntil ?? remindAt`, which is
+  /// the same `effectiveAt` the server's aggregate plans from.
+  DateTimeColumn get snoozedUntil => dateTime().nullable()();
+
+  TextColumn get source => text().withDefault(const Constant('app'))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// The alerts the server planned for this device, as `/sync` returned them.
+///
+/// A mirror of `pendingAlerts` (next 7 days) and nothing else: it carries the
+/// alerts this phone could *not* have worked out for itself — a meeting
+/// occurrence, an evening prompt, a suggestion — so the local alarm plan is
+/// the union of these rows and what the local tasks and reminders imply.
+///
+/// Deliberately without [SyncColumns], for the reason [Profiles] gives: alerts
+/// are server-only (data-model §2.4), the phone never pushes one, and
+/// `pendingOp`, `pushAttempts` and `baseUpdatedAt` on a table nothing pushes
+/// would be three columns of speculation that every later migration has to
+/// step over. The rows are replaced wholesale on every sync, so there is
+/// nothing to reconcile either.
+///
+/// The instants here are **already final**: the server applied quiet hours
+/// before sending them, so re-applying the shift on this side would move a
+/// system alert twice. Only the locally derived alerts go through the quiet
+/// window.
+@DataClassName('LocalAlert')
+@TableIndex(name: 'alerts_local_notify_at', columns: {#notifyAt})
+class AlertsLocal extends Table {
+  /// `kind|sourceId|occurrenceAt|label` — the server's own unique key for an
+  /// alert, so the same alert pulled twice is one row, and the row a local
+  /// task or reminder implies collides with the server's copy of it instead of
+  /// double-notifying.
+  TextColumn get id => text()();
+
+  /// `reminder` | `task` | `meeting` | `rhythm` | `suggestion`.
+  TextColumn get sourceKind => text()();
+  TextColumn get sourceId => text()();
+
+  /// Which occurrence of a recurring source this is, or null for a one-off.
+  DateTimeColumn get occurrenceAt => dateTime().nullable()();
+
+  /// `0m` | `1h` | `prep` | `evening` | `morning` | `suggestion`. Half of the
+  /// notification id, so it has to be the server's own string rather than
+  /// display text.
+  TextColumn get label => text()();
+
+  DateTimeColumn get notifyAt => dateTime()();
+
+  TextColumn get title => text()();
+  TextColumn get body => text().withDefault(const Constant(''))();
+  TextColumn get deepLink => text().withDefault(const Constant(''))();
+
+  /// When this mirror row was pulled. Not the alert's own time — this is about
+  /// the copy, as on [Profiles].
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// The member's own facts, mirrored locally.
 ///
 /// One row, keyed by `userId`. It is a *mirror*, not a source: the server owns
@@ -144,7 +316,17 @@ class MigrationLadderError extends Error {
       'in AppDatabase.migration, in the same change.';
 }
 
-@DriftDatabase(tables: [KeyValues, Profiles, UserPreferences])
+@DriftDatabase(
+  tables: [
+    KeyValues,
+    Profiles,
+    UserPreferences,
+    Labels,
+    Tasks,
+    Reminders,
+    AlertsLocal,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'botvy_v2'));
 
@@ -152,7 +334,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -186,6 +368,35 @@ class AppDatabase extends _$AppDatabase {
       if (from >= 1 && from < 2) {
         await m.createTable(profiles);
         await m.createTable(userPreferences);
+      }
+
+      // 2 -> 3: tasks, labels, reminders and the alert mirror.
+      //
+      // Same guard shape, and for the same reason: an install created at
+      // version 3 already has these tables, and `from < 3` alone would try to
+      // build them a second time on the *next* bump — a defect that only shows
+      // up one version later, on phones that are already in service.
+      //
+      // `createTable` builds the table and nothing else: drift creates a
+      // table's indexes as separate schema entities, which `createAll` picks
+      // up on a fresh install and an upgrade does not. So each index is
+      // created here explicitly. Missing them costs nothing visible in a test
+      // database of ten rows and shows up as a slow Today list on a real one.
+      if (from >= 2 && from < 3) {
+        await m.createTable(labels);
+        await m.createTable(tasks);
+        await m.createTable(reminders);
+        await m.createTable(alertsLocal);
+
+        await m.create(labelsSort);
+        await m.create(labelsPending);
+        await m.create(tasksDue);
+        await m.create(tasksStatusDue);
+        await m.create(tasksLabel);
+        await m.create(tasksPending);
+        await m.create(remindersRemindAt);
+        await m.create(remindersPending);
+        await m.create(alertsLocalNotifyAt);
       }
 
       // Anything the ladder above did not cover.
