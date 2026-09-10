@@ -253,9 +253,36 @@ services:
       N8N_PORT: 5678
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Africa/Cairo}
       N8N_DIAGNOSTICS_ENABLED: 'false'
+      # `$env` in a node expression, which n8n blocks by default.
+      #
+      # Every execution of both cron workflows failed with
+      # `ExpressionError: access to env vars denied` until this was set, so the
+      # sweep and the rhythm tick had never once fired from n8n. P0's gate
+      # caught it — `verify.mjs` reports a job stale after fifteen minutes, and
+      # that check is the only reason anybody found out.
+      #
+      # The default is a sensible one for a shared n8n where anybody can write a
+      # workflow: an expression that can read the process environment can read
+      # every secret in it. It is the wrong default *here* because this instance
+      # runs three workflows, all committed to this repository and imported by
+      # `bootstrap.mjs`, and its whole reason for holding the token in the
+      # environment is principle II — one credential, no data in n8n's own
+      # database. Turning this off would mean storing a second copy of the
+      # service token as an n8n credential, which is the thing principle II
+      # exists to prevent.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'
       # Both secrets come from the same .env the API reads, as environment.
       # Never a second credential stored in n8n's own database, so principle
       # II's "one credential and no data" still reads true.
+      #
+      # `BOTVY_SERVICE_TOKEN` as well as `BOTVY_INTERNAL_TOKEN`, and the same
+      # value: the two cron workflows were written against the first name and
+      # `error_handler.json` against the second. One of them was always going to
+      # be empty, and an empty `Bearer ` is a 401 that looks like nothing. Both
+      # names are provided rather than one being renamed, because renaming a
+      # variable a committed workflow reads is a change that breaks silently on
+      # an installation whose n8n database still holds the old import.
+      BOTVY_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
       BOTVY_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
       BOTVY_WEBHOOK_SECRET: ${AUTOMATION_WEBHOOK_SECRET:?set it in .env}
       BOTVY_API_BASE: http://backend:8080

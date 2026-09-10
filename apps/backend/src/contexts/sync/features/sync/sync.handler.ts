@@ -10,6 +10,7 @@ import type {
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import {
   DeviceTouchPort,
+  MESSAGE_PAGE_SIZE,
   PendingAlertsPort,
   SYNCABLE_ENTITIES,
   SYNCABLE_PATCHES,
@@ -35,6 +36,24 @@ export const CURSOR_LAG_MS = 5_000;
 export interface SyncRequest {
   installId: string;
   since: Date | null;
+  /**
+   * The highest message `seq` this client already holds. `contracts/sync.md`
+   * has carried it since it was written; P3 shipped this facade without
+   * reading it, because there was no `messages` pull to read it for.
+   *
+   * Null means "everything", the same as a null `since` — a fresh install, or
+   * one that has thrown its local database away. It is not defaulted to
+   * anything else: a missing cursor read as "the latest" would leave a new
+   * install with an empty chat and no way to ask again, since the rows are
+   * immutable and would never appear in a later delta.
+   *
+   * Optional in the same way `push` is: a caller with no interest in messages
+   * (the extension's subset, and every spec written before this field existed)
+   * says nothing and is read as null. Absent and null mean the same thing here
+   * — there is no third state worth distinguishing, because "everything" is
+   * what a client with no cursor needs either way.
+   */
+  lastSeq?: number | null;
   entities: string[];
   push?: Record<string, unknown>;
 }
@@ -181,9 +200,33 @@ export class SyncHandler {
 
     // ----------------------------------------------------------- 3. the pull
     const pull: Record<string, unknown> = {};
-    for (const adapter of this.entities) {
+    const lastSeq = Math.max(0, request.lastSeq ?? 0);
+    /*
+     * **Children before parents, which is the apply order backwards.**
+     *
+     * `contracts/sync.md` states it for the one pair where it bites —
+     * "conversations are queried after messages so a message never names a
+     * thread the response does not carry" — and it generalises to every pair,
+     * in the opposite direction from the apply. Reading the parent first and
+     * the child second leaves a window: a child written between the two reads
+     * comes back naming a parent this response does not include, and the phone
+     * applies a row pointing at nothing. Reading the child first cannot go
+     * wrong the same way — a parent created in that window is simply not
+     * mentioned by anything, and arrives on the next round trip.
+     *
+     * Sorted rather than left to the order the module happens to list its
+     * providers in. That order is invisible from here, nothing would fail if
+     * somebody rearranged the array, and the failure it would cause is a
+     * dangling reference on one device on one round trip.
+     */
+    for (const adapter of [...this.entities].sort(
+      (a, b) => b.applyOrder - a.applyOrder,
+    )) {
       if (!wanted.has(adapter.entity)) continue;
-      pull[adapter.entity] = await adapter.pull(userId, since);
+      // Both cursors, and each adapter reads the one its collection has — a
+      // date for rows with an `updatedAt`, `lastSeq` for messages. See
+      // `SyncableEntity.pull`, which carries the whole argument.
+      pull[adapter.entity] = await adapter.pull(userId, since, lastSeq);
     }
     for (const adapter of this.patches) {
       if (!wanted.has(adapter.entity)) continue;
@@ -191,6 +234,28 @@ export class SyncHandler {
       // useful delta of a single row, and a client that had missed the one
       // change would have no way to ask for it again.
       pull[adapter.entity] = await adapter.pull(userId);
+    }
+
+    /*
+     * `moreMessages`, the one paging flag in the protocol.
+     *
+     * The facade names an entity here, which it does nowhere else, and that is
+     * the compromise rather than an oversight. `contracts/sync.md`'s response
+     * has a single `moreMessages` key beside the `pull` map, so the flag is
+     * part of the protocol this handler owns and not part of any adapter's
+     * rows — an adapter returning `{ rows, more }` would need the facade to
+     * unwrap it and build the key's name from the entity's, which is magic
+     * string-building in place of one honest special case.
+     *
+     * A full page means "ask again", which is one wasted round trip when the
+     * transcript happens to be an exact multiple of the page size — and the
+     * alternative, asking for one row more and dropping it, cannot be done from
+     * out here without the adapter agreeing to over-fetch. `MESSAGE_PAGE_SIZE`
+     * is shared with the adapter so the two cannot disagree about what full
+     * means.
+     */
+    if (Array.isArray(pull.messages)) {
+      pull.moreMessages = pull.messages.length >= MESSAGE_PAGE_SIZE;
     }
 
     // ------------------------------------------------ 4. touch, and nudge
@@ -262,12 +327,19 @@ function toChange(raw: unknown): SyncChange | null {
   const id = row.id;
   const op = row.op;
   if (typeof id !== 'string' || id === '') return null;
+  // The seven `SyncOp` words. `upsert` and `clear` are the conversations
+  // push's, and they are accepted *here* — this function is the one gate every
+  // pushed row passes, so an op missing from this list is refused as `invalid`
+  // before the owning adapter is ever asked, which is what happened to the
+  // contract's own conversation vocabulary until P4.
   if (
     op !== 'create' &&
     op !== 'update' &&
     op !== 'delete' &&
     op !== 'restore' &&
-    op !== 'purge'
+    op !== 'purge' &&
+    op !== 'upsert' &&
+    op !== 'clear'
   ) {
     return null;
   }

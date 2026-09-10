@@ -19,7 +19,7 @@ import 'package:sqlite3/sqlite3.dart';
 ///
 /// "From the previous version" is not enough, and P3 found out why. drift calls
 /// `onUpgrade` **once**, with the pair it actually has: a phone that last ran
-/// version 1 and opens version 4 arrives as `(1, 4)`, and every branch in the
+/// version 1 and opens version 5 arrives as `(1, 5)`, and every branch in the
 /// ladder sees `from == 1`. A branch guarded `from >= 2 && from < 3` therefore
 /// never runs for it — so a v1 install upgrading to v3 came out with the
 /// profile mirrors and **no task tables at all**, and every query against them
@@ -105,11 +105,190 @@ void main() {
     'alerts_local',
   ];
 
+
+  /// What every shipped version held, so a donor can be built at any of them.
+  ///
+  /// Version 1 is spelled out in its own test below rather than taken from a
+  /// donor, because `donorAt` reads today's DDL and version 1 is the one step
+  /// where that is not enough — it shipped a single table and nothing else, and
+  /// building it by hand is what proves the `from < 2` guard runs.
+  const v4Tables = [
+    ...v3Tables,
+    'daily_plans',
+    'checkins',
+    'rhythm_state',
+  ];
+
+  /// Every earlier version, upgraded to the current schema, asserting the
+  /// **whole** schema each time.
+  ///
+  /// The one test in this file that could not have been skipped by an oversight
+  /// and is the reason P3's defect existed for two phases. drift calls
+  /// `onUpgrade` **once** with the pair it actually has, so a phone at version
+  /// 1 opening version 5 arrives as `(1, 5)` and *every* branch sees
+  /// `from == 1`. A branch guarded `from >= 4 && from < 5` therefore never runs
+  /// for it, and that band is the only thing that would create `conversations`,
+  /// `messages` and `pending_messages`: the install would come out with the
+  /// chat feature querying tables that do not exist, for the life of the
+  /// install. Written as a loop over every prior version so a sixth one is one
+  /// entry in the map rather than a test somebody has to remember to add.
+  ///
+  /// `containsAll(declaredTables(db))` and not a fixed list, for the same
+  /// reason: it covers the tables a later phase adds without this file being
+  /// touched, which is exactly the remembering that failed last time.
+  group('every earlier version upgrades to the current schema entire', () {
+    final donors = <int, List<String>>{
+      2: v2Tables,
+      3: v3Tables,
+      4: v4Tables,
+    };
+
+    for (final entry in donors.entries) {
+      test('a version ${entry.key} file', () async {
+        final db = AppDatabase.forTesting(
+          NativeDatabase.opened(await donorAt(entry.key, entry.value)),
+        );
+        addTearDown(db.close);
+
+        // Forces the open, and therefore the migration.
+        expect(await db.getValue('anything'), isNull);
+
+        expect(
+          await tablesIn(db),
+          containsAll(declaredTables(db)),
+          reason:
+              'a v${entry.key} install must end up with every table the '
+              'current schema declares, not only the ones its own step adds: '
+              'drift calls onUpgrade once with (${entry.key}, '
+              '${db.schemaVersion}), so every createTable branch has to be '
+              'guarded `from < N` rather than `from >= N-1 && from < N`',
+        );
+
+        // And every index, for the reason the 2 -> 3 branch gives: drift keeps
+        // indexes as separate schema entities, so an upgrade that only calls
+        // `createTable` leaves a phone with the tables and none of the indexes
+        // and nothing ever says so.
+        expect(
+          await indexesIn(db),
+          containsAll([
+            'conversations_updated',
+            'conversations_pending',
+            'messages_conversation_seq',
+            'messages_client',
+            'pending_messages_composed',
+          ]),
+        );
+
+        // Usable, not merely present, and written the way the sync applier and
+        // the chat outbox write them — so a column the migration got wrong
+        // fails here rather than on a phone.
+        await db.into(db.conversations).insert(
+          ConversationsCompanion.insert(
+            id: 'conv-1',
+            kind: const Value('coach'),
+            title: const Value('Coach'),
+            pinned: const Value(true),
+            createdAt: DateTime.now().toUtc(),
+            updatedAt: DateTime.now().toUtc(),
+          ),
+        );
+        await db.into(db.messages).insert(
+          MessagesCompanion.insert(
+            seq: const Value(1),
+            conversationId: 'conv-1',
+            role: 'user',
+            content: 'How much protein today?',
+            createdAt: DateTime.now().toUtc(),
+          ),
+        );
+        await db.into(db.pendingMessages).insert(
+          PendingMessagesCompanion.insert(
+            clientId: 'client-1',
+            conversationId: 'conv-1',
+            body: 'remind me to call Dad in two hours',
+            // Relative to now, never a pinned date: a fixture dated in the
+            // future starts failing the day the clock reaches it.
+            composedAt: DateTime.now().toUtc(),
+          ),
+        );
+
+        expect((await db.select(db.conversations).get()).single.pinned, isTrue);
+        // The defaults the columns declare, for a chat nothing has been
+        // cleared from.
+        expect(
+          (await db.select(db.conversations).get()).single.clearedUpToSeq,
+          0,
+        );
+        expect((await db.select(db.messages).get()).single.seq, 1);
+        expect((await db.select(db.pendingMessages).get()).single.attempts, 0);
+      });
+    }
+  });
+
+  /// The immutable-message re-pull, which is the only migration move that table
+  /// has.
+  ///
+  /// Messages carry no `updatedAt`, so they cannot be cut on a timestamp and a
+  /// column backfilled onto the server's rows can never reach a device that
+  /// already holds them — their sequences are below the watermark for ever.
+  /// The answer is to discard the cache and rewind the watermark, and this is
+  /// the test that the two halves actually happen: the rows go, and the number
+  /// the next sync sends as `lastSeq` goes back with them.
+  group('the immutable-message re-pull', () {
+    Future<void> seed(AppDatabase db) async {
+      for (final seq in [1, 2, 3]) {
+        await db.into(db.messages).insert(
+          MessagesCompanion.insert(
+            seq: Value(seq),
+            conversationId: 'conv-1',
+            role: seq.isOdd ? 'user' : 'assistant',
+            content: 'message $seq',
+            createdAt: DateTime.now().toUtc(),
+          ),
+        );
+      }
+      await db.setValue(DbKeys.messagesLastSeq, '3');
+    }
+
+    test('discards the whole cache and rewinds the watermark to nought',
+        () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seed(db);
+
+      await repullMessages(db);
+
+      expect(await db.select(db.messages).get(), isEmpty);
+      // Nought and not null: `seq > 0` is how the server is asked for
+      // everything, and clearing the key would work only because absent
+      // happens to parse to the same request. Storing the number says it.
+      expect(await db.getValue(DbKeys.messagesLastSeq), '0');
+    });
+
+    test('a partial re-pull keeps what is below the sequence given', () async {
+      final db = AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seed(db);
+
+      await repullMessages(db, fromSeq: 3);
+
+      // Inclusive: `fromSeq: 3` means "message 3 is wrong too".
+      expect(
+        (await db.select(db.messages).get()).map((r) => r.seq),
+        [1, 2],
+      );
+      // One below, because the server answers `seq > lastSeq`. Off by one here
+      // and message 3 is never sent again — which is precisely the failure the
+      // re-pull exists to avoid.
+      expect(await db.getValue(DbKeys.messagesLastSeq), '2');
+    });
+  });
+
   test('a fresh file at the current schemaVersion has every declared table', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 4);
+    expect(db.schemaVersion, 5);
 
     final rows = await db
         .customSelect(
@@ -125,7 +304,7 @@ void main() {
     expect(await db.getValue('probe'), 'ok');
   });
 
-  /// 1 -> 4, the longest path there is, and the one that was broken.
+  /// 1 -> 5, the longest path there is, and the one that was broken.
   ///
   /// Opened as a v1-shaped file — the one table version 1 actually had, stamped
   /// with `user_version = 1` — so the upgrade path runs for real rather than
@@ -154,7 +333,7 @@ void main() {
       containsAll(declaredTables(db)),
       reason:
           'a v1 install must end up with every table, not only the ones the '
-          '1 -> 2 branch adds: drift calls onUpgrade once with (1, 4), so '
+          '1 -> 2 branch adds: drift calls onUpgrade once with (1, 5), so '
           'every later branch has to be guarded `from < N` rather than '
           '`from >= N-1 && from < N`',
     );
@@ -204,7 +383,7 @@ void main() {
     expect(stored.endOfDayTime, '22:00');
   });
 
-  /// 2 -> 4: the P2 tables, and then the P3 ones on top.
+  /// 2 -> 5: the P2 tables, and then everything since.
   test('a version 2 file upgrades and gains the P2 tables', () async {
     final db = AppDatabase.forTesting(
       NativeDatabase.opened(await donorAt(2, v2Tables)),
@@ -253,8 +432,8 @@ void main() {
     expect((await db.select(db.tasks).get()).single.status, 'open');
   });
 
-  /// 3 -> 4: the daily rhythm (P3 T350).
-  test('a version 3 file upgrades to 4 and gains the rhythm tables', () async {
+  /// 3 -> 5: the daily rhythm (P3 T350), plus the chat on top.
+  test('a version 3 file upgrades and gains the rhythm tables', () async {
     final raw = await donorAt(3, v3Tables);
     // A task the member already had, so the upgrade is asserted to *keep* what
     // was there rather than merely to add what was not.

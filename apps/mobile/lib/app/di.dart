@@ -12,6 +12,9 @@ import '../core/notifications/local_notifications.dart';
 import '../core/push.dart';
 import '../core/sync/sync_engine.dart';
 import '../features/auth/application/auth_cubit.dart';
+import '../features/chat/application/chat_cubit.dart';
+import '../features/chat/application/conversations_cubit.dart';
+import '../features/chat/data/chat_outbox.dart';
 import '../features/home/application/home_cubit.dart';
 import '../features/onboarding/application/identity_steps.dart';
 import '../features/onboarding/application/onboarding_steps.dart';
@@ -82,11 +85,54 @@ Future<void> configureDependencies({required String baseUrl}) async {
     ..registerSingleton<RhythmCubit>(
       RhythmCubit(sl<AppDatabase>(), sl<ApiClient>(), sl<SyncEngine>()),
     )
+    // The chat outbox is a singleton and has to be: it holds the "one flush at
+    // a time" latch, and two instances would each hold their own and send the
+    // member's queued messages twice.
+    ..registerSingleton<ChatOutbox>(
+      ChatOutbox(sl<ApiClient>(), sl<AppDatabase>(), sl<SyncEngine>()),
+    )
+    ..registerSingleton<ConversationsCubit>(
+      ConversationsCubit(sl<AppDatabase>(), sl<ApiClient>(), sl<SyncEngine>()),
+    )
+    // A singleton for the reason the others are, and one more: it owns the live
+    // turn. A factory would give the chat screen a fresh instance on every
+    // rebuild, and the `requestId` of the answer being streamed would go with
+    // the old one — so the tokens would arrive, match nothing, and be dropped.
+    ..registerSingleton<ChatCubit>(
+      ChatCubit(
+        sl<AppDatabase>(),
+        sl<ApiClient>(),
+        sl<SocketClient>(),
+        sl<ChatOutbox>(),
+        sl<SyncEngine>(),
+        // Completing a card row goes through the context that owns the row, so
+        // the recurrence and `pendingOp` rules live in one place. Same pair
+        // `handleAlertAction` takes, and wired here for the same reason: this
+        // is the one file where the chat and the two owning cubits are all
+        // visible.
+        onCardAction: completeFromChat,
+      ),
+    )
     ..registerSingleton<OnboardingRegistry>(OnboardingRegistry());
 
   sl<TasksCubit>().listenToSync();
   sl<RemindersCubit>().listenToSync();
   sl<HomeCubit>().listenToSync();
+  sl<ConversationsCubit>().listenToSync();
+  sl<ChatCubit>().listen();
+
+  // The chat's own queue, drained on every pass. Registered here rather than
+  // inside the engine because the outbox is a feature's and the engine is
+  // shared: what the engine owes it is a signal, which is what `outcomes` is.
+  //
+  // Every pass, not only the ones that reached the server: `flush()` is latched
+  // and returns immediately when there is nothing waiting, and a pass that
+  // failed is exactly the moment the network may have just come back.
+  sl<SyncEngine>().outcomes.listen((_) {
+    // ignore: discarded_futures — fire-and-forget by design: a sync pass must
+    // not wait for a batch of chat messages before reporting what it did.
+    sl<ChatOutbox>().flush();
+  });
 
   // Connectivity and app-resume triggers. The socket's own `connect` is the
   // connectivity signal: what the engine needs to know is not "this handset
@@ -106,6 +152,33 @@ Future<void> configureDependencies({required String baseUrl}) async {
     // must not wait for the UI to catch up before returning the 401.
     sl<AuthCubit>().onSessionLost();
   };
+}
+
+/// A tick on a chat card row, turned into a write.
+///
+/// The chat asked for an item to be completed and named which context owns it;
+/// the write itself belongs to that context, because that is where the
+/// recurrence rule and the `pendingOp` rule live. A chat feature that imported
+/// the tasks feature to call this directly would be the cross-context reach the
+/// constitution refuses, so the chat cubit takes it as a callback and this file
+/// — the one place all three are visible — supplies it.
+///
+/// The kind is checked rather than trusted: an id routed to the wrong feature
+/// would be looked up in the wrong table, find nothing, and silently do nothing
+/// — a tick that appears not to work.
+Future<void> completeFromChat(String kind, String id) async {
+  switch (kind) {
+    case 'task':
+      await sl<TasksCubit>().complete(id);
+    case 'reminder':
+      await sl<RemindersCubit>().complete(id);
+    default:
+      // `meeting` lands here until P5 ships the meetings feature, and a card of
+      // that kind cannot arrive before it does — the server only sends the
+      // kinds it can produce. Logged rather than thrown: a newer gateway
+      // offering a kind this build has no writer for must not crash the chat.
+      debugPrint('no local writer for chat card kind $kind');
+  }
 }
 
 /// A notification button, turned into a write.

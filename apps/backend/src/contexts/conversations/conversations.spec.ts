@@ -5,12 +5,14 @@ import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-un
 import { NudgeService } from '../../ws/nudge.service.js';
 import { AppendMessageHandler } from './features/append-message/append-message.handler.js';
 import { ConversationsBootstrapHandler } from './features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
+import { CloseOnBannedHandler } from './features/close-on-banned/close-on-banned.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-deleted.handler.js';
 import {
   InMemoryConversationRepository,
   InMemoryMessageRepository,
   InMemorySeq,
 } from './infrastructure/in-memory-conversations.repositories.js';
+import { InMemoryQuickQuestionRepository } from './infrastructure/in-memory-quick-question.repository.js';
 
 const MEMBER = 'member-1';
 
@@ -25,11 +27,30 @@ const MEMBER = 'member-1';
  */
 class RecordingSockets {
   readonly frames: Array<{ room: string; event: string; payload: unknown }> = [];
+  /** Rooms whose sockets were closed, for `close-on-banned`. */
+  readonly closed: string[] = [];
 
   to(room: string) {
     return {
       emit: (event: string, payload: unknown) => {
         this.frames.push({ room, event, payload });
+      },
+    };
+  }
+
+  /**
+   * Socket.IO 4's `in(room).disconnectSockets()`, which is how a banned
+   * member's live connections are actually cut. Implemented here rather than
+   * left off so the handler's happy path is the one this spec exercises —
+   * `NudgeService.disconnect` degrades to a log line when the broadcaster
+   * lacks it, and a fake without it would let this spec pass over a service
+   * that never closed anything. That degradation has its own test in
+   * `ws/ws.spec.ts`.
+   */
+  in(room: string) {
+    return {
+      disconnectSockets: (_close?: boolean) => {
+        this.closed.push(room);
       },
     };
   }
@@ -55,10 +76,12 @@ interface Bench {
   conversations: InMemoryConversationRepository;
   messages: InMemoryMessageRepository;
   seq: InMemorySeq;
+  questions: InMemoryQuickQuestionRepository;
   sockets: RecordingSockets;
   bootstrap: ConversationsBootstrapHandler;
   append: AppendMessageHandler;
   purge: ConversationsPurgeOnDeletedHandler;
+  closeOnBanned: CloseOnBannedHandler;
 }
 
 function bench(): Bench {
@@ -66,6 +89,7 @@ function bench(): Bench {
   const conversations = new InMemoryConversationRepository(uow);
   const messages = new InMemoryMessageRepository(uow);
   const seq = new InMemorySeq();
+  const questions = new InMemoryQuickQuestionRepository(uow);
   const sockets = new RecordingSockets();
   const nudges = new NudgeService();
   nudges.attach(sockets);
@@ -80,12 +104,17 @@ function bench(): Bench {
     append: new AppendMessageHandler(uow, conversations, messages, seq, nudges, () =>
       messages.nextId(),
     ),
+    questions,
+    // The fourth collection this context owns. The purge was missing it, so a
+    // deleted member's own quick questions outlived their account.
     purge: new ConversationsPurgeOnDeletedHandler(
       uow,
       conversations,
       messages,
       seq,
+      questions,
     ),
+    closeOnBanned: new CloseOnBannedHandler(nudges),
   };
 }
 
@@ -355,5 +384,65 @@ describe('when the account goes away', () => {
     expect(await b.conversations.byKind(other, 'coach')).not.toBeNull();
     expect(await b.seq.current(other)).toBe(1);
     expect(await b.messages.afterSeq(other, 0, 10)).toHaveLength(1);
+  });
+});
+
+describe('when access is withdrawn', () => {
+  let b: Bench;
+  beforeEach(async () => {
+    b = bench();
+    await b.bootstrap.handle(event('identity.UserRegistered'));
+  });
+
+  /**
+   * FR-022: a banned member's live connections are closed, and nothing further
+   * is answered.
+   *
+   * This exists because of a property of the design rather than an oversight.
+   * **The socket authenticates in the handshake** — that is what makes it cheap,
+   * no per-message verification — and it means a socket outlives any decision
+   * made after it opened. A JWT cannot be revoked mid-flight either, so without
+   * this handler a banned member keeps a working chat until their access token
+   * expires: up to fifteen minutes of the coach answering somebody who has been
+   * shut out.
+   *
+   * A `principal.banned` check at the top of `chat.send` was the cheaper-looking
+   * option and it is worse twice over. It is a check somebody has to remember to
+   * add to the *next* socket message, and it leaves the connection open — so the
+   * member sits watching a chat that silently stops answering, which reads as a
+   * broken app rather than as a decision. Both halves are asserted: the frame
+   * that tells their client to sign out, and the close itself.
+   */
+  it('closes every socket the banned member has open, after telling them why', async () => {
+    await b.closeOnBanned.handle(event('identity.UserBanned'));
+
+    expect(b.sockets.frames).toEqual([
+      { room: `user:${MEMBER}`, event: 'auth.revoked', payload: { code: 'banned' } },
+    ]);
+    expect(b.sockets.closed).toEqual([`user:${MEMBER}`]);
+  });
+
+  /**
+   * An event carrying no member does nothing at all.
+   *
+   * Not a defensive nicety: `DomainEvent.userId` is nullable, the relay delivers
+   * whatever the outbox holds, and `roomForUser(undefined)` is the perfectly
+   * valid room name `user:undefined`. A handler without the guard would emit
+   * `auth.revoked` into that room and call `disconnectSockets` on it — which
+   * today reaches nobody, and would reach *everybody* the moment anything else
+   * ever joined a room built from an absent id.
+   */
+  it('does nothing for an event carrying no member', async () => {
+    await b.closeOnBanned.handle(event('identity.UserBanned', null));
+
+    expect(b.sockets.frames).toEqual([]);
+    expect(b.sockets.closed).toEqual([]);
+  });
+
+  /** One member's ban is not another's. The room is the whole of the scoping. */
+  it('leaves another member’s connections alone', async () => {
+    await b.closeOnBanned.handle(event('identity.UserBanned', 'member-2'));
+
+    expect(b.sockets.closed).toEqual(['user:member-2']);
   });
 });

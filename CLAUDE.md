@@ -256,6 +256,89 @@ finds it, with a test, and named in the commit; it does not go there.
   that response and it is the only record of what a 22:00 pass did — read the
   claim dates or the plan, not the counter, when asking whether a touch
   happened.
+- **A repository's write filter must carry `userId`, not only `_id`.**
+  `MongoRepositoryBase.save` is an upsert, because a client mints the id and an
+  offline create is a save of a row the server has never seen — and its filter
+  was `{ _id, updatedAt }`. So a `/sync` push naming an id belonging to another
+  member matched their row and `$set` wrote over it, `userId` included. Live
+  from P2 to P4, reachable for every client-minted-id entity, and invisible to
+  every handler spec because the scoped *read* cannot see the row: from inside
+  the adapter a foreign id and a never-before-seen id are identical. That is why
+  the guard has to be in the filter and not in a check before it. The refusal is
+  `ForeignRowError`, reported as `invalid` — never `stale`, which would send the
+  phone into a retry loop against a rule that will never accept it.
+- **An asset the code reads at runtime has to be copied into the image.** The
+  prompt templates were not, so every chat turn in the container would have
+  thrown on the first template read while the whole local suite passed. And
+  resolve such a path by **walking up** from `import.meta.url` to the directory
+  you want, never by counting `..`: the count agrees between `src/` and `dist/`
+  only by accident of the build layout, and it breaks silently.
+- **n8n blocks `$env` inside node expressions by default.** Every execution of
+  every cron workflow failed with `access to env vars denied` until
+  `N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'` was set — so no scheduled job had
+  ever run on this installation. It was invisible because every gate calls
+  `/internal/*` directly, which is the right thing for a gate to do and leaves
+  the automation itself untested. The heartbeat rule caught it: `verify.mjs`
+  reporting a job stale is the only reason anybody found out. **And check the
+  variable names match**: the two cron workflows read
+  `$env.BOTVY_SERVICE_TOKEN` while compose set `BOTVY_INTERNAL_TOKEN`, which is
+  an empty `Bearer ` and the silent 401 that rule was written after.
+- **A read that a client cannot reach is a read that does not exist.** A query
+  handler with a spec and no GraphQL resolver happened in P2 and again in P4
+  (`quickQuestions`). Adding a slice means adding it to `RESOLVERS` in
+  `graphql/graphql.module.ts` *and* checking it appears in the regenerated
+  `packages/contracts/schema.graphql` — that file is the proof.
+- **`inConversation`-shaped reads sort ascending and then limit, which gives
+  you the OLDEST n.** A prompt asking for "the last twenty messages" through
+  one of those carries the member's *first* twenty for ever and never the
+  previous turn. A "latest n" read is its own method — sort descending, limit,
+  reverse — and not a boolean flag on the same one, which would leave two
+  callers one typo apart from reading opposite ends of a transcript.
+- **The turn stores the member's message before it builds the prompt.** That is
+  deliberate (a refused turn leaves nothing; an accepted one is on the record),
+  and it means the newest history row *is* the message the prompt exists to
+  answer. Any history read for a prompt needs an exclusive upper bound, or the
+  model is handed it twice and answers the undelimited copy.
+- **A grammar beats an instruction.** `format` with a JSON schema is enforced;
+  the prompt is advice. As a free string, `metric` came back empty from
+  `record_metric` two times in three; as an `enum` of the two values the profile
+  actually stores, the model fills it. Constrain the field rather than
+  explaining it — and normalise whatever arrives anyway, because the schema is
+  enforced by the *server* and a different backend or an older Ollama may not.
+- **Never put a corpus sentence in the prompt that grades it.** The `scope`
+  section was sharpened with sixteen examples and the score went 24 → 30; ten
+  of those examples were lifted from `intent-cases.json`, and the honest score
+  with different sentences was 29. Teaching to the test measures the model
+  recognising strings it was just handed. The script that writes the examples
+  now asserts none of them appears in the corpus.
+- **A fixture must grade the pipeline, not the prompt.** The intent fixture
+  first called the extraction prompt and graded its raw output — measuring the
+  model's unaided performance at the one job `relative-time.ts` exists to take
+  away from it. Six of its "silent time errors" were phrases the pipeline
+  resolves correctly. It imports the **compiled** helpers now, which is also one
+  more caller that would notice a runtime-only breakage in the built output.
+- **`qwen3` is not a drop-in for extraction.** It is a thinking model: it emits
+  a `thinking` field before its answer, which is exactly what `format` exists to
+  prevent, and a schema-constrained call does not return in reasonable time. A
+  bigger extraction model means a bigger **instruct** model.
+- **An absolute millisecond budget in a test needs headroom for the machine, or
+  it is flaky by construction.** Best-of-three is already the technique here;
+  what it cannot fix is a ceiling calibrated on other hardware. Set it where it
+  still catches the regression it was written for — a per-task widget rebuild
+  takes a render to *seconds*, so 600 ms catches it with an order of magnitude
+  to spare — and record the measured number beside it.
+- **Two contexts that reference each other need `forwardRef`, and that is
+  fine.** P3's rhythm writes into the coach chat; P4's chat reads the plan, the
+  streak and the check-in. Both directions are ports bound in
+  `infrastructure/`, so the cycle is a DI artifact and not a domain one — no
+  aggregate on either side knows the other exists. Resist "fixing" it by
+  turning one direction into an event: the rhythm composes the sentence, and an
+  event carrying chat copy in a rhythm payload is worse than one `forwardRef`.
+- **A shared client belongs in its own module, not in the first module that
+  needed it.** `OllamaClient` was provided by `HealthModule` — reasonable while
+  the only caller was the reachability probe, and wrong the moment the chat
+  needed it, because a context importing `HealthModule` points the dependency
+  backwards and drags a controller along with a client.
 - **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
   while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
   v2 served v1's live database and neither could run beside the other. Keep the

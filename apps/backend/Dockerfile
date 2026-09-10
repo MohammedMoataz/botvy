@@ -33,8 +33,22 @@ RUN pnpm --filter @botvy/backend exec prisma generate \
 # `pnpm deploy` flattens the workspace into a self-contained tree, which is what
 # makes the runtime stage independent of the monorepo layout.
 # No `--legacy`: that flag belongs to pnpm 10, and this repository pins 9.15.
+#
+# The prompt templates are copied **contents-into-directory** (`prompts/.`), not
+# directory-into-directory. `pnpm deploy` already brings them — they are
+# committed source inside the package — so `cp -r prompts /out/prompts` put a
+# second copy *inside* the directory that already held them and left a nested
+# `prompts/prompts/`. Harmless, since the loader walks up to the first
+# `prompts/` it finds, and confusing to anybody who looks.
+#
+# The line stays rather than trusting deploy to keep doing it: these templates
+# are the intent extractor's grammar and the prompt assembler's input, and an
+# image without them throws on the first chat turn while every local test
+# passes. One redundant copy is cheap insurance against that.
 RUN pnpm --filter @botvy/backend deploy --prod /out \
  && cp -r apps/backend/dist /out/dist \
+ && mkdir -p /out/prompts \
+ && cp -r apps/backend/prompts/. /out/prompts/ \
  && cp -r apps/backend/migrations /out/migrations \
  && cp apps/backend/migrate-mongo-config.cjs /out/ \
  && cp -r apps/backend/src/contexts/identity/infrastructure/prisma /out/prisma

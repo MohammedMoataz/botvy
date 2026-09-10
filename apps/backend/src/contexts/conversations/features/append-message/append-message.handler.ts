@@ -7,7 +7,11 @@ import {
   MessageRepository,
   SeqPort,
 } from '../../domain/conversations.repositories.js';
-import { Message, type MessageRole } from '../../domain/message.aggregate.js';
+import {
+  Message,
+  type MessageRole,
+  type MessageUsage,
+} from '../../domain/message.aggregate.js';
 
 /**
  * Mints a message id. A token, because the two adapters mint differently — a
@@ -51,6 +55,16 @@ export interface AppendMessageInput {
    * name; the frame simply omits `kind` for those.
    */
   touch?: TouchMessageKind;
+  /**
+   * What the turn cost, for the assistant's message. Null for the member's own.
+   *
+   * It rides on `conversations.MessageSent` from here, which is the only way
+   * Operations learns of it — the two contexts never open each other's
+   * collections, and the daily allowance is summed back through a query.
+   */
+  usage?: MessageUsage | null;
+  /** What the turn was understood to be asking, or `{ cancelled: true }`. */
+  intent?: Record<string, unknown> | null;
   at: Date;
 }
 
@@ -130,6 +144,37 @@ export class AppendMessageHandler {
         return null;
       }
 
+      /*
+       * A `clientId` already stored is a replay, and it consumes no sequence.
+       *
+       * The offline batch is flushed by a phone that may have been told
+       * nothing about the first attempt — a response lost to the same network
+       * that made the messages offline in the first place. Without this, the
+       * second flush either creates a duplicate message or, once the unique
+       * partial index on `(userId, clientId)` exists, fails with a
+       * duplicate-key error that the member reads as "your messages could not
+       * be sent".
+       *
+       * Returning the original `seq` makes the retry a no-op the caller cannot
+       * tell from a success, which is exactly what an idempotent write should
+       * look like. Checked before the sequence is issued so a replay does not
+       * burn a number and leave a gap in the member's transcript — harmless,
+       * since the cursor is `seq > lastSeq`, but a gap invites somebody to go
+       * looking for the missing message.
+       */
+      if (input.clientId) {
+        const existing = await this.messages.byClientId(
+          input.userId,
+          input.clientId,
+        );
+        if (existing) {
+          this.logger.debug(
+            `clientId ${input.clientId} already stored at seq ${existing.seq}; replay`,
+          );
+          return { seq: existing.seq };
+        }
+      }
+
       const seq = await this.seq.next(input.userId);
       const message = Message.write({
         id: this.nextId(),
@@ -141,7 +186,9 @@ export class AppendMessageHandler {
         clientId: input.clientId ?? null,
         composedAt: input.composedAt ?? null,
         at: input.at,
-      });
+              usage: input.usage ?? null,
+        intent: input.intent ?? null,
+});
 
       // The message and the touch in one transaction. A crash between them
       // would leave a message the chat list cannot order, because

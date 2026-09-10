@@ -46,6 +46,14 @@ class HomePage extends StatelessWidget {
                   : t.homeGreeting(state.displayName!),
             ),
             actions: [
+              // First, because it is what this phase makes the app for: the
+              // rest of Home is a list of what the member already knows and
+              // this is where they can ask.
+              IconButton(
+                icon: const Icon(Icons.forum_outlined),
+                tooltip: t.chatsTitle,
+                onPressed: () => context.push(Routes.chats),
+              ),
               IconButton(
                 icon: const Icon(Icons.checklist),
                 tooltip: t.taskToday,

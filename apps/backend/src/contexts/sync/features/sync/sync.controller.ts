@@ -3,9 +3,11 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import {
   IsArray,
   IsDateString,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 import {
   CurrentPrincipal,
@@ -27,6 +29,20 @@ export class SyncDto {
   @IsOptional()
   @IsDateString()
   since?: string | null;
+
+  /**
+   * The highest message `seq` this client holds, or null on a first sync.
+   *
+   * A separate cursor from `since` because messages are immutable and have no
+   * `updatedAt` — `SyncableEntity.pull` carries the argument. `@Min(0)` rather
+   * than a bare integer: a negative cursor would ask for messages before the
+   * first one, which is harmless against the store and is a client bug worth
+   * telling somebody about rather than quietly clamping at the edge.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  lastSeq?: number | null;
 
   @IsArray()
   @IsString({ each: true })
@@ -71,6 +87,7 @@ export class SyncController {
     return this.sync.handle(principal.id, {
       installId: body.installId,
       since: body.since ? new Date(body.since) : null,
+      lastSeq: body.lastSeq ?? null,
       entities: body.entities,
       push: body.push,
     });

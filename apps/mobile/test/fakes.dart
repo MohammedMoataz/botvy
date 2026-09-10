@@ -26,6 +26,7 @@ class OfflineApi extends ApiClient {
     required String installId,
     required List<String> entities,
     String? since,
+    int? lastSeq,
     Map<String, dynamic> push = const {},
   }) async => throw ApiException('offline', isOffline: true);
 

@@ -208,12 +208,24 @@ class ApiException implements Exception {
   ApiException(
     this.message, {
     this.statusCode,
+    this.code,
     this.isOffline = false,
     this.linkEmail,
   });
 
   final String message;
   final int? statusCode;
+
+  /// The server's own machine-readable reason, when it sent one: `protected`,
+  /// `quota`, `forbidden`, `model_unavailable` — the codes `ws-chat.md` lists
+  /// for both directions.
+  ///
+  /// Carried apart from [statusCode] because the status is not specific enough
+  /// to act on. Refusing to delete the Coach chat and refusing to touch
+  /// somebody else's chat are both `403`, and the first one has a next step —
+  /// clearing it instead — while the second must reveal nothing at all. A
+  /// caller branching on 403 offers the wrong thing to one of them.
+  final String? code;
 
   /// The gateway could not be reached at all. Callers queue instead of
   /// failing: no connection is a normal state for this app, not an error.
@@ -783,10 +795,18 @@ class ApiClient {
   /// verbatim as the string it arrived as. Never a locally formatted time: the
   /// cursor is the server's clock, and reformatting it through `DateTime` would
   /// round the milliseconds a delta depends on.
+  /// [lastSeq] is the chat's own cursor and deliberately a second one.
+  ///
+  /// Messages are immutable and carry no `updatedAt`, so they cannot be cut on
+  /// [since] like every other entity — the server answers `seq > lastSeq`
+  /// instead (`sync.md` step 5). One number rather than a timestamp is what
+  /// makes that cursor cheap, and it is also why a message already held can
+  /// never be re-sent: see `repullMessages`.
   Future<Map<String, dynamic>> sync({
     required String installId,
     required List<String> entities,
     String? since,
+    int? lastSeq,
     Map<String, dynamic> push = const {},
   }) async {
     final res = await _guard(
@@ -798,12 +818,132 @@ class ApiClient {
           // snapshot, and omitting the key would look the same to the server
           // but not to anyone reading the request.
           'since': since,
+          'lastSeq': lastSeq,
           'entities': entities,
           if (push.isNotEmpty) 'push': push,
         },
       ),
     );
     return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  // -- conversations ---------------------------------------------------------
+
+  /// A new ordinary chat. `kind` is always `free`: the two pinned kinds are
+  /// created by the server when the member registers and there is no request
+  /// that can make a third.
+  Future<Map<String, dynamic>> createConversation({
+    required String id,
+    String? title,
+  }) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '/conversations',
+        // The id is the phone's, minted before the request, so a create
+        // retried after a half-delivered response is a no-op rather than a
+        // second empty chat in the list.
+        data: {'id': id, if (title != null && title.isNotEmpty) 'title': title},
+      ),
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// Renames, pins, unpins or archives a chat.
+  ///
+  /// [baseUpdatedAt] is the server's own value for the version this device last
+  /// pulled — never a local edit time. The server accepts the change outright
+  /// while the base still matches; sending this handset's clock instead would
+  /// make every edit fall through to a comparison a slow handset loses.
+  ///
+  /// Refused with `403 protected` for `coach` and `planner` when the change is
+  /// an unpin or an archive. The caller turns that into an explanation and an
+  /// offer to clear the chat instead; it must not be reported as a conflict,
+  /// which would have the phone retry for ever.
+  Future<Map<String, dynamic>> patchConversation(
+    String id, {
+    String? title,
+    bool? pinned,
+    bool? archived,
+    DateTime? baseUpdatedAt,
+  }) async {
+    final res = await _guard(
+      () => dio.patch<dynamic>(
+        '/conversations/$id',
+        data: {
+          if (title != null) 'title': title,
+          if (pinned != null) 'pinned': pinned,
+          if (archived != null) 'archived': archived,
+          'baseUpdatedAt': baseUpdatedAt?.toUtc().toIso8601String(),
+        },
+      ),
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// Empties a chat, everywhere and for good.
+  ///
+  /// Answers the new `clearedUpToSeq`. Not reversible by design (FR-011): the
+  /// watermark is what a device that has been away compares its own rows
+  /// against, so nothing cleared reaches it on the catch-up either.
+  Future<Map<String, dynamic>> clearConversation(String id) async {
+    final res = await _guard(
+      () => dio.post<dynamic>('/conversations/$id/clear'),
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// Refused with `403 protected` for `coach` and `planner`.
+  Future<void> deleteConversation(String id) async {
+    await _guard(() => dio.delete<dynamic>('/conversations/$id'));
+  }
+
+  /// Flushes messages composed offline, at most twenty per call.
+  ///
+  /// Each carries its own `composedAt`, which is the whole point: the server
+  /// understands "remind me in two hours" as of when it was **typed**, not as
+  /// of when the network came back (FR-007). One reply per conversation, so a
+  /// flush that spans three chats is answered in three chats.
+  ///
+  /// Answers `{ accepted: [clientId], replies: [{ conversationId, seq }] }`.
+  /// The replies themselves arrive as ordinary messages on the next pull —
+  /// nothing here writes them, because a message written from a REST response
+  /// and again from a pull is the one row this table is not allowed to have
+  /// twice.
+  Future<Map<String, dynamic>> conversationsBatch(
+    List<Map<String, dynamic>> messages,
+  ) async {
+    final res = await _guard(
+      () => dio.post<dynamic>(
+        '/conversations/batch',
+        data: {'messages': messages},
+      ),
+    );
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
+  /// The tappable questions offered in a chat of [scope].
+  ///
+  /// Global ones seeded by the operator plus the member's own, already ordered
+  /// and already filtered by the member's latest check-in mood — a low mood
+  /// brings a lighter-day question to the top (FR-010). All of that is the
+  /// server's, deliberately: the mood lives in the Rhythm context and a phone
+  /// that re-derived the ordering would be a second implementation of a rule
+  /// only one side can see.
+  Future<List<Map<String, dynamic>>> quickQuestions(String scope) async {
+    final data = await query(
+      r'''
+        query QuickQuestions($scope: ConversationKind!) {
+          quickQuestions(scope: $scope) { id scope text mood isMine }
+        }
+      ''',
+      {'scope': scope},
+    );
+    final rows = data['quickQuestions'];
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
   }
 
   /// The colours the label picker offers.
@@ -868,10 +1008,32 @@ class ApiClient {
           linkEmail: data['email'] as String?,
         );
       }
+      // The code is read for *every* refusal that carries one, not only the
+      // ones with a message: a `protected` verdict with an empty body still
+      // has to reach the conversation list as something it can offer a way out
+      // of, and a caller that only sees "403" offers nothing.
+      final code = data['code'] is String ? data['code'] as String : null;
       final reason = data['reason'] ?? data['message'];
-      if (reason is String) return ApiException(reason, statusCode: status);
+      if (reason is String) {
+        return ApiException(reason, statusCode: status, code: code);
+      }
       if (reason is List && reason.isNotEmpty) {
-        return ApiException(reason.join('\n'), statusCode: status);
+        return ApiException(
+          reason.join('\n'),
+          statusCode: status,
+          code: code,
+        );
+      }
+      if (code != null) {
+        return ApiException(
+          // No sentence to show, so the caller falls back to its own — which
+          // is what `AppLocalizations` is for. Empty rather than an invented
+          // English string: the cubit has no locale and this one would end up
+          // on an Arabic screen.
+          '',
+          statusCode: status,
+          code: code,
+        );
       }
     }
     if (status == 401) {

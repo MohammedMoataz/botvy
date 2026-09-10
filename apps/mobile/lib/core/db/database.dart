@@ -447,6 +447,188 @@ class RhythmState extends Table {
   Set<Column<Object>> get primaryKey => {userId};
 }
 
+/// One of the member's chats, mirroring the server's `conversations` shape
+/// (data-model §2.9).
+///
+/// Two of these exist from the day the member registers and cannot be got rid
+/// of: `coach` and `planner` (FR-001). Their [pinned] flag is what puts them in
+/// their own section at the top of the list, and the server refuses to clear
+/// it — a `PATCH` that unpins one, an archive, or a `DELETE` all come back
+/// `403 protected`, and the phone's answer to that is to offer *clearing*
+/// instead. Nothing here enforces that locally: a client-side rule would be a
+/// second implementation of a decision the server owns, and the two would
+/// disagree the first time the operator seeded a third pinned kind.
+///
+/// Carries [SyncColumns] and is nonetheless **pull-only** through the sync
+/// engine, which needs saying because the combination looks like an oversight.
+/// The writes — create, rename, pin, archive, clear, delete — go out as REST
+/// commands (`rest-commands.md`, Conversations), for the same reason the daily
+/// rhythm's two writes do: the refusals are the point. A `protected` verdict
+/// has to reach the member as a sentence with a next step in it, and a sync
+/// push that is refused arrives as a rejection three seconds later with no
+/// screen still open to show it. What the mixin's columns actually buy here is
+/// [SyncColumns.baseUpdatedAt]: `PATCH /conversations/:id` takes it verbatim,
+/// so the server can accept the edit outright while the base still matches
+/// rather than falling through to a clock comparison a slow handset loses.
+///
+/// [clearedUpToSeq] is the one column with a rule on both sides. The server
+/// pulls messages from `max(lastSeq, clearedUpToSeq)`, and the sync applier
+/// here deletes every local message at or below it the moment a higher value
+/// arrives — because FR-011 says nothing cleared may reappear in the history a
+/// screen shows, and a device that already holds those rows would otherwise go
+/// on showing them for ever. The server's half only stops them being sent
+/// *again*.
+@DataClassName('LocalConversation')
+@TableIndex(name: 'conversations_updated', columns: {#updatedAt})
+@TableIndex(name: 'conversations_pending', columns: {#pendingOp})
+class Conversations extends Table with SyncColumns {
+  /// `coach` | `planner` | `free`. Not an enum column: the set is the server's
+  /// and a fourth kind from a newer gateway has to land in the row rather than
+  /// fail the pull, which is what a strict local enum would do.
+  TextColumn get kind => text().withDefault(const Constant('free'))();
+
+  /// The member's own opening words for a chat that was moved here, the seeded
+  /// name for the two pinned ones. Empty is legitimate — a chat created from
+  /// the list before anything has been said has no title yet — so the screen
+  /// falls back to a placeholder rather than this column carrying one.
+  TextColumn get title => text().withDefault(const Constant(''))();
+
+  BoolColumn get pinned => boolean().withDefault(const Constant(false))();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+
+  /// The highest message sequence the member has cleared away.
+  ///
+  /// A watermark and not a delete, so clearing is idempotent and survives a
+  /// device that has been away: the number is what a catching-up phone compares
+  /// its own rows against. Nought means nothing has been cleared, which is why
+  /// it defaults to nought rather than being nullable — "cleared up to message
+  /// zero" and "never cleared" are the same statement.
+  IntColumn get clearedUpToSeq => integer().withDefault(const Constant(0))();
+
+  /// When something was last said here, for the list's ordering. Null for a
+  /// chat nobody has written in.
+  DateTimeColumn get lastMessageAt => dateTime().nullable()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// One message, mirroring the server's `messages` shape (data-model §2.9).
+///
+/// **Immutable, and that is load-bearing.** There is no [SyncColumns] here and
+/// there must not be: no `updatedAt`, no `pendingOp`, no `baseUpdatedAt`, no
+/// tombstone. The whole cursor for this table is one integer — the highest
+/// [seq] this device holds, kept in [DbKeys.messagesLastSeq] — and a pull is
+/// `seq > lastSeq`. That is why the cursor is cheap, and it is also why the
+/// usual migration move is unavailable: a column backfilled onto the server's
+/// existing rows can never reach a device that already holds them, because
+/// their sequences are below the watermark and nothing will ever send them
+/// again. The answer is [repullMessages] — mark the cache and re-pull — and the
+/// comment there is the long version.
+///
+/// [seq] is the primary key rather than the server's `_id`, because the
+/// per-member monotonic sequence *is* the identity as far as this device is
+/// concerned: it is what the pull is cut on, what orders the conversation, and
+/// what `chat.accepted` and `chat.done` name when they tell the phone where the
+/// turn's two messages landed. The server's ObjectId is never sent here and
+/// nothing would use it. Two messages sent by one member from two devices in
+/// the same moment take distinct increasing sequences (SC-007), so the key
+/// holds.
+///
+/// [clientId] is the id this device minted before sending, and it is how the
+/// server's copy of a message the member typed offline is recognised as the
+/// same thing as the local [PendingMessages] row: the sync applier deletes the
+/// pending row when a pulled message names its client id, which is what stops
+/// the sentence appearing twice. The server's own unique partial index over
+/// `{userId, clientId}` is the other half — a message re-sent because the
+/// socket died mid-flight is one row there, not two.
+@DataClassName('LocalMessage')
+@TableIndex(name: 'messages_conversation_seq', columns: {#conversationId, #seq})
+@TableIndex(name: 'messages_client', columns: {#clientId})
+class Messages extends Table {
+  /// The member's own monotonic sequence, issued by the server's `counters`
+  /// document. Unique per member, so it is unique on a device that holds one
+  /// member's rows.
+  IntColumn get seq => integer()();
+
+  TextColumn get conversationId => text()();
+
+  /// `user` | `assistant` | `system`. A text column for the reason
+  /// [Conversations.kind] gives.
+  TextColumn get role => text()();
+
+  TextColumn get content => text()();
+
+  /// The id this device minted for a message it composed, or null for anything
+  /// the server wrote — an answer, the evening prompt, a system note.
+  TextColumn get clientId => text().nullable()();
+
+  /// When the member typed it, which is **not** when it was understood.
+  ///
+  /// FR-007: a message composed offline is delivered later and interpreted as
+  /// of when it was typed, so "remind me in two hours" written at 14:10 and
+  /// flushed at 19:00 is still a reminder for 16:10. Null for anything the
+  /// server wrote.
+  DateTimeColumn get composedAt => dateTime().nullable()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {seq};
+}
+
+/// A message the member has typed and the server has not acknowledged.
+///
+/// The chat outbox, and a table of its own rather than a `pendingOp` on
+/// [Messages] — which is the shape every other synced entity uses and which
+/// cannot work here. A message has no [Messages.seq] until the server issues
+/// one, and `seq` is that table's primary key, so a locally composed message
+/// has nothing to be keyed by there. Keying it by [clientId] in its own table
+/// is the honest version of the same idea.
+///
+/// It is also what the member sees the moment they press send, online or off:
+/// every send writes a row here first and the socket path is what removes it
+/// again, on `chat.accepted`. So there is one code path for "typed but not yet
+/// acknowledged" instead of two, and a socket that dies between `chat.send`
+/// and `chat.accepted` leaves the row for the batch flush to carry — deduped
+/// by the server's unique `{userId, clientId}` index rather than by anything
+/// this device has to remember.
+///
+/// No tombstone and no `deletedAt`: a row here is either still waiting or gone
+/// because it arrived. Nothing else can happen to it.
+@DataClassName('LocalPendingMessage')
+@TableIndex(name: 'pending_messages_composed', columns: {#composedAt})
+class PendingMessages extends Table {
+  /// Client-minted UUIDv7, so a flush retried after a half-delivered request is
+  /// a no-op on the server rather than a second copy of the sentence.
+  TextColumn get clientId => text()();
+
+  TextColumn get conversationId => text()();
+
+  /// Named `body` and not `text`, because `text()` is drift's own column
+  /// builder and a getter called `text` shadows it into infinite recursion.
+  TextColumn get body => text()();
+
+  /// When the member typed it. Not nullable here, unlike [Messages.composedAt]:
+  /// a row in this table exists *because* somebody typed it, and the whole
+  /// point of the batch flush is that the server is told when.
+  DateTimeColumn get composedAt => dateTime()();
+
+  /// How many flushes have failed for this row.
+  ///
+  /// Capped for the reason the sync engine gives for its own cap: the row is
+  /// never discarded — that would be the app quietly deciding somebody's
+  /// sentence was not worth keeping — but it does stop being re-sent, so a
+  /// message the server refuses for a reason retrying cannot fix does not flush
+  /// on every reconnection for the life of the install.
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {clientId};
+}
+
 /// Thrown when the ladder is asked for a step it has no branch for.
 ///
 /// drift's own default `onUpgrade` throws too, which is the right behaviour and
@@ -478,6 +660,9 @@ class MigrationLadderError extends Error {
     DailyPlans,
     Checkins,
     RhythmState,
+    Conversations,
+    Messages,
+    PendingMessages,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -487,7 +672,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -589,6 +774,32 @@ class AppDatabase extends _$AppDatabase {
         await m.create(checkinsPending);
       }
 
+      // 4 -> 5: the chat — conversations, messages and the chat outbox (P4,
+      // `specs/018-coach-chat` T440).
+      //
+      // `from < 5` and not a band, for the reason the note above gives: these
+      // are `createTable` calls, and a phone at 1, 2, 3 or 4 all need them
+      // built. The band shape belongs to `addColumn` alone.
+      if (from < 5) {
+        await m.createTable(conversations);
+        await m.createTable(messages);
+        await m.createTable(pendingMessages);
+
+        await m.create(conversationsUpdated);
+        await m.create(conversationsPending);
+        await m.create(messagesConversationSeq);
+        await m.create(messagesClient);
+        await m.create(pendingMessagesComposed);
+
+        // Mark the cache and re-pull. A no-op today — the table was created
+        // three lines up, so there is nothing to discard and no watermark to
+        // reset — and it is here rather than in a comment because the *next*
+        // change to `messages` has to do exactly this and a call that has run
+        // in CI is worth more than an instruction nobody has executed. See
+        // [repullMessages] for why a backfill is not available to this table.
+        await repullMessages(this);
+      }
+
       // Anything the ladder above did not cover.
       if (from < 1 || from > schemaVersion) throw MigrationLadderError(from, to);
     },
@@ -620,6 +831,18 @@ abstract final class DbKeys {
 
   /// The signed-in member, so the mirrors can be read before a request.
   static const String userId = 'userId';
+
+  /// The highest message [Messages.seq] this device holds.
+  ///
+  /// The whole of the chat's pull cursor, and a key here rather than a column
+  /// anywhere because it is about the *copy* and not about any row: the sync
+  /// request carries it as `lastSeq` and the server answers `seq > lastSeq`.
+  /// Kept as text like every other value in `key_values` and parsed on read;
+  /// absent means "nothing held", which is the same request as nought.
+  ///
+  /// Rewound by [repullMessages], which is the only thing that ever moves it
+  /// backwards.
+  static const String messagesLastSeq = 'messagesLastSeq';
 }
 
 /// This install's id, minted once and kept forever.
@@ -632,4 +855,46 @@ Future<String> stableInstallId(AppDatabase db) async {
   final fresh = const Uuid().v7();
   await db.setValue(DbKeys.installId, fresh);
   return fresh;
+}
+
+/// Discards the local message cache from [fromSeq] upwards and rewinds the pull
+/// watermark so the next sync fetches those rows again.
+///
+/// **The only migration move available to [Messages].** Every other table on
+/// this device can gain a column and have the server backfill it: the pull is
+/// cut on `updatedAt`, a backfill bumps `updatedAt`, and the row arrives again
+/// carrying the new field. Messages have no `updatedAt` — deliberately, because
+/// that absence is what makes their cursor a single integer — and the pull is
+/// cut on `seq > lastSeq`. A row the device already holds is below the
+/// watermark for ever, so a column added to it on the server can never reach
+/// this handset. Nothing fails; the field is simply null on every message the
+/// member already had, on every install that already existed, permanently.
+///
+/// So the schema change and the cache invalidation are the same operation.
+/// v1 learned this the expensive way and the trick it settled on is the one
+/// here: delete the rows, rewind the watermark, let the ordinary sync pass pull
+/// them down again with the new shape. It is not clever and it is not cheap —
+/// a long-lived chat re-downloads — but it is the only version that is
+/// *correct*, and the rows are immutable so there is nothing local to lose.
+///
+/// [fromSeq] is inclusive: the watermark is set to `fromSeq - 1`, because the
+/// server sends `seq > lastSeq`. Default nought re-pulls the member's whole
+/// history, which is what a change to a column every message carries needs.
+/// Pass a real sequence when only messages written after some point are
+/// affected.
+///
+/// Written with `customStatement` rather than the generated query builder
+/// because it is called from inside `onUpgrade`, where drift's generated API
+/// describes *today's* schema and the file on disk may not match it yet. The
+/// two statements below are true of every version of these tables that has
+/// ever existed.
+Future<void> repullMessages(AppDatabase db, {int fromSeq = 0}) async {
+  await db.customStatement('DELETE FROM messages WHERE seq >= ?', [fromSeq]);
+
+  final watermark = fromSeq > 0 ? fromSeq - 1 : 0;
+  await db.customStatement(
+    'INSERT INTO key_values (key, value) VALUES (?, ?) '
+    'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [DbKeys.messagesLastSeq, '$watermark'],
+  );
 }

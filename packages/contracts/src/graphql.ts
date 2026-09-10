@@ -38,6 +38,26 @@ export type Checkin = {
   note?: Maybe<Scalars['String']['output']>;
 };
 
+export type Conversation = {
+  __typename?: 'Conversation';
+  archived: Scalars['Boolean']['output'];
+  clearedUpToSeq: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  kind: ConversationKind;
+  lastMessageAt?: Maybe<Scalars['DateTime']['output']>;
+  pinned: Scalars['Boolean']['output'];
+  title: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+/** The two chats an account comes with, and the ones a member starts. */
+export enum ConversationKind {
+  Coach = 'coach',
+  Free = 'free',
+  Planner = 'planner'
+}
+
 export type DailyPlan = {
   __typename?: 'DailyPlan';
   autoConfirmed: Scalars['Boolean']['output'];
@@ -84,6 +104,31 @@ export type LabelSnapshot = {
   color: Scalars['String']['output'];
   name: Scalars['String']['output'];
 };
+
+export type Message = {
+  __typename?: 'Message';
+  clientId?: Maybe<Scalars['String']['output']>;
+  composedAt?: Maybe<Scalars['DateTime']['output']>;
+  content: Scalars['String']['output'];
+  conversationId: Scalars['ID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  intent?: Maybe<Scalars['JSON']['output']>;
+  role: MessageRole;
+  seq: Scalars['Int']['output'];
+};
+
+export type MessageConnection = {
+  __typename?: 'MessageConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage: Scalars['Boolean']['output'];
+  nodes: Array<Message>;
+};
+
+export enum MessageRole {
+  Assistant = 'assistant',
+  System = 'system',
+  User = 'user'
+}
 
 /** What the member decided about a day: proposed and unanswered, agreed, or declined. A day with no plan at all reads as `draft` with no `promptedAt`. */
 export enum PlanStatus {
@@ -148,12 +193,14 @@ export type Query = {
   /** The caller's body metric history. */
   bodyMetrics: Array<BodyMetric>;
   checkins: Array<Checkin>;
+  conversations: Array<Conversation>;
   /** A member's devices. Administrators only. */
   devicesOf: Array<Device>;
   labelPalette: Array<Scalars['String']['output']>;
   labels: Array<Label>;
   /** The authenticated member. */
   me: User;
+  messages: MessageConnection;
   /** The caller's own registered devices. */
   myDevices: Array<Device>;
   plans: Array<DailyPlan>;
@@ -161,6 +208,7 @@ export type Query = {
   preferences: Preferences;
   /** The caller's own profile. */
   profile: Profile;
+  quickQuestions: Array<QuickQuestion>;
   reminder?: Maybe<Reminder>;
   reminders: ReminderPage;
   /** Registered machine callers. Administrators only. */
@@ -188,6 +236,11 @@ export type QueryCheckinsArgs = {
 };
 
 
+export type QueryConversationsArgs = {
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
 export type QueryDevicesOfArgs = {
   userId: Scalars['ID']['input'];
 };
@@ -198,9 +251,21 @@ export type QueryLabelsArgs = {
 };
 
 
+export type QueryMessagesArgs = {
+  afterSeq?: InputMaybe<Scalars['Int']['input']>;
+  conversationId: Scalars['ID']['input'];
+  first?: InputMaybe<Scalars['Int']['input']>;
+};
+
+
 export type QueryPlansArgs = {
   from: Scalars['Date']['input'];
   to: Scalars['Date']['input'];
+};
+
+
+export type QueryQuickQuestionsArgs = {
+  scope: ConversationKind;
 };
 
 
@@ -240,6 +305,15 @@ export type QueryUsersArgs = {
   role?: InputMaybe<Role>;
   search?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<UserStatus>;
+};
+
+export type QuickQuestion = {
+  __typename?: 'QuickQuestion';
+  id: Scalars['ID']['output'];
+  isMine: Scalars['Boolean']['output'];
+  mood: Scalars['String']['output'];
+  scope: ConversationKind;
+  text: Scalars['String']['output'];
 };
 
 export type QuietHours = {

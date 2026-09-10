@@ -59,6 +59,11 @@ dependencies:
   # Client-minted ids: what makes a retried create a no-op.
   uuid: ^4.5.1
 
+  # Markdown, for the coach's answers only — never for the member's own text,
+  # which is rendered as plain text so a pasted link cannot become a tap
+  # target. The community fork rather than the discontinued flutter_markdown.
+  flutter_markdown_plus: ^1.0.12
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

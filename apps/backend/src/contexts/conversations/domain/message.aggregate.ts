@@ -2,6 +2,24 @@ import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.
 
 export type MessageRole = 'user' | 'assistant' | 'system';
 
+/**
+ * What a turn cost, as the model reported it.
+ *
+ * Stored on the row *and* carried on the event, which is not duplication: the
+ * row is what an operator reads beside the message, and the event is the only
+ * way Operations learns of it. Conversations never opens `usage_log` and
+ * Operations never opens `messages` — the event is the whole of the crossing,
+ * and the daily allowance is summed back through a query. Without that loop the
+ * allowance sums an empty collection and every member sits permanently at zero
+ * used, which is a limit that silently does not exist.
+ */
+export interface MessageUsage {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  ms: number;
+}
+
 export interface MessageState {
   id: string;
   userId: string;
@@ -11,6 +29,16 @@ export interface MessageState {
   content: string;
   clientId: string | null;
   composedAt: Date | null;
+  usage: MessageUsage | null;
+  /**
+   * What the turn was understood to be asking, or `{ cancelled: true }` for a
+   * partial answer the member stopped.
+   *
+   * Loosely typed on purpose: the shape belongs to `intent.ts` and this
+   * aggregate has no business knowing it. A message is a message whether the
+   * turn that produced it parsed an intent or not.
+   */
+  intent: Record<string, unknown> | null;
   createdAt: Date;
 }
 
@@ -38,6 +66,8 @@ export class Message extends AggregateRoot<string> {
   readonly content: string;
   readonly clientId: string | null;
   readonly composedAt: Date | null;
+  readonly usage: MessageUsage | null;
+  readonly intent: Record<string, unknown> | null;
   readonly createdAt: Date;
 
   private constructor(state: MessageState) {
@@ -50,6 +80,8 @@ export class Message extends AggregateRoot<string> {
     this.content = state.content;
     this.clientId = state.clientId;
     this.composedAt = state.composedAt;
+    this.usage = state.usage;
+    this.intent = state.intent;
     this.createdAt = state.createdAt;
     this.updatedAt = state.createdAt;
   }
@@ -75,6 +107,8 @@ export class Message extends AggregateRoot<string> {
     content: string;
     clientId?: string | null;
     composedAt?: Date | null;
+    usage?: MessageUsage | null;
+    intent?: Record<string, unknown> | null;
     at: Date;
   }): Message {
     const message = new Message({
@@ -86,6 +120,8 @@ export class Message extends AggregateRoot<string> {
       content: input.content,
       clientId: input.clientId ?? null,
       composedAt: input.composedAt ?? null,
+      usage: input.usage ?? null,
+      intent: input.intent ?? null,
       createdAt: input.at,
     });
     message.raise(
@@ -95,6 +131,10 @@ export class Message extends AggregateRoot<string> {
         conversationId: input.conversationId,
         seq: input.seq,
         role: input.role,
+        // Null for the member's own turn, which costs nothing. Operations
+        // writes no row for one: a usage log carrying zero-token entries is a
+        // log whose row count means nothing.
+        usage: input.usage ?? null,
       },
       input.at,
     );

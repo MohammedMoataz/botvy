@@ -6,6 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/auth_cubit.dart';
 import '../features/auth/presentation/sign_in_page.dart';
+import '../features/chat/application/chat_cubit.dart';
+import '../features/chat/application/conversations_cubit.dart';
+import '../features/chat/presentation/chat_page.dart';
+import '../features/chat/presentation/conversations_page.dart';
 import '../features/home/application/home_cubit.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
@@ -29,6 +33,17 @@ abstract final class Routes {
   static const String preferences = '/preferences';
   static const String tasks = '/tasks';
   static const String reminders = '/reminders';
+
+  /// The chat list, and one conversation.
+  ///
+  /// A route for the conversation and not only a pushed page, for the reason
+  /// the rhythm sheets give: Botvy writes into the coach chat unprompted
+  /// (FR-017) and the notification for that arrives with a deep link, on a cold
+  /// start, with no screen behind it.
+  static const String chats = '/chats';
+
+  /// One conversation, by id.
+  static String chat(String conversationId) => '$chats/$conversationId';
 
   /// The two rhythm sheets, as routes.
   ///
@@ -80,6 +95,13 @@ String? routeForDeepLink(String deepLink) {
     // one.
     ['rhythm', 'plan', final String date] => '${Routes.rhythmPlan}/$date',
     ['rhythm', 'checkin', ...] => Routes.rhythmCheckin,
+    // Both spellings the server may produce for a chat. `chat` is what the
+    // rhythm's own touches use in their deep links; `conversations` is the REST
+    // path and is what a card row or a knowledge suggestion may carry. One
+    // table for both rather than guessing which the gateway sends.
+    ['chat', final String id] || ['conversations', final String id] =>
+      Routes.chat(id),
+    ['chat', ...] || ['conversations', ...] => Routes.chats,
     // No per-row route exists for these yet, so the list is where a tap lands.
     // Better than nowhere, and it is the screen the member was going to have
     // to reach anyway.
@@ -222,6 +244,42 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
       builder: (context, state) => BlocProvider<RemindersCubit>.value(
         value: sl<RemindersCubit>(),
         child: const RemindersPage(),
+      ),
+    ),
+    // The chat list and one conversation. `.value` for both cubits, as
+    // everywhere else: the chat cubit owns the turn that is streaming, and a
+    // second instance built by the route would not recognise its `requestId`.
+    GoRoute(
+      path: Routes.chats,
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<ConversationsCubit>.value(
+            value: sl<ConversationsCubit>(),
+          ),
+          BlocProvider<ChatCubit>.value(value: sl<ChatCubit>()),
+        ],
+        child: ConversationsPage(
+          onOpen: (id) => context.push(Routes.chat(id)),
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '${Routes.chats}/:id',
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<ConversationsCubit>.value(
+            value: sl<ConversationsCubit>(),
+          ),
+          BlocProvider<ChatCubit>.value(value: sl<ChatCubit>()),
+        ],
+        child: ChatPage(
+          conversationId: state.pathParameters['id'] ?? '',
+          // `pushReplacement`, so following a moved answer does not leave the
+          // chat it moved *out of* on the back stack: going back from there
+          // would land the member in a conversation the message is no longer
+          // in, which is the confusion the notice exists to prevent.
+          onOpenChat: (id) => context.pushReplacement(Routes.chat(id)),
+        ),
       ),
     ),
     GoRoute(

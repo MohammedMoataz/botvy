@@ -166,6 +166,36 @@ export class InMemoryMessageRepository extends MessageRepository {
     this.rows.delete(message.id);
   }
 
+  async latestInConversation(
+    userId: string,
+    conversationId: string,
+    floorSeq: number,
+    beforeSeq: number,
+    limit: number,
+  ): Promise<Message[]> {
+    // The same window and the same order as the Mongo adapter: newest `limit`
+    // inside the bounds, handed back oldest first. Two adapters that disagreed
+    // about which end of a transcript "latest" means would make every handler
+    // spec prove nothing about production.
+    const rows = this.#bySeq(
+      (row) =>
+        row.userId === userId &&
+        row.conversationId === conversationId &&
+        row.seq > floorSeq &&
+        row.seq < beforeSeq,
+    );
+    return rows
+      .slice(-limit)
+      .map((row) => Message.rehydrate(structuredClone(row)));
+  }
+
+  async byClientId(userId: string, clientId: string): Promise<Message | null> {
+    const found = this.#bySeq(
+      (row) => row.userId === userId && row.clientId === clientId,
+    )[0];
+    return found ? Message.rehydrate(structuredClone(found)) : null;
+  }
+
   async afterSeq(
     userId: string,
     afterSeq: number,
@@ -281,6 +311,13 @@ function stateOfMessage(message: Message): MessageState {
     content: message.content,
     clientId: message.clientId,
     composedAt: message.composedAt,
+    // The same two fields the Mongo mapper had dropped. Held to the same
+    // promise for the reason the class comment gives: a handler spec that
+    // asserts a stored `intent` of `{ cancelled: true }` has to be asserting
+    // something the real adapter would also have kept, or the spec proves the
+    // adapter rather than the handler.
+    usage: message.usage,
+    intent: message.intent,
     createdAt: message.createdAt,
   };
 }

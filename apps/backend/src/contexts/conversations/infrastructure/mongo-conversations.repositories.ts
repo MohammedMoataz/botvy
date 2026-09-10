@@ -47,7 +47,19 @@ export interface MessageDoc extends Omit<MessageState, 'id'> {
   schemaVersion: number;
 }
 
-const conversationMapper: Mapper<Conversation, ConversationDoc> = {
+/**
+ * Exported, unlike its sibling below, and for one reason: it is the standard
+ * the backfill migration is held to.
+ *
+ * `migrations/mongo/20260912000000-backfill-pinned-conversations.cjs` writes
+ * this same document by hand, because a CommonJS migration cannot reach a Nest
+ * handler or a Mongoose model. Two writers of one document is a drift risk, and
+ * the only honest way to close it is a test that compares them —
+ * `backfill-pinned.spec.ts` asserts the migration's row is key-for-key and
+ * value-for-value what `toPersistence` produces here. A field added to the
+ * aggregate and to this mapper, and forgotten there, fails that test.
+ */
+export const conversationMapper: Mapper<Conversation, ConversationDoc> = {
   toDomain(doc) {
     return Conversation.rehydrate({
       id: doc._id,
@@ -92,6 +104,26 @@ const messageMapper: Mapper<Message, MessageDoc> = {
       content: doc.content,
       clientId: doc.clientId ?? null,
       composedAt: doc.composedAt ?? null,
+      /*
+       * Both nullable, both defaulted, and both were missing from this mapper
+       * for the length of the change that added them to `MessageState`.
+       *
+       * `MessageSchema` declared `usage` and `intent` and the aggregate carried
+       * them, so the fields looked implemented from either end — but the mapper
+       * is the only thing that moves a value between the two, and a round trip
+       * that drops a field is indistinguishable from a field nobody set. What
+       * that would have cost is exactly the loop `message.aggregate.ts`
+       * describes: `conversations.MessageSent` carries the usage from the
+       * aggregate, so the event would still have been right and Operations
+       * would still have written its `usage_log` row, while the row an operator
+       * reads beside the message stayed null for ever. `intent` is worse in a
+       * quieter way — `{ cancelled: true }` is the only record that a partial
+       * answer was stopped by the member rather than truncated by a crash, and
+       * messages are immutable, so a value not written on the insert can never
+       * be written at all.
+       */
+      usage: doc.usage ?? null,
+      intent: doc.intent ?? null,
       createdAt: doc.createdAt,
     });
   },
@@ -116,6 +148,13 @@ const messageMapper: Mapper<Message, MessageDoc> = {
       content: message.content,
       clientId: message.clientId,
       composedAt: message.composedAt,
+      // Written explicitly as null rather than omitted, because `$set` leaves
+      // a key it is not given alone: an omitted `usage` could never *clear* a
+      // stored one. It cannot arise for an immutable row whose only write is
+      // its insert, and it is written this way so that the mapper says what the
+      // document contains rather than what this one write path happens to need.
+      usage: message.usage,
+      intent: message.intent,
       createdAt: message.createdAt,
       schemaVersion: message.schemaVersion,
     };
@@ -262,6 +301,53 @@ export class MongoMessageRepository extends MessageRepository {
    * transcript — which is the entire reason the counter is per member and not
    * per chat. A client that has never opened a chat still knows where it is.
    */
+  /**
+   * The prompt's window: sorted **descending** to take the newest, then
+   * reversed so the caller reads them in the order they were said.
+   *
+   * Descending-then-limit is the whole difference from `inConversation`, and
+   * it is why this is its own method rather than a flag: the index
+   * `{ conversationId, seq }` serves both directions, and a boolean parameter
+   * would leave two callers one typo apart from silently reading opposite ends
+   * of a member's transcript.
+   */
+  async latestInConversation(
+    userId: string,
+    conversationId: string,
+    floorSeq: number,
+    beforeSeq: number,
+    limit: number,
+  ): Promise<Message[]> {
+    const docs = await this.model
+      .find({
+        userId,
+        conversationId,
+        seq: { $gt: floorSeq, $lt: beforeSeq },
+      })
+      .sort({ seq: -1 })
+      .limit(limit)
+      .session(MongoUnitOfWork.currentSession())
+      .lean<MessageDoc[]>()
+      .exec();
+    return docs.reverse().map((doc) => messageMapper.toDomain(doc));
+  }
+
+  /**
+   * The replay check for the offline batch.
+   *
+   * Served by the partial unique index on `(userId, clientId)` — partial on
+   * `$exists: true` because every message this server writes has none, and
+   * Mongo treats missing and null as one value for uniqueness.
+   */
+  async byClientId(userId: string, clientId: string): Promise<Message | null> {
+    const doc = await this.model
+      .findOne({ userId, clientId })
+      .session(MongoUnitOfWork.currentSession())
+      .lean<MessageDoc>()
+      .exec();
+    return doc ? messageMapper.toDomain(doc) : null;
+  }
+
   async afterSeq(
     userId: string,
     afterSeq: number,

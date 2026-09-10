@@ -6,6 +6,7 @@ import {
   MessageRepository,
   SeqPort,
 } from '../../domain/conversations.repositories.js';
+import { QuickQuestionRepository } from '../../domain/quick-question.repository.js';
 
 /**
  * Removes every chat, every message and the counter a deleted member had.
@@ -45,6 +46,7 @@ export class ConversationsPurgeOnDeletedHandler {
     private readonly conversations: ConversationRepository,
     private readonly messages: MessageRepository,
     private readonly seq: SeqPort,
+    private readonly questions: QuickQuestionRepository,
   ) {}
 
   async handle(event: DomainEvent): Promise<'purged' | 'nothing-to-do'> {
@@ -56,7 +58,7 @@ export class ConversationsPurgeOnDeletedHandler {
       return 'nothing-to-do';
     }
 
-    const [messages, conversations] = await this.uow.run(async () => {
+    const [messages, conversations, questions] = await this.uow.run(async () => {
       // Messages before conversations, mirroring the dependency direction: a
       // message names the conversation it belongs to. Nothing observes the
       // intermediate state inside one transaction, but a future reader looking
@@ -69,13 +71,30 @@ export class ConversationsPurgeOnDeletedHandler {
       // found anything, because a partly purged member from an earlier failed
       // delivery would otherwise keep theirs forever.
       await this.seq.reset(userId);
-      return [removedMessages, removedConversations];
+      /*
+       * And the member's own quick questions, which this handler was missing.
+       *
+       * The fourth collection this context owns, and the easiest to forget
+       * because nothing else reads it: a deleted member's chips would have
+       * outlived them, referencing a `userId` nothing could resolve. That is a
+       * privacy leak of exactly the kind the purge exists to prevent — a
+       * question somebody wrote is a sentence they wrote.
+       *
+       * The seeded globals are untouched. `removeAllFor` filters on this
+       * member's id, and a global carries `null`, so the filter cannot reach
+       * them — by the shape of the query rather than by a guard.
+       */
+      const removedQuestions = await this.questions.removeAllFor(userId);
+      return [removedMessages, removedConversations, removedQuestions];
     });
 
-    if (messages === 0 && conversations === 0) return 'nothing-to-do';
+    if (messages === 0 && conversations === 0 && questions === 0) {
+      return 'nothing-to-do';
+    }
 
     this.logger.log(
-      `purged ${conversations} conversation(s) and ${messages} message(s) for ${userId}`,
+      `purged ${conversations} conversation(s), ${messages} message(s) and ` +
+        `${questions} quick question(s) for ${userId}`,
     );
     return 'purged';
   }

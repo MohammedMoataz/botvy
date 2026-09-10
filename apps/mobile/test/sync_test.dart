@@ -560,6 +560,222 @@ void main() {
       expect(api.calls.length, lessThanOrEqualTo(2));
     });
   });
+
+  // ── the chat's two entities ─────────────────────────────────────────────────
+
+  group('conversations and messages', () {
+    Map<String, dynamic> serverConversation(
+      String id, {
+      String kind = 'coach',
+      int clearedUpToSeq = 0,
+      DateTime? updatedAt,
+    }) => {
+      'id': id,
+      'kind': kind,
+      'title': kind,
+      'pinned': kind != 'free',
+      'archived': false,
+      'clearedUpToSeq': clearedUpToSeq,
+      'lastMessageAt': null,
+      'createdAt': now.toIso8601String(),
+      'updatedAt': (updatedAt ?? now).toIso8601String(),
+      'deletedAt': null,
+    };
+
+    Map<String, dynamic> serverMessage(
+      int seq, {
+      String conversationId = 'coach-1',
+      String role = 'assistant',
+      String content = 'About 120 g.',
+      String? clientId,
+    }) => {
+      'seq': seq,
+      'conversationId': conversationId,
+      'role': role,
+      'content': content,
+      'clientId': clientId,
+      'composedAt': null,
+      'intent': null,
+      'createdAt': now.toIso8601String(),
+    };
+
+    test('the request carries the message watermark, and a pull advances it',
+        () async {
+      api.next = reply(
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': [serverMessage(1), serverMessage(2)],
+        },
+      );
+      await engine.sync();
+
+      // The cursor for this one table is a single integer, because messages
+      // have no `updatedAt` to cut a delta on.
+      expect(await db.getValue(DbKeys.messagesLastSeq), '2');
+      expect(
+        (await db.select(db.messages).get()).map((r) => r.seq),
+        [1, 2],
+      );
+    });
+
+    test('the watermark is never moved backwards by a pass that pulled nothing',
+        () async {
+      await db.setValue(DbKeys.messagesLastSeq, '9');
+      api.next = reply(
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': const <dynamic>[],
+        },
+      );
+      await engine.sync();
+
+      // `repullMessages` rewinds this key on purpose when a schema change makes
+      // the cache wrong. A quiet pass that stored a nought over it would undo
+      // that — and, worse, would re-download the member's whole history on
+      // every empty sync.
+      expect(await db.getValue(DbKeys.messagesLastSeq), '9');
+    });
+
+    test('a full snapshot does not sweep the message history away', () async {
+      api.next = reply(
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': [serverMessage(1)],
+        },
+      );
+      await engine.sync();
+
+      // A second pass, full, carrying no messages — which is what a full
+      // snapshot looks like for this entity: the message pull is cut on
+      // `seq > lastSeq` whether the snapshot is full or not, so "everything"
+      // still means "everything the device does not have". Sweeping against
+      // that set would delete the member's entire transcript.
+      api.next = reply(
+        full: true,
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': const <dynamic>[],
+        },
+      );
+      await engine.sync();
+
+      expect(await db.select(db.messages).get(), hasLength(1));
+    });
+
+    test('a raised clear watermark deletes the messages it covers', () async {
+      api.next = reply(
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': [serverMessage(1), serverMessage(2), serverMessage(3)],
+        },
+      );
+      await engine.sync();
+      expect(await db.select(db.messages).get(), hasLength(3));
+
+      // The clear was made on another device, so it reaches this one as a
+      // conversation row with a higher watermark and nothing else. The server's
+      // half only stops those messages being *sent* again; this device already
+      // holds them, and FR-011 says nothing cleared may appear in the history a
+      // screen shows — on any device, including one that has been away.
+      api.next = reply(
+        pull: {
+          'conversations': [
+            serverConversation(
+              'coach-1',
+              clearedUpToSeq: 2,
+              updatedAt: now.add(const Duration(minutes: 1)),
+            ),
+          ],
+          'messages': const <dynamic>[],
+        },
+      );
+      await engine.sync();
+
+      expect(
+        (await db.select(db.messages).get()).map((r) => r.seq),
+        [3],
+      );
+      expect(
+        (await db.select(db.conversations).get()).single.clearedUpToSeq,
+        2,
+      );
+    });
+
+    test('a pulled message retires the outbox row that composed it', () async {
+      await db.into(db.pendingMessages).insert(
+        PendingMessagesCompanion.insert(
+          clientId: 'client-7',
+          conversationId: 'coach-1',
+          body: 'remind me to call Dad in two hours',
+          composedAt: now,
+        ),
+      );
+
+      api.next = reply(
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': [
+            serverMessage(
+              4,
+              role: 'user',
+              content: 'remind me to call Dad in two hours',
+              clientId: 'client-7',
+            ),
+          ],
+        },
+      );
+      await engine.sync();
+
+      // Matched on the client id and not on the text — a member who sends "yes"
+      // twice has two rows. Without this the sentence renders twice: once as
+      // the queued bubble that never went away, and once as the message the
+      // server issued a sequence for.
+      expect(await db.select(db.pendingMessages).get(), isEmpty);
+      expect(await db.select(db.messages).get(), hasLength(1));
+    });
+
+    test('the same message pulled twice is one row', () async {
+      // The cursor the server cuts on is `now - 5 s`, lagged on purpose so a
+      // transaction that committed just after a read arrives twice rather than
+      // never. A plain insert would throw on the primary key and abort a pass
+      // that is also carrying the member's tasks.
+      final page = reply(
+        pull: {
+          'conversations': [serverConversation('coach-1')],
+          'messages': [serverMessage(5)],
+        },
+      );
+      api.next = page;
+      await engine.sync();
+      api.next = page;
+      await engine.sync();
+
+      expect(await db.select(db.messages).get(), hasLength(1));
+    });
+
+    test('a full page asks again, and stops at the cap', () async {
+      // `moreMessages` lives inside `pull`, which is where the server puts it:
+      // it is the one key in that map that is not an entity's rows.
+      api.next = {
+        ...reply(
+          pull: {
+            'conversations': [serverConversation('coach-1')],
+            'messages': [serverMessage(1)],
+          },
+        ),
+      };
+      (api.next['pull'] as Map<String, dynamic>)['moreMessages'] = true;
+
+      // This fake answers "there is more" for ever, which is the case the cap
+      // exists for and which is not hypothetical: a gateway whose page does
+      // not advance the watermark says exactly this, and the first version of
+      // this test hung the whole suite because nothing stopped the drain.
+      await engine.sync();
+
+      // One round trip, then the pages the cap allows — and then it ends.
+      expect(api.calls.length, SyncEngine.maxMessagePages + 1);
+    });
+  });
 }
 
 /// Answers whatever the test queued, and records what was asked.
@@ -587,6 +803,7 @@ class _FakeApi extends ApiClient {
     required String installId,
     required List<String> entities,
     String? since,
+    int? lastSeq,
     Map<String, dynamic> push = const {},
   }) async {
     calls.add((since: since, push: push));

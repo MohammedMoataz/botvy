@@ -51,6 +51,19 @@ const NOT_THROUGH_THE_BASE: Record<string, string> = {
   audit_log: 'append-only, written by the audit adapter',
   idempotency_keys: 'written by the interceptor, and expire on a TTL index',
   counters: 'one findOneAndUpdate with $inc; no aggregate and no optimistic check',
+  /*
+   * Append-only, one row per model call, inserted by Operations' handler from
+   * `conversations.MessageSent`. There is no aggregate and nothing ever
+   * modifies a row, so there is no lost update to guard against — `eventId` is
+   * unique instead, which is what makes a redelivered event write nothing.
+   *
+   * This entry was added in the same change as the collection, because the
+   * check above named it the moment it appeared. That is the check working:
+   * every new collection has to make this decision explicitly rather than
+   * discover it against a real Mongo two phases later, which is how both
+   * `AlertSchema` and `MessageSchema` shipped broken.
+   */
+  usage_log: 'append-only inserts by Operations; unique on eventId, never modified',
 };
 
 interface SchemaLike {

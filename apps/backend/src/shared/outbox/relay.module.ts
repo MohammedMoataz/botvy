@@ -21,6 +21,9 @@ import { MealLineChangedHandler } from '../../contexts/rhythm/features/meal-line
 import { RhythmPurgeOnDeletedHandler } from '../../contexts/rhythm/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RhythmModule } from '../../contexts/rhythm/rhythm.module.js';
 import { RolloverOnEndOfDaySaga } from '../../contexts/planning/features/rollover/rollover-on-end-of-day.saga.js';
+import { CloseOnBannedHandler } from '../../contexts/conversations/features/close-on-banned/close-on-banned.handler.js';
+import { RecordUsageHandler } from '../../contexts/operations/features/record-usage/record-usage.handler.js';
+import { OperationsPurgeOnDeletedHandler } from '../../contexts/operations/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { SyncModule } from '../../contexts/sync/sync.module.js';
 import { NotificationsModule } from '../../contexts/notifications/notifications.module.js';
 import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
@@ -138,6 +141,9 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         MealLineChangedHandler,
         RhythmPurgeOnDeletedHandler,
         RolloverOnEndOfDaySaga,
+        CloseOnBannedHandler,
+        RecordUsageHandler,
+        OperationsPurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -160,6 +166,9 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         mealLine: MealLineChangedHandler,
         rhythmPurge: RhythmPurgeOnDeletedHandler,
         rollover: RolloverOnEndOfDaySaga,
+        closeSockets: CloseOnBannedHandler,
+        recordUsage: RecordUsageHandler,
+        operationsPurge: OperationsPurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -234,6 +243,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await notificationsPurge.handle(event);
                 await rhythmPurge.handle(event);
                 await conversationsPurge.handle(event);
+                await operationsPurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -296,8 +306,21 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await alertPlanning.onPreferencesChanged(event);
                 await rhythmPreferences.handle(event);
                 return;
+              /*
+               * Two reactions, and the second is the one that would have
+               * been easy to leave out.
+               *
+               * The alerts go, and the member's **live sockets close**.
+               * The socket authenticates in the handshake — which is what
+               * makes it cheap — so it outlives any decision made after it
+               * opened, and a JWT cannot be revoked mid-flight either.
+               * Without this a banned member keeps a working chat until
+               * their access token expires: up to fifteen minutes of the
+               * coach answering somebody who has been shut out (FR-022).
+               */
               case 'identity.UserBanned':
                 await alertPlanning.onUserBanned(event);
+                await closeSockets.handle(event);
                 return;
               case 'identity.UserUnbanned':
                 await alertPlanning.onUserUnbanned(event);
@@ -345,6 +368,22 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               case 'nutrition.MealPlanReady':
               case 'nutrition.MealPlanWithheld':
                 await mealLine.handle(event);
+                return;
+
+              /*
+               * The usage loop's only crossing.
+               *
+               * Conversations raises this with the turn's token counts;
+               * Operations writes one `usage_log` row from it, idempotent
+               * on `eventId`. Neither context opens the other's
+               * collection, and the daily allowance is summed back through
+               * `UsageTodayQuery`. **Without this row the allowance sums an
+               * empty collection and every member sits permanently at zero
+               * used** — a limit that silently does not exist, which is
+               * exactly the kind of thing this table's `default` hides.
+               */
+              case 'conversations.MessageSent':
+                await recordUsage.handle(event);
                 return;
 
               // One device pushed; the member's others are told. This is what

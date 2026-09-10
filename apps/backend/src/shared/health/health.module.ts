@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { OperationsModule } from '../../contexts/operations/operations.module.js';
-import { ENV } from '../config/config.module.js';
-import type { Env } from '../config/env.schema.js';
-import { OllamaClient } from '../llm/ollama.client.js';
+import { LlmModule } from '../llm/llm.module.js';
 import { HealthController } from './health.controller.js';
 
 /**
@@ -10,15 +8,10 @@ import { HealthController } from './health.controller.js';
  * `/healthz`, because the two processes answer different questions.
  */
 @Module({
-  imports: [OperationsModule],
+  // The client moved to `LlmModule` in P4, when the chat became a second
+  // caller: `ConversationsModule` importing this one would have pointed the
+  // dependency backwards and dragged a controller along with a client.
+  imports: [OperationsModule, LlmModule],
   controllers: [HealthController],
-  providers: [
-    {
-      provide: OllamaClient,
-      inject: [ENV],
-      useFactory: (env: Env) => new OllamaClient(env.OLLAMA_BASE_URL),
-    },
-  ],
-  exports: [OllamaClient],
 })
 export class HealthModule {}

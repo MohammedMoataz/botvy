@@ -270,6 +270,67 @@ class AppLocalizations {
   String get rhythmOffline => _t('rhythmOffline');
   String get rhythmRefused => _t('rhythmRefused');
 
+  // -- P4: the chat ----------------------------------------------------------
+
+  /// "Cancel", for a dialog that is a question rather than a command.
+  ///
+  /// Its own key and not `taskCancel`, which means cancelling a *task* — a
+  /// status, not a dismissal. They are the same word in English and the same
+  /// word in Arabic today, and they are still two different sentences: the day
+  /// one of them is rephrased the other must not follow it.
+  String get dismiss => _t('dismiss');
+
+  String get chatsTitle => _t('chatsTitle');
+  String get chatNewChat => _t('chatNewChat');
+  String get chatPinned => _t('chatPinned');
+  String get chatOthers => _t('chatOthers');
+  String get chatNoneYet => _t('chatNoneYet');
+
+  /// The two pinned chats are named by the app rather than by the row, because
+  /// their titles are seeded on the server in one language.
+  String get chatCoach => _t('chatCoach');
+  String get chatPlanner => _t('chatPlanner');
+
+  String get chatUntitled => _t('chatUntitled');
+  String get chatClear => _t('chatClear');
+  String get chatClearWarning => _t('chatClearWarning');
+  String get chatClearInstead => _t('chatClearInstead');
+  String get chatRename => _t('chatRename');
+  String get chatUnpin => _t('chatUnpin');
+  String get chatArchive => _t('chatArchive');
+  String get chatProtectedTitle => _t('chatProtectedTitle');
+  String get chatProtectedBody => _t('chatProtectedBody');
+  String get chatOffline => _t('chatOffline');
+  String get chatRefused => _t('chatRefused');
+  String get chatEmpty => _t('chatEmpty');
+  String get chatQueued => _t('chatQueued');
+  String get chatWriting => _t('chatWriting');
+  String get chatComposeHint => _t('chatComposeHint');
+  String get chatSend => _t('chatSend');
+  String get chatStop => _t('chatStop');
+
+  /// Fallbacks only. A `quota` or `model_unavailable` error that arrives with a
+  /// message is shown **verbatim**: the server's sentence names the limit and
+  /// the moment it resets in the member's own time zone, and this one cannot.
+  String get chatModelUnavailable => _t('chatModelUnavailable');
+  String get chatTooFast => _t('chatTooFast');
+  String get chatQuotaReached => _t('chatQuotaReached');
+
+  String get chatMovedBodyUntitled => _t('chatMovedBodyUntitled');
+  String get chatMovedOpen => _t('chatMovedOpen');
+  String get chatCardComplete => _t('chatCardComplete');
+  String get chatCardEmpty => _t('chatCardEmpty');
+  String get chatCardMeetings => _t('chatCardMeetings');
+  String get chatCardSessions => _t('chatCardSessions');
+  String get chatCardOther => _t('chatCardOther');
+  String get chatLinkRefused => _t('chatLinkRefused');
+  String get chatLinkCopied => _t('chatLinkCopied');
+
+  /// The title is the member's own opening words, so it is substituted rather
+  /// than concatenated: the two languages do not put it in the same place in
+  /// the sentence, and a string assembled with `+` reads backwards in one.
+  String chatMovedBody(String title) => _f('chatMovedBody', {'title': title});
+
   /// The tables, for the parity test and nothing else.
   ///
   /// Every key must exist in every locale, because `_t` falls back to English
@@ -486,6 +547,54 @@ class AppLocalizations {
           'Botvy could not be reached, so this was not saved. Try again when '
           'you are back online.',
       'rhythmRefused': 'Botvy refused that. Nothing was saved.',
+
+      // ---- P4: the chat ---------------------------------------------------
+      'dismiss': 'Cancel',
+      'chatsTitle': 'Chats',
+      'chatNewChat': 'New chat',
+      'chatPinned': 'Always here',
+      'chatOthers': 'Your other chats',
+      'chatNoneYet': 'No chats yet.',
+      'chatCoach': 'Coach',
+      'chatPlanner': 'Planner',
+      'chatUntitled': 'Untitled chat',
+      'chatClear': 'Empty this chat',
+      'chatClearWarning':
+          'Everything said here goes, on every one of your devices, and it '
+          'does not come back.',
+      'chatClearInstead': 'Empty it instead',
+      'chatRename': 'Rename',
+      'chatUnpin': 'Move out of this section',
+      'chatArchive': 'Archive',
+      'chatProtectedTitle': 'This chat stays',
+      'chatProtectedBody':
+          'Coach and Planner are always here, so they cannot be removed. You '
+          'can empty this one instead.',
+      'chatOffline':
+          'Botvy could not be reached, so that was not saved. Try again when '
+          'you are back online.',
+      'chatRefused': 'Botvy refused that. Nothing was changed.',
+      'chatEmpty': 'Nothing here yet. Ask something.',
+      'chatQueued': 'Waiting to send',
+      'chatWriting': 'Botvy is writing',
+      'chatComposeHint': 'Ask Botvy',
+      'chatSend': 'Send',
+      'chatStop': 'Stop',
+      'chatModelUnavailable':
+          'Botvy cannot answer right now. Your message is kept, and your '
+          'reminders and plans are unaffected.',
+      'chatTooFast': 'That was a lot at once. Give it a moment.',
+      'chatQuotaReached': 'You have used up today’s allowance.',
+      'chatMovedBody': 'That did not belong here, so Botvy answered in {title}.',
+      'chatMovedBodyUntitled': 'That did not belong here, so Botvy answered in a new chat.',
+      'chatMovedOpen': 'Open it',
+      'chatCardComplete': 'Mark as done',
+      'chatCardEmpty': 'Nothing to show.',
+      'chatCardMeetings': 'Meetings',
+      'chatCardSessions': 'Training',
+      'chatCardOther': 'Results',
+      'chatLinkRefused': 'That link was not opened. Botvy only opens web links.',
+      'chatLinkCopied': 'Link copied.',
     },
     'ar': {
       'appTitle': 'بوتفي',
@@ -689,6 +798,53 @@ class AppLocalizations {
         'تعذّر الوصول إلى بوتفي، فلم يُحفظ ذلك. حاول مرة أخرى عند '
         'عودة الاتصال.',
     'rhythmRefused': 'رفض بوتفي ذلك. لم يُحفظ شيء.',
+
+    // ---- P4: المحادثة ------------------------------------------------
+    'dismiss': 'إلغاء',
+    'chatsTitle': 'المحادثات',
+    'chatNewChat': 'محادثة جديدة',
+    'chatPinned': 'دائمًا هنا',
+    'chatOthers': 'محادثاتك الأخرى',
+    'chatNoneYet': 'لا توجد محادثات بعد.',
+    'chatCoach': 'المدرّب',
+    'chatPlanner': 'المنظّم',
+    'chatUntitled': 'محادثة بلا عنوان',
+    'chatClear': 'إفراغ هذه المحادثة',
+    'chatClearWarning':
+        'سيُحذف كل ما قيل هنا، من جميع أجهزتك، ولا يمكن استرجاعه.',
+    'chatClearInstead': 'أفرغها بدلًا من ذلك',
+    'chatRename': 'إعادة التسمية',
+    'chatUnpin': 'إخراجها من هذا القسم',
+    'chatArchive': 'أرشفة',
+    'chatProtectedTitle': 'هذه المحادثة تبقى',
+    'chatProtectedBody':
+        'المدرّب والمنظّم موجودان دائمًا، فلا يمكن إزالتهما. يمكنك '
+        'إفراغ هذه المحادثة بدلًا من ذلك.',
+    'chatOffline':
+        'تعذّر الوصول إلى بوتفي، فلم يُحفظ ذلك. حاول مرة أخرى عند '
+        'عودة الاتصال.',
+    'chatRefused': 'رفض بوتفي ذلك. لم يتغيّر شيء.',
+    'chatEmpty': 'لا يوجد شيء هنا بعد. اسأل عن أي شيء.',
+    'chatQueued': 'في انتظار الإرسال',
+    'chatWriting': 'بوتفي يكتب',
+    'chatComposeHint': 'اسأل بوتفي',
+    'chatSend': 'إرسال',
+    'chatStop': 'إيقاف',
+    'chatModelUnavailable':
+        'لا يستطيع بوتفي الإجابة الآن. رسالتك محفوظة، وتذكيراتك وخططك '
+        'لم تتأثر.',
+    'chatTooFast': 'هذا كثير في وقت واحد. أمهله لحظة.',
+    'chatQuotaReached': 'استنفدت حصّتك لهذا اليوم.',
+    'chatMovedBody': 'لم يكن هذا في مكانه، فأجاب بوتفي في {title}.',
+    'chatMovedBodyUntitled': 'لم يكن هذا في مكانه، فأجاب بوتفي في محادثة جديدة.',
+    'chatMovedOpen': 'افتحها',
+    'chatCardComplete': 'تحديدها كمنجزة',
+    'chatCardEmpty': 'لا يوجد ما يُعرض.',
+    'chatCardMeetings': 'الاجتماعات',
+    'chatCardSessions': 'التدريب',
+    'chatCardOther': 'النتائج',
+    'chatLinkRefused': 'لم يُفتح هذا الرابط. بوتفي لا يفتح إلا روابط الويب.',
+    'chatLinkCopied': 'تم نسخ الرابط.',
     },
   };
 }

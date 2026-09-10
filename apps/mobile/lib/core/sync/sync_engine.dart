@@ -66,6 +66,18 @@ class SyncEngine {
   /// it has to work from a notification shade with no screen behind it.
   /// `rhythm_state` is the tick's own bookkeeping and the phone never writes it
   /// at all.
+  ///
+  /// `conversations` and `messages` are pull-only too (P4), and for the same
+  /// kind of reason: renaming, pinning, archiving, clearing and deleting a chat
+  /// go out as REST commands because the **refusals** are the point — a
+  /// `protected` verdict on the Coach chat has to come back as a sentence with
+  /// a next step in it while the screen that asked is still open, which a
+  /// rejection arriving on the next pass cannot do. Messages are pushed by
+  /// neither path: they go over the socket, or through
+  /// `POST /conversations/batch` when the socket was down. `conversations`
+  /// precedes `messages` because a message naming a thread this device has
+  /// never heard of would render in no chat at all, and because clearing is
+  /// applied from the conversation row.
   static const List<String> entities = [
     'labels',
     'tasks',
@@ -73,10 +85,25 @@ class SyncEngine {
     'daily_plans',
     'checkins',
     'rhythm_state',
+    'conversations',
+    'messages',
   ];
 
   Future<void>? _inFlight;
   bool _again = false;
+
+  /// How many message pages this drain has already asked for.
+  ///
+  /// `sync.md` caps the paging at fifty, and the cap is not decoration: the
+  /// re-run is scheduled by setting [_again], which [_drain]'s own loop then
+  /// consumes — so a gateway that answers `moreMessages: true` for ever, or one
+  /// whose page never advances the watermark, spins that loop with no exit. It
+  /// hung this file's own test for the first time it was written. Reset at the
+  /// start of every drain, because the cap is per catch-up and not per install.
+  int _messagePages = 0;
+
+  /// `sync.md`: "Page messages while `moreMessages` (cap 50 pages)."
+  static const int maxMessagePages = 50;
   AppLifecycleListener? _lifecycle;
 
   final StreamController<SyncOutcome> _outcomes =
@@ -116,7 +143,7 @@ class SyncEngine {
   void watch(SocketClient socket) {
     socket
       ..on('connect', (_) => kick())
-      ..on('sync.nudge', (_) => kick());
+      ..on(ChatFrames.nudge, (_) => kick());
 
     // An `AppLifecycleListener` rather than a `WidgetsBindingObserver`: it
     // needs no widget to hang off, which is what lets the engine own its own
@@ -156,6 +183,7 @@ class SyncEngine {
   /// spec that awaited a pass could still have a second one land after it
   /// finished, against a database the teardown had closed.
   Future<void> _drain() async {
+    _messagePages = 0;
     await _run();
     while (_again) {
       _again = false;
@@ -207,6 +235,11 @@ class SyncEngine {
       installId: await stableInstallId(_db),
       entities: entities,
       since: cursor,
+      // The chat's own cursor, and a second one because it has to be: messages
+      // carry no `updatedAt` to cut a delta on. Parsed rather than stored as an
+      // int because `key_values` holds text; absent reads as null, which is the
+      // same request as "I hold nothing".
+        lastSeq: int.tryParse(await _db.getValue(DbKeys.messagesLastSeq) ?? ''),
       push: push,
     );
 
@@ -327,11 +360,53 @@ class SyncEngine {
       //    something the member has dealt with.
       await _writePendingAlerts(response['pendingAlerts']);
 
-      // 6. The cursor, last. Stored verbatim as the string the server sent:
+      // 6. The chat's watermark, from the sequences that actually landed.
+      //
+      //    Read out of `seen` rather than tracked separately, because `seen` is
+      //    exactly "the ids this pass wrote" and the messages applier's id
+      //    *is* the sequence. Advanced only upwards: `repullMessages` rewinds
+      //    this key on purpose when a schema change makes the cache wrong, and
+      //    a pass that wrote nothing must not undo that by storing a nought.
+      final highest = (seen['messages'] ?? const <String>{})
+          .map(int.tryParse)
+          .whereType<int>()
+          .fold<int>(0, (best, seq) => seq > best ? seq : best);
+      if (highest > 0) {
+        final held =
+            int.tryParse(await _db.getValue(DbKeys.messagesLastSeq) ?? '') ?? 0;
+        if (highest > held) {
+          await _db.setValue(DbKeys.messagesLastSeq, '$highest');
+        }
+      }
+
+      // 7. The cursor, last. Stored verbatim as the string the server sent:
       //    it is the server's clock, and reformatting it through `DateTime`
       //    rounds off the milliseconds a delta is cut on.
       if (now != null) await _db.setValue(SyncKeys.cursor, now);
     });
+
+    // A member with more history than one page carries. `moreMessages` means
+    // the server truncated the message pull, so another pass is scheduled
+    // rather than the rest being lost — the queued re-run reads the watermark
+    // this pass just advanced and asks for the next page.
+    //
+    // ponytail: paging inside the pass, as `sync.md` describes it, would need
+    // a second round trip inside the one local transaction the apply commits
+    // in. One extra pass per page costs a request and reuses the latch that is
+    // already there. If a first sync on a very long history proves too slow,
+    // the upgrade is to loop the pull inside `_roundTrip` and apply the pages
+    // together; nothing else here changes.
+    //
+    // Read from inside `pull` and not from the envelope, which is where the
+    // server puts it (`sync.handler.ts` sets `pull.moreMessages`, and
+    // `sync.md`'s example response has it beside the `messages` array). It is
+    // the one key in that map that is not an entity's rows, which is why the
+    // apply loop above — which only ever indexes `pull` by a name from
+    // [entities] — never sees it.
+    if (pull['moreMessages'] == true && _messagePages < maxMessagePages) {
+      _messagePages++;
+      _again = true;
+    }
 
     return SyncOutcome(
       reachedServer: true,
@@ -479,6 +554,8 @@ class SyncEngine {
     'daily_plans': _DailyPlanApplier(),
     'checkins': _CheckinApplier(),
     'rhythm_state': _RhythmStateApplier(),
+    'conversations': _ConversationApplier(),
+    'messages': _MessageApplier(),
   };
 }
 
@@ -1192,6 +1269,157 @@ class _RhythmStateApplier extends _PullOnlyApplier {
       ),
     );
   }
+}
+
+/// One chat, pulled.
+///
+/// Pull-only for the reason [SyncEngine.entities] gives: every write to a
+/// conversation is a REST command, because the refusals are what the member has
+/// to see. What arrives here is the server's own row, and the local copy is
+/// replaced by it.
+class _ConversationApplier extends _PullOnlyApplier {
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.conversations)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final id = row['id'] as String;
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+    final cleared = row['clearedUpToSeq'] as int? ?? 0;
+
+    await db.into(db.conversations).insertOnConflictUpdate(
+      ConversationsCompanion.insert(
+        id: id,
+        kind: Value(row['kind'] as String? ?? 'free'),
+        title: Value(row['title'] as String? ?? ''),
+        pinned: Value(row['pinned'] == true),
+        archived: Value(row['archived'] == true),
+        clearedUpToSeq: Value(cleared),
+        lastMessageAt: Value(_date(row['lastMessageAt'])),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        // The server's value, and only ever the server's: it is what
+        // `PATCH /conversations/:id` sends back as `baseUpdatedAt` so the edit
+        // can be accepted outright. A local clock here makes every rename fall
+        // through to a comparison a slow handset loses.
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+
+    // The client half of clearing, and it is not optional.
+    //
+    // The server's half only stops cleared messages being *sent* again: the
+    // pull starts at `max(lastSeq, clearedUpToSeq)`. A device that already
+    // holds those rows would therefore go on showing them for ever — the chat
+    // would read as cleared on the phone it was cleared from and full of
+    // history on every other one, which is exactly what FR-011 forbids ("not
+    // in the history the screen shows, and not on a device that has been away
+    // and catches up later"). Deleting them here is what makes the clear
+    // arrive.
+    //
+    // Deleting a message row is not a violation of their immutability. What is
+    // immutable is a message's *content*: nothing edits one in place. Removing
+    // the local copy of something the member asked to be rid of is the cache
+    // obeying the server, and the same rows are gone there too.
+    if (cleared > 0) {
+      await (db.delete(db.messages)..where(
+        (r) =>
+            r.conversationId.equals(id) & r.seq.isSmallerOrEqualValue(cleared),
+      )).go();
+    }
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    // A full snapshot really is every conversation this member has, unlike the
+    // message pull below, so the ordinary sweep applies: a chat deleted on
+    // another device before this one's tombstone horizon has no row and no
+    // tombstone in the snapshot, and only its absence can say so.
+    await (db.delete(db.conversations)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
+/// One message, pulled.
+///
+/// Immutable, keyed by the member's own sequence, and never pushed: the send
+/// path is `chat.send` over the socket, and `POST /conversations/batch` when
+/// the socket was down.
+class _MessageApplier extends _PullOnlyApplier {
+  /// The sequence, as a string, because that is what the apply loop's `seen`
+  /// set holds — and it is read back out of there as the pull's new watermark.
+  @override
+  String? keyOf(Map<String, dynamic> row) {
+    final seq = row['seq'];
+    return seq is int ? '$seq' : null;
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    final seqs = ids.map(int.tryParse).whereType<int>().toSet();
+    if (seqs.isEmpty) return;
+    await (db.delete(db.messages)..where((r) => r.seq.isIn(seqs))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final seq = row['seq'] as int;
+    final clientId = row['clientId'] as String?;
+
+    // `insertOnConflictUpdate` on an immutable row, which reads like a
+    // contradiction and is not. The cursor the server cuts on is `now - 5 s`
+    // (`sync.md` step 3), deliberately lagged so a transaction committing just
+    // after the pull's read arrives twice rather than never — and the socket
+    // path writes the turn's two rows locally the moment `chat.accepted` and
+    // `chat.done` name their sequences, so the pull that follows carries rows
+    // this device already has. A plain insert would throw on the primary key
+    // and abort a pass that is also carrying the member's tasks. The values
+    // are identical either way: the same seq is the same message.
+    await db.into(db.messages).insertOnConflictUpdate(
+      MessagesCompanion.insert(
+        seq: Value(seq),
+        conversationId: row['conversationId'] as String? ?? '',
+        role: row['role'] as String? ?? 'assistant',
+        content: row['content'] as String? ?? '',
+        clientId: Value(clientId),
+        composedAt: Value(_date(row['composedAt'])),
+        createdAt: _date(row['createdAt']) ?? DateTime.now().toUtc(),
+      ),
+    );
+
+    // The outbox row this message *is*, now that it has arrived.
+    //
+    // Matched on the client id rather than on the text, because the text is not
+    // unique — a member who sends "yes" twice has two rows — and because the
+    // client id is the whole reason it is minted here and sent up. Without this
+    // the member's own sentence renders twice: once as the pending bubble that
+    // never went away and once as the message the server issued a sequence for.
+    if (clientId != null) {
+      await (db.delete(db.pendingMessages)
+            ..where((r) => r.clientId.equals(clientId)))
+          .go();
+    }
+  }
+
+  /// Nothing, and this one would be actively destructive.
+  ///
+  /// [_PullOnlyApplier] already answers this with a no-op; it is overridden
+  /// only to say why, because `messages` is the one entity where a reader might
+  /// reasonably expect the standard sweep. `full` means "every row, tombstones
+  /// included" for every other entity — but the message pull is *always* cut on
+  /// `seq > lastSeq`, full or not, so a full snapshot for a device that already
+  /// holds ten thousand messages carries none of them. Sweeping against that
+  /// set would delete the member's entire chat history on the next full sync.
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {}
 }
 
 /// The rows one entity's slot in a response carries.

@@ -52,8 +52,45 @@ export interface SyncableEntity {
    * are the only way a deletion travels. `since: null` means everything.
    *
    * Returns wire-shaped objects, not aggregates: this is the response body.
+   *
+   * ## Two cursors, and why the second one is a third parameter
+   *
+   * `since` is a date and every row-shaped entity reads it. **Messages do
+   * not.** They are immutable and pulled by `seq > lastSeq` against the
+   * member's own counter — that is the whole reason the collection has no
+   * `updatedAt` and no tombstone, and it is what makes the phone's cursor one
+   * integer instead of a date it has to trust its own clock about. A message
+   * adapter handed only a date could not answer at all: there is no field to
+   * compare it to.
+   *
+   * `contracts/sync.md` has carried `lastSeq` in the request since it was
+   * written, and P3 shipped the facade without reading it, so this parameter is
+   * the missing wire rather than a new idea. Three ways were open:
+   *
+   * 1. **A second port** (`SyncableSeqEntity`) beside `SyncableEntity` and
+   *    `SyncablePatch`, with its own multi-provider token. Rejected: the two
+   *    existing ports differ in their *protocol* — an array of rows against a
+   *    single patch, a conflict rule against none — where this would differ
+   *    only in which cursor its read uses, and the facade would gain a third
+   *    loop and a third pull branch to carry the distinction.
+   * 2. **A cursor object** (`{ since, lastSeq }`) replacing the date.
+   *    Rejected: it changes the signature of all six existing adapters for the
+   *    benefit of one.
+   * 3. **A third argument.** TypeScript lets an implementation declare fewer
+   *    parameters than its interface, so every existing adapter satisfies this
+   *    unchanged and simply never sees it. That is what is written.
+   *
+   * So the rule is: an adapter reads the cursor its collection actually has.
+   * `since` for a row with an `updatedAt`, `lastSeq` for messages, and there is
+   * exactly one collection in the second group by construction — an entity that
+   * wanted both would be an entity whose rows are mutable *and* sequenced, and
+   * the sequence is only cheap because the rows are not.
    */
-  pull(userId: string, since: Date | null): Promise<unknown[]>;
+  pull(
+    userId: string,
+    since: Date | null,
+    lastSeq: number,
+  ): Promise<unknown[]>;
 
   /** One pushed row. See `contracts/sync.md` for the conflict rule. */
   apply(userId: string, change: SyncChange, now: Date): Promise<ApplyOutcome>;
@@ -88,6 +125,25 @@ export interface SyncablePatch {
     now: Date,
   ): Promise<ApplyOutcome>;
 }
+
+/**
+ * How many messages one round trip carries. `contracts/sync.md`'s number.
+ *
+ * Here rather than inside the messages adapter because two places need to
+ * agree on it: the adapter, which asks the store for that many, and the facade,
+ * which reports `moreMessages` when a page comes back full. Two constants would
+ * be two chances for the flag to be wrong in the direction that matters — a
+ * flag stuck at false leaves the rest of a member's transcript unreachable
+ * until something else happens to move their cursor, and messages are the one
+ * entity whose pull cannot be repaired by a later `full` snapshot, because the
+ * snapshot decision is about `updatedAt` and these rows have none.
+ *
+ * 200 is a page a slow handset can apply inside one local transaction. The
+ * phone pages while `moreMessages` is true (capped at 50 pages by the
+ * contract), so a member with a year of history catches up over several round
+ * trips rather than one that times out.
+ */
+export const MESSAGE_PAGE_SIZE = 200;
 
 /** Multi-provider tokens. Each context adds itself; the facade collects. */
 export const SYNCABLE_ENTITIES = Symbol('SYNCABLE_ENTITIES');

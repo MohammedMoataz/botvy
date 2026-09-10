@@ -17,6 +17,9 @@ import { RhythmModule } from './contexts/rhythm/rhythm.module.js';
 import { ConversationsModule } from './contexts/conversations/conversations.module.js';
 import { InternalRhythmController } from './contexts/rhythm/features/tick/internal-rhythm.controller.js';
 import { RhythmController } from './contexts/rhythm/features/confirm-plan/rhythm.controller.js';
+import { ConversationsController } from './contexts/conversations/features/manage-conversation/conversations.controller.js';
+import { ConversationsBatchController } from './contexts/conversations/features/batch/conversations.batch.controller.js';
+import { QuickQuestionsController } from './contexts/conversations/features/quick-questions/quick-questions.controller.js';
 import { SyncController } from './contexts/sync/features/sync/sync.controller.js';
 import { RemindersController } from './contexts/reminders/features/manage-reminder/reminders.controller.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
@@ -90,6 +93,9 @@ import { WsModule } from './ws/ws.module.js';
     InternalSweepController,
     InternalRhythmController,
     RhythmController,
+    ConversationsController,
+    ConversationsBatchController,
+    QuickQuestionsController,
     SyncController,
     InternalAlertsController,
     InternalHeartbeatController,

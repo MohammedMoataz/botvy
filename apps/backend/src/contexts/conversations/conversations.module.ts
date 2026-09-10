@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { OutboxModule } from '../../shared/outbox/outbox.module.js';
@@ -36,6 +36,75 @@ import {
   MongoSeq,
   type CounterDoc,
 } from './infrastructure/mongo-seq.adapter.js';
+import {
+  QuickQuestionSchema,
+} from '../../shared/persistence/mongo/schemas.js';
+import { LlmModule } from '../../shared/llm/llm.module.js';
+import { OllamaClient } from '../../shared/llm/ollama.client.js';
+import { SettingsService } from '../../shared/settings/settings.service.js';
+import { OperationsModule } from '../operations/operations.module.js';
+import { PlanningModule } from '../planning/planning.module.js';
+import { ProfileModule } from '../profile/profile.module.js';
+import { RemindersModule } from '../reminders/reminders.module.js';
+import { RhythmModule } from '../rhythm/rhythm.module.js';
+import { CancelTaskHandler } from '../planning/features/cancel-task/cancel-task.handler.js';
+import { CreateTaskHandler } from '../planning/features/create-task/create-task.handler.js';
+import { TasksQueryHandler } from '../planning/features/tasks-query/tasks.query.js';
+import { ManageReminderHandler } from '../reminders/features/manage-reminder/manage-reminder.handler.js';
+import { ReminderLifecycleHandler } from '../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
+import { RemindersQueryHandler } from '../reminders/features/reminders-query/reminders.query.js';
+import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
+import { UpdateProfileHandler } from '../profile/features/update-profile/update-profile.handler.js';
+import { CaptureCheckinReplyHandler } from '../rhythm/features/capture-checkin-reply/capture-checkin-reply.handler.js';
+import { CheckinsQueryHandler } from '../rhythm/features/checkins/checkins.query.js';
+import { StreakQueryHandler } from '../rhythm/features/streak/streak.query.js';
+import { TodayPlanQueryHandler } from '../rhythm/features/today-plan/today-plan.query.js';
+import { UsageTodayQueryHandler } from '../operations/features/usage-today/usage-today.query.js';
+import {
+  AllergenGuardPort,
+  CheckinPort,
+  IntentExecutorPort,
+  IntentExtractorPort,
+  LatestCheckinPort,
+  MemberDayPort,
+  MemberFactsPort,
+  PlannerActionsPort,
+  ProfileWritesPort,
+  PromptAssemblerPort,
+  UsagePort,
+} from './domain/chat.ports.js';
+import { QuickQuestionRepository } from './domain/quick-question.repository.js';
+import { AllergenGuard } from './application/allergen-guard.js';
+import { IntentExecutor } from './application/intent-executor.js';
+import { IntentExtractor } from './application/intent-extractor.js';
+import { PromptAssembler } from './application/prompt-assembler.js';
+import { TurnRunner } from './application/turn-runner.js';
+import { ArchiveConversationHandler } from './features/archive/archive-conversation.handler.js';
+import { BatchHandler } from './features/batch/batch.handler.js';
+import { ClearConversationHandler } from './features/clear/clear-conversation.handler.js';
+import { CloseOnBannedHandler } from './features/close-on-banned/close-on-banned.handler.js';
+import { ConversationsQueryHandler } from './features/conversations/conversations.query.js';
+import { CreateConversationHandler } from './features/create-conversation/create-conversation.handler.js';
+import { DeleteConversationHandler } from './features/delete/delete-conversation.handler.js';
+import { MessagesQueryHandler } from './features/messages/messages.query.js';
+import { PinConversationHandler } from './features/pin/pin-conversation.handler.js';
+import { ManageQuickQuestionHandler } from './features/quick-questions/manage-quick-question.handler.js';
+import { QuickQuestionsQueryHandler } from './features/quick-questions/quick-questions.query.js';
+import { RenameConversationHandler } from './features/rename/rename-conversation.handler.js';
+import { ChatGateway } from './features/send-message/chat.gateway.js';
+import {
+  OperationsUsage,
+  PlanningReminderActions,
+  ProfileChatWrites,
+  ProfileMemberFacts,
+  RhythmCheckins,
+  RhythmLatestCheckin,
+  RhythmMemberDay,
+} from './infrastructure/chat.adapters.js';
+import {
+  MongoQuickQuestionRepository,
+  type QuickQuestionDoc,
+} from './infrastructure/mongo-quick-question.repository.js';
 
 /**
  * Conversations: where a message is written down.
@@ -61,10 +130,48 @@ import {
   imports: [
     OutboxModule,
     WsModule,
+    LlmModule,
+    /*
+     * Five contexts, and every one of them is here for a *port binding* in
+     * `infrastructure/chat.adapters.ts` and for nothing else.
+     *
+     * The module is imported so Nest can find the provider; the dependency in
+     * the code is on the abstract port. Nothing under `domain/`,
+     * `application/` or `features/` imports any of these — `no-restricted-imports`
+     * refuses it there — so this list is the whole of what the chat is coupled
+     * to, and it is deliberately visible in one place.
+     *
+     * It is also the longest such list in the system, which is what the chat
+     * *is*: the surface where a member's own words reach every other context.
+     * A shorter list would mean the coach knew less about them.
+     */
+    ProfileModule,
+    PlanningModule,
+    RemindersModule,
+    /*
+     * `forwardRef`, because this edge is genuinely bidirectional.
+     *
+     * P3's rhythm writes its three daily touches into the coach chat through
+     * `CoachTranscriptPort`, so `RhythmModule` imports this one. P4's chat
+     * reads the plan, the streak and the check-in through three ports of its
+     * own, so this one imports `RhythmModule`. Both directions are ports bound
+     * in `infrastructure/` — the sanctioned seam — so the cycle is a DI
+     * artifact rather than a domain one: no aggregate here knows a rhythm
+     * aggregate exists.
+     *
+     * Worth resisting the instinct to "fix" it by making one side an event.
+     * The rhythm composes the sentence and hands it over; an event carrying
+     * that sentence would put chat copy in a rhythm event payload, and
+     * `contracts/events.md` says plainly that the rhythm writes its own
+     * touches. Two ports and one `forwardRef` is the smaller thing.
+     */
+    forwardRef(() => RhythmModule),
+    OperationsModule,
     MongooseModule.forFeature([
       { name: MODEL_NAMES.conversation, schema: ConversationSchema },
       { name: MODEL_NAMES.message, schema: MessageSchema },
       { name: MODEL_NAMES.counter, schema: CounterSchema },
+      { name: MODEL_NAMES.quickQuestion, schema: QuickQuestionSchema },
     ]),
   ],
   providers: [
@@ -139,11 +246,144 @@ import {
     },
     ConversationsBootstrapHandler,
     ConversationsPurgeOnDeletedHandler,
+    {
+      provide: QuickQuestionRepository,
+      inject: [getModelToken(MODEL_NAMES.quickQuestion)],
+      useFactory: (model: Model<QuickQuestionDoc>) =>
+        new MongoQuickQuestionRepository(model),
+    },
+
+    // ---- the ports, bound to the contexts that own the answers ----------
+    {
+      provide: MemberFactsPort,
+      inject: [ProfileQueryHandler],
+      useFactory: (profiles: ProfileQueryHandler) =>
+        new ProfileMemberFacts(profiles),
+    },
+    {
+      provide: MemberDayPort,
+      inject: [TodayPlanQueryHandler, StreakQueryHandler, ProfileQueryHandler],
+      useFactory: (
+        plans: TodayPlanQueryHandler,
+        streaks: StreakQueryHandler,
+        profiles: ProfileQueryHandler,
+      ) => new RhythmMemberDay(plans, streaks, profiles),
+    },
+    {
+      provide: PlannerActionsPort,
+      inject: [
+        CreateTaskHandler,
+        TasksQueryHandler,
+        CancelTaskHandler,
+        ManageReminderHandler,
+        RemindersQueryHandler,
+        ReminderLifecycleHandler,
+      ],
+      useFactory: (
+        tasks: CreateTaskHandler,
+        taskQueries: TasksQueryHandler,
+        cancelTask: CancelTaskHandler,
+        reminders: ManageReminderHandler,
+        reminderQueries: RemindersQueryHandler,
+        lifecycle: ReminderLifecycleHandler,
+      ) =>
+        new PlanningReminderActions(
+          tasks,
+          taskQueries,
+          cancelTask,
+          reminders,
+          reminderQueries,
+          lifecycle,
+        ),
+    },
+    {
+      provide: ProfileWritesPort,
+      inject: [UpdateProfileHandler],
+      useFactory: (profiles: UpdateProfileHandler) =>
+        new ProfileChatWrites(profiles),
+    },
+    {
+      provide: UsagePort,
+      inject: [UsageTodayQueryHandler],
+      useFactory: (usage: UsageTodayQueryHandler) => new OperationsUsage(usage),
+    },
+    {
+      provide: CheckinPort,
+      inject: [CaptureCheckinReplyHandler],
+      useFactory: (replies: CaptureCheckinReplyHandler) =>
+        new RhythmCheckins(replies),
+    },
+    {
+      provide: LatestCheckinPort,
+      inject: [CheckinsQueryHandler, ProfileQueryHandler],
+      useFactory: (
+        checkins: CheckinsQueryHandler,
+        profiles: ProfileQueryHandler,
+      ) => new RhythmLatestCheckin(checkins, profiles),
+    },
+
+    // ---- the turn's four collaborators ----------------------------------
+    {
+      provide: IntentExtractorPort,
+      inject: [OllamaClient, SettingsService],
+      useFactory: (llm: OllamaClient, settings: SettingsService) =>
+        new IntentExtractor(llm, settings),
+    },
+    {
+      provide: IntentExecutorPort,
+      inject: [PlannerActionsPort, ProfileWritesPort],
+      useFactory: (planner: PlannerActionsPort, profile: ProfileWritesPort) =>
+        new IntentExecutor(planner, profile),
+    },
+    {
+      provide: PromptAssemblerPort,
+      inject: [MemberDayPort, MessageRepository, SettingsService],
+      useFactory: (
+        day: MemberDayPort,
+        messages: MessageRepository,
+        settings: SettingsService,
+      ) => new PromptAssembler(day, messages, settings),
+    },
+    { provide: AllergenGuardPort, useClass: AllergenGuard },
+
+    // ---- the turn, and the two ways in ----------------------------------
+    TurnRunner,
+    ChatGateway,
+    BatchHandler,
+
+    // ---- the slices -----------------------------------------------------
+    CreateConversationHandler,
+    RenameConversationHandler,
+    PinConversationHandler,
+    ArchiveConversationHandler,
+    ClearConversationHandler,
+    DeleteConversationHandler,
+    CloseOnBannedHandler,
+    ManageQuickQuestionHandler,
+    ConversationsQueryHandler,
+    MessagesQueryHandler,
+    QuickQuestionsQueryHandler,
+
     MongoUnitOfWork,
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
   exports: [
     ConversationsBootstrapHandler,
+    AppendMessageHandler,
+    TurnRunner,
+    BatchHandler,
+    CloseOnBannedHandler,
+    CreateConversationHandler,
+    RenameConversationHandler,
+    PinConversationHandler,
+    ArchiveConversationHandler,
+    ClearConversationHandler,
+    DeleteConversationHandler,
+    ManageQuickQuestionHandler,
+    ConversationsQueryHandler,
+    MessagesQueryHandler,
+    QuickQuestionsQueryHandler,
+    QuickQuestionRepository,
     ConversationsPurgeOnDeletedHandler,
     AppendMessageHandler,
     ConversationRepository,

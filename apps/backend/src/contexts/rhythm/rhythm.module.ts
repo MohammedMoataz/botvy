@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import { OutboxModule } from '../../shared/outbox/outbox.module.js';
@@ -100,7 +100,8 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
     OperationsModule,
     ProfileModule,
     PlanningModule,
-    ConversationsModule,
+    // The other half of the cycle — see the note in `conversations.module.ts`.
+    forwardRef(() => ConversationsModule),
     MongooseModule.forFeature([
       { name: MODEL_NAMES.dailyPlan, schema: DailyPlanSchema },
       { name: MODEL_NAMES.checkin, schema: CheckinSchema },

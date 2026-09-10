@@ -191,10 +191,15 @@ not lost, and everything that is not chat keeps working.
   would need, or a choice between several matches.
 - **FR-007** Messages composed offline MUST be delivered later and understood as of
   when they were typed.
-- **FR-008** A message belonging to neither coaching nor planning MUST be moved to a
-  new chat of its own before it is answered, titled from the member's own opening
-  words, and the member MUST be told where it went; an instruction belonging to the
-  other pinned chat MUST be carried out where it was typed rather than moved.
+- **FR-008** A message belonging to neither coaching nor planning MUST be answered
+  in a new chat of its own, titled from the member's own opening words, and the
+  member MUST be told where it went; an instruction belonging to the other pinned
+  chat MUST be carried out where it was typed rather than moved. The **reply** is
+  what moves: the member's own message stays where they typed it, because a
+  transcript that silently relocated what somebody wrote would be a transcript
+  they could not trust. (This sentence first read "must never leave a trace in a
+  pinned chat", which the acceptance criterion below contradicts by one row —
+  corrected in P4 to say what was always intended.)
 - **FR-009** A reply MUST count as the evening check-in only inside the Coach chat and
   only within the window the operator sets, twelve hours by default.
 - **FR-010** Quick questions MUST be offered per chat, MUST adapt to the member's

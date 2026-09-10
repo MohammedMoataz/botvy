@@ -563,6 +563,88 @@ export const CounterSchema = new Schema(
   { collection: 'counters', versionKey: false, _id: false },
 );
 
+/**
+ * What every model call cost, one row per call.
+ *
+ * Operations owns this collection and is the **only** writer, from
+ * `conversations.MessageSent`. Conversations never opens it, and asks for
+ * today's total through `UsageTodayQuery` instead. That loop is the whole of
+ * the crossing between the two contexts, and it is load-bearing: without it the
+ * daily allowance sums an empty collection and every member sits permanently at
+ * zero used, which is a limit that silently does not exist.
+ *
+ * Server-only, so an ObjectId `_id` — no client creates one and the id never
+ * has to survive a retry from a phone. `eventId` is what makes the write
+ * idempotent: the relay delivers at least once, and a replayed `MessageSent`
+ * must not double-count a member's allowance.
+ *
+ * The 90-day TTL is declared in the migration, not here. It is the one index in
+ * the system that deletes data, so it belongs somewhere a reader will find it
+ * while asking why a number changed.
+ */
+export const UsageLogSchema = new Schema(
+  {
+    userId: { type: String, required: true },
+    /** `chat`, `intent`, `summarize`, `suggest`, `plan`. */
+    kind: { type: String, required: true },
+    model: { type: String, required: true },
+    promptTokens: { type: Number, required: true, default: 0 },
+    completionTokens: { type: Number, required: true, default: 0 },
+    ms: { type: Number, required: true, default: 0 },
+    /** The event this row came from. Unique, so a redelivery writes nothing. */
+    eventId: { type: String, required: true },
+    createdAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'usage_log', versionKey: false },
+);
+
+/**
+ * The tappable questions each chat offers.
+ *
+ * `userId: null` means a global one the Owner seeded; anything else belongs to
+ * the member who added it and is returned to nobody else. A partial index is
+ * not needed here because nothing is unique — two members may add the same
+ * question, and the Owner's seed and a member's own copy are two rows on
+ * purpose.
+ *
+ * `text` carries both languages rather than one, because the seeded set is
+ * shown to every member whatever their locale, and a chip that falls back to
+ * English on an Arabic screen is the defect `enhancements/E-012` describes for
+ * the coach's own sentences.
+ */
+export const QuickQuestionSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    /** `coach`, `planner` or `free`. */
+    scope: { type: String, required: true },
+    text: {
+      type: {
+        _id: false,
+        en: { type: String, required: true },
+        ar: { type: String, required: true },
+      },
+      required: true,
+    },
+    /**
+     * Which state this question suits: `any`, `low` or `ok`.
+     *
+     * Read against the member's latest check-in mood, so a member who reported
+     * a bad day is offered a lighter option first. `any` is the default and is
+     * what a question with no opinion about the member's mood carries.
+     */
+    mood: { type: String, required: true, default: 'any' },
+    order: { type: Number, required: true, default: 100 },
+    /** Null for a seeded global question; a member id for their own. */
+    userId: { type: String, default: null },
+    enabled: { type: Boolean, required: true, default: true },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'quick_questions', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -582,4 +664,6 @@ export const MODEL_NAMES = {
   conversation: 'Conversation',
   message: 'Message',
   counter: 'Counter',
+  usageLog: 'UsageLog',
+  quickQuestion: 'QuickQuestion',
 } as const;

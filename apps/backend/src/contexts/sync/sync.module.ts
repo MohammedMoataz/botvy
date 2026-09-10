@@ -9,8 +9,12 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { RhythmModule } from '../rhythm/rhythm.module.js';
 import { ConversationsModule } from '../conversations/conversations.module.js';
-import { ConversationRepository } from '../conversations/domain/conversations.repositories.js';
+import {
+  ConversationRepository,
+  MessageRepository,
+} from '../conversations/domain/conversations.repositories.js';
 import { ConversationSyncAdapter } from '../conversations/infrastructure/conversations-sync.adapter.js';
+import { MessageSyncAdapter } from '../conversations/infrastructure/messages-sync.adapter.js';
 import {
   CheckinRepository,
   DailyPlanRepository,
@@ -137,21 +141,55 @@ import {
         new CheckinSyncAdapter(checkins),
     },
     /*
-     * The chat list, pull-only until P4.
+     * The chat list, and from P4 a push as well.
      *
-     * It is here in P3 because FR-005 requires every member to *have* the coach
+     * It arrived in P3 because FR-005 requires every member to *have* the coach
      * conversation from the moment they register, and without a read surface
      * that requirement is unverifiable from outside the process — while its
      * failure is silent, because a touch written into a missing conversation
-     * logs and carries on looking successful.
+     * logs and carries on looking successful. P4 adds the three pushed ops
+     * (`upsert`, `delete`, `clear`) and with them the `UnitOfWork` this adapter
+     * now needs: the pull never wrote anything, and the push saves an
+     * aggregate whose events belong in the same transaction as the row.
      */
     {
       provide: ConversationSyncAdapter,
-      inject: [ConversationRepository],
-      useFactory: (conversations: ConversationRepository) =>
-        new ConversationSyncAdapter(conversations),
+      inject: [UnitOfWork, ConversationRepository],
+      useFactory: (uow: UnitOfWork, conversations: ConversationRepository) =>
+        new ConversationSyncAdapter(uow, conversations),
+    },
+    /*
+     * The transcript, pull-only and cursored by `seq`.
+     *
+     * Two repositories, both this context's own: the conversations to learn
+     * each chat's clear watermark and the messages to read from it. That is
+     * what makes `seq > max(lastSeq, clearedUpToSeq)` a property of the pull
+     * rather than something every client has to reimplement — and FR-011's
+     * second half, that nothing cleared reaches a device catching up later,
+     * is exactly this line.
+     *
+     * `apply` refuses every push with `invalid`: a client that could insert a
+     * message would choose its own `seq`, and the sequence is the one value in
+     * this collection that nothing can repair afterwards. Offline messages go
+     * through `POST /conversations/batch`.
+     */
+    {
+      provide: MessageSyncAdapter,
+      inject: [ConversationRepository, MessageRepository],
+      useFactory: (
+        conversations: ConversationRepository,
+        messages: MessageRepository,
+      ) => new MessageSyncAdapter(conversations, messages),
     },
     {
+      /*
+       * The order of this list is the *apply* order's tie-break and nothing
+       * more: the facade sorts by `applyOrder` before applying and by the
+       * reverse of it before pulling, so neither path depends on where an
+       * adapter sits here. It is still written parents-then-children, because a
+       * list that reads in a different order from the one it produces is a list
+       * somebody will "fix".
+       */
       provide: SYNCABLE_ENTITIES,
       inject: [
         LabelSyncAdapter,
@@ -160,6 +198,7 @@ import {
         DailyPlanSyncAdapter,
         CheckinSyncAdapter,
         ConversationSyncAdapter,
+        MessageSyncAdapter,
       ],
       useFactory: (...adapters: SyncableEntity[]) => adapters,
     },

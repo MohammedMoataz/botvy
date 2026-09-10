@@ -21,9 +21,48 @@
  * strings cross the network and the phone branches on them, so they are fixed
  * here in one place rather than translated at the edge.
  */
+/**
+ * The operations a pushed row can carry, across every entity.
+ *
+ * Five of them are the row protocol's and are described above. The last two
+ * belong to **conversations only**, and they are here rather than in a second
+ * union because `toChange` in the sync facade is the one gate every pushed row
+ * passes through: an op it does not recognise is rejected as `invalid` before
+ * any adapter sees it. `contracts/sync.md` types the conversations push as
+ * `{ op: 'upsert' | 'delete' | 'clear' }`, so without these two words in this
+ * list the contract's own vocabulary was unsendable — a phone renaming a chat
+ * offline would have had its push refused by the protocol rather than by a
+ * rule, and `invalid` tells a client to stop trying.
+ *
+ * - `upsert` — create-or-update in one word, which is what a chat row wants: a
+ *   conversation created offline and renamed twice before it ever reaches the
+ *   server is one row the client has, and making it decide whether the server
+ *   has seen it yet is asking the client to track something the id already
+ *   answers. `resolveConflict` treats it as a create when the server row is
+ *   missing and as an update otherwise.
+ * - `clear` — raise the conversation's `clearedUpToSeq`. Not expressible as an
+ *   update, because the field is monotonic and a *lower* value pushed by a
+ *   device whose cursor is behind must change nothing (FR-011: a clear is not
+ *   reversible). An `update` carrying `clearedUpToSeq` in `data` would have
+ *   been the same write with the guarantee left to whoever wrote the adapter.
+ *
+ * An entity that receives one of the two and does not implement it refuses it
+ * the way it refuses anything else it does not accept — the ops being in one
+ * union does not make them meaningful everywhere, and the adapters' switches
+ * take their `default` branch for both today.
+ */
+export type SyncOp =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'restore'
+  | 'purge'
+  | 'upsert'
+  | 'clear';
+
 export interface SyncChange<Fields = Record<string, unknown>> {
   id: string;
-  op: 'create' | 'update' | 'delete' | 'restore' | 'purge';
+  op: SyncOp;
   updatedAt: Date;
   baseUpdatedAt: Date | null;
   fields: Fields;
@@ -82,7 +121,14 @@ export function resolveConflict(
   if (!server) {
     // A create with no server row is the ordinary offline case: insert it.
     // Anything else is a client editing a row that has been erased.
-    return change.op === 'create'
+    //
+    // `upsert` counts as a create here, which is the whole of what the word
+    // buys: a conversation the phone made offline and has since renamed
+    // arrives as one row, and the client does not have to remember whether the
+    // server has seen it before to choose the right op. `clear` does not — a
+    // clear names a conversation, and a watermark on a chat that is not there
+    // is a client holding an id nothing corresponds to, which is `gone`.
+    return change.op === 'create' || change.op === 'upsert'
       ? { accept: true }
       : { accept: false, reason: 'gone' };
   }

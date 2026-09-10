@@ -163,8 +163,13 @@ export const SETTINGS_REGISTRY = {
     default: 12,
     description: 'Messages a member may send per minute.',
   }),
+  // `0` turns the allowance off, which `TurnRunner.checkAllowance` has
+  // always honoured and the schema refused: the floor was 1000, so the
+  // branch was unreachable and its comment described a capability no
+  // operator had. A single-member installation running its own GPU has no
+  // reason to meter itself, and the rate limit still stands.
   'chat.dailyQuotaTokens': define({
-    schema: z.number().int().min(1000),
+    schema: z.number().int().min(0),
     default: 120_000,
     description: "A member's daily model allowance, counted over their own local day.",
   }),

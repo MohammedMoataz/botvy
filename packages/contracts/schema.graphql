@@ -13,6 +13,25 @@ type Checkin {
   note: String
 }
 
+type Conversation {
+  archived: Boolean!
+  clearedUpToSeq: Int!
+  createdAt: DateTime!
+  id: ID!
+  kind: ConversationKind!
+  lastMessageAt: DateTime
+  pinned: Boolean!
+  title: String!
+  updatedAt: DateTime!
+}
+
+"""The two chats an account comes with, and the ones a member starts."""
+enum ConversationKind {
+  coach
+  free
+  planner
+}
+
 type DailyPlan {
   autoConfirmed: Boolean!
   briefedAt: DateTime
@@ -65,6 +84,29 @@ type Label {
 type LabelSnapshot {
   color: String!
   name: String!
+}
+
+type Message {
+  clientId: String
+  composedAt: DateTime
+  content: String!
+  conversationId: ID!
+  createdAt: DateTime!
+  intent: JSON
+  role: MessageRole!
+  seq: Int!
+}
+
+type MessageConnection {
+  endCursor: String
+  hasNextPage: Boolean!
+  nodes: [Message!]!
+}
+
+enum MessageRole {
+  assistant
+  system
+  user
 }
 
 """
@@ -127,6 +169,7 @@ type Query {
   """The caller's body metric history."""
   bodyMetrics(last: Int = 30): [BodyMetric!]!
   checkins(from: Date!, to: Date!): [Checkin!]!
+  conversations(includeArchived: Boolean = false): [Conversation!]!
 
   """A member's devices. Administrators only."""
   devicesOf(userId: ID!): [Device!]!
@@ -135,6 +178,7 @@ type Query {
 
   """The authenticated member."""
   me: User!
+  messages(afterSeq: Int, conversationId: ID!, first: Int = 50): MessageConnection!
 
   """The caller's own registered devices."""
   myDevices: [Device!]!
@@ -145,6 +189,7 @@ type Query {
 
   """The caller's own profile."""
   profile: Profile!
+  quickQuestions(scope: ConversationKind!): [QuickQuestion!]!
   reminder(id: ID!): Reminder
   reminders(cursor: String, limit: Int, view: ReminderViewName!): ReminderPage!
 
@@ -161,6 +206,14 @@ type Query {
 
   """Every member. Administrators only."""
   users(after: String, first: Int = 50, role: Role, search: String, status: UserStatus): UserConnection!
+}
+
+type QuickQuestion {
+  id: ID!
+  isMine: Boolean!
+  mood: String!
+  scope: ConversationKind!
+  text: String!
 }
 
 type QuietHours {
