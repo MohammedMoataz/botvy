@@ -99,8 +99,15 @@ void main() {
 
     fake
       ..on('POST', '/auth/login', _session)
-      ..on('GET', '/profile', _profile)
-      ..on('GET', '/preferences', _preferences);
+      // Both reads are GraphQL now, and both are one POST to the same absolute
+      // URL beside the REST prefix — so a single canned envelope carrying both
+      // fields answers each of them: `profile()` reads `data.profile` and
+      // `preferences()` reads `data.preferences`. The two REST stubs this
+      // replaces stopped matching anything when the reads moved, and every
+      // test that filled the mirror failed on a null `data`.
+      ..on('POST', 'http://test.invalid/graphql', {
+        'data': {'profile': _profile, 'preferences': _preferences},
+      });
   });
 
   tearDown(() async {

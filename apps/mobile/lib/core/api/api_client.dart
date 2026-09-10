@@ -670,7 +670,12 @@ class ApiClient {
   ]) async {
     final res = await _guard(
       () => dio.post<dynamic>(
-        '\$_origin/graphql',
+        // Interpolated, not escaped: written `'\$_origin/graphql'` this posted
+        // to the *literal* path `$_origin/graphql`, which dio resolved against
+        // `baseUrl` — so every read on the phone asked for
+        // `/api/v1/$_origin/graphql` and got a 404 the caller reported as an
+        // empty answer.
+        '$_origin/graphql',
         data: {
           'query': document,
           if (variables != null) 'variables': variables,

@@ -21,7 +21,7 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 2);
+    expect(db.schemaVersion, 3);
 
     final rows = await db
         .customSelect(
@@ -117,6 +117,91 @@ void main() {
 
     final stored = await db.select(db.userPreferences).getSingle();
     expect(stored.endOfDayTime, '22:00');
+  });
+
+  /// 2 -> 3: tasks, labels, reminders and the alert mirror.
+  ///
+  /// The v2-shaped file is built from the DDL a current database reports for
+  /// the three tables version 2 actually had. That is exact rather than
+  /// approximate *because* this bump does not touch those tables: today's
+  /// definition of `profiles` is version 2's definition of `profiles`. The day
+  /// a later bump alters one of them, this donor stops being a v2 file and the
+  /// DDL has to be written out by hand here — which is the same rule the
+  /// guarded branches follow, and the same reason.
+  test('a version 2 file upgrades to 3 and gains the P2 tables', () async {
+    final donor = AppDatabase.forTesting(NativeDatabase.memory());
+    final ddl = await donor
+        .customSelect(
+          "SELECT sql FROM sqlite_master WHERE type = 'table' "
+          "AND name IN ('key_values', 'profiles', 'user_preferences')",
+        )
+        .get();
+    final statements = ddl.map((r) => r.read<String>('sql')).toList();
+    await donor.close();
+    expect(statements, hasLength(3), reason: 'the v2 tables to build from');
+
+    final raw = sqlite3.openInMemory();
+    for (final statement in statements) {
+      raw.execute(statement);
+    }
+    raw.execute("INSERT INTO key_values (key, value) VALUES ('userId', 'u-1')");
+    raw.execute('PRAGMA user_version = 2');
+
+    final db = AppDatabase.forTesting(NativeDatabase.opened(raw));
+    addTearDown(db.close);
+
+    // Forces the open, and therefore the migration.
+    expect(await db.getValue('userId'), 'u-1');
+
+    final tables = (await db
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type = 'table' "
+              "AND name NOT LIKE 'sqlite_%'",
+            )
+            .get())
+        .map((r) => r.read<String>('name'))
+        .toSet();
+    expect(tables, containsAll(['tasks', 'labels', 'reminders', 'alerts_local']));
+
+    // The indexes too. `createTable` does not create them — drift keeps them as
+    // separate schema entities, so an upgrade that only calls `createTable`
+    // leaves a phone with the tables and none of the indexes, and nothing ever
+    // says so.
+    final indexes = (await db
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type = 'index' "
+              "AND name NOT LIKE 'sqlite_%'",
+            )
+            .get())
+        .map((r) => r.read<String>('name'))
+        .toSet();
+    expect(
+      indexes,
+      containsAll([
+        'labels_sort',
+        'labels_pending',
+        'tasks_due',
+        'tasks_status_due',
+        'tasks_label',
+        'tasks_pending',
+        'reminders_remind_at',
+        'reminders_pending',
+        'alerts_local_notify_at',
+      ]),
+    );
+
+    // And the new tables are usable straight away, not merely present.
+    await db
+        .into(db.tasks)
+        .insert(
+          TasksCompanion.insert(
+            id: 'task-1',
+            title: 'Pay the electricity bill',
+            updatedAt: DateTime.now(),
+            createdAt: DateTime.now(),
+          ),
+        );
+    expect((await db.select(db.tasks).get()).single.status, 'open');
   });
 
   test(

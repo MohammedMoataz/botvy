@@ -1,44 +1,41 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+
+import '../db/database.dart';
+import 'alert_plan.dart';
+
+/// The plan and the ids belong to `alert_plan.dart`, which knows nothing about
+/// the plugin. Re-exported so a caller needs one import to arm an alarm and to
+/// read what was armed.
+export 'alert_plan.dart';
 
 /// The channel both local alarms and server pushes land on, so a user has one
 /// switch to control rather than two. Must match the FCM default-channel
 /// meta-data in AndroidManifest.xml.
 const String kReminderChannelId = 'botvy_reminders';
 
-/// Android tolerates hundreds of pending alarms and iOS caps at 64. Scheduling
-/// the nearest window and rolling it forward on every sync costs nothing and
-/// stays under both.
-const int kMaxScheduled = 50;
+/// The iOS category the two actions hang off. iOS attaches buttons by
+/// category, registered once at init; Android attaches them per notification.
+const String kAlertCategoryId = 'botvy_alert';
 
-/// A stable 31-bit notification id for one alert.
-///
-/// FNV-1a over `sourceId|label`, which is the server's own unique key for an
-/// alert — so the id survives the offline-create id swap, and cancelling works
-/// even for a row the server has since renumbered. Dart's String.hashCode is
-/// not stable across runs and cannot be used here.
-int notificationIdFor(String sourceId, String label) {
-  var hash = 0x811c9dc5;
-  for (final unit in '$sourceId|$label'.codeUnits) {
-    hash ^= unit;
-    hash = (hash * 0x01000193) & 0xffffffff;
-  }
-  return hash & 0x7fffffff;
+/// The two things a member can do without opening the app.
+abstract final class AlertActions {
+  static const String complete = 'complete';
+  static const String snooze = 'snooze';
 }
 
 /// Owns the device's own alarms.
 ///
 /// Alerts fire from the phone: the device schedules them from its local
 /// database so they work offline, and the server sweep is only the fallback.
-///
-/// ponytail: P0 has no synced tables yet, so this ships init / permissions /
-/// show / cancel — everything push and a cold start need. `rescheduleAll`,
-/// which reads the alert rows and arms `zonedSchedule`, lands with those tables
-/// in P2; [tz] and [kMaxScheduled] are set up here so that is a method, not a
-/// rewrite.
+/// [rescheduleAll] is the single entry point — edits, completions, deletions
+/// and syncs all just change rows and call it. Tracking which individual ids to
+/// cancel per operation is the bookkeeping that eventually leaves an alarm
+/// firing for something the member dealt with days ago.
 class NotificationScheduler {
   NotificationScheduler({FlutterLocalNotificationsPlugin? plugin})
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
@@ -58,20 +55,49 @@ class NotificationScheduler {
   /// the user: nothing here reads a server clock or a server zone.
   tz.Location get location => tz.local;
 
-  Future<void> init({void Function(String payload)? onTap}) async {
+  /// [onAction] is called for a notification button — complete or snooze, one
+  /// of [AlertActions] — and [onTap] for the body of the notification. The
+  /// writes themselves belong to the feature that owns the row, so this only
+  /// reports what was pressed and about what.
+  Future<void> init({
+    void Function(String payload)? onTap,
+    void Function(String actionId, String payload)? onAction,
+  }) async {
     if (_ready) return;
 
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation(await deviceTimezone()));
 
     await _plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
+      settings: InitializationSettings(
+        android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(
+          // Registered at init and never later: iOS reads the category list
+          // once, so a category added after the fact gets a notification with
+          // no buttons on it and no error anywhere.
+          notificationCategories: [
+            DarwinNotificationCategory(
+              kAlertCategoryId,
+              actions: [
+                DarwinNotificationAction.plain(
+                  AlertActions.complete,
+                  'Complete',
+                ),
+                DarwinNotificationAction.plain(AlertActions.snooze, 'Snooze'),
+              ],
+            ),
+          ],
+        ),
       ),
       onDidReceiveNotificationResponse: (response) {
         final payload = response.payload;
-        if (payload != null && onTap != null) onTap(payload);
+        if (payload == null) return;
+        final actionId = response.actionId;
+        if (actionId != null && actionId.isNotEmpty && onAction != null) {
+          onAction(actionId, payload);
+          return;
+        }
+        onTap?.call(payload);
       },
     );
 
@@ -128,6 +154,65 @@ class NotificationScheduler {
     );
   }
 
+  /// Re-reads whether the OS still allows exact alarms.
+  ///
+  /// Worth calling when the app comes back to the foreground: the permission
+  /// screen [requestPermissions] opens is a system Activity, and the answer is
+  /// only known once the member returns from it. Android may also revoke it
+  /// later, on its own, for an app it considers idle — which is why this is a
+  /// question asked repeatedly rather than a fact learned at install.
+  Future<bool> refreshExactAlarms() async {
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) return _exactAllowed;
+    _exactAllowed = await android.canScheduleExactNotifications() ?? true;
+    return _exactAllowed;
+  }
+
+  /// Cancels every armed alarm and arms the plan again from the database.
+  ///
+  /// Cancel-then-arm rather than a diff: the ids are derived from
+  /// `(sourceId, label)`, so re-arming an alert that is still in the plan
+  /// replaces it in place, and anything that left the plan — completed,
+  /// cancelled, deleted, moved out of the window — is simply not re-armed.
+  /// A diff would have to remember what it armed last time, and the one thing
+  /// that memory can do is disagree with the rows.
+  ///
+  /// Called after every sync pass, on resume, and after any local edit. That
+  /// is also what makes the [kMaxScheduled] cap safe: the nearest 50 are armed
+  /// now, and the window rolls forward long before the 51st matters.
+  Future<int> rescheduleAll(AppDatabase db, {DateTime? now}) async {
+    if (!_ready) return 0;
+
+    final plan = await plannedAlertsFor(db, now: now);
+
+    await _plugin.cancelAll();
+
+    var armed = 0;
+    for (final alert in plan) {
+      try {
+        await _plugin.zonedSchedule(
+          id: alert.notificationId,
+          title: alert.title,
+          body: alert.body,
+          scheduledDate: tz.TZDateTime.from(alert.notifyAt, tz.local),
+          notificationDetails: details,
+          androidScheduleMode: scheduleMode,
+          payload: encodeAlertPayload(alert),
+        );
+        armed++;
+      } on PlatformException catch (e) {
+        // Losing exact-alarm permission mid-flight must not take the sync down,
+        // and must not stop the rest of the plan from being armed inexactly.
+        debugPrint('could not schedule ${alert.key}: $e');
+        _exactAllowed = false;
+      }
+    }
+    return armed;
+  }
+
   Future<void> cancelAll() => _plugin.cancelAll();
 
   /// The delivery mode to schedule with: exact while the OS allows it,
@@ -143,8 +228,29 @@ class NotificationScheduler {
       channelDescription: 'Reminder pings, check-ins and daily programs.',
       importance: Importance.high,
       priority: Priority.high,
+      actions: [
+        // `showsUserInterface: true` on both, so the tap wakes the app and the
+        // response arrives in the foreground handler.
+        //
+        // ponytail: the alternative is a background isolate
+        // (`onDidReceiveBackgroundNotificationResponse`), which would need its
+        // own database handle and its own push queue to write a completion
+        // while the app is dead — a second copy of the sync path for two
+        // buttons. Upgrade to it if members complain about the app opening;
+        // until then the shade is one tap from a screen that can undo.
+        AndroidNotificationAction(
+          AlertActions.complete,
+          'Complete',
+          showsUserInterface: true,
+        ),
+        AndroidNotificationAction(
+          AlertActions.snooze,
+          'Snooze',
+          showsUserInterface: true,
+        ),
+      ],
     ),
-    iOS: DarwinNotificationDetails(),
+    iOS: DarwinNotificationDetails(categoryIdentifier: kAlertCategoryId),
   );
 }
 
