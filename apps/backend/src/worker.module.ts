@@ -5,6 +5,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
+import { RemindersModule } from './contexts/reminders/reminders.module.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
 import { ConfigModule } from './shared/config/config.module.js';
 import { HealthzController } from './shared/health/healthz.controller.js';
@@ -40,6 +41,9 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     // the relay, and for `PurgeTaskHandler.purgeTombstones`, which the sweep
     // dispatches. Neither has an HTTP surface, which is why they belong here.
     PlanningModule,
+    // For `ReminderLifecycleHandler.purgeTombstones`, the other half of the
+    // command the sweep dispatches rather than doing itself.
+    RemindersModule,
     RelayModule,
   ],
   controllers: [HealthzController],

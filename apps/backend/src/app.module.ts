@@ -10,6 +10,8 @@ import { AuthController } from './contexts/identity/features/sign-in/auth.contro
 import { PingController } from './contexts/operations/features/ping/ping.controller.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
+import { RemindersModule } from './contexts/reminders/reminders.module.js';
+import { RemindersController } from './contexts/reminders/features/manage-reminder/reminders.controller.js';
 import { ProfileModule } from './contexts/profile/profile.module.js';
 import { TasksController } from './contexts/planning/features/create-task/tasks.controller.js';
 import { SettingsController } from './contexts/operations/features/patch-setting/settings.controller.js';
@@ -55,6 +57,7 @@ import { WsModule } from './ws/ws.module.js';
     OperationsModule,
     ProfileModule,
     PlanningModule,
+    RemindersModule,
     HealthModule,
 
     // The other two edges. Commands are REST above; these are the reads and the
@@ -73,6 +76,7 @@ import { WsModule } from './ws/ws.module.js';
     SettingsController,
     PingController,
     TasksController,
+    RemindersController,
     InternalAlertsController,
     InternalHeartbeatController,
   ],

@@ -26,8 +26,8 @@ mirroring the server's.
 
 ## Phase 2 — Reminders context
 
-- [ ] T210 `contexts/reminders/`: domain aggregate + port, mongo and in-memory adapters, mappers
-- [ ] T211 [P] Slices `create/ update/ snooze/ complete/ cancel/ reactivate/ delete/ restore/ purge/ clear-deleted` and query `reminders(view)`; `create` takes the client's UUIDv7 `id` and a replay of it is the same reminder, not a second one; `remindAt` resolved through `shared/time` against the member's zone; spec: restore keeps status, purge refused for a live row, reactivate requires a new moment, a `remindAt` an hour behind `Date.now()` is refused as `remind_at_past` with the reason, and a `remindAt` inside a daylight-saving gap lands on the first valid instant after it (fixtures built from `Date.now()`, never a pinned date)
+- [X] T210 `contexts/reminders/`: domain aggregate + port, mongo and in-memory adapters, mappers
+- [X] T211 [P] Slices `create/ update/ snooze/ complete/ cancel/ reactivate/ delete/ restore/ purge/ clear-deleted` and query `reminders(view)`; `create` takes the client's UUIDv7 `id` and a replay of it is the same reminder, not a second one; `remindAt` resolved through `shared/time` against the member's zone; spec: restore keeps status, purge refused for a live row, reactivate requires a new moment, a `remindAt` an hour behind `Date.now()` is refused as `remind_at_past` with the reason, and a `remindAt` inside a daylight-saving gap lands on the first valid instant after it (fixtures built from `Date.now()`, never a pinned date)
 
 ## Phase 3 — Notifications context (US5, US6)
 
