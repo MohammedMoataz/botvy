@@ -248,16 +248,23 @@ finding its author was overruled on is not a review. The anonymous rate limit
 added in §5 is what now stands between that password and an unbounded guessing
 attempt.
 
-## 11. The inherited exposed key
+## 11. The inherited exposed key · **half closed**
 
-A Google service-account key was committed to the v1 repository. The Owner chose
-to defer rotation.
+A Google service-account key was committed to the v1 repository.
 
-**A service-account key stays valid until it is deleted at the provider** —
-removing it from the repository, rewriting history and revoking nothing all
-leave it live. Until `T1113` is done, treat that key as known to whoever has
-ever cloned the repository, and assume anything it can do can be done by them.
+**Rotated on 10 September.** `secrets/firebase-admin.json` now carries key id
+ending `424ead`, and that is the credential the backend uses.
 
-Status: **deferred at the Owner's explicit instruction.** Not closed, not
-accepted — deferred, which is a different thing and is why it stays in this
-document until the key is deleted.
+**The exposed key ending `c3a2a5` has not been deleted, so it is still live.**
+This is the half that matters and it is worth being exact about why: adding a
+key revokes nothing. Removing the file from the repository, rewriting history
+and making the repository private all leave the key working. A service-account
+key is valid until it is **deleted at the provider**, and that has not happened.
+
+So until `T1113` closes, treat `c3a2a5` as known to everybody who has ever
+cloned the v1 repository, and assume anything it is authorised to do can be done
+by them. What that is depends on the service account's roles, which are worth
+narrowing at the same time — Firebase Cloud Messaging needs very little.
+
+Status: **open.** Not accepted and not deferred any longer — the remaining step
+is a deletion in a console, and this section stays until it is done.

@@ -45,6 +45,20 @@ D1 and D3 both came back on 10 September and their files are gone.
   the exposed key stays valid until it is *deleted* in the console. See
   [I21](inputs-016-to-025.md#i21--rotate-the-firebase-key-for-real).
 
+---
+
+# 🔴 Now — the reset, the release, and the key
+
+Five new files, from the P10/P11 sessions on 11–12 September:
+
+| File | What it is |
+|---|---|
+| [`do-1-the-reset-and-what-it-destroys.md`](do-1-the-reset-and-what-it-destroys.md) | `infra/reset.mjs` — archive v1, retire it, rebuild v2 from nothing. **Read before running**: two of the deletions are irreversible and one of them ends an open task |
+| [`do-2-the-firebase-key-is-still-live.md`](do-2-the-firebase-key-is-still-live.md) | `I21`, pulled out on its own: the new key is in place, the exposed one is **not deleted**, and that is the half that closes the hole. The one mandatory blocker for the release |
+| [`decide-1-what-to-call-this-release.md`](decide-1-what-to-call-this-release.md) | `v2.0.0` or `v1.2.1`. My recommendation is `v2.0.0` and the reasoning is one table |
+| [`decide-2-the-admin-password-before-a-public-release.md`](decide-2-the-admin-password-before-a-public-release.md) | Raised once more, only because publishing changes what is at stake. Settled either way after this |
+| [`decide-3-who-still-uses-v1.md`](decide-3-who-still-uses-v1.md) | `T1121`: who to tell, and what to do about members v1 had banned. Has to happen before the volumes go |
+
 ## Still open — the roadmap register
 
 | # | What | Why it is still here |
