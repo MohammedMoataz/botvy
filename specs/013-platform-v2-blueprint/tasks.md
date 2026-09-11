@@ -122,10 +122,10 @@ slot; logged sets persist offline and sync; T603 green.
 
 ## Phase 7 — Knowledge Ingestion & Suggestions (`021-knowledge-ingestion`)
 
-- [ ] T701 API Knowledge context: add/retry/remove link, kind detection (article/website/video/playlist), worker pipeline (readability+jsdom, youtubei.js transcripts + playlist expansion with `playlistMaxItems`, map-reduce summarise with `llm.summarizeModel`, media refs via signed proxy), state machine + `LinkStateChanged` nudges, `knowledge_docs`; `SuggestionSaga` on `SessionScheduled` when `aiSuggestions` (schema-constrained draft from the member's docs by sport), accept/dismiss → Training; GraphQL `links`, `link`, `suggestions`; `/internal/knowledge/ingest/:id`
-- [ ] T702 [P] MOB Knowledge feature inside Athlete: add link, status chips with retry, summary + key points + media viewer, suggestions inbox (accept into session / dismiss); preference toggle for suggestions
-- [ ] T703 [P] WEB (admin) Ingestion queue page (all users, retry, failures)
-- [ ] T704 API Tests: failed → retry increments attempts and caps; playlist children created once; suggestion not generated when `aiSuggestions=false`; summary chunking on a 20k-word fixture
+- [x] T701 API Knowledge context: add/retry/remove link, kind detection (article/website/video/playlist), worker pipeline (readability+jsdom, youtubei.js transcripts + playlist expansion with `playlistMaxItems`, map-reduce summarise with `llm.summarizeModel`, media refs via signed proxy), state machine + `LinkStateChanged` nudges, `knowledge_docs`; `SuggestionSaga` on `SessionScheduled` when `aiSuggestions` (schema-constrained draft from the member's docs by sport), accept/dismiss → Training; GraphQL `links`, `link`, `suggestions`; `/internal/knowledge/ingest/:id`
+- [x] T702 [P] MOB Knowledge feature inside Athlete: add link, status chips with retry, summary + key points + media viewer, suggestions inbox (accept into session / dismiss); preference toggle for suggestions
+- [x] T703 [P] WEB (admin) Ingestion queue page (all users, retry, failures)
+- [x] T704 API Tests: failed → retry increments attempts and caps; playlist children created once; suggestion not generated when `aiSuggestions=false`; summary chunking on a 20k-word fixture
 
 **Gate**: 3-video playlist → 3 children `done` within 20 min on the reference
 host; suggestion for tomorrow's session references a saved source; failure UX

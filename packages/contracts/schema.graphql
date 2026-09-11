@@ -132,6 +132,19 @@ Arbitrary JSON, used for a settings value and an audit entry’s metadata.
 """
 scalar JSON
 
+type KnowledgeDoc {
+  author: String
+  durationSec: Int
+  hadTranscript: Boolean
+  keyPoints: [String!]!
+  lengthChars: Int!
+  media: [SourceMedia!]!
+  publishedAt: DateTime
+  readAt: DateTime!
+  summary: String!
+  title: String
+}
+
 type Label {
   color: String!
   deletedAt: DateTime
@@ -145,6 +158,45 @@ type Label {
 type LabelSnapshot {
   color: String!
   name: String!
+}
+
+type Link {
+  addedAt: DateTime!
+  attempts: Int!
+  children: [Link!]!
+  doc: KnowledgeDoc
+  failReason: String
+  id: ID!
+  kind: LinkKind!
+  parentId: ID
+  processedAt: DateTime
+  skippedCount: Int
+  status: LinkStatus!
+  tags: [String!]!
+  title: String
+  url: String!
+}
+
+type LinkConnection {
+  endCursor: String
+  hasNextPage: Boolean!
+  nodes: [Link!]!
+}
+
+enum LinkKind {
+  article
+  playlist
+  video
+  website
+}
+
+enum LinkStatus {
+  done
+  extracting
+  failed
+  fetching
+  queued
+  summarising
 }
 
 type Location {
@@ -342,8 +394,17 @@ type Query {
 
   """A member's devices. Administrators only."""
   devicesOf(userId: ID!): [Device!]!
+
+  """Every member’s unfinished links. Administrators only."""
+  ingestionQueue(status: LinkStatus): [Link!]!
   labelPalette: [String!]!
   labels(includeDeleted: Boolean): [Label!]!
+
+  """One saved link with its summary and, for a playlist, its videos."""
+  link(id: ID!): Link
+
+  """The member’s saved links, newest first."""
+  links(after: String, first: Int = 50, kind: LinkKind, status: LinkStatus): LinkConnection!
 
   """The authenticated member."""
   me: User!
@@ -377,6 +438,9 @@ type Query {
   """The settings registry. Administrators only."""
   settings: [Setting!]!
   streak: Streak!
+
+  """Session suggestions drawn from the member’s own saved sources."""
+  suggestions(status: SuggestionStatus = pending): [Suggestion!]!
   task(id: ID!): Task
   tasks(cursor: String, labelId: ID, limit: Int, view: TaskViewName!): TaskPage!
   todayPlan(date: Date): DailyPlan!
@@ -496,11 +560,62 @@ type Slot {
   weekday: Int!
 }
 
+type SourceMedia {
+  caption: String
+  type: String!
+  url: String
+}
+
 type Streak {
   best: Int!
   current: Int!
   lastAdheredDate: Date
   weekAdherence: [Boolean]!
+}
+
+type SuggestedExercise {
+  name: String!
+  notes: String
+  sets: [SuggestedSet!]!
+}
+
+type SuggestedSet {
+  targetDistanceM: Int
+  targetDurationSec: Int
+  targetReps: Int
+  targetWeightKg: Float
+}
+
+type Suggestion {
+  acceptedSessionId: ID
+  createdAt: DateTime!
+  draft: SuggestionDraft!
+  forDate: Date!
+  id: ID!
+  outcome: String
+  rationale: String!
+  sessionId: ID
+  sources: [SuggestionSource!]!
+  sport: String!
+  status: SuggestionStatus!
+}
+
+type SuggestionDraft {
+  exercises: [SuggestedExercise!]!
+  focus: String
+  title: String!
+}
+
+type SuggestionSource {
+  id: ID!
+  title: String
+  url: String!
+}
+
+enum SuggestionStatus {
+  accepted
+  dismissed
+  pending
 }
 
 type Task {

@@ -12113,6 +12113,922 @@ class SessionsCompanion extends UpdateCompanion<LocalSession> {
   }
 }
 
+class $LinksTable extends Links with TableInfo<$LinksTable, LocalLink> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LinksTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _urlMeta = const VerificationMeta('url');
+  @override
+  late final GeneratedColumn<String> url = GeneratedColumn<String>(
+      'url', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('article'));
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _tagsJsonMeta =
+      const VerificationMeta('tagsJson');
+  @override
+  late final GeneratedColumn<String> tagsJson = GeneratedColumn<String>(
+      'tags_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('queued'));
+  static const VerificationMeta _failReasonMeta =
+      const VerificationMeta('failReason');
+  @override
+  late final GeneratedColumn<String> failReason = GeneratedColumn<String>(
+      'fail_reason', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _attemptsMeta =
+      const VerificationMeta('attempts');
+  @override
+  late final GeneratedColumn<int> attempts = GeneratedColumn<int>(
+      'attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _parentLinkIdMeta =
+      const VerificationMeta('parentLinkId');
+  @override
+  late final GeneratedColumn<String> parentLinkId = GeneratedColumn<String>(
+      'parent_link_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _skippedCountMeta =
+      const VerificationMeta('skippedCount');
+  @override
+  late final GeneratedColumn<int> skippedCount = GeneratedColumn<int>(
+      'skipped_count', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _docIdMeta = const VerificationMeta('docId');
+  @override
+  late final GeneratedColumn<String> docId = GeneratedColumn<String>(
+      'doc_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _addedAtMeta =
+      const VerificationMeta('addedAt');
+  @override
+  late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
+      'added_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _processedAtMeta =
+      const VerificationMeta('processedAt');
+  @override
+  late final GeneratedColumn<DateTime> processedAt = GeneratedColumn<DateTime>(
+      'processed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        url,
+        kind,
+        title,
+        tagsJson,
+        status,
+        failReason,
+        attempts,
+        parentLinkId,
+        skippedCount,
+        docId,
+        addedAt,
+        processedAt,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'links';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalLink> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('url')) {
+      context.handle(
+          _urlMeta, url.isAcceptableOrUnknown(data['url']!, _urlMeta));
+    } else if (isInserting) {
+      context.missing(_urlMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    }
+    if (data.containsKey('tags_json')) {
+      context.handle(_tagsJsonMeta,
+          tagsJson.isAcceptableOrUnknown(data['tags_json']!, _tagsJsonMeta));
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('fail_reason')) {
+      context.handle(
+          _failReasonMeta,
+          failReason.isAcceptableOrUnknown(
+              data['fail_reason']!, _failReasonMeta));
+    }
+    if (data.containsKey('attempts')) {
+      context.handle(_attemptsMeta,
+          attempts.isAcceptableOrUnknown(data['attempts']!, _attemptsMeta));
+    }
+    if (data.containsKey('parent_link_id')) {
+      context.handle(
+          _parentLinkIdMeta,
+          parentLinkId.isAcceptableOrUnknown(
+              data['parent_link_id']!, _parentLinkIdMeta));
+    }
+    if (data.containsKey('skipped_count')) {
+      context.handle(
+          _skippedCountMeta,
+          skippedCount.isAcceptableOrUnknown(
+              data['skipped_count']!, _skippedCountMeta));
+    }
+    if (data.containsKey('doc_id')) {
+      context.handle(
+          _docIdMeta, docId.isAcceptableOrUnknown(data['doc_id']!, _docIdMeta));
+    }
+    if (data.containsKey('added_at')) {
+      context.handle(_addedAtMeta,
+          addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta));
+    } else if (isInserting) {
+      context.missing(_addedAtMeta);
+    }
+    if (data.containsKey('processed_at')) {
+      context.handle(
+          _processedAtMeta,
+          processedAt.isAcceptableOrUnknown(
+              data['processed_at']!, _processedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalLink map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalLink(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      url: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}url'])!,
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title']),
+      tagsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tags_json'])!,
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      failReason: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}fail_reason']),
+      attempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}attempts'])!,
+      parentLinkId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}parent_link_id']),
+      skippedCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}skipped_count']),
+      docId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}doc_id']),
+      addedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}added_at'])!,
+      processedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}processed_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $LinksTable createAlias(String alias) {
+    return $LinksTable(attachedDatabase, alias);
+  }
+}
+
+class LocalLink extends DataClass implements Insertable<LocalLink> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String url;
+
+  /// `article` | `website` | `video` | `playlist`. The server recognises it
+  /// from the URL; the phone never declares one, because a client that could
+  /// declare a kind could declare the wrong one.
+  final String kind;
+  final String? title;
+  final String tagsJson;
+
+  /// `queued` | `fetching` | `extracting` | `summarising` | `done` | `failed`.
+  ///
+  /// The member reads the middle two as one word — "reading" — because from
+  /// outside they are one thing. They are two states on the server because a
+  /// crash between them says where the work stopped.
+  final String status;
+  final String? failReason;
+  final int attempts;
+
+  /// Set on a playlist's videos; null for anything the member saved directly.
+  final String? parentLinkId;
+
+  /// How many of a playlist's videos the Owner's limit left behind. Null — not
+  /// zero — for anything that is not an expanded playlist, so the list can say
+  /// nothing at all rather than "0 skipped" beside every article.
+  final int? skippedCount;
+
+  /// Whether a summary exists to fetch. Never the summary itself.
+  final String? docId;
+  final DateTime addedAt;
+  final DateTime? processedAt;
+  final DateTime createdAt;
+  const LocalLink(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.url,
+      required this.kind,
+      this.title,
+      required this.tagsJson,
+      required this.status,
+      this.failReason,
+      required this.attempts,
+      this.parentLinkId,
+      this.skippedCount,
+      this.docId,
+      required this.addedAt,
+      this.processedAt,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['url'] = Variable<String>(url);
+    map['kind'] = Variable<String>(kind);
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    map['tags_json'] = Variable<String>(tagsJson);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || failReason != null) {
+      map['fail_reason'] = Variable<String>(failReason);
+    }
+    map['attempts'] = Variable<int>(attempts);
+    if (!nullToAbsent || parentLinkId != null) {
+      map['parent_link_id'] = Variable<String>(parentLinkId);
+    }
+    if (!nullToAbsent || skippedCount != null) {
+      map['skipped_count'] = Variable<int>(skippedCount);
+    }
+    if (!nullToAbsent || docId != null) {
+      map['doc_id'] = Variable<String>(docId);
+    }
+    map['added_at'] = Variable<DateTime>(addedAt);
+    if (!nullToAbsent || processedAt != null) {
+      map['processed_at'] = Variable<DateTime>(processedAt);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  LinksCompanion toCompanion(bool nullToAbsent) {
+    return LinksCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      url: Value(url),
+      kind: Value(kind),
+      title:
+          title == null && nullToAbsent ? const Value.absent() : Value(title),
+      tagsJson: Value(tagsJson),
+      status: Value(status),
+      failReason: failReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failReason),
+      attempts: Value(attempts),
+      parentLinkId: parentLinkId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentLinkId),
+      skippedCount: skippedCount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(skippedCount),
+      docId:
+          docId == null && nullToAbsent ? const Value.absent() : Value(docId),
+      addedAt: Value(addedAt),
+      processedAt: processedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(processedAt),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalLink.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalLink(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      url: serializer.fromJson<String>(json['url']),
+      kind: serializer.fromJson<String>(json['kind']),
+      title: serializer.fromJson<String?>(json['title']),
+      tagsJson: serializer.fromJson<String>(json['tagsJson']),
+      status: serializer.fromJson<String>(json['status']),
+      failReason: serializer.fromJson<String?>(json['failReason']),
+      attempts: serializer.fromJson<int>(json['attempts']),
+      parentLinkId: serializer.fromJson<String?>(json['parentLinkId']),
+      skippedCount: serializer.fromJson<int?>(json['skippedCount']),
+      docId: serializer.fromJson<String?>(json['docId']),
+      addedAt: serializer.fromJson<DateTime>(json['addedAt']),
+      processedAt: serializer.fromJson<DateTime?>(json['processedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'url': serializer.toJson<String>(url),
+      'kind': serializer.toJson<String>(kind),
+      'title': serializer.toJson<String?>(title),
+      'tagsJson': serializer.toJson<String>(tagsJson),
+      'status': serializer.toJson<String>(status),
+      'failReason': serializer.toJson<String?>(failReason),
+      'attempts': serializer.toJson<int>(attempts),
+      'parentLinkId': serializer.toJson<String?>(parentLinkId),
+      'skippedCount': serializer.toJson<int?>(skippedCount),
+      'docId': serializer.toJson<String?>(docId),
+      'addedAt': serializer.toJson<DateTime>(addedAt),
+      'processedAt': serializer.toJson<DateTime?>(processedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalLink copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? url,
+          String? kind,
+          Value<String?> title = const Value.absent(),
+          String? tagsJson,
+          String? status,
+          Value<String?> failReason = const Value.absent(),
+          int? attempts,
+          Value<String?> parentLinkId = const Value.absent(),
+          Value<int?> skippedCount = const Value.absent(),
+          Value<String?> docId = const Value.absent(),
+          DateTime? addedAt,
+          Value<DateTime?> processedAt = const Value.absent(),
+          DateTime? createdAt}) =>
+      LocalLink(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        url: url ?? this.url,
+        kind: kind ?? this.kind,
+        title: title.present ? title.value : this.title,
+        tagsJson: tagsJson ?? this.tagsJson,
+        status: status ?? this.status,
+        failReason: failReason.present ? failReason.value : this.failReason,
+        attempts: attempts ?? this.attempts,
+        parentLinkId:
+            parentLinkId.present ? parentLinkId.value : this.parentLinkId,
+        skippedCount:
+            skippedCount.present ? skippedCount.value : this.skippedCount,
+        docId: docId.present ? docId.value : this.docId,
+        addedAt: addedAt ?? this.addedAt,
+        processedAt: processedAt.present ? processedAt.value : this.processedAt,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalLink copyWithCompanion(LinksCompanion data) {
+    return LocalLink(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      url: data.url.present ? data.url.value : this.url,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      title: data.title.present ? data.title.value : this.title,
+      tagsJson: data.tagsJson.present ? data.tagsJson.value : this.tagsJson,
+      status: data.status.present ? data.status.value : this.status,
+      failReason:
+          data.failReason.present ? data.failReason.value : this.failReason,
+      attempts: data.attempts.present ? data.attempts.value : this.attempts,
+      parentLinkId: data.parentLinkId.present
+          ? data.parentLinkId.value
+          : this.parentLinkId,
+      skippedCount: data.skippedCount.present
+          ? data.skippedCount.value
+          : this.skippedCount,
+      docId: data.docId.present ? data.docId.value : this.docId,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      processedAt:
+          data.processedAt.present ? data.processedAt.value : this.processedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalLink(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('url: $url, ')
+          ..write('kind: $kind, ')
+          ..write('title: $title, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('status: $status, ')
+          ..write('failReason: $failReason, ')
+          ..write('attempts: $attempts, ')
+          ..write('parentLinkId: $parentLinkId, ')
+          ..write('skippedCount: $skippedCount, ')
+          ..write('docId: $docId, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('processedAt: $processedAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      updatedAt,
+      baseUpdatedAt,
+      pendingOp,
+      pushAttempts,
+      deletedAt,
+      url,
+      kind,
+      title,
+      tagsJson,
+      status,
+      failReason,
+      attempts,
+      parentLinkId,
+      skippedCount,
+      docId,
+      addedAt,
+      processedAt,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalLink &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.url == this.url &&
+          other.kind == this.kind &&
+          other.title == this.title &&
+          other.tagsJson == this.tagsJson &&
+          other.status == this.status &&
+          other.failReason == this.failReason &&
+          other.attempts == this.attempts &&
+          other.parentLinkId == this.parentLinkId &&
+          other.skippedCount == this.skippedCount &&
+          other.docId == this.docId &&
+          other.addedAt == this.addedAt &&
+          other.processedAt == this.processedAt &&
+          other.createdAt == this.createdAt);
+}
+
+class LinksCompanion extends UpdateCompanion<LocalLink> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> url;
+  final Value<String> kind;
+  final Value<String?> title;
+  final Value<String> tagsJson;
+  final Value<String> status;
+  final Value<String?> failReason;
+  final Value<int> attempts;
+  final Value<String?> parentLinkId;
+  final Value<int?> skippedCount;
+  final Value<String?> docId;
+  final Value<DateTime> addedAt;
+  final Value<DateTime?> processedAt;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const LinksCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.url = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.title = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.failReason = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.parentLinkId = const Value.absent(),
+    this.skippedCount = const Value.absent(),
+    this.docId = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.processedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LinksCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String url,
+    this.kind = const Value.absent(),
+    this.title = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.failReason = const Value.absent(),
+    this.attempts = const Value.absent(),
+    this.parentLinkId = const Value.absent(),
+    this.skippedCount = const Value.absent(),
+    this.docId = const Value.absent(),
+    required DateTime addedAt,
+    this.processedAt = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        url = Value(url),
+        addedAt = Value(addedAt),
+        createdAt = Value(createdAt);
+  static Insertable<LocalLink> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? url,
+    Expression<String>? kind,
+    Expression<String>? title,
+    Expression<String>? tagsJson,
+    Expression<String>? status,
+    Expression<String>? failReason,
+    Expression<int>? attempts,
+    Expression<String>? parentLinkId,
+    Expression<int>? skippedCount,
+    Expression<String>? docId,
+    Expression<DateTime>? addedAt,
+    Expression<DateTime>? processedAt,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (url != null) 'url': url,
+      if (kind != null) 'kind': kind,
+      if (title != null) 'title': title,
+      if (tagsJson != null) 'tags_json': tagsJson,
+      if (status != null) 'status': status,
+      if (failReason != null) 'fail_reason': failReason,
+      if (attempts != null) 'attempts': attempts,
+      if (parentLinkId != null) 'parent_link_id': parentLinkId,
+      if (skippedCount != null) 'skipped_count': skippedCount,
+      if (docId != null) 'doc_id': docId,
+      if (addedAt != null) 'added_at': addedAt,
+      if (processedAt != null) 'processed_at': processedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LinksCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? url,
+      Value<String>? kind,
+      Value<String?>? title,
+      Value<String>? tagsJson,
+      Value<String>? status,
+      Value<String?>? failReason,
+      Value<int>? attempts,
+      Value<String?>? parentLinkId,
+      Value<int?>? skippedCount,
+      Value<String?>? docId,
+      Value<DateTime>? addedAt,
+      Value<DateTime?>? processedAt,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return LinksCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      url: url ?? this.url,
+      kind: kind ?? this.kind,
+      title: title ?? this.title,
+      tagsJson: tagsJson ?? this.tagsJson,
+      status: status ?? this.status,
+      failReason: failReason ?? this.failReason,
+      attempts: attempts ?? this.attempts,
+      parentLinkId: parentLinkId ?? this.parentLinkId,
+      skippedCount: skippedCount ?? this.skippedCount,
+      docId: docId ?? this.docId,
+      addedAt: addedAt ?? this.addedAt,
+      processedAt: processedAt ?? this.processedAt,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (url.present) {
+      map['url'] = Variable<String>(url.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (tagsJson.present) {
+      map['tags_json'] = Variable<String>(tagsJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (failReason.present) {
+      map['fail_reason'] = Variable<String>(failReason.value);
+    }
+    if (attempts.present) {
+      map['attempts'] = Variable<int>(attempts.value);
+    }
+    if (parentLinkId.present) {
+      map['parent_link_id'] = Variable<String>(parentLinkId.value);
+    }
+    if (skippedCount.present) {
+      map['skipped_count'] = Variable<int>(skippedCount.value);
+    }
+    if (docId.present) {
+      map['doc_id'] = Variable<String>(docId.value);
+    }
+    if (addedAt.present) {
+      map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    if (processedAt.present) {
+      map['processed_at'] = Variable<DateTime>(processedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LinksCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('url: $url, ')
+          ..write('kind: $kind, ')
+          ..write('title: $title, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('status: $status, ')
+          ..write('failReason: $failReason, ')
+          ..write('attempts: $attempts, ')
+          ..write('parentLinkId: $parentLinkId, ')
+          ..write('skippedCount: $skippedCount, ')
+          ..write('docId: $docId, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('processedAt: $processedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -12137,6 +13053,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ProgramsTable programs = $ProgramsTable(this);
   late final $WorkoutsTable workouts = $WorkoutsTable(this);
   late final $SessionsTable sessions = $SessionsTable(this);
+  late final $LinksTable links = $LinksTable(this);
   late final Index labelsSort =
       Index('labels_sort', 'CREATE INDEX labels_sort ON labels (sort_order)');
   late final Index labelsPending = Index(
@@ -12197,6 +13114,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX sessions_status_planned ON sessions (status, planned_at)');
   late final Index sessionsPending = Index('sessions_pending',
       'CREATE INDEX sessions_pending ON sessions (pending_op)');
+  late final Index linksAddedAt = Index(
+      'links_added_at', 'CREATE INDEX links_added_at ON links (added_at)');
+  late final Index linksStatusAdded = Index('links_status_added',
+      'CREATE INDEX links_status_added ON links (status, added_at)');
+  late final Index linksParent = Index(
+      'links_parent', 'CREATE INDEX links_parent ON links (parent_link_id)');
+  late final Index linksPending = Index(
+      'links_pending', 'CREATE INDEX links_pending ON links (pending_op)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -12221,6 +13146,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         programs,
         workouts,
         sessions,
+        links,
         labelsSort,
         labelsPending,
         tasksDue,
@@ -12250,7 +13176,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         workoutsPending,
         sessionsPlannedAt,
         sessionsStatusPlanned,
-        sessionsPending
+        sessionsPending,
+        linksAddedAt,
+        linksStatusAdded,
+        linksParent,
+        linksPending
       ];
   @override
   DriftDatabaseOptions get options =>
@@ -17614,6 +18544,384 @@ typedef $$SessionsTableProcessedTableManager = ProcessedTableManager<
     (LocalSession, BaseReferences<_$AppDatabase, $SessionsTable, LocalSession>),
     LocalSession,
     PrefetchHooks Function()>;
+typedef $$LinksTableCreateCompanionBuilder = LinksCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String url,
+  Value<String> kind,
+  Value<String?> title,
+  Value<String> tagsJson,
+  Value<String> status,
+  Value<String?> failReason,
+  Value<int> attempts,
+  Value<String?> parentLinkId,
+  Value<int?> skippedCount,
+  Value<String?> docId,
+  required DateTime addedAt,
+  Value<DateTime?> processedAt,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$LinksTableUpdateCompanionBuilder = LinksCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> url,
+  Value<String> kind,
+  Value<String?> title,
+  Value<String> tagsJson,
+  Value<String> status,
+  Value<String?> failReason,
+  Value<int> attempts,
+  Value<String?> parentLinkId,
+  Value<int?> skippedCount,
+  Value<String?> docId,
+  Value<DateTime> addedAt,
+  Value<DateTime?> processedAt,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$LinksTableFilterComposer extends Composer<_$AppDatabase, $LinksTable> {
+  $$LinksTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get url => $composableBuilder(
+      column: $table.url, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tagsJson => $composableBuilder(
+      column: $table.tagsJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get failReason => $composableBuilder(
+      column: $table.failReason, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get attempts => $composableBuilder(
+      column: $table.attempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get parentLinkId => $composableBuilder(
+      column: $table.parentLinkId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get skippedCount => $composableBuilder(
+      column: $table.skippedCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get docId => $composableBuilder(
+      column: $table.docId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get addedAt => $composableBuilder(
+      column: $table.addedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get processedAt => $composableBuilder(
+      column: $table.processedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$LinksTableOrderingComposer
+    extends Composer<_$AppDatabase, $LinksTable> {
+  $$LinksTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get url => $composableBuilder(
+      column: $table.url, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tagsJson => $composableBuilder(
+      column: $table.tagsJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get failReason => $composableBuilder(
+      column: $table.failReason, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get attempts => $composableBuilder(
+      column: $table.attempts, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get parentLinkId => $composableBuilder(
+      column: $table.parentLinkId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get skippedCount => $composableBuilder(
+      column: $table.skippedCount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get docId => $composableBuilder(
+      column: $table.docId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get addedAt => $composableBuilder(
+      column: $table.addedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get processedAt => $composableBuilder(
+      column: $table.processedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$LinksTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LinksTable> {
+  $$LinksTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get url =>
+      $composableBuilder(column: $table.url, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get tagsJson =>
+      $composableBuilder(column: $table.tagsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get failReason => $composableBuilder(
+      column: $table.failReason, builder: (column) => column);
+
+  GeneratedColumn<int> get attempts =>
+      $composableBuilder(column: $table.attempts, builder: (column) => column);
+
+  GeneratedColumn<String> get parentLinkId => $composableBuilder(
+      column: $table.parentLinkId, builder: (column) => column);
+
+  GeneratedColumn<int> get skippedCount => $composableBuilder(
+      column: $table.skippedCount, builder: (column) => column);
+
+  GeneratedColumn<String> get docId =>
+      $composableBuilder(column: $table.docId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get processedAt => $composableBuilder(
+      column: $table.processedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$LinksTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $LinksTable,
+    LocalLink,
+    $$LinksTableFilterComposer,
+    $$LinksTableOrderingComposer,
+    $$LinksTableAnnotationComposer,
+    $$LinksTableCreateCompanionBuilder,
+    $$LinksTableUpdateCompanionBuilder,
+    (LocalLink, BaseReferences<_$AppDatabase, $LinksTable, LocalLink>),
+    LocalLink,
+    PrefetchHooks Function()> {
+  $$LinksTableTableManager(_$AppDatabase db, $LinksTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LinksTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LinksTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LinksTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> url = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<String?> title = const Value.absent(),
+            Value<String> tagsJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String?> failReason = const Value.absent(),
+            Value<int> attempts = const Value.absent(),
+            Value<String?> parentLinkId = const Value.absent(),
+            Value<int?> skippedCount = const Value.absent(),
+            Value<String?> docId = const Value.absent(),
+            Value<DateTime> addedAt = const Value.absent(),
+            Value<DateTime?> processedAt = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              LinksCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            url: url,
+            kind: kind,
+            title: title,
+            tagsJson: tagsJson,
+            status: status,
+            failReason: failReason,
+            attempts: attempts,
+            parentLinkId: parentLinkId,
+            skippedCount: skippedCount,
+            docId: docId,
+            addedAt: addedAt,
+            processedAt: processedAt,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String url,
+            Value<String> kind = const Value.absent(),
+            Value<String?> title = const Value.absent(),
+            Value<String> tagsJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String?> failReason = const Value.absent(),
+            Value<int> attempts = const Value.absent(),
+            Value<String?> parentLinkId = const Value.absent(),
+            Value<int?> skippedCount = const Value.absent(),
+            Value<String?> docId = const Value.absent(),
+            required DateTime addedAt,
+            Value<DateTime?> processedAt = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              LinksCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            url: url,
+            kind: kind,
+            title: title,
+            tagsJson: tagsJson,
+            status: status,
+            failReason: failReason,
+            attempts: attempts,
+            parentLinkId: parentLinkId,
+            skippedCount: skippedCount,
+            docId: docId,
+            addedAt: addedAt,
+            processedAt: processedAt,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$LinksTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $LinksTable,
+    LocalLink,
+    $$LinksTableFilterComposer,
+    $$LinksTableOrderingComposer,
+    $$LinksTableAnnotationComposer,
+    $$LinksTableCreateCompanionBuilder,
+    $$LinksTableUpdateCompanionBuilder,
+    (LocalLink, BaseReferences<_$AppDatabase, $LinksTable, LocalLink>),
+    LocalLink,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -17656,4 +18964,6 @@ class $AppDatabaseManager {
       $$WorkoutsTableTableManager(_db, _db.workouts);
   $$SessionsTableTableManager get sessions =>
       $$SessionsTableTableManager(_db, _db.sessions);
+  $$LinksTableTableManager get links =>
+      $$LinksTableTableManager(_db, _db.links);
 }

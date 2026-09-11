@@ -423,6 +423,55 @@ export class PlanAlertsSaga {
     });
   }
 
+  /**
+   * `knowledge.SuggestionReady` — Botvy has drawn a session from what the
+   * member saved (P7, FR-009).
+   *
+   * ## Why the alert is for *now* and not for the session
+   *
+   * The suggestion is about a session at least a day away, and the point of
+   * telling the member is that they still have time to act on it. An alert
+   * timed to the session itself would arrive when the decision is already made,
+   * which is the same reasoning that keeps a rhythm touch's alert at the moment
+   * of the touch — so `timed: false` and the moment is the event's.
+   *
+   * ## Idempotent through the source id, like everything else here
+   *
+   * The suggestion's own id, which this context did not mint and cannot repeat.
+   * A redelivered `SuggestionReady` reconciles to the same single row instead of
+   * planning a second, which is the only thing standing between at-least-once
+   * delivery and a member being told twice about one card.
+   *
+   * The deep link opens the inbox rather than the session: the member has a
+   * choice to make — take it or not — and landing them on the session would
+   * show them a week that has not changed yet.
+   */
+  async onSuggestionReady(event: DomainEvent): Promise<void> {
+    const userId = event.userId;
+    const payload = event.payload as {
+      suggestionId?: string;
+      sport?: string;
+      forDate?: string;
+    };
+    if (!userId || !payload.suggestionId) return;
+
+    await this.plan(userId, {
+      kind: 'suggestion',
+      id: payload.suggestionId,
+      // No occurrence, for the same reason a rhythm touch has none: this
+      // instant belongs to the suggestion rather than to a recurring source the
+      // member picked, and `replanFuture` reads the field to decide what a
+      // zone change may rebuild.
+      occurrenceAt: null,
+      moment: event.occurredAt,
+      title: payload.sport
+        ? `A ${payload.sport} session, from what you saved`
+        : 'A session, from what you saved',
+      timed: false,
+      deepLink: 'botvy://knowledge/suggestions',
+    });
+  }
+
   // ------------------------------------------------------- Profile and Identity
 
   /**

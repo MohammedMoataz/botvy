@@ -13,7 +13,11 @@ import { AllergenGuard } from './application/allergen-guard.js';
 import { IntentExecutor } from './application/intent-executor.js';
 import { IntentExtractor } from './application/intent-extractor.js';
 import { PromptAssembler } from './application/prompt-assembler.js';
-import { delimitQuoted, renderPrompt, resetPromptCache } from './application/prompt-files.js';
+import {
+  renderPrompt,
+  resetPromptCache,
+} from '../../shared/templates/prompt-files.js';
+import { delimitQuoted } from './application/prompt-files.js';
 import {
   MeetingActionsPort,
   MemberDayPort,

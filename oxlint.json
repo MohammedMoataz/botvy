@@ -218,7 +218,19 @@
                   "../../../../contexts/training",
                   "../../../../contexts/training/**",
                   "../../../../../contexts/training",
-                  "../../../../../contexts/training/**"
+                  "../../../../../contexts/training/**",
+                  "../../knowledge",
+                  "../../knowledge/**",
+                  "../../../knowledge",
+                  "../../../knowledge/**",
+                  "../../../../knowledge",
+                  "../../../../knowledge/**",
+                  "../../../contexts/knowledge",
+                  "../../../contexts/knowledge/**",
+                  "../../../../contexts/knowledge",
+                  "../../../../contexts/knowledge/**",
+                  "../../../../../contexts/knowledge",
+                  "../../../../../contexts/knowledge/**"
                 ],
                 "message": "Constitution IX: a context may not import another context. Cross-context needs go through a QueryBus call, an outbox event, or a port declared here and bound to an adapter in this context's own infrastructure/ - the one layer allowed to know another context exists. A helper three contexts want belongs in shared/."
               }

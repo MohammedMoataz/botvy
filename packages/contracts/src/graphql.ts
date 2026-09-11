@@ -153,6 +153,20 @@ export type Exercise = {
   sets: Array<SetEntry>;
 };
 
+export type KnowledgeDoc = {
+  __typename?: 'KnowledgeDoc';
+  author?: Maybe<Scalars['String']['output']>;
+  durationSec?: Maybe<Scalars['Int']['output']>;
+  hadTranscript?: Maybe<Scalars['Boolean']['output']>;
+  keyPoints: Array<Scalars['String']['output']>;
+  lengthChars: Scalars['Int']['output'];
+  media: Array<SourceMedia>;
+  publishedAt?: Maybe<Scalars['DateTime']['output']>;
+  readAt: Scalars['DateTime']['output'];
+  summary: Scalars['String']['output'];
+  title?: Maybe<Scalars['String']['output']>;
+};
+
 export type Label = {
   __typename?: 'Label';
   color: Scalars['String']['output'];
@@ -169,6 +183,47 @@ export type LabelSnapshot = {
   color: Scalars['String']['output'];
   name: Scalars['String']['output'];
 };
+
+export type Link = {
+  __typename?: 'Link';
+  addedAt: Scalars['DateTime']['output'];
+  attempts: Scalars['Int']['output'];
+  children: Array<Link>;
+  doc?: Maybe<KnowledgeDoc>;
+  failReason?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  kind: LinkKind;
+  parentId?: Maybe<Scalars['ID']['output']>;
+  processedAt?: Maybe<Scalars['DateTime']['output']>;
+  skippedCount?: Maybe<Scalars['Int']['output']>;
+  status: LinkStatus;
+  tags: Array<Scalars['String']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
+  url: Scalars['String']['output'];
+};
+
+export type LinkConnection = {
+  __typename?: 'LinkConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage: Scalars['Boolean']['output'];
+  nodes: Array<Link>;
+};
+
+export enum LinkKind {
+  Article = 'article',
+  Playlist = 'playlist',
+  Video = 'video',
+  Website = 'website'
+}
+
+export enum LinkStatus {
+  Done = 'done',
+  Extracting = 'extracting',
+  Failed = 'failed',
+  Fetching = 'fetching',
+  Queued = 'queued',
+  Summarising = 'summarising'
+}
 
 export type Location = {
   __typename?: 'Location';
@@ -376,8 +431,14 @@ export type Query = {
   conversations: Array<Conversation>;
   /** A member's devices. Administrators only. */
   devicesOf: Array<Device>;
+  /** Every member’s unfinished links. Administrators only. */
+  ingestionQueue: Array<Link>;
   labelPalette: Array<Scalars['String']['output']>;
   labels: Array<Label>;
+  /** One saved link with its summary and, for a playlist, its videos. */
+  link?: Maybe<Link>;
+  /** The member’s saved links, newest first. */
+  links: LinkConnection;
   /** The authenticated member. */
   me: User;
   meeting?: Maybe<Meeting>;
@@ -405,6 +466,8 @@ export type Query = {
   /** The settings registry. Administrators only. */
   settings: Array<Setting>;
   streak: Streak;
+  /** Session suggestions drawn from the member’s own saved sources. */
+  suggestions: Array<Suggestion>;
   task?: Maybe<Task>;
   tasks: TaskPage;
   todayPlan: DailyPlan;
@@ -442,8 +505,26 @@ export type QueryDevicesOfArgs = {
 };
 
 
+export type QueryIngestionQueueArgs = {
+  status?: InputMaybe<LinkStatus>;
+};
+
+
 export type QueryLabelsArgs = {
   includeDeleted?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
+export type QueryLinkArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryLinksArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  kind?: InputMaybe<LinkKind>;
+  status?: InputMaybe<LinkStatus>;
 };
 
 
@@ -517,6 +598,11 @@ export type QuerySessionArgs = {
 export type QuerySessionsArgs = {
   from: Scalars['DateTime']['input'];
   to: Scalars['DateTime']['input'];
+};
+
+
+export type QuerySuggestionsArgs = {
+  status?: InputMaybe<SuggestionStatus>;
 };
 
 
@@ -667,6 +753,13 @@ export type Slot = {
   weekday: Scalars['Int']['output'];
 };
 
+export type SourceMedia = {
+  __typename?: 'SourceMedia';
+  caption?: Maybe<Scalars['String']['output']>;
+  type: Scalars['String']['output'];
+  url?: Maybe<Scalars['String']['output']>;
+};
+
 export type Streak = {
   __typename?: 'Streak';
   best: Scalars['Int']['output'];
@@ -674,6 +767,56 @@ export type Streak = {
   lastAdheredDate?: Maybe<Scalars['Date']['output']>;
   weekAdherence: Array<Maybe<Scalars['Boolean']['output']>>;
 };
+
+export type SuggestedExercise = {
+  __typename?: 'SuggestedExercise';
+  name: Scalars['String']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  sets: Array<SuggestedSet>;
+};
+
+export type SuggestedSet = {
+  __typename?: 'SuggestedSet';
+  targetDistanceM?: Maybe<Scalars['Int']['output']>;
+  targetDurationSec?: Maybe<Scalars['Int']['output']>;
+  targetReps?: Maybe<Scalars['Int']['output']>;
+  targetWeightKg?: Maybe<Scalars['Float']['output']>;
+};
+
+export type Suggestion = {
+  __typename?: 'Suggestion';
+  acceptedSessionId?: Maybe<Scalars['ID']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  draft: SuggestionDraft;
+  forDate: Scalars['Date']['output'];
+  id: Scalars['ID']['output'];
+  outcome?: Maybe<Scalars['String']['output']>;
+  rationale: Scalars['String']['output'];
+  sessionId?: Maybe<Scalars['ID']['output']>;
+  sources: Array<SuggestionSource>;
+  sport: Scalars['String']['output'];
+  status: SuggestionStatus;
+};
+
+export type SuggestionDraft = {
+  __typename?: 'SuggestionDraft';
+  exercises: Array<SuggestedExercise>;
+  focus?: Maybe<Scalars['String']['output']>;
+  title: Scalars['String']['output'];
+};
+
+export type SuggestionSource = {
+  __typename?: 'SuggestionSource';
+  id: Scalars['ID']['output'];
+  title?: Maybe<Scalars['String']['output']>;
+  url: Scalars['String']['output'];
+};
+
+export enum SuggestionStatus {
+  Accepted = 'accepted',
+  Dismissed = 'dismissed',
+  Pending = 'pending'
+}
 
 export type Task = {
   __typename?: 'Task';

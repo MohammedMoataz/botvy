@@ -13,7 +13,7 @@ import {
   type ListKind,
 } from '../domain/intent.js';
 import { mentionsAMoment, preferSoonestDay, resolveRelativePhrase } from '../domain/relative-time.js';
-import { renderPrompt } from './prompt-files.js';
+import { renderPrompt } from '../../../shared/templates/prompt-files.js';
 
 /**
  * The enums, taken from the schema the model is actually constrained by rather

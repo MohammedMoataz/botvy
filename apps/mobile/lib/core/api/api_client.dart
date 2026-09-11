@@ -797,6 +797,63 @@ class ApiClient {
     await _guard(() => dio.post<dynamic>('/programs/$programId/archive'));
   }
 
+  /// "Try that link again" (P7, FR-003).
+  ///
+  /// REST rather than a sync push, and it is the clearest case in this client
+  /// for why the two are different things. `status` and `attempts` are the
+  /// *server's* record of work it did; the sync adapter refuses an edit to them
+  /// outright. What the member is asking for is not "set this row back to
+  /// queued" — it is "do the work again", which is a command with a limit
+  /// attached (`knowledge.maxAttempts`) and an answer worth reading.
+  ///
+  /// A 409 comes back when the attempts are spent, and it is returned rather
+  /// than thrown: the member needs to be told the limit was reached, and a
+  /// thrown error would be indistinguishable from a network failure.
+  Future<({String status, int attempts, String? refusal})> retryLink(
+    String linkId,
+  ) async {
+    try {
+      final response = await dio.post<dynamic>('/links/$linkId/retry');
+      final data = response.data;
+      final map = data is Map ? Map<String, dynamic>.from(data) : const {};
+      return (
+        status: map['status'] as String? ?? 'queued',
+        attempts: (map['attempts'] as num?)?.toInt() ?? 0,
+        refusal: null,
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (e.response?.statusCode == 409 && data is Map) {
+        return (
+          status: 'failed',
+          attempts: 0,
+          refusal: data['message'] as String? ?? 'This link cannot be retried.',
+        );
+      }
+      throw translate(e);
+    }
+  }
+
+  /// The member takes a suggestion into a session (P7, FR-010).
+  ///
+  /// `sessionId` is omitted to mean "the session it was suggested for", which
+  /// is what the member taps in the inbox. Naming one is the case where they
+  /// chose a different session.
+  Future<void> acceptSuggestion(String id, {String? sessionId}) async {
+    await _guard(
+      () => dio.post<dynamic>(
+        '/suggestions/$id/accept',
+        data: {if (sessionId != null) 'sessionId': sessionId},
+      ),
+    );
+  }
+
+  /// "Not this one." A record rather than a delete, so the same session is not
+  /// proposed again (FR-010).
+  Future<void> dismissSuggestion(String id) async {
+    await _guard(() => dio.post<dynamic>('/suggestions/$id/dismiss'));
+  }
+
   // -- reads -----------------------------------------------------------------
 
   /// The selections, named once. A GraphQL query asks for exactly the fields it
@@ -818,6 +875,62 @@ class ApiClient {
     leadTimes quietHours { from to } weekStartsOn checkinEnabled
     meetingDurationMin mealMode aiSuggestions
   ''';
+
+  /// One saved link's summary, and — for a playlist — its videos.
+  ///
+  /// The only read in this client that is deliberately *not* mirrored into
+  /// drift. A knowledge document runs to sixty thousand characters and the
+  /// phone shows one at a time, so it is fetched when the member opens a link
+  /// and forgotten when they leave. The list itself comes from the local table
+  /// like every other screen, and renders with the network off.
+  static const String _linkFields = '''
+    id url kind title tags status failReason attempts parentId skippedCount
+    addedAt processedAt
+    doc {
+      title author publishedAt summary keyPoints durationSec lengthChars
+      hadTranscript readAt
+      media { type url caption }
+    }
+  ''';
+
+  Future<Map<String, dynamic>?> link(String id) async {
+    final data = await query(
+      'query Link(\$id: ID!) { link(id: \$id) { $_linkFields children { $_linkFields } } }',
+      {'id': id},
+    );
+    final row = data['link'];
+    return row is Map ? Map<String, dynamic>.from(row) : null;
+  }
+
+  /// The suggestions inbox (FR-009).
+  ///
+  /// Not synced, because the two things a member does with one — accept and
+  /// dismiss — are commands that have to reach the server to mean anything.
+  Future<List<Map<String, dynamic>>> suggestions({
+    String status = 'pending',
+  }) async {
+    final data = await query(
+      '''
+      query Suggestions(\$status: SuggestionStatus) {
+        suggestions(status: \$status) {
+          id forDate sport rationale status sessionId acceptedSessionId
+          sources { id url title }
+          draft {
+            title focus
+            exercises {
+              name notes
+              sets { targetReps targetWeightKg targetDurationSec targetDistanceM }
+            }
+          }
+        }
+      }''',
+      {'status': status},
+    );
+    final rows = data['suggestions'];
+    return rows is List
+        ? [for (final row in rows) Map<String, dynamic>.from(row as Map)]
+        : const [];
+  }
 
   /// A read.
   ///

@@ -5,6 +5,7 @@ import { MeetingRepository } from '../../meetings/domain/meetings.repositories.j
 import { MeetingOccurrencesQueryHandler } from '../../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
 import { PurgeMeetingHandler } from '../../meetings/features/purge-meeting/purge-meeting.handler.js';
 import { PurgeTrainingTombstonesHandler } from '../../training/features/purge-tombstones/purge-tombstones.handler.js';
+import { PurgeKnowledgeTombstonesHandler } from '../../knowledge/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PurgeTaskHandler } from '../../planning/features/purge-task/purge-task.handler.js';
 import { ReminderLifecycleHandler } from '../../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import {
@@ -133,6 +134,26 @@ export class TrainingTombstonePurge extends TombstonePurgePort {
 
   async purgeBefore(before: Date): Promise<number> {
     return this.training.purgeTombstones(before);
+  }
+}
+
+/**
+ * Knowledge purging its own, on request.
+ *
+ * The fifth owner, and the one whose sweep does more than delete rows: a
+ * link's tombstone past the horizon takes its `knowledge_docs` document with
+ * it. The number it reports is still links, because that is what the sweep
+ * counts everywhere else and two units in one total would be a number nobody
+ * could read.
+ */
+@Injectable()
+export class KnowledgeTombstonePurge extends TombstonePurgePort {
+  constructor(private readonly knowledge: PurgeKnowledgeTombstonesHandler) {
+    super();
+  }
+
+  async purgeBefore(before: Date): Promise<number> {
+    return this.knowledge.purgeTombstones(before);
   }
 }
 

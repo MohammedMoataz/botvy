@@ -27,6 +27,7 @@ import {
 } from './domain/training.repositories.js';
 import { ActivateProgramHandler } from './features/activate-program/activate-program.handler.js';
 import { ApplyProgramHandler } from './features/apply-program/apply-program.handler.js';
+import { ApplySuggestionHandler } from './features/apply-suggestion/apply-suggestion.handler.js';
 import { ApplyWorkoutToSessionHandler } from './features/apply-workout-to-session/apply-workout-to-session.handler.js';
 import { ArchiveProgramHandler } from './features/archive-program/archive-program.handler.js';
 import { AthleteProfileQueryHandler } from './features/athlete-profile/athlete-profile.query.js';
@@ -182,6 +183,23 @@ import { ProfileNextPracticeCutoff } from './infrastructure/training.adapters.js
       provide: 'EXERCISE_ID',
       useValue: newId satisfies ExerciseIdFactory,
     },
+    /*
+     * P7's consumer of `knowledge.SuggestionAccepted`.
+     *
+     * A factory rather than a class token because it takes the same
+     * `EXERCISE_ID` the materialiser does — the exercises a suggestion brings
+     * get fresh ids on the way in, so a member editing the session afterwards
+     * cannot rewrite the suggestion they accepted.
+     */
+    {
+      provide: ApplySuggestionHandler,
+      inject: [UnitOfWork, SessionRepository, 'EXERCISE_ID'],
+      useFactory: (
+        uow: UnitOfWork,
+        sessions: SessionRepository,
+        nextId: ExerciseIdFactory,
+      ) => new ApplySuggestionHandler(uow, sessions, nextId),
+    },
     {
       provide: SessionMaterialiserSaga,
       inject: [
@@ -331,6 +349,7 @@ import { ProfileNextPracticeCutoff } from './infrastructure/training.adapters.js
 
     // For the relay's dispatch table and the nightly sweep.
     SessionMaterialiserSaga,
+    ApplySuggestionHandler,
     BootstrapAthleteProfileHandler,
     TrainingPurgeOnDeletedHandler,
     PurgeTrainingTombstonesHandler,

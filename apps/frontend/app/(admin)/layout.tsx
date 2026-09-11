@@ -24,6 +24,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <nav className="row" style={{ gap: 12 }}>
           <Link href="/overview">{t('admin.overview')}</Link>
           <Link href="/users">{t('admin.users')}</Link>
+          <Link href="/ingestion">{t('admin.ingestion')}</Link>
           <Link href="/service-clients">{t('admin.serviceClients')}</Link>
         </nav>
         <span className="muted">{t('admin.title')}</span>

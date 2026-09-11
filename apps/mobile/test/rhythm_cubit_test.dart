@@ -615,13 +615,23 @@ void main() {
        * because the first line carries the property on its own.
        */
       expect(routeForDeepLink('botvy://not-a-feature/abc'), isNull);
-      // P7's and P8's. When either lands, delete its line — the case above is
-      // what actually holds the property.
-      expect(routeForDeepLink('botvy://links/abc'), isNull);
+      // P8's. P7's `links` line was deleted when saved links landed, exactly as
+      // this note said to do — the case above is what actually holds the
+      // property, and these are the ones expected to need replacing.
       expect(routeForDeepLink('botvy://meals/abc'), isNull);
       expect(routeForDeepLink(''), isNull);
       expect(routeForDeepLink('   '), isNull);
       expect(routeForDeepLink('botvy://'), isNull);
+    });
+
+    test('a suggestion alert lands on the saved-links screen (P7)', () {
+      // `knowledge.SuggestionReady` plans `botvy://knowledge/suggestions`, and
+      // it lands on the list rather than on one card: the inbox is where the
+      // choice is made, and a card whose session the member has since changed
+      // would be the wrong thing to open cold.
+      expect(routeForDeepLink('botvy://knowledge/suggestions'), '/knowledge');
+      expect(routeForDeepLink('botvy://links/abc'), '/knowledge');
+      expect(routeForDeepLink('/knowledge'), '/knowledge');
     });
 
     test('a meeting alert lands on the meeting, not on the list (P5)', () {

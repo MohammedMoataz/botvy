@@ -9,6 +9,9 @@ import '../features/athlete/application/athlete_cubit.dart';
 import '../features/athlete/application/programs_cubit.dart';
 import '../features/athlete/presentation/athlete_page.dart';
 import '../features/athlete/presentation/programs_page.dart';
+import '../features/knowledge/application/knowledge_cubit.dart';
+import '../features/knowledge/presentation/knowledge_page.dart';
+import '../features/knowledge/presentation/link_page.dart';
 import '../features/athlete/presentation/session_page.dart';
 import '../features/auth/application/auth_cubit.dart';
 import '../features/auth/presentation/sign_in_page.dart';
@@ -69,6 +72,16 @@ abstract final class Routes {
   static String session(String sessionId) => '$athlete/session/$sessionId';
 
   static const String programs = '$athlete/programs';
+
+  /// Saved links and the suggestions drawn from them (P7).
+  ///
+  /// A route for the single link as well as the list, for the reason the
+  /// session and the meeting both have one: a `suggestion` alert arrives with a
+  /// deep link, on a cold start, with no screen behind it — and the point of
+  /// that notification is that the card is one tap away.
+  static const String knowledge = '/knowledge';
+
+  static String link(String linkId) => '$knowledge/$linkId';
 
   /// The chat list, and one conversation.
   ///
@@ -153,6 +166,12 @@ String? routeForDeepLink(String deepLink) {
     // what a chat card of kind `sessions` may hold.
     ['session', final String id] || ['sessions', final String id] =>
       Routes.session(id),
+    // `botvy://knowledge/suggestions` is the `suggestion` alert's link, and it
+    // lands on the list rather than on one card: the inbox is where the choice
+    // is made, and a card whose session the member has since changed would be
+    // the wrong thing to open cold.
+    ['knowledge', ...] || ['links', ...] || ['suggestions', ...] =>
+      Routes.knowledge,
     ['session', ...] || ['sessions', ...] => Routes.athlete,
     ['athlete', ...] || ['training', ...] => Routes.athlete,
     ['programs', ...] => Routes.programs,
@@ -413,6 +432,20 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
           BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
         ],
         child: SessionPage(sessionId: state.pathParameters['id'] ?? ''),
+      ),
+    ),
+    GoRoute(
+      path: Routes.knowledge,
+      builder: (context, state) => BlocProvider<KnowledgeCubit>.value(
+        value: sl<KnowledgeCubit>(),
+        child: const KnowledgePage(),
+      ),
+    ),
+    GoRoute(
+      path: '${Routes.knowledge}/:id',
+      builder: (context, state) => BlocProvider<KnowledgeCubit>.value(
+        value: sl<KnowledgeCubit>(),
+        child: LinkPage(linkId: state.pathParameters['id'] ?? ''),
       ),
     ),
     GoRoute(

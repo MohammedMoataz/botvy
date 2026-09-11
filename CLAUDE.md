@@ -493,6 +493,59 @@ finds it, with a test, and named in the commit; it does not go there.
   window (never the past) and the source (`fill`); a list the member agreed to
   and a set of rows actually written that can disagree is worse than no warning,
   because they believe it happened.
+- **An external source says "no" in two ways, and collapsing them breaks the
+  retry limit in one direction or the other.** The source refusing — a 404, a
+  paywall, a login wall, a page that parses to nothing — spends an attempt and
+  leaves the row `failed` with a reason the member can read. *Our* end failing —
+  the network, the model, a container that was restarted — must spend nothing
+  and leave the row where it is, for the sweep to bring round again. Read the
+  first as "try later" and a dead URL is retried for ever; read the second as a
+  refusal and one restart exhausts the retry limit of every link in flight. The
+  split lives at the **adapter**, because only it knows which it got: a pipeline
+  guessing from a message string gets it wrong the first time somebody changes a
+  library. And an *unexpected* error is treated as a refusal, because that is
+  the bounded direction — a bug read as "try later" loops through the sweep at
+  four in the morning for the life of the installation.
+- **"Is the queue draining" can only be asked before the pass.** The first
+  version of P7's health check asked afterwards and always answered yes, because
+  a drain moves every row it touches out of `queued` — including the ones it
+  defers, which leave as `fetching` and are the stall sweep's business. A link
+  still `queued` when a pass *begins* is one every pass since it was saved failed
+  to take, and that is the only moment the difference is visible. Its spec caught
+  it answering healthy for a queue stuck for three hours.
+- **A loader that walks up looking for a directory must not live in a directory
+  of that name.** `renderPrompt` moved from Conversations to `shared/prompts/`
+  and the walk promptly found *itself*: the first candidate above the module is
+  `shared/prompts`, which exists, so every template read resolved to the folder
+  holding the loader and twenty-five chat tests failed with `ENOENT …
+  src/shared/prompts/coach.md`. It is `shared/templates/` now. A search that
+  stops at the first match of a name cannot be given a same-named home, and
+  renaming keeps the search simple instead of adding a rule about which match to
+  ignore.
+- **A constructor parameter typed `typeof fetch` is `Function` to Nest, and a
+  default value does not save it.** `design:paramtypes` emits `Function`, so the
+  container tries to resolve it and the module fails to build with an
+  `UnknownDependenciesException` at boot that no typecheck sees. Either construct
+  the class with a `useFactory` — which is what both of P7's source fetchers do —
+  or make it an assignable property, which is what `MediaController` does so its
+  spec can substitute one. `app.module.spec.ts` is what turns either mistake into
+  a red test rather than a red deploy.
+- **A drift `@DataClassName` annotates the class that follows it, so a table
+  inserted between the two silently renames both.** P7's `Links` table landed
+  after `@DataClassName('LocalMessage')` and before `class Messages`: the
+  annotation attached to `Links`, `Messages` regenerated as `Message`, and six
+  files that had compiled for three phases stopped. Generated code is where this
+  shows up and `flutter analyze` is where it is caught; the fix is to put a new
+  table somewhere no annotation is dangling and give it its own.
+- **A tracking-parameter list needs prefixes, not names.** URL normalisation is
+  what makes "do not read the same article twice" true, and the first version of
+  P7's list named `fbclid`, `gclid` and eleven others and *not* `utm_*` — so the
+  single most common case, an article from a newsletter, was two entries. The
+  thirty-URL fixture table caught it on its first run, which is the argument for
+  the table. `utm_` is open-ended by design, so it is matched as a prefix.
+  Deleting while iterating `URLSearchParams.keys()` is the other half: it is a
+  live iterator over the list `delete` mutates, so two adjacent tracking
+  parameters leave the second one in place.
 - **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
   while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
   v2 served v1's live database and neither could run beside the other. Keep the

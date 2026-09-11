@@ -108,6 +108,7 @@ class SyncEngine {
     'programs',
     'workouts',
     'sessions',
+    'links',
     'daily_plans',
     'checkins',
     'rhythm_state',
@@ -590,6 +591,7 @@ class SyncEngine {
     'programs': _ProgramApplier(),
     'workouts': _WorkoutApplier(),
     'sessions': _SessionApplier(),
+    'links': _LinkApplier(),
     'daily_plans': _DailyPlanApplier(),
     'checkins': _CheckinApplier(),
     'rhythm_state': _RhythmStateApplier(),
@@ -1969,6 +1971,131 @@ abstract class _PullOnlyApplier extends _EntityApplier {
   /// on Home that cannot be recomputed from anything else the phone holds.
   @override
   Future<void> sweep(AppDatabase db, Set<String> seen) async {}
+}
+
+/// One saved link, **pull and add-or-remove** (P7, FR-001, FR-003).
+///
+/// The narrowest push in this engine, and deliberately so. The server's
+/// `LinkSyncAdapter` accepts `create`, `delete`, `restore` and `purge` and
+/// refuses an `update` as `invalid` — so the data sent on a create is the two
+/// fields a member actually chose, the URL and the tags, and nothing else. A
+/// phone that pushed a `status` would be telling the server it had read an
+/// article itself.
+///
+/// `invalid` rather than `stale` matters on this side too: a stale verdict
+/// sends the engine back with the server's row to try again, and against a rule
+/// that will never accept an edit it would retry for ever.
+///
+/// Nothing here carries a summary. [Links] says why, and the consequence for
+/// this file is that a finished link syncs in a few hundred bytes however long
+/// the article was.
+class _LinkApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.links)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          // The two fields the member chose. The server normalises the URL and
+          // decides the kind, so sending either back would be the phone
+          // asserting something only the server can know.
+          'data': {'url': row.url, 'tags': decodeStringList(row.tagsJson)},
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows =
+        await (db.select(db.links)..where((r) => r.pendingOp.isNotNull())).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.links)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.links)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.links)..where((r) => r.id.isIn(ids))).write(
+      const LinksCompanion(pendingOp: Value(null), pushAttempts: Value(0)),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.links)..where((r) => r.id.equals(id)))
+        .write(LinksCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.links)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+
+    await db.into(db.links).insertOnConflictUpdate(
+      LinksCompanion.insert(
+        id: row['id'] as String,
+        url: row['url'] as String? ?? '',
+        kind: Value(row['kind'] as String? ?? 'article'),
+        title: Value(row['title'] as String?),
+        tagsJson: Value(
+          jsonEncode(
+            (row['tags'] as List? ?? const []).map((raw) => '$raw').toList(),
+          ),
+        ),
+        status: Value(row['status'] as String? ?? 'queued'),
+        failReason: Value(row['failReason'] as String?),
+        attempts: Value((row['attempts'] as num?)?.toInt() ?? 0),
+        parentLinkId: Value(row['parentLinkId'] as String?),
+        skippedCount: Value((row['skippedCount'] as num?)?.toInt()),
+        docId: Value(row['docId'] as String?),
+        addedAt: _date(row['addedAt']) ?? updatedAt,
+        processedAt: Value(_date(row['processedAt'])),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.links)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
 }
 
 /// One day's plan, pulled. Written by the tick and by the confirm command, both

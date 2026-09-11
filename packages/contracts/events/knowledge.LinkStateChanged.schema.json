@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "knowledge.LinkStateChanged",
+  "description": "Payload of knowledge.LinkStateChanged. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "linkId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "status": {},
+    "failReason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "linkId",
+    "status",
+    "failReason"
+  ],
+  "additionalProperties": false
+}

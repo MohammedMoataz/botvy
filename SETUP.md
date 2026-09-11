@@ -177,6 +177,48 @@ A few readings worth recognising:
   the outbox and will be delivered when it comes back; nothing is lost.
 - **`ollama` false** — the model server is unreachable. Chat and extraction
   stop; reminders, plans and sync carry on.
+- **`knowledge.ingest` stale, with `lastError` naming a wait in minutes** — the
+  reading queue is not draining. The pass reports its own verdict rather than
+  stamping `ok` for having run: a link still waiting when a pass *begins* is one
+  every pass since it was saved failed to take, and a queue nobody is draining
+  looks exactly like an idle queue otherwise. Usually the model server, which
+  the `ollama` line above will also be saying.
+
+## Reading saved links, and the platform's terms
+
+Botvy reads the links a member saves: articles and pages over ordinary HTTP,
+and YouTube videos and playlists through `youtubei.js`.
+
+**The YouTube part is worth an explicit decision.** That library talks to
+YouTube's internal API rather than the public Data API, because the public one
+does not serve captions for videos the caller does not own — and without
+captions a video summary is a summary of its title. Using it is outside
+YouTube's published terms of service.
+
+Botvy is self-hosted and single-household. What happens is one person's own
+machine fetching, for that person alone, the metadata and captions of videos
+they chose to save: nothing is downloaded but text, nothing is re-hosted,
+nothing is redistributed, and every screen that shows a summary links to the
+original. That is a judgement about a personal tool rather than a licence, and
+it is yours to make as the Owner rather than ours to make for you.
+
+An Owner who would rather not make it can simply not save video links. Every
+other kind of source goes through the ordinary HTTP fetcher and touches none of
+it; nothing else in the product depends on the YouTube path.
+
+Two other things about outbound fetching worth knowing:
+
+- **Botvy will not fetch anything on its own network.** Every outbound request
+  — the reader's and the image proxy's — goes through the same guard, which
+  refuses `localhost`, private addresses, the cloud metadata address, and any
+  bare hostname with no dot in it. Those last are the container names on the
+  compose network: `postgres`, `mongo`, `n8n`. A feature that fetches a URL a
+  member typed is an open proxy without it.
+- **Pictures reach a member's device through Botvy, never from the source.**
+  The summaries a member reads carry images at a signed `/media` path, so
+  reading an article's summary does not tell that article's server where the
+  member is. It needs `MEDIA_SIGNING_SECRET` set, which the environment contract
+  already requires; without it the pictures are simply absent.
 
 ## Where things are
 

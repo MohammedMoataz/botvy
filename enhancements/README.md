@@ -42,3 +42,4 @@ pagination cursor — and none of them is in this directory.
 | [E-017](E-017-a-back-dated-at-becomes-a-500.md) | A back-dated `at` on a status command becomes a 500 | build | A well-formed request pages somebody instead of being refused; unreachable from any current client |
 | [E-018](E-018-a-jobs-cadence-is-a-table-somewhere-else.md) | A job's cadence lives in a table somewhere else | build | A nightly job added without editing the health module reports the platform broken 23 hours a day |
 | [E-019](E-019-a-new-member-has-no-preferences-for-a-few-seconds.md) | A new member has no preferences for a few seconds | architecture | Onboarding can set a preference before the row exists and be told 404 |
+| [E-020](E-020-four-contexts-each-read-one-member-preference-their-own-way.md) | Four contexts each read one member preference their own way | architecture | Four copies of one four-line adapter and its bootstrap fallback; a fifth is scheduled for P8 |

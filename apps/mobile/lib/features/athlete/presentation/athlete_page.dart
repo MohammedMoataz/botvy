@@ -48,6 +48,15 @@ class AthletePage extends StatelessWidget {
                 tooltip: t.programsTitle,
                 onPressed: () => context.push(Routes.programs),
               ),
+              // Saved links live inside Athlete rather than beside it, which is
+              // the plan's own placement and the right one: a member saves an
+              // article *about their training*, and the suggestions it produces
+              // are sessions. Home's bar is already six icons.
+              IconButton(
+                icon: const Icon(Icons.bookmark_border),
+                tooltip: t.knowledgeTitle,
+                onPressed: () => context.push(Routes.knowledge),
+              ),
               IconButton(
                 icon: const Icon(Icons.sports_score),
                 tooltip: t.athleteSports,

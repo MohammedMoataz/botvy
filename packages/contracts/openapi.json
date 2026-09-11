@@ -3106,6 +3106,347 @@
         ]
       }
     },
+    "/api/v1/links": {
+      "post": {
+        "operationId": "LinksController_addLink",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Links"
+        ]
+      }
+    },
+    "/api/v1/links/{id}/retry": {
+      "post": {
+        "operationId": "LinksController_retryLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Links"
+        ]
+      }
+    },
+    "/api/v1/links/{id}": {
+      "delete": {
+        "operationId": "LinksController_deleteLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Links"
+        ]
+      }
+    },
+    "/api/v1/links/{id}/restore": {
+      "post": {
+        "operationId": "LinksController_restoreLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Links"
+        ]
+      }
+    },
+    "/api/v1/links/{id}/purge": {
+      "delete": {
+        "operationId": "LinksController_purgeLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Links"
+        ]
+      }
+    },
+    "/api/v1/suggestions/{id}/accept": {
+      "post": {
+        "operationId": "SuggestionsController_acceptSuggestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptSuggestionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Suggestions"
+        ]
+      }
+    },
+    "/api/v1/suggestions/{id}/dismiss": {
+      "post": {
+        "operationId": "SuggestionsController_dismissSuggestion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Suggestions"
+        ]
+      }
+    },
+    "/api/v1/admin/knowledge/{linkId}/retry": {
+      "post": {
+        "operationId": "AdminKnowledgeController_retry",
+        "parameters": [
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "AdminKnowledge"
+        ]
+      }
+    },
+    "/api/v1/admin/knowledge/{linkId}": {
+      "delete": {
+        "operationId": "AdminKnowledgeController_clearLink",
+        "parameters": [
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "AdminKnowledge"
+        ]
+      }
+    },
+    "/internal/knowledge/ingest": {
+      "post": {
+        "operationId": "InternalIngestController_drain",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalIngest"
+        ]
+      }
+    },
+    "/internal/knowledge/ingest/{linkId}": {
+      "post": {
+        "operationId": "InternalIngestController_one",
+        "parameters": [
+          {
+            "name": "linkId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalIngest"
+        ]
+      }
+    },
+    "/media": {
+      "get": {
+        "operationId": "MediaController_proxy",
+        "parameters": [
+          {
+            "name": "url",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sig",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Media"
+        ]
+      }
+    },
     "/api/v1/sync": {
       "post": {
         "operationId": "SyncController_round",
@@ -3427,6 +3768,18 @@
         "properties": {}
       },
       "ApplyWorkoutDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "AddLinkDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "AcceptSuggestionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ClearLinkDto": {
         "type": "object",
         "properties": {}
       },

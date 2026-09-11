@@ -120,11 +120,32 @@ type Workout { id: ID!, name: String!, sport: String!, exercises: [Exercise!]!, 
 
 enum LinkKind { article website video playlist }
 enum LinkStatus { queued fetching extracting summarising done failed }
-type KnowledgeDoc { title: String, author: String, publishedAt: DateTime, summary: String!, keyPoints: [String!]!, media: [MediaRef!]!, durationSec: Int }
-type Link { id: ID!, url: String!, kind: LinkKind!, title: String, tags: [String!]!, status: LinkStatus!, failReason: String, attempts: Int!, parentId: ID, children: [Link!]!, doc: KnowledgeDoc, addedAt: DateTime!, processedAt: DateTime }
+# `media` is `[SourceMedia!]!`, whose `url` is the **proxied** path and is
+# nullable — null means this installation has no signing secret, and a client
+# renders no picture rather than falling back to the source’s own address.
+# `lengthChars` and `hadTranscript` are P7’s additions: SC-006 wants "is this
+# worth my time" answerable on one screen, and a video with no captions has to
+# say so rather than leaving the member to notice.
+type SourceMedia { type: String!, url: String, caption: String }
+type KnowledgeDoc { title: String, author: String, publishedAt: DateTime, summary: String!, keyPoints: [String!]!, media: [SourceMedia!]!, durationSec: Int, lengthChars: Int!, hadTranscript: Boolean, readAt: DateTime! }
+type Link { id: ID!, url: String!, kind: LinkKind!, title: String, tags: [String!]!, status: LinkStatus!, failReason: String, attempts: Int!, parentId: ID, skippedCount: Int, children: [Link!]!, doc: KnowledgeDoc, addedAt: DateTime!, processedAt: DateTime }
 enum SuggestionStatus { pending accepted dismissed }
-type SuggestionDraft { title: String!, focus: String, exercises: [Exercise!]! }
-type Suggestion { id: ID!, forDate: Date!, sport: String!, draft: SuggestionDraft!, sourceLinks: [Link!]!, rationale: String!, status: SuggestionStatus!, acceptedSessionId: ID, createdAt: DateTime! }
+# `exercises` is `[SuggestedExercise!]!` as served, not `[Exercise!]!`.
+#
+# `Exercise` is Training’s type, and a `features/` file in Knowledge declaring
+# it is precisely what `no-restricted-imports` refuses — the same correction P6
+# made to `Program.sourceLinks`, in the other direction. The shapes differ
+# anyway: a suggestion has targets and can never have actuals, because it is a
+# proposal about a session that has not happened.
+type SuggestedSet { targetReps: Int, targetWeightKg: Float, targetDurationSec: Int, targetDistanceM: Int }
+type SuggestedExercise { name: String!, notes: String, sets: [SuggestedSet!]! }
+type SuggestionDraft { title: String!, focus: String, exercises: [SuggestedExercise!]! }
+# `sources` is `[SuggestionSource!]!` as served, not `sourceLinks: [Link!]!`.
+# The card wants a title and a link out; serving the whole `Link` would carry
+# the document into a list read. A source the member has since deleted simply
+# drops out — the rationale still names it, which is the honest outcome.
+type SuggestionSource { id: ID!, url: String!, title: String }
+type Suggestion { id: ID!, forDate: Date!, sport: String!, draft: SuggestionDraft!, sources: [SuggestionSource!]!, rationale: String!, status: SuggestionStatus!, sessionId: ID, acceptedSessionId: ID, outcome: String, createdAt: DateTime! }
 
 # ---------- Nutrition ----------
 

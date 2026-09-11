@@ -28,7 +28,17 @@
         }
       ]
     },
-    "status": {}
+    "status": {},
+    "suggestionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
   },
   "required": [
     "sessionId",
@@ -37,7 +47,8 @@
     "sport",
     "title",
     "focus",
-    "status"
+    "status",
+    "suggestionId"
   ],
   "additionalProperties": false
 }

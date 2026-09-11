@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "knowledge.LinkAdded",
+  "description": "Payload of knowledge.LinkAdded. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "linkId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "url": {
+      "type": "string"
+    },
+    "kind": {}
+  },
+  "required": [
+    "linkId",
+    "url",
+    "kind"
+  ],
+  "additionalProperties": false
+}

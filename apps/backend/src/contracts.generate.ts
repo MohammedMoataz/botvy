@@ -324,6 +324,14 @@ export const eventSchemas = {
       }),
     ),
   }),
+  /*
+   * `suggestionId` was promised by `contracts/events.md` from P0 — "present
+   * when the session came from an accepted suggestion, so Knowledge can record
+   * the outcome without guessing" — and written by nothing until P7, because
+   * nothing set the field. It is here now, nullable, and its reader is
+   * Knowledge's suggestion saga: a session that *is* a suggestion produces no
+   * new one, which is what stops a member being asked about their own answer.
+   */
   'training.SessionScheduled': z.object({
     sessionId: z.string().uuid(),
     plannedAt: z.coerce.date(),
@@ -332,6 +340,7 @@ export const eventSchemas = {
     title: z.string(),
     focus: z.string().nullable(),
     status: z.enum(['planned', 'completed', 'cancelled', 'skipped']),
+    suggestionId: z.string().nullable(),
   }),
   'training.SessionRescheduled': z.object({
     sessionId: z.string().uuid(),
@@ -341,6 +350,7 @@ export const eventSchemas = {
     title: z.string(),
     focus: z.string().nullable(),
     status: z.enum(['planned', 'completed', 'cancelled', 'skipped']),
+    suggestionId: z.string().nullable(),
   }),
   'training.SessionCompleted': z.object({
     sessionId: z.string().uuid(),
@@ -388,6 +398,91 @@ export const eventSchemas = {
   }),
   'training.ProgramDeleted': z.object({
     programId: z.string().uuid(),
+  }),
+
+  /*
+   * ---- Knowledge --------------------------------------------------------
+   *
+   * `LinkAdded` is the pipeline's own trigger and carries what the worker needs
+   * to start without a read. `LinkStateChanged` carries the reason as well as
+   * the status, because the Owner's queue and the member's list both show it
+   * and a consumer that had to ask for it would be asking Knowledge for a fact
+   * the event was already about.
+   *
+   * `LinkIngested.docId` is **nullable**, which the catalogue's prose did not
+   * say. An expanded playlist's parent finishes with children rather than a
+   * document, so a payload that promised one would make every consumer branch
+   * on a value it had been told was there.
+   */
+  'knowledge.LinkAdded': z.object({
+    linkId: z.string().uuid(),
+    url: z.string().url(),
+    kind: z.enum(['article', 'website', 'video', 'playlist']),
+  }),
+  'knowledge.LinkStateChanged': z.object({
+    linkId: z.string().uuid(),
+    status: z.enum([
+      'queued',
+      'fetching',
+      'extracting',
+      'summarising',
+      'done',
+      'failed',
+    ]),
+    failReason: z.string().nullable(),
+  }),
+  'knowledge.LinkIngested': z.object({
+    linkId: z.string().uuid(),
+    docId: z.string().nullable(),
+    tags: z.array(z.string()),
+  }),
+  'knowledge.SuggestionReady': z.object({
+    suggestionId: z.string(),
+    /** The member's own local date. Principle XI, which is why it is a string. */
+    forDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    sport: z.string(),
+    sessionId: z.string().nullable(),
+  }),
+  /*
+   * `SuggestionAccepted` carries the **whole draft**, which widens what
+   * `contracts/events.md` types (`{ suggestionId, sessionId? }`).
+   *
+   * That contract's own consumer column says "Training → fill/create session",
+   * and those two cannot both be true: there is no session content in
+   * `{ suggestionId, sessionId }`, only a pointer, and following it would mean
+   * Training reading `suggestions`. A consumer forced to read the producer's
+   * collection is the boundary violation the event exists to prevent — and a
+   * payload missing a field its consumer reads is the defect this codebase
+   * shipped in P2, where every task notification said "Task due".
+   */
+  'knowledge.SuggestionAccepted': z.object({
+    suggestionId: z.string(),
+    sessionId: z.string().nullable(),
+    forDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    sport: z.string(),
+    draft: z.object({
+      title: z.string(),
+      focus: z.string().nullable(),
+      exercises: z.array(
+        z.object({
+          name: z.string(),
+          notes: z.string().nullable(),
+          sets: z.array(
+            z.object({
+              targetReps: z.number().int().nullable(),
+              targetWeightKg: z.number().nullable(),
+              targetDurationSec: z.number().int().nullable(),
+              targetDistanceM: z.number().int().nullable(),
+            }),
+          ),
+        }),
+      ),
+    }),
+    sourceLinkIds: z.array(z.string()),
+  }),
+  'knowledge.SuggestionDismissed': z.object({
+    suggestionId: z.string(),
+    sessionId: z.string().nullable(),
   }),
 
   // ---- Sync -------------------------------------------------------------

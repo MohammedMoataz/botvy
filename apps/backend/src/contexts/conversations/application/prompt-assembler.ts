@@ -8,7 +8,8 @@ import {
   type MemberFacts,
 } from '../domain/chat.ports.js';
 import { MessageRepository } from '../domain/conversations.repositories.js';
-import { delimitQuoted, renderPrompt } from './prompt-files.js';
+import { renderPrompt } from '../../../shared/templates/prompt-files.js';
+import { delimitQuoted } from './prompt-files.js';
 
 /**
  * How far back the history read is willing to scan for the tail of a

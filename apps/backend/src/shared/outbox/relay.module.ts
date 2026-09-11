@@ -17,6 +17,12 @@ import { BootstrapAthleteProfileHandler } from '../../contexts/training/features
 import { SessionMaterialiserSaga } from '../../contexts/training/features/materialise/materialise.saga.js';
 import { TrainingPurgeOnDeletedHandler } from '../../contexts/training/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { TrainingModule } from '../../contexts/training/training.module.js';
+import { ApplySuggestionHandler } from '../../contexts/training/features/apply-suggestion/apply-suggestion.handler.js';
+import { IngestLinkSaga } from '../../contexts/knowledge/features/ingest-link/ingest-link.saga.js';
+import { GenerateSuggestionSaga } from '../../contexts/knowledge/features/generate-suggestion/generate-suggestion.saga.js';
+import { RecordSuggestionOutcomeHandler } from '../../contexts/knowledge/features/accept-suggestion/accept-suggestion.handler.js';
+import { KnowledgePurgeOnDeletedHandler } from '../../contexts/knowledge/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { KnowledgeModule } from '../../contexts/knowledge/knowledge.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
 import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
@@ -97,6 +103,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     RhythmModule,
     MeetingsModule,
     TrainingModule,
+    KnowledgeModule,
     SyncModule,
   ],
   providers: [
@@ -156,6 +163,11 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         SessionMaterialiserSaga,
         BootstrapAthleteProfileHandler,
         TrainingPurgeOnDeletedHandler,
+        ApplySuggestionHandler,
+        IngestLinkSaga,
+        GenerateSuggestionSaga,
+        RecordSuggestionOutcomeHandler,
+        KnowledgePurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -185,6 +197,11 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         materialiser: SessionMaterialiserSaga,
         trainingBootstrap: BootstrapAthleteProfileHandler,
         trainingPurge: TrainingPurgeOnDeletedHandler,
+        applySuggestion: ApplySuggestionHandler,
+        ingest: IngestLinkSaga,
+        suggesting: GenerateSuggestionSaga,
+        suggestionOutcomes: RecordSuggestionOutcomeHandler,
+        knowledgePurge: KnowledgePurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -274,6 +291,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await operationsPurge.handle(event);
                 await meetingsPurge.handle(event);
                 await trainingPurge.handle(event);
+                await knowledgePurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -465,14 +483,116 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                * its alarms to fire all week.
                */
               case 'training.SessionScheduled':
+                await alertPlanning.onSessionScheduled(event);
+                /*
+                 * And P7's second subscriber: a session at least a day away may
+                 * be worth a suggestion drawn from what the member has saved.
+                 *
+                 * Only `SessionScheduled`, never `SessionRescheduled`. A
+                 * rescheduled session is one that already existed and has
+                 * therefore already been through this — including the fill that
+                 * an accepted suggestion performs, which raises `Rescheduled`
+                 * itself and would otherwise ask the member about their own
+                 * answer on every acceptance.
+                 *
+                 * The saga returns before it reads anything when the member has
+                 * `aiSuggestions` off, which is what SC-003's second half is
+                 * about: no background work runs for them at all.
+                 */
+                await suggesting.onSessionScheduled(event);
+                return;
               case 'training.SessionRescheduled':
                 await alertPlanning.onSessionScheduled(event);
                 return;
               case 'training.SessionCompleted':
               case 'training.SessionCancelled':
               case 'training.SessionSkipped':
+                await alertPlanning.onSessionClosed(event);
+                // What became of a session an accepted suggestion produced. A
+                // miss is the normal case — almost no session came from one —
+                // so the handler is silent about it.
+                await suggestionOutcomes.handle(event);
+                return;
               case 'training.SessionDeleted':
                 await alertPlanning.onSessionClosed(event);
+                return;
+
+              /*
+               * ---- knowledge -------------------------------------------
+               *
+               * `LinkAdded` starts the reading immediately rather than waiting
+               * for the drain tick, which is what makes SC-001's three minutes
+               * achievable for a member who has just pasted something. The tick
+               * exists for the other cases — a worker killed mid-pipeline, a
+               * relay that was down when the event passed — and both converge
+               * on the same drain.
+               *
+               * `LinkIngested` has **no in-process subscriber**, and that is
+               * deliberate rather than an omission. The member's devices learn
+               * that a link finished through `/sync`, whose nudge rides on
+               * `sync.ChangesApplied`; the coach message the event catalogue
+               * imagines for "I read …" would be Botvy speaking unprompted
+               * about every link a member saves, which is chatter rather than
+               * coaching. It is still published to n8n for an Owner who wants
+               * it.
+               */
+              case 'knowledge.LinkAdded':
+                await ingest.onLinkAdded(event);
+                return;
+
+              /*
+               * And back to the queue, which is a different trigger with the
+               * same body.
+               *
+               * P7's gate found the gap: a member pressed Retry, the row went
+               * to `queued`, and nothing read it until the five-minute tick —
+               * because `LinkAdded` is raised once, at creation. The Owner's
+               * force-requeue and every row the stall sweep recovered had the
+               * same wait. The saga acts only on a `queued` status, so the four
+               * transitions the pipeline itself makes pass straight through
+               * this row.
+               */
+              case 'knowledge.LinkStateChanged':
+                await ingest.onLinkStateChanged(event);
+                return;
+
+              /*
+               * The member accepted a draft, and **Training** fills the session.
+               *
+               * This is the one row in this table where the consumer is the
+               * context that owns the collection rather than the one that
+               * raised the event, which is constitution IX exactly: Knowledge
+               * says what happened, Training decides what that means, and
+               * neither imports the other. A Knowledge handler dispatching a
+               * Training command would be the same violation wearing a bus.
+               */
+              case 'knowledge.SuggestionAccepted':
+                await applySuggestion.handle(event);
+                return;
+
+              /*
+               * Botvy has something to propose. Notifications turns it into the
+               * `suggestion` alert kind that has been in `AlertSourceKind`
+               * since P2 with nothing raising it.
+               *
+               * The event catalogue also lists Conversations posting a coach
+               * message here, and this table deliberately does not. The rhythm
+               * writes its touches into the chat because the *question* would
+               * otherwise exist only inside a notification — a member who
+               * opened the app was expected to answer something that was
+               * nowhere on screen, which is v1's lesson. A suggestion has a
+               * screen: the inbox, with Use this and No thanks on the card. A
+               * coach line about every suggestion would be Botvy narrating its
+               * own background work, which is chatter rather than coaching.
+               *
+               * The one case that *does* write into the chat is the opposite
+               * one: a draft the model would not produce structurally, where
+               * there is no card to show and its plain words are the only
+               * honest thing to deliver. `generate-suggestion` does that
+               * itself, through its own port.
+               */
+              case 'knowledge.SuggestionReady':
+                await alertPlanning.onSuggestionReady(event);
                 return;
 
               /*

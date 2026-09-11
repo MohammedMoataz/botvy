@@ -23,6 +23,8 @@ import { MeetingsModule } from '../contexts/meetings/meetings.module.js';
 import { CalendarResolver } from '../contexts/meetings/features/agenda/calendar.resolver.js';
 import { TrainingModule } from '../contexts/training/training.module.js';
 import { TrainingResolver } from '../contexts/training/features/sessions/training.resolver.js';
+import { KnowledgeModule } from '../contexts/knowledge/knowledge.module.js';
+import { KnowledgeResolver } from '../contexts/knowledge/features/links/knowledge.resolver.js';
 
 /**
  * The read edge.
@@ -174,6 +176,15 @@ export const RESOLVERS = [
    * in the regenerated `packages/contracts/schema.graphql`, which is the proof.
    */
   TrainingResolver,
+  /*
+   * P7's four reads — the member's links, one link with its summary and its
+   * videos, their suggestions inbox, and the Owner's queue across members.
+   * Same rule as the two lines above, and it has been broken twice in this
+   * codebase: adding a slice means adding it here **and** checking it appears
+   * in the regenerated `packages/contracts/schema.graphql`, which is the
+   * proof.
+   */
+  KnowledgeResolver,
 ] as const;
 
 @Module({
@@ -188,6 +199,7 @@ export const RESOLVERS = [
     ConversationsModule,
     MeetingsModule,
     TrainingModule,
+    KnowledgeModule,
   ],
   providers: [...RESOLVERS],
 })

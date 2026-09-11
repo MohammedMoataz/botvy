@@ -134,13 +134,22 @@ void main() {
     'calendar_events',
   ];
 
+  /// What version 7 shipped: training (P6).
+  const v7Tables = [
+    ...v6Tables,
+    'athlete_profile',
+    'programs',
+    'workouts',
+    'sessions',
+  ];
+
   /// Every earlier version, upgraded to the current schema, asserting the
   /// **whole** schema each time.
   ///
   /// The one test in this file that could not have been skipped by an oversight
   /// and is the reason P3's defect existed for two phases. drift calls
   /// `onUpgrade` **once** with the pair it actually has, so a phone at version
-  /// 1 opening version 7 arrives as `(1, 7)` and *every* branch sees
+  /// 1 opening version 8 arrives as `(1, 8)` and *every* branch sees
   /// `from == 1`. A branch guarded `from >= 4 && from < 5` therefore never runs
   /// for it, and that band is the only thing that would create `conversations`,
   /// `messages` and `pending_messages`: the install would come out with the
@@ -158,6 +167,7 @@ void main() {
       4: v4Tables,
       5: v5Tables,
       6: v6Tables,
+      7: v7Tables,
     };
 
     for (final entry in donors.entries) {
@@ -214,6 +224,11 @@ void main() {
             'sessions_planned_at',
             'sessions_status_planned',
             'sessions_pending',
+            // P7's, in the same list and for the same reason.
+            'links_added_at',
+            'links_status_added',
+            'links_parent',
+            'links_pending',
           ]),
         );
 
@@ -459,7 +474,7 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 7);
+    expect(db.schemaVersion, 8);
 
     final rows = await db
         .customSelect(
@@ -475,7 +490,7 @@ void main() {
     expect(await db.getValue('probe'), 'ok');
   });
 
-  /// 1 -> 7, the longest path there is, and the one that was broken.
+  /// 1 -> 8, the longest path there is, and the one that was broken.
   ///
   /// Opened as a v1-shaped file — the one table version 1 actually had, stamped
   /// with `user_version = 1` — so the upgrade path runs for real rather than
@@ -554,7 +569,7 @@ void main() {
     expect(stored.endOfDayTime, '22:00');
   });
 
-  /// 2 -> 7: the P2 tables, and then everything since.
+  /// 2 -> 8: the P2 tables, and then everything since.
   test('a version 2 file upgrades and gains the P2 tables', () async {
     final db = AppDatabase.forTesting(
       NativeDatabase.opened(await donorAt(2, v2Tables)),
@@ -603,7 +618,7 @@ void main() {
     expect((await db.select(db.tasks).get()).single.status, 'open');
   });
 
-  /// 3 -> 7: the daily rhythm (P3 T350), plus the chat, the calendar and
+  /// 3 -> 8: the daily rhythm (P3 T350), plus the chat, the calendar and
   /// training on top.
   test('a version 3 file upgrades and gains the rhythm tables', () async {
     final raw = await donorAt(3, v3Tables);

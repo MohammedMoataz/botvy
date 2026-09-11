@@ -921,6 +921,67 @@ class PendingMessages extends Table {
   Set<Column<Object>> get primaryKey => {clientId};
 }
 
+@DataClassName('LocalLink')
+/// Something the member saved to read later (P7, FR-001, FR-003).
+///
+/// The phone holds a copy so the list renders with the network off, and it
+/// **pushes only add and remove**. Every interesting column here —
+/// [status], [attempts], [failReason], [docId], [title] — is the server's
+/// record of work it did, and a client that could push them could tell the
+/// server it had read an article itself. The sync adapter refuses an edit as
+/// `invalid` rather than ignoring it, so the phone stops trying rather than
+/// believing a write landed.
+///
+/// There is no summary column and there never should be. A knowledge document
+/// runs to sixty thousand characters, no list shows it, and the detail screen
+/// fetches it over GraphQL when the member opens one. [docId] is the pointer
+/// that says there is something to fetch — the difference between "done, tap to
+/// read" and "done, nothing here".
+@TableIndex(name: 'links_added_at', columns: {#addedAt})
+@TableIndex(name: 'links_status_added', columns: {#status, #addedAt})
+@TableIndex(name: 'links_parent', columns: {#parentLinkId})
+@TableIndex(name: 'links_pending', columns: {#pendingOp})
+class Links extends Table with SyncColumns {
+  TextColumn get url => text()();
+
+  /// `article` | `website` | `video` | `playlist`. The server recognises it
+  /// from the URL; the phone never declares one, because a client that could
+  /// declare a kind could declare the wrong one.
+  TextColumn get kind => text().withDefault(const Constant('article'))();
+
+  TextColumn get title => text().nullable()();
+
+  TextColumn get tagsJson => text().withDefault(const Constant('[]'))();
+
+  /// `queued` | `fetching` | `extracting` | `summarising` | `done` | `failed`.
+  ///
+  /// The member reads the middle two as one word — "reading" — because from
+  /// outside they are one thing. They are two states on the server because a
+  /// crash between them says where the work stopped.
+  TextColumn get status => text().withDefault(const Constant('queued'))();
+
+  TextColumn get failReason => text().nullable()();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+
+  /// Set on a playlist's videos; null for anything the member saved directly.
+  TextColumn get parentLinkId => text().nullable()();
+
+  /// How many of a playlist's videos the Owner's limit left behind. Null — not
+  /// zero — for anything that is not an expanded playlist, so the list can say
+  /// nothing at all rather than "0 skipped" beside every article.
+  IntColumn get skippedCount => integer().nullable()();
+
+  /// Whether a summary exists to fetch. Never the summary itself.
+  TextColumn get docId => text().nullable()();
+
+  DateTimeColumn get addedAt => dateTime()();
+  DateTimeColumn get processedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// Thrown when the ladder is asked for a step it has no branch for.
 ///
 /// drift's own default `onUpgrade` throws too, which is the right behaviour and
@@ -961,6 +1022,7 @@ class MigrationLadderError extends Error {
     Programs,
     Workouts,
     Sessions,
+    Links,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -970,7 +1032,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1143,6 +1205,23 @@ class AppDatabase extends _$AppDatabase {
         await m.create(sessionsPlannedAt);
         await m.create(sessionsStatusPlanned);
         await m.create(sessionsPending);
+      }
+
+      // 7 -> 8: saved links (P7, `specs/021-knowledge-ingestion` T740).
+      //
+      // `from < 8`, one `createTable` and its four indexes listed explicitly —
+      // the two reasons every branch above gives, unchanged: drift calls
+      // `onUpgrade` once with the pair it has, so a `createTable` is guarded
+      // `from < N`; and `createTable` builds the table and *not* its indexes,
+      // which drift keeps as separate schema entities that only `createAll`
+      // picks up on a fresh install.
+      if (from < 8) {
+        await m.createTable(links);
+
+        await m.create(linksAddedAt);
+        await m.create(linksStatusAdded);
+        await m.create(linksParent);
+        await m.create(linksPending);
       }
 
       // Anything the ladder above did not cover.

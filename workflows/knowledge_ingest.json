@@ -1,0 +1,159 @@
+{
+  "name": "Botvy Knowledge Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "6b2f0000-0000-4000-8000-000000000051",
+      "name": "Every five minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -420,
+        -100
+      ],
+      "notes": "Five minutes rather than nightly, and this is the opposite decision from training_materialise -- worth saying why, because the two look alike.\n\nThe materialiser exists for the day nothing happens: a slot is a weekly rule, so the far edge of the horizon has to be filled even on a quiet week, and that is a once-a-night job. This one exists for the day something DOES happen and the immediate path missed it. `knowledge.LinkAdded` starts the reading at once, which is what makes SC-001's three minutes achievable; this catches the cases where that did not run -- a worker killed mid-pipeline, a relay that was down when the event passed, a model that was not answering. FR-016 says an entry left mid-read must come back on its own, and `knowledge.stuckAfterMinutes` defaults to 30, so a pulse measured in hours would make that promise a lie.\n\nIt is also what stamps the `knowledge.ingest` heartbeat. FR-017 wants a stopped pipeline to be visible, and a heartbeat only exists if something stamps it -- there is nothing for the per-link route to stamp. `/health` reads the stamp after `ops.staleAfterMinutes`, which is fifteen, so a five-minute pulse gives it three chances before it cries wolf.\n\nA pass with an empty queue costs one indexed query and returns zeroes; it needs no claimed date, because the drain claims by moving each link's state out of `queued` and a second pass therefore finds nothing to take."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "botvy/knowledge-ingest",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "6b2f0000-0000-4000-8000-000000000052",
+      "name": "Run Now",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        100
+      ],
+      "webhookId": "botvy-knowledge-ingest",
+      "notes": "The way a person drains the queue without waiting for the next tick, and the way the phase gate does it -- calling /internal/* directly is the right thing for a gate to do, and it is also what leaves the automation itself untested, which is the hole the heartbeat rule exists to cover. Unconditional on purpose: it takes no input and the drain is idempotent."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOTVY_API_BASE }}/internal/knowledge/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.BOTVY_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "6b2f0000-0000-4000-8000-000000000053",
+      "name": "Drain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "retryOnFail": false,
+      "notes": "`BOTVY_SERVICE_TOKEN` and `BOTVY_API_BASE` are the names the other four cron workflows read and the names compose sets -- the pair once disagreed (`BOTVY_INTERNAL_TOKEN` in compose, `BOTVY_SERVICE_TOKEN` here), which is an empty `Bearer ` and a silent 401 nobody noticed for days. Reading them at all needs `N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'`, which compose sets: n8n blocks `$env` inside node expressions by default, and until that was set every execution of every cron workflow here failed with `access to env vars denied`.\n\nTen minutes of timeout, because one pass reads up to fifty links and each one is a fetch plus several calls to the local model -- on a 3B model at 8K context that is minutes, not seconds, and the whole point of doing it here is that nobody is waiting.\n\n`retryOnFail` is OFF, which is the one place this workflow differs from the other four. The drain is not idempotent in the way their passes are: a retry would start a *second* concurrent drain against the same queue, and the in-process guard that makes that harmless lives in one worker process rather than in n8n. There is nothing to gain either way -- a link the failed pass left alone is still `queued` and the next tick, five minutes away, takes it.\n\n`neverError` is off deliberately. A 401 or a 500 has to FAIL here so the error workflow fires and the heartbeat `knowledge.ingest` goes stale, which is what /health reports after fifteen minutes."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "requeued",
+              "value": "={{ $json.requeued }}",
+              "type": "number"
+            },
+            {
+              "id": "b2",
+              "name": "ingested",
+              "value": "={{ $json.ingested }}",
+              "type": "number"
+            },
+            {
+              "id": "b3",
+              "name": "failed",
+              "value": "={{ $json.failed }}",
+              "type": "number"
+            },
+            {
+              "id": "b4",
+              "name": "ms",
+              "value": "={{ $json.ms }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6b2f0000-0000-4000-8000-000000000054",
+      "name": "Counts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        0
+      ],
+      "notes": "Kept as the execution's output so n8n's own log is the record of what each pass did. A steady-state tick is all zeroes except `ms`. A non-zero `requeued` is worth reading: it means a worker died holding a link, and those links' attempt counts are deliberately untouched -- a machine that failed is not a link that failed (FR-016). A non-zero `failed` is a source that refused us, and the reason is on the row where the member can read it."
+    }
+  ],
+  "connections": {
+    "Every five minutes": {
+      "main": [
+        [
+          {
+            "node": "Drain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Now": {
+      "main": [
+        [
+          {
+            "node": "Drain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drain": {
+      "main": [
+        [
+          {
+            "node": "Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": "Botvy Error Handler"
+  }
+}

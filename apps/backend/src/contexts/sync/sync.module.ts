@@ -45,6 +45,9 @@ import {
   WorkoutSyncAdapter,
 } from '../training/infrastructure/training-sync.adapters.js';
 import { TrainingModule } from '../training/training.module.js';
+import { LinkRepository } from '../knowledge/domain/knowledge.repositories.js';
+import { LinkSyncAdapter } from '../knowledge/infrastructure/knowledge-sync.adapter.js';
+import { KnowledgeModule } from '../knowledge/knowledge.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { LabelRepository } from '../planning/domain/label.repository.js';
 import { TaskRepository } from '../planning/domain/task.repository.js';
@@ -114,6 +117,7 @@ import {
     ConversationsModule,
     MeetingsModule,
     TrainingModule,
+    KnowledgeModule,
     WsModule,
   ],
   providers: [
@@ -202,6 +206,27 @@ import {
         new WorkoutSyncAdapter(uow, workouts),
     },
     /*
+     * P7's links. 45 — after Training's workouts at 39 and before the chat at
+     * 50, which is where `contracts/sync.md`'s `entities` list puts them, with
+     * 43 and 44 left for P8's meals. Not a dependency: a link references
+     * nothing and nothing references a link.
+     *
+     * It takes the member's clock and the settings because the daily quota is
+     * enforced on this path too — a create arriving in a batch is still a
+     * member saving a link, and a path that skipped FR-015 would be the way
+     * round it.
+     */
+    {
+      provide: LinkSyncAdapter,
+      inject: [UnitOfWork, LinkRepository, MemberContextPort, SettingsService],
+      useFactory: (
+        uow: UnitOfWork,
+        links: LinkRepository,
+        member: MemberContextPort,
+        settings: SettingsService,
+      ) => new LinkSyncAdapter(uow, links, member, settings),
+    },
+    /*
      * The rhythm's two row entities, both **pull-only**.
      *
      * They are here so the phone can hold a copy and render Home with the
@@ -283,6 +308,7 @@ import {
         ProgramSyncAdapter,
         SessionSyncAdapter,
         WorkoutSyncAdapter,
+        LinkSyncAdapter,
         DailyPlanSyncAdapter,
         CheckinSyncAdapter,
         ConversationSyncAdapter,

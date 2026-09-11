@@ -21,6 +21,11 @@ import { SessionsController } from './contexts/training/features/create-session/
 import { WorkoutsController } from './contexts/training/features/create-workout/workouts.controller.js';
 import { InternalMaterialiseController } from './contexts/training/features/materialise/internal-materialise.controller.js';
 import { TrainingModule } from './contexts/training/training.module.js';
+import { LinksController } from './contexts/knowledge/features/add-link/links.controller.js';
+import { SuggestionsController } from './contexts/knowledge/features/accept-suggestion/suggestions.controller.js';
+import { AdminKnowledgeController } from './contexts/knowledge/features/admin-clear-link/admin-knowledge.controller.js';
+import { InternalIngestController } from './contexts/knowledge/features/ingest-link/internal-ingest.controller.js';
+import { KnowledgeModule } from './contexts/knowledge/knowledge.module.js';
 import { InternalReconcileController } from './contexts/notifications/features/reconcile-meeting-alerts/internal-reconcile.controller.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
 import { RhythmModule } from './contexts/rhythm/rhythm.module.js';
@@ -43,6 +48,7 @@ import { RolesGuard } from './shared/auth/roles.guard.js';
 import { ServiceTokenGuard } from './shared/auth/service-token.guard.js';
 import { ConfigModule } from './shared/config/config.module.js';
 import { HealthModule } from './shared/health/health.module.js';
+import { MediaController } from './shared/media/media.controller.js';
 import { OutboxModule } from './shared/outbox/outbox.module.js';
 import { MongoPersistenceModule } from './shared/persistence/mongo/mongoose.module.js';
 import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
@@ -83,6 +89,7 @@ import { WsModule } from './ws/ws.module.js';
     RhythmModule,
     MeetingsModule,
     TrainingModule,
+    KnowledgeModule,
     SyncModule,
     HealthModule,
 
@@ -116,6 +123,23 @@ import { WsModule } from './ws/ws.module.js';
     ProgramsController,
     WorkoutsController,
     InternalMaterialiseController,
+    LinksController,
+    SuggestionsController,
+    AdminKnowledgeController,
+    InternalIngestController,
+    /*
+     * The signed image proxy, and the one controller in this list that lives
+     * in `shared/`.
+     *
+     * It belongs to no context: `media.signing.ts` was ported in P0 and
+     * `rest-commands.md` has listed `GET /media` since the blueprint, with
+     * nothing behind it until P7 gave the product its first external images.
+     * Declaring it here rather than in `HealthModule` or `KnowledgeModule`
+     * keeps it out of the worker — which imports the contexts for their
+     * services and must mount no public route — and keeps a context from
+     * owning a capability three of them will eventually want.
+     */
+    MediaController,
     SyncController,
     InternalAlertsController,
     InternalHeartbeatController,

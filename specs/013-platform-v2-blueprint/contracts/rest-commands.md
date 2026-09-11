@@ -130,8 +130,10 @@ for the path to have hung off.
 |---|---|---|
 | `POST /links` | user | `{ id, url, tags? }` → `{ id, kind, status: 'queued' }` |
 | `POST /links/:id/retry` | user | |
-| `DELETE /links/:id` | user | tombstone; children of a playlist follow |
-| `POST /suggestions/:id/accept` | user | `{ sessionId? }` → creates/fills a session |
+| `DELETE /links/:id` | user | tombstone; children of a playlist follow. The extracted documents stay until the tombstone is reaped, so an undo is possible |
+| `POST /links/:id/restore` | user | the undo, for a member who tapped the wrong row |
+| `DELETE /links/:id/purge` | user | erases a tombstone for good; refused on a live row |
+| `POST /suggestions/:id/accept` | user | `{ sessionId? }` → **fills** a session. Omitting `sessionId` means "the session it was suggested for", which always exists: a suggestion is generated *from* a session. The creating half of this line turned out to be unreachable and was not built — see `contracts/events.md`’s `SuggestionAccepted` row |
 | `POST /suggestions/:id/dismiss` | user | |
 | `POST /internal/knowledge/ingest/:linkId` | service (`internal:ingest`) | manual re-run of one link |
 

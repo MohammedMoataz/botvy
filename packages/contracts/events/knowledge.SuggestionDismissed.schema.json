@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "knowledge.SuggestionDismissed",
+  "description": "Payload of knowledge.SuggestionDismissed. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "suggestionId": {
+      "type": "string"
+    },
+    "sessionId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "suggestionId",
+    "sessionId"
+  ],
+  "additionalProperties": false
+}

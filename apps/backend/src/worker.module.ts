@@ -5,6 +5,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { NotificationsModule } from './contexts/notifications/notifications.module.js';
+import { KnowledgeModule } from './contexts/knowledge/knowledge.module.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
 import { RemindersModule } from './contexts/reminders/reminders.module.js';
@@ -49,6 +50,13 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     // The alert planning saga reacts to events from four contexts, so it runs
     // where the relay runs. The sweep's own route stays with the backend.
     NotificationsModule,
+    /*
+     * The reading pipeline runs where the relay runs: `LinkAdded` starts it,
+     * the drain tick keeps it moving, and every model call and outbound fetch
+     * in it happens off the request path (FR-012). The two internal routes
+     * stay with the backend, because routes are declared there.
+     */
+    KnowledgeModule,
     // For `NudgeOnChangesHandler`, which turns `sync.ChangesApplied` into a
     // socket nudge and therefore runs where the relay runs.
     SyncModule,

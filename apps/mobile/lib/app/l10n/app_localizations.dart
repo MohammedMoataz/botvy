@@ -380,6 +380,48 @@ class AppLocalizations {
   String weekdayName(int weekday) =>
       _t('weekday_${weekday.clamp(1, 7)}');
 
+  // ── P7: saved links and suggestions ─────────────────────────────────────
+  //
+  // The member reads three words where the server has six states — waiting,
+  // reading, summarising — because `fetching` and `extracting` are one thing
+  // from outside. `spec.md`'s glossary records the translation and
+  // `knowledge_cubit.dart`'s `phaseOf` performs it, so a screen never sees a
+  // server status.
+  String get knowledgeTitle => _t('knowledgeTitle');
+  String get knowledgeEmptyTitle => _t('knowledgeEmptyTitle');
+  String get knowledgeEmptyBody => _t('knowledgeEmptyBody');
+  String get knowledgeAdd => _t('knowledgeAdd');
+  String get knowledgeUrl => _t('knowledgeUrl');
+  String get knowledgeTags => _t('knowledgeTags');
+  String get knowledgeSaveAction => _t('knowledgeSaveAction');
+  String get knowledgeAll => _t('knowledgeAll');
+  String get knowledgeWaiting => _t('knowledgeWaiting');
+  String get knowledgeReading => _t('knowledgeReading');
+  String get knowledgeSummarising => _t('knowledgeSummarising');
+  String get knowledgeDone => _t('knowledgeDone');
+  String get knowledgeFailed => _t('knowledgeFailed');
+  String get knowledgeRetry => _t('knowledgeRetry');
+  String get knowledgeRemove => _t('knowledgeRemove');
+  String get knowledgeSummary => _t('knowledgeSummary');
+  String get knowledgeKeyPoints => _t('knowledgeKeyPoints');
+  String get knowledgeOpenOriginal => _t('knowledgeOpenOriginal');
+  String get knowledgeNoSummaryYet => _t('knowledgeNoSummaryYet');
+  String get knowledgeOffline => _t('knowledgeOffline');
+  String get knowledgeNoTranscript => _t('knowledgeNoTranscript');
+  String get knowledgeVideos => _t('knowledgeVideos');
+  String get knowledgeSuggestions => _t('knowledgeSuggestions');
+  String get knowledgeSuggestionsEmpty => _t('knowledgeSuggestionsEmpty');
+  String get knowledgeAccept => _t('knowledgeAccept');
+  String get knowledgeDismiss => _t('knowledgeDismiss');
+  String get knowledgeSources => _t('knowledgeSources');
+  String get knowledgeAlreadySaved => _t('knowledgeAlreadySaved');
+
+  /// "…and {count} more were left out." The playlist limit, said plainly
+  /// (FR-002's edge case). Substituted rather than concatenated, because the
+  /// number sits in a different place in Arabic.
+  String knowledgeSkipped(int count) =>
+      _f('knowledgeSkipped', {'count': '$count'});
+
   String get athleteTitle => _t('athleteTitle');
   String get athleteNextPractice => _t('athleteNextPractice');
   String get athleteToday => _t('athleteToday');
@@ -753,6 +795,38 @@ class AppLocalizations {
       'weekday_6': 'Saturday',
       'weekday_7': 'Sunday',
 
+      'knowledgeTitle': 'Saved links',
+      'knowledgeEmptyTitle': 'Nothing saved yet',
+      'knowledgeEmptyBody':
+          'Paste an article, a video or a playlist and Botvy will read it for you.',
+      'knowledgeAdd': 'Save a link',
+      'knowledgeUrl': 'Paste a link',
+      'knowledgeTags': 'Tags, for matching sessions',
+      'knowledgeSaveAction': 'Save',
+      'knowledgeAll': 'All',
+      'knowledgeWaiting': 'Waiting',
+      'knowledgeReading': 'Reading',
+      'knowledgeSummarising': 'Summarising',
+      'knowledgeDone': 'Done',
+      'knowledgeFailed': 'Failed',
+      'knowledgeRetry': 'Try again',
+      'knowledgeRemove': 'Remove',
+      'knowledgeSummary': 'Summary',
+      'knowledgeKeyPoints': 'Key points',
+      'knowledgeOpenOriginal': 'Open the original',
+      'knowledgeNoSummaryYet': 'Botvy has not finished reading this yet.',
+      'knowledgeOffline': 'The summary is on the server. Connect to read it.',
+      'knowledgeNoTranscript':
+          'This video had no captions, so the summary was built from its title and description.',
+      'knowledgeVideos': 'Videos',
+      'knowledgeSuggestions': 'Suggestions',
+      'knowledgeSuggestionsEmpty':
+          'Nothing suggested. Save something about your training and Botvy will draw on it.',
+      'knowledgeAccept': 'Use this',
+      'knowledgeDismiss': 'No thanks',
+      'knowledgeSources': 'From',
+      'knowledgeAlreadySaved': 'You already have that one.',
+      'knowledgeSkipped': 'and {count} more were left out',
       'athleteTitle': 'Training',
       'athleteNextPractice': 'Next practice',
       'athleteToday': 'Today',
@@ -1099,6 +1173,38 @@ class AppLocalizations {
     'weekday_6': 'السبت',
     'weekday_7': 'الأحد',
 
+    'knowledgeTitle': 'الروابط المحفوظة',
+    'knowledgeEmptyTitle': 'لا يوجد شيء محفوظ بعد',
+    'knowledgeEmptyBody':
+        'الصق مقالًا أو فيديو أو قائمة تشغيل وسيقرأها بوتفي نيابة عنك.',
+    'knowledgeAdd': 'احفظ رابطًا',
+    'knowledgeUrl': 'الصق رابطًا',
+    'knowledgeTags': 'وسوم، لمطابقة الحصص',
+    'knowledgeSaveAction': 'احفظ',
+    'knowledgeAll': 'الكل',
+    'knowledgeWaiting': 'في الانتظار',
+    'knowledgeReading': 'قيد القراءة',
+    'knowledgeSummarising': 'قيد التلخيص',
+    'knowledgeDone': 'تم',
+    'knowledgeFailed': 'فشل',
+    'knowledgeRetry': 'حاول مرة أخرى',
+    'knowledgeRemove': 'احذف',
+    'knowledgeSummary': 'الملخص',
+    'knowledgeKeyPoints': 'أهم النقاط',
+    'knowledgeOpenOriginal': 'افتح المصدر',
+    'knowledgeNoSummaryYet': 'لم ينتهِ بوتفي من قراءة هذا بعد.',
+    'knowledgeOffline': 'الملخص على الخادم. اتصل بالإنترنت لقراءته.',
+    'knowledgeNoTranscript':
+        'لا توجد ترجمة نصية لهذا الفيديو، لذا بُني الملخص من عنوانه ووصفه.',
+    'knowledgeVideos': 'الفيديوهات',
+    'knowledgeSuggestions': 'الاقتراحات',
+    'knowledgeSuggestionsEmpty':
+        'لا توجد اقتراحات. احفظ شيئًا عن تدريبك وسيعتمد عليه بوتفي.',
+    'knowledgeAccept': 'استخدم هذا',
+    'knowledgeDismiss': 'لا شكرًا',
+    'knowledgeSources': 'من',
+    'knowledgeAlreadySaved': 'هذا الرابط محفوظ لديك بالفعل.',
+    'knowledgeSkipped': 'و{count} أخرى لم تُضَف',
     'athleteTitle': 'التدريب',
     'athleteNextPractice': 'التدريب القادم',
     'athleteToday': 'اليوم',

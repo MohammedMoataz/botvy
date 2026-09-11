@@ -13,7 +13,8 @@
     "notAdmin": "This account is not an administrator. Ask the Owner for the admin role.",
     "overview": "Overview",
     "users": "Members",
-    "serviceClients": "Service clients"
+    "serviceClients": "Service clients",
+    "ingestion": "Reading queue"
   },
   "login": {
     "title": "Sign in",
@@ -90,5 +91,29 @@
     "secretTitle": "Secret for {name}",
     "secretWarning": "Copy this now. It is stored as a hash and cannot be shown again — if it is lost, revoke this client and create another.",
     "secretDone": "I have copied it"
+  },
+  "ingestion": {
+    "title": "Reading queue",
+    "intro": "What Botvy is reading across the installation, what failed and why. The summaries are not shown here: the content of somebody's reading is not operational information.",
+    "unfinished": "Unfinished",
+    "refresh": "Refresh",
+    "empty": "Nothing waiting.",
+    "what": "Link",
+    "kind": "Kind",
+    "state": "State",
+    "reason": "Reason",
+    "retry": "Retry",
+    "retried": "Queued again.",
+    "clear": "Clear",
+    "clearConfirm": "Clear {url}? It leaves the member's list and its extracted text is erased. The clearing is recorded in the audit trail.",
+    "cleared": "Cleared.",
+    "status": {
+      "queued": "Waiting",
+      "fetching": "Fetching",
+      "extracting": "Extracting",
+      "summarising": "Summarising",
+      "done": "Done",
+      "failed": "Failed"
+    }
   }
 }

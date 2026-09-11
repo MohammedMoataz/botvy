@@ -17,6 +17,7 @@ import { IdentityModule } from '../identity/identity.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { MeetingsModule } from '../meetings/meetings.module.js';
 import { TrainingModule } from '../training/training.module.js';
+import { KnowledgeModule } from '../knowledge/knowledge.module.js';
 import { PlanningModule } from '../planning/planning.module.js';
 import { ProfileModule } from '../profile/profile.module.js';
 import { RemindersModule } from '../reminders/reminders.module.js';
@@ -44,6 +45,7 @@ import {
   MeetingsOccurrenceLookup,
   MeetingsTombstonePurge,
   TrainingTombstonePurge,
+  KnowledgeTombstonePurge,
   PlanningTombstonePurge,
   RemindersTombstonePurge,
 } from './infrastructure/notification.adapters.js';
@@ -85,6 +87,7 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
     RemindersModule,
     MeetingsModule,
     TrainingModule,
+    KnowledgeModule,
     MongooseModule.forFeature([
       { name: MODEL_NAMES.alert, schema: AlertSchema },
     ]),
@@ -118,6 +121,7 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
     RemindersTombstonePurge,
     MeetingsTombstonePurge,
     TrainingTombstonePurge,
+    KnowledgeTombstonePurge,
     {
       provide: TOMBSTONE_PURGES,
       inject: [
@@ -125,6 +129,7 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
         RemindersTombstonePurge,
         MeetingsTombstonePurge,
         TrainingTombstonePurge,
+        KnowledgeTombstonePurge,
       ],
       useFactory: (...purges: TombstonePurgePort[]) => purges,
     },

@@ -449,6 +449,47 @@ export class Session extends AggregateRoot<string> {
     );
   }
 
+  /**
+   * The member accepted a suggestion into this session (P7, FR-010).
+   *
+   * ## Why it is not `fillFromProgram` with different arguments
+   *
+   * The two write almost the same fields and mean opposite things. A program
+   * fill is the *materialiser's*, unattended, and is therefore fenced by four
+   * refusals — never over content, never in the past, never twice for the same
+   * week — because nobody asked for it just now. This one is a member pressing
+   * Accept on a card in front of them, so it overwrites whatever is there and
+   * says nothing about programs: a session that came from a suggestion belongs
+   * to no program and no week, and clearing those two is what keeps the
+   * nightly pass from later deciding this session is filled wrongly.
+   *
+   * `suggestionId` is the record of where the content came from. It is what the
+   * session screen reads to show the citation, and what stops the suggestion
+   * saga proposing over its own answer.
+   *
+   * It announces for the same reason `fillFromProgram` does: the title is the
+   * alert's label, so a session renamed without an event is a plan on screen
+   * that does not match the notification.
+   */
+  fillFromSuggestion(
+    filling: {
+      suggestionId: string;
+      title: string;
+      focus: string | null;
+      exercises: Exercise[];
+    },
+    at: Date = new Date(),
+  ): void {
+    this.title = requireTitle(filling.title);
+    this.focus = truncate(filling.focus, MAX_FOCUS);
+    this.suggestionId = filling.suggestionId;
+    this.programId = null;
+    this.weekIndex = null;
+    this.exercises = validatedExercises(filling.exercises);
+    this.updatedAt = at;
+    this.raise('training.SessionRescheduled', 'session', this.alertFacts(), at);
+  }
+
   applyWorkout(
     exercises: Exercise[],
     nextId: () => string,
@@ -547,6 +588,7 @@ export class Session extends AggregateRoot<string> {
     title: string;
     focus: string | null;
     status: SessionStatus;
+    suggestionId: string | null;
   } {
     return {
       sessionId: this.id,
@@ -556,6 +598,19 @@ export class Session extends AggregateRoot<string> {
       title: this.title,
       focus: this.focus,
       status: this.status,
+      /*
+       * Promised by `contracts/events.md` since P0 — "present when the session
+       * came from an accepted suggestion, so Knowledge can record the outcome
+       * without guessing" — and written by nothing until P7, because nothing
+       * set the field. It is on the payload rather than only on the row for the
+       * reason that catalogue entry gives and that this codebase has paid for
+       * twice: a consumer that has to read the producer's collection to act on
+       * an event is the boundary violation the event exists to prevent.
+       *
+       * Its reader is Knowledge's suggestion saga, which declines to suggest
+       * over a session that is already a suggestion.
+       */
+      suggestionId: this.suggestionId,
     };
   }
 }

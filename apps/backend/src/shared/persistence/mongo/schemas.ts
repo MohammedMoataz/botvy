@@ -1080,6 +1080,186 @@ export const WorkoutSchema = new Schema(
   { collection: 'workouts', versionKey: false, _id: false },
 );
 
+/**
+ * Something the member saved to be read (data-model §2.7, P7).
+ *
+ * A syncable row, and the one in this system whose *status* is the interesting
+ * column: `queued → fetching → extracting → summarising → done`, any step to
+ * `failed`, and `failed → queued` on a retry. The phone holds a copy so the
+ * list renders offline, and pushes only add and remove — a client that could
+ * push a status would be telling the server it had read an article itself.
+ *
+ * `normalizedUrl` is stored beside `url` rather than derived on read, because
+ * it is what the unique index is built on: the same article arriving from a
+ * newsletter and from a friend is two URLs and one reading (FR-005), and
+ * deriving the comparison at query time would mean a collection scan per save.
+ *
+ * `docId` points into `knowledge_docs` and is null until the summary exists —
+ * and also null for an expanded playlist's *parent*, which finishes with
+ * children rather than with a document.
+ */
+export const LinkSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    url: { type: String, required: true },
+    normalizedUrl: { type: String, required: true },
+    /** `article` | `website` | `video` | `playlist`. */
+    kind: { type: String, required: true },
+    /** The YouTube video or list id, for a source that has one. */
+    externalId: { type: String, default: null },
+    /** Set on a playlist's children; null for anything the member saved directly. */
+    parentLinkId: { type: String, default: null },
+    title: { type: String, default: null },
+    /** Sports and topics, lower-cased. What the suggestion saga matches on. */
+    tags: { type: [String], default: [] },
+    status: { type: String, required: true, default: 'queued' },
+    failReason: { type: String, default: null },
+    attempts: { type: Number, default: 0 },
+    docId: { type: String, default: null },
+    /** Videos of a playlist left behind by `knowledge.playlistMaxItems`. */
+    skippedCount: { type: Number, default: null },
+    addedAt: { type: Date, required: true },
+    processedAt: { type: Date, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'links', versionKey: false, _id: false },
+);
+
+/**
+ * What Botvy read, dated (data-model §2.7).
+ *
+ * Server-only: the phone never holds one. It is the single largest document in
+ * the system — `text` runs to `knowledge.maxChars`, which defaults to sixty
+ * thousand characters — and the member only ever wants the *summary* of it,
+ * which the detail view fetches over GraphQL on demand. Syncing the extracted
+ * text of every article a member has ever saved onto their handset would be a
+ * cost with no reader.
+ *
+ * Written once and never edited. A source that changes after being read does
+ * not change this; re-reading a link writes a new document, so a suggestion's
+ * evidence cannot be rewritten under it after the member accepted it.
+ * `updatedAt` is here because `MongoRepositoryBase` writes it on every save,
+ * and it will equal `createdAt` for the life of every row.
+ */
+export const KnowledgeDocSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    linkId: { type: String, required: true },
+    sourceUrl: { type: String, required: true },
+    title: { type: String, default: null },
+    author: { type: String, default: null },
+    publishedAt: { type: Date, default: null },
+    text: { type: String, required: true, default: '' },
+    /**
+     * The video's captions, or null.
+     *
+     * Null on an article means "not a video"; null on a *video* is the spec's
+     * own edge case — the entry finishes on title, description and duration
+     * alone and says the summary was built without one. Nothing records that as
+     * a separate flag, because the link's kind and this field already say it
+     * and a third column could disagree with them.
+     */
+    transcript: { type: String, default: null },
+    summary: { type: String, required: true },
+    keyPoints: { type: [String], default: [] },
+    media: {
+      type: [
+        {
+          _id: false,
+          type: { type: String, required: true },
+          /** The source's own URL. Clients are handed the proxied form (FR-008). */
+          url: { type: String, required: true },
+          caption: { type: String, default: null },
+        },
+      ],
+      default: [],
+    },
+    durationSec: { type: Number, default: null },
+    model: { type: String, required: true },
+    tokens: { type: Number, default: 0 },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+  },
+  { collection: 'knowledge_docs', versionKey: false, _id: false },
+);
+
+/**
+ * A proposal for one session, drawn from the member's own readings
+ * (data-model §2.7, FR-009).
+ *
+ * Server-only and read over GraphQL rather than synced, because it is not a
+ * thing the member edits offline: it is generated by the worker, and the two
+ * actions on it — accept and dismiss — are commands that have to reach the
+ * server to mean anything.
+ *
+ * `forDate` is a **local date string** and not a Date, which is principle XI
+ * again: the suggestion is about the member's Tuesday, and an instant would put
+ * a member who trains at 06:00 into the wrong day the moment they flew.
+ *
+ * `sessionId` is the session it was generated *for*; `acceptedSessionId` is the
+ * one it ended up in, which may be a different session the member chose or one
+ * Training created afterwards. Two fields rather than one because the first is
+ * how FR-010's "not proposed again" is answered and the second is how T734's
+ * outcome is found, and collapsing them would lose whichever question was asked
+ * second.
+ */
+export const SuggestionSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    /** Only `session` exists; a meal or a reading order would be the next. */
+    kind: { type: String, required: true, default: 'session' },
+    forDate: { type: String, required: true },
+    sport: { type: String, required: true },
+    sessionId: { type: String, default: null },
+    draft: {
+      type: {
+        _id: false,
+        title: { type: String, required: true },
+        focus: { type: String, default: null },
+        exercises: {
+          type: [
+            {
+              _id: false,
+              name: { type: String, required: true },
+              notes: { type: String, default: null },
+              sets: {
+                type: [
+                  {
+                    _id: false,
+                    targetReps: { type: Number, default: null },
+                    targetWeightKg: { type: Number, default: null },
+                    targetDurationSec: { type: Number, default: null },
+                    targetDistanceM: { type: Number, default: null },
+                  },
+                ],
+                default: [],
+              },
+            },
+          ],
+          default: [],
+        },
+      },
+      required: true,
+    },
+    sourceLinkIds: { type: [String], default: [] },
+    rationale: { type: String, required: true, default: '' },
+    /** `pending` | `accepted` | `dismissed`. */
+    status: { type: String, required: true, default: 'pending' },
+    acceptedSessionId: { type: String, default: null },
+    /** `completed` | `cancelled` | `skipped`, once the session was dealt with. */
+    outcome: { type: String, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+  },
+  { collection: 'suggestions', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -1107,4 +1287,7 @@ export const MODEL_NAMES = {
   session: 'Session',
   program: 'Program',
   workout: 'Workout',
+  link: 'Link',
+  knowledgeDoc: 'KnowledgeDoc',
+  suggestion: 'Suggestion',
 } as const;
