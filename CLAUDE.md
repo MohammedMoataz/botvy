@@ -595,3 +595,56 @@ finds it, with a test, and named in the commit; it does not go there.
   under `forbidNonWhitelisted`. And the response serves rows under `pull`, not
   under `entities` — `entities` is what the *request* names. Both mistakes read
   as "this entity does not sync".
+- **A browser's `fetch` refuses to be called as a method of anything but the
+  window.** `this.fetchImpl = globalThis.fetch` followed by
+  `this.fetchImpl(url, init)` passes the client as the receiver, and Chrome
+  answers `TypeError: Failed to execute 'fetch' on 'Window': Illegal
+  invocation`. Node does not check a receiver, so the whole SDK suite passed
+  while **every request from a real browser threw before it was sent** — no
+  entry in the network panel, nothing in the server log, and a sign-in form
+  reporting an unreachable server that had never been asked. It shipped in P0
+  and was found in P9 by the first end-to-end test in a real browser; the admin
+  portal had been broken by it the entire time. Bind it, and pin it with a test
+  whose fake `fetch` throws on a foreign receiver, because a Node test cannot
+  otherwise tell.
+- **A MobX computed that reads no observable is evaluated once and cached for
+  ever.** `makeAutoObservable` turns every getter into a computed, so
+  `get isAuthenticated() { return this.mirror.signedIn; }` — over a field
+  deliberately excluded from observability — returned its value at mount for the
+  life of the store. The panel signed in successfully and went on drawing the
+  sign-in form. A getter that must react has to read an observable; one that
+  genuinely reads outside state must be annotated `false` rather than left to
+  become a computed by default.
+- **A local edit is two writes, and a sweep can land between them.** The engine
+  protects a row from the full-snapshot delete sweep by looking for its id in
+  the push queue — so a row applied optimistically and queued a tick later is
+  unprotected for that tick, and a first sync landing in the gap deletes what
+  the member just typed. The row's own `pendingOp` is the earlier signal and the
+  one to filter on: the row knows before the queue does.
+- **An await is a place a sign-out can happen.** The profile read fired at
+  sign-in resolves a second later, and if the member signed out in between it
+  writes their zone, language and name back onto a computer they have just
+  cleared — which is the one promise sign-out makes, and it failed by exactly
+  two keys reappearing after `clearAll`. Anything that writes member data across
+  an await carries the session it started in and drops if that session has
+  ended.
+- **A cross-context lock does not stop a stale mirror.** The panel and the
+  service worker both keep an in-memory copy of one `chrome.storage` token pair
+  because the SDK reads tokens synchronously. A Web Lock stops them refreshing
+  *at the same moment*; it does nothing about the loser holding an old pair
+  afterwards and replaying a refresh token the winner has already spent — which
+  the API answers by revoking the family. The lock must **re-read inside
+  itself**, and every context must follow `chrome.storage.onChanged`.
+- **Stable Chrome no longer honours `--load-extension`.** With
+  `channel: 'chrome'` an unpacked extension silently does not load and
+  `context.serviceWorkers()` stays empty however long you wait — a failure that
+  reads as "my extension is broken". Playwright's bundled Chromium honours it
+  with `--disable-features=DisableLoadExtensionCommandLineSwitch`, and an
+  extension needs `launchPersistentContext` besides: Playwright's default
+  context is incognito, which loads no extension at all.
+- **An optional host permission cannot be granted by an automated browser.** The
+  prompt is browser chrome. So an end-to-end suite that signs in through the
+  real flow gets a refused permission and a blocked request — which is the
+  truth, not a bug. The e2e build declares the hosts instead, differing from the
+  shipped manifest by exactly one key, and *granting* stays a manual check. Say
+  so next to the code rather than hiding it in a script.
