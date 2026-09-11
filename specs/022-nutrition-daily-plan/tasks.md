@@ -191,6 +191,44 @@ time of day for exactly this reason.
   exists to stop *the system* handing them something, not to police them. The
   same meal is still held back from an automatic rotation.
 
+### The Android build, fixed in this phase
+
+The phase also unblocked `flutter build apk`, which had been failing on `main`
+since before P7 and was only noticed when a release wanted an APK:
+
+```
+Dependency ':flutter_secure_storage' requires libraries and applications that
+depend on it to compile against version 37 or later of the Android APIs.
+:app is currently compiled against android-36.
+Also, the maximum recommended compile SDK version for Android Gradle plugin
+9.1.0 is 36.
+```
+
+`flutter_secure_storage` 11.0.0 demands `compileSdk 37`; the app compiles
+against 36 and AGP 9.1.0 caps there, so raising one without the other cannot
+work. It is **pinned to 10.3.2** — the newest 10.x, whose `android/build.gradle`
+declares `compileSdk = 36` — with the reason and the unpin condition in
+`pubspec.yaml` beside it. The alternative, bumping AGP and `compileSdk`
+together, is the direction the toolchain is going and is a change to the Android
+build for every future build and for CI; it does not belong in a phase about
+meals.
+
+Two things worth recording beside it:
+
+- **`flutter build apk --release` alone fails on this project**, with "Gradle
+  build failed to produce an .apk file" *even though Gradle succeeded*: the app
+  declares `dev` and `prod` product flavours, so the artifacts land in
+  `apk/prod/release/` and nothing is written to the flavourless path the tool
+  looks at. The command is `--release --flavor prod`.
+- **The APK is debug-signed.** `android/key.properties` does not exist, so the
+  release build type falls back to the debug signing config. It is sideloadable
+  and not upgradeable in place; a real keystore is a release-checklist item, not
+  this phase's.
+
+Built from this branch after the pin: `app-prod-release.apk`, 70.8 MB,
+Flutter 3.47.2 / Dart 3.13.2, with `flutter analyze` clean and 370 tests green
+on the pinned resolution.
+
 ### What is not done
 
 - **T852's RTL screenshots.** The Arabic strings are in and the parity test
