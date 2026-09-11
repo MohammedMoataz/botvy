@@ -15,8 +15,17 @@ import type { AgendaEntry, PanelStore } from '../../lib/store';
  */
 export const Meetings = observer(function Meetings({
   store,
+  /**
+   * Whether the Add form is open, which the panel's tabs decide.
+   *
+   * The list is always drawn — "what is coming" is the reason to look at this
+   * section at all — and only the form follows the tab. Defaulting to open
+   * would put a five-field form under every list on every mount.
+   */
+  showForm = false,
 }: {
   store: PanelStore;
+  showForm?: boolean;
 }) {
   return (
     <section className="mb-3">
@@ -47,7 +56,7 @@ export const Meetings = observer(function Meetings({
         </ul>
       )}
 
-      <QuickAdd store={store} />
+      {showForm && <QuickAdd store={store} />}
     </section>
   );
 });

@@ -1,10 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { observer } from 'mobx-react-lite';
 import type { PanelTaskRow } from '../../lib/db';
-import { SYNC_NUDGE_MESSAGE } from '../../lib/config';
+import { MESSAGES, type ExtensionMessage } from '../../lib/config';
 import { PanelStore } from '../../lib/store';
 import { locales, type Locale } from '../../lib/i18n';
+import { AddReminder } from './AddReminder';
 import { Meetings } from './Meetings';
+import { Settings } from './Settings';
+import { Status } from './Status';
 
 export const App = observer(function App() {
   // A new store per mount, hydrated from chrome.storage + Dexie — the panel is
@@ -18,20 +21,40 @@ export const App = observer(function App() {
   // survives nothing, and nothing should want it to — Dexie already holds the
   // outcome.
   const [undoable, setUndoable] = useState<PanelTaskRow | null>(null);
+  /** Which of the three Add forms is open. Task first: it is the common one. */
+  const [adding, setAdding] = useState<'task' | 'reminder' | 'meeting'>('task');
 
   useEffect(() => {
     void store.hydrate();
   }, [store]);
 
-  // The nudge. FCM does not work in an extension, so this and the sync on mount
-  // are the whole of how the panel hears about a change made on the phone.
+  /*
+   * What the worker says to the panel.
+   *
+   * FCM does not work in an extension, so this and the sync on mount are the
+   * whole of how the panel hears about a change made on the phone.
+   *
+   * - **nudge**: something changed elsewhere — run a pass.
+   * - **captured**: the worker queued a capture while this panel was open, so
+   *   the counts are stale even though nothing came off the wire.
+   * - **compose**: the keyboard shortcut, which opens the Add form with the
+   *   page's title already in it. Handled here rather than in the store because
+   *   it is the form's state and nothing durable depends on it.
+   */
   useEffect(() => {
     const onMessage = (message: unknown): void => {
-      if ((message as { type?: string } | null)?.type === SYNC_NUDGE_MESSAGE) {
-        void store.syncNow();
+      const typed = message as ExtensionMessage | null;
+      if (typed?.type === MESSAGES.nudge) void store.syncNow();
+      if (typed?.type === MESSAGES.captured) void store.syncNow();
+      if (typed?.type === MESSAGES.compose) {
+        setAdding('task');
+        setDraft(typed.title);
       }
     };
     chrome.runtime.onMessage.addListener(onMessage);
+    // Tell the worker the panel is up, which is the third of the three ways
+    // this surface catches up (the socket and the alarm are the others).
+    void chrome.runtime.sendMessage({ type: MESSAGES.syncNow }).catch(() => undefined);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
   }, [store]);
 
@@ -82,58 +105,49 @@ export const App = observer(function App() {
 
       {store.isAuthenticated ? (
         <div>
-          {/* The sync indicator. It reports the *last completed pass*, read back
-              out of Dexie, so a reopened panel says "synced 14:02" rather than
-              "not synced yet" — the round trip is durable and the label has to
-              agree with it. */}
-          <div className="d-flex align-items-center gap-2 mb-2">
-            <span className="text-muted small me-auto">
-              {store.syncing
-                ? store.t('sync.syncing')
-                : store.lastSyncedAt
-                  ? store.t('sync.at', { time: formatTime(store.lastSyncedAt, store.locale) })
-                  : store.t('sync.never')}
-            </span>
-            <button
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => void store.syncNow()}
-              disabled={store.syncing}
-            >
-              {store.t('sync.now')}
-            </button>
-          </div>
+          <Status store={store} />
 
-          {/* One notice line for both the round trip and the commands. A blocked
-              push is the case the contract is strictest about: the edit is never
-              discarded, so it must be possible to see it and retry it. */}
+          {/* The one notice line that is not a state: something the member
+              should read once, such as a pass that could not reach Botvy. The
+              strip above already says *what* is true; this says what happened. */}
           {store.noticeKey && (
-            <div className="alert alert-warning py-2 small d-flex align-items-center gap-2">
-              <span className="me-auto">
-                {store.t(store.noticeKey, { count: store.blockedCount })}
-              </span>
-              {store.blockedCount > 0 && (
-                <button
-                  className="btn btn-outline-secondary btn-sm"
-                  onClick={() => void store.retryBlocked()}
-                >
-                  {store.t('sync.retry')}
-                </button>
-              )}
+            <div className="alert alert-warning py-2 small mb-2">
+              {store.t(store.noticeKey, { count: store.blockedCount })}
             </div>
           )}
 
-          <form className="input-group input-group-sm mb-3" onSubmit={onAdd}>
-            <input
-              className="form-control"
-              placeholder={store.t('tasks.add')}
-              aria-label={store.t('tasks.add')}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button className="btn btn-primary" type="submit" disabled={!draft.trim()}>
-              {store.t('tasks.addSubmit')}
-            </button>
-          </form>
+          {/* Three things a member adds, behind three tabs rather than three
+              screens: the panel is a column beside their work, and a form they
+              have to navigate to is a form they use on the phone instead. */}
+          <ul className="nav nav-pills nav-fill mb-2 small">
+            {(['task', 'reminder', 'meeting'] as const).map((kind) => (
+              <li className="nav-item" key={kind}>
+                <button
+                  className={`nav-link py-1 ${adding === kind ? 'active' : ''}`}
+                  onClick={() => setAdding(kind)}
+                >
+                  {store.t(`add.${kind}`)}
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {adding === 'task' && (
+            <form className="input-group input-group-sm mb-3" onSubmit={onAdd}>
+              <input
+                className="form-control"
+                placeholder={store.t('tasks.add')}
+                aria-label={store.t('tasks.add')}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+              />
+              <button className="btn btn-primary" type="submit" disabled={!draft.trim()}>
+                {store.t('tasks.addSubmit')}
+              </button>
+            </form>
+          )}
+
+          {adding === 'reminder' && <AddReminder store={store} />}
 
           {undoable && (
             <div className="alert alert-secondary py-2 small d-flex align-items-center gap-2">
@@ -199,14 +213,9 @@ export const App = observer(function App() {
               because recurrence is a rule plus exceptions and never expanded
               rows. */}
           <hr />
-          <Meetings store={store} />
+          <Meetings store={store} showForm={adding === 'meeting'} />
 
-          <button
-            className="btn btn-outline-secondary btn-sm mt-3"
-            onClick={() => void store.logout()}
-          >
-            {store.t('login.signOut')}
-          </button>
+          <Settings store={store} />
         </div>
       ) : (
         <form onSubmit={onSubmit}>
@@ -277,17 +286,5 @@ export const App = observer(function App() {
   );
 });
 
-/**
- * The clock time of the last pass, in the panel's locale.
- *
- * A wall-clock time and not a relative one ("3 minutes ago"), because a
- * relative label has to be re-rendered to stay true and this component only
- * re-renders when something changes. A stale "just now" is worse than a fixed
- * time that the member can read against their own clock.
- */
-function formatTime(instant: string, locale: string): string {
-  return new Date(instant).toLocaleTimeString(locale, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
+// `formatTime` moved to `Status.tsx`, which is the only thing that renders a
+// sync time now.

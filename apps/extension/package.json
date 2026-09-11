@@ -8,7 +8,8 @@
     "build": "wxt build",
     "zip": "wxt zip",
     "typecheck": "wxt prepare && tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "test": "vitest run"
   },
   "dependencies": {
     "@botvy/sdk": "workspace:*",
@@ -26,7 +27,9 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@wxt-dev/module-react": "^1.2.2",
+    "fake-indexeddb": "^6.0.0",
     "typescript": "^5.7.2",
+    "vitest": "^5.0.0",
     "wxt": "^0.21.4"
   }
 }

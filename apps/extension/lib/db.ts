@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
+import type { CaptureRow } from './capture';
 import type {
   CalendarEventRow,
   LabelRow,
@@ -61,6 +62,7 @@ export class BotvyDb extends Dexie {
   meetings!: Table<MeetingRow, string>;
   calendar_events!: Table<CalendarEventRow, string>;
   pending_ops!: Table<PendingOpRow, [SyncEntity, string]>;
+  captures!: Table<CaptureRow, string>;
 
   constructor() {
     super('botvy');
@@ -111,6 +113,50 @@ export class BotvyDb extends Dexie {
       calendar_events: '&id',
       pending_ops: '[entity+id], entity',
     });
+
+    // 4: the capture outbox (P9, T940).
+    //
+    // Its own store rather than a row in `pending_ops`, because a capture is
+    // **not** a synced row: a reminder and a saved link are commands against
+    // entities this surface does not hold, so the sync engine has no table to
+    // apply them through and no rejection branch to take for them. Putting them
+    // in the same store would mean the engine reading rows it cannot act on.
+    this.version(4).stores({
+      meta: '&key',
+      tasks: '&id',
+      labels: '&id',
+      meetings: '&id',
+      calendar_events: '&id',
+      pending_ops: '[entity+id], entity',
+      captures: '&id',
+    });
+  }
+}
+
+/**
+ * Open the cache, and start it again from nothing if it will not open.
+ *
+ * Constitution IV is forward-only for the two **stores of record**, and this is
+ * neither: every row here came from `/sync` and can be asked for again. So the
+ * fallback a corrupted or unreadable IndexedDB gets is a delete and a full
+ * pull — which is the honest thing for a cache, and the plan records it as
+ * acceptable for exactly that reason.
+ *
+ * What it must never do is take the member's **unsent** work with it, so this
+ * is called only where there is nothing queued to lose: on a failure to open at
+ * all, where the queue is unreadable in any case. A panel that opened fine and
+ * then hit a version error mid-session keeps its queue and says so.
+ */
+export async function openOrRebuild(): Promise<'opened' | 'rebuilt'> {
+  try {
+    await db.open();
+    return 'opened';
+  } catch {
+    await db.delete().catch(() => undefined);
+    await db.open();
+    // The cursor went with the database, so the next pass asks for everything —
+    // which is what makes this recoverable rather than a hole in the cache.
+    return 'rebuilt';
   }
 }
 

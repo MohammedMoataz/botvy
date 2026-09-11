@@ -1,9 +1,17 @@
 import type { TokenStore } from './tokens.js';
 
 export interface ClientOptions {
-  /** Origin the API is reached at. Empty means same-origin, which is what
-   *  running behind the edge gives the web app. */
-  baseUrl?: string;
+  /**
+   * Origin the API is reached at. Empty means same-origin, which is what
+   * running behind the edge gives the web app.
+   *
+   * A **function** is accepted for the one surface whose origin is not fixed
+   * at construction: the browser extension, where the member's Botvy address
+   * is a per-browser setting they can change in the panel. Pinning it in the
+   * constructor would mean an address change took effect only after a reload,
+   * and the reload of a side panel is a thing the member cannot ask for.
+   */
+  baseUrl?: string | (() => string);
   tokens?: TokenStore;
   fetchImpl?: typeof fetch;
 }
@@ -78,12 +86,18 @@ export class NotAvailableYetError extends ApiError {
  * least resistance.
  */
 export class BotvyClient {
-  private readonly baseUrl: string;
+  private readonly origin: string | (() => string);
   private readonly fetchImpl: typeof fetch;
 
   constructor(private readonly options: ClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? '').replace(/\/$/, '');
+    this.origin = options.baseUrl ?? '';
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  }
+
+  /** Resolved per request, so a surface whose address can change is correct. */
+  private get baseUrl(): string {
+    const raw = typeof this.origin === 'function' ? this.origin() : this.origin;
+    return (raw ?? '').replace(/\/$/, '');
   }
 
   /**

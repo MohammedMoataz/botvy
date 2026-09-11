@@ -20,7 +20,22 @@ import {
   type TaskAck,
   type TokenPair,
 } from '@botvy/sdk';
-import { GATEWAY_URL, readTokens, writeTokens } from './config';
+import { flushCaptures, queueCapture } from './capture';
+import { googleIdToken, requestBotvyOrigin } from './google';
+import {
+  DEFAULT_GATEWAY,
+  profileIsStale,
+  readDeviceId,
+  readGateway,
+  readProfile,
+  readTokens,
+  refreshUnderLock,
+  signOut,
+  writeDeviceId,
+  writeGateway,
+  writeProfile,
+  writeTokens,
+} from './session';
 import { db, getMeta, setMeta, type PanelTaskRow } from './db';
 import {
   DexieSyncTable,
@@ -88,7 +103,21 @@ const INSTALL_ID_KEY = 'auth.installId';
  * panel opened with no connection still draws the right day rather than
  * silently falling back to the host's.
  */
-const TIMEZONE_KEY = 'profile.timezone';
+// The cached zone moved to `session.ts`, where it sits beside the language
+// and the display name as one `chrome.storage` record with a `fetchedAt` on
+// it — which is what makes "the panel follows a change within a day"
+// (FR-013) something the code can actually decide rather than a hope. Two
+// caches for one profile is how one of them goes stale unnoticed.
+
+/**
+ * Past this, the panel stops calling itself in step (FR-007).
+ *
+ * Not a tuning knob: it is what the strip *means* by the word, and the member
+ * reading it needs one meaning rather than an operator's. The worker uses the
+ * same figure to decide whether to sync unprompted, which is what keeps the two
+ * from disagreeing about whether this panel is current.
+ */
+const STALE_AFTER_MS = 5 * 60 * 1000;
 
 /** Priority 4 — the server's own default for a task nobody prioritised. */
 const DEFAULT_PRIORITY = 4;
@@ -131,8 +160,19 @@ export class PanelStore {
   labels: LabelRow[] = [];
   meetings: MeetingRow[] = [];
 
-  /** The member's zone, from the profile and cached in Dexie. Never the host's. */
+  /** The member's zone, from their profile. Never the host's. */
   timezone: string | null = null;
+
+  /**
+   * Where this browser looks for the member's Botvy.
+   *
+   * Observable because the settings row edits it, and read by the client on
+   * every request through the `baseUrl` function above.
+   */
+  gateway: string = DEFAULT_GATEWAY;
+
+  /** This browser's device row, so sign-out can remove it (FR-009). */
+  deviceId: string | null = null;
 
   syncing = false;
   /** The server's `now` from the last completed pass, kept across re-mounts. */
@@ -141,6 +181,12 @@ export class PanelStore {
   blockedCount = 0;
   /** A translation key for the one notice line, or null when there is nothing to say. */
   noticeKey: string | null = null;
+
+  /** Edits and captures that have not reached the member's Botvy yet. */
+  unsentCount = 0;
+
+  /** True when the last attempt could not reach the member's Botvy at all. */
+  unreachable = false;
 
   /** The synchronous mirror the SDK reads; chrome.storage stays the durable copy. */
   readonly mirror: TokenStore;
@@ -215,14 +261,29 @@ export class PanelStore {
           void writeTokens(tokens);
         },
       },
-      // Deferred through a closure: the auth store needs the client, the client
-      // needs this token store, and a refresh can only happen after all three
-      // exist.
-      (refreshToken) => this.auth.refreshFn(refreshToken),
+      /*
+       * Deferred through a closure: the auth store needs the client, the client
+       * needs this token store, and a refresh can only happen after all three
+       * exist.
+       *
+       * Wrapped in the cross-context lock, because the panel is not the only
+       * refresher any more. The background worker refreshes before it connects
+       * and before it syncs, and two contexts spending one rotating refresh
+       * token is a replay — which the API answers by revoking the whole family
+       * and signing the member out of a session they never touched.
+       */
+      (refreshToken) =>
+        refreshUnderLock(
+          (current) => this.auth.refreshFn(current),
+          { accessToken: held?.accessToken ?? '', refreshToken },
+        ),
     );
 
     this.client = new BotvyClient({
-      baseUrl: GATEWAY_URL,
+      // A function, not a string: the address is a per-browser setting the
+      // member can change in the panel, and a client pinned at construction
+      // would keep talking to the old one until something reloaded the panel.
+      baseUrl: () => this.gateway,
       tokens: this.mirror,
     });
     this.auth = new SdkAuthStore(this.client, this.mirror);
@@ -254,6 +315,36 @@ export class PanelStore {
         }
       });
     });
+  }
+
+  /**
+   * What the strip says, in one of four words (T921, FR-007).
+   *
+   * Each has a rule behind it and they are checked in order of seriousness:
+   *
+   * - **blocked** — something the server refused, or something that has burned
+   *   its five attempts. It comes first because it is the only state that needs
+   *   the member to *do* something, and a panel that said "in step" while an
+   *   edit sat refused would be lying about the member's own work.
+   * - **catching up** — a pass is on the wire, or there is unsent work waiting
+   *   for one.
+   * - **offline** — the last attempt could not reach Botvy, or the browser says
+   *   there is no network. Not a signed-out state: the tokens are fine and the
+   *   machine at the other end is not answering.
+   * - **in step** — the last exchange succeeded and is under five minutes old.
+   *   Anything older calls itself out of step rather than claiming currency it
+   *   cannot vouch for, which is FR-007 in as many words.
+   */
+  get syncState(): 'blocked' | 'catching-up' | 'offline' | 'in-step' | 'stale' {
+    if (this.blockedCount > 0) return 'blocked';
+    if (this.syncing) return 'catching-up';
+    if (this.unreachable || (typeof navigator !== 'undefined' && !navigator.onLine))
+      return 'offline';
+    if (this.unsentCount > 0) return 'catching-up';
+    if (!this.lastSyncedAt) return 'stale';
+    return Date.now() - new Date(this.lastSyncedAt).getTime() > STALE_AFTER_MS
+      ? 'stale'
+      : 'in-step';
   }
 
   get isAuthenticated(): boolean {
@@ -365,7 +456,9 @@ export class PanelStore {
       installId,
       cursor,
       lastSyncedAt,
-      timezone,
+      cached,
+      gateway,
+      deviceId,
     ] = await Promise.all([
       loadLocale(),
       readTokens(),
@@ -373,7 +466,9 @@ export class PanelStore {
       this.installId(),
       getMeta<string>(SYNC_CURSOR_KEY),
       getMeta<string>(SYNC_LAST_AT_KEY),
-      getMeta<string>(TIMEZONE_KEY),
+      readProfile(),
+      readGateway(),
+      readDeviceId(),
     ]);
     applyDirection(locale);
     if (tokens) this.mirror.set(tokens);
@@ -398,15 +493,25 @@ export class PanelStore {
       this.locale = locale;
       this.email = lastEmail ?? '';
       this.lastSyncedAt = lastSyncedAt ?? null;
-      this.timezone = timezone ?? null;
+      this.timezone = cached?.timezone ?? null;
+      this.gateway = gateway;
+      this.deviceId = deviceId;
       this.status = tokens ? 'authenticated' : 'idle';
       this.hydrated = true;
     });
 
     if (tokens) {
-      // The zone first, because the list cannot be drawn without it, then the
-      // round trip. Both fire and forget: the panel renders from Dexie meanwhile.
-      await this.loadTimezone();
+      /*
+       * The cached profile is drawn immediately and refreshed only when it is
+       * over a day old (FR-013).
+       *
+       * Refreshing on every mount would be a round trip per panel open for two
+       * fields that change once a year, and — worse — it would make the day the
+       * panel calls "today" depend on the network: a member on a plane would
+       * get no zone and a list resolved against the browser's, which is the
+       * three-hour shift principle XI exists to stop.
+       */
+      if (profileIsStale(cached)) void this.loadProfile();
       void this.syncNow();
     }
   }
@@ -430,6 +535,11 @@ export class PanelStore {
       this.failure = null;
     });
 
+    // Asked for here, at the one moment the browser knows which origin to ask
+    // about and the member is pressing a button — `permissions.request` needs a
+    // user gesture, and sign-in is the only one this flow has.
+    await requestBotvyOrigin(this.gateway);
+
     try {
       const member = await this.auth.login(
         email,
@@ -439,11 +549,12 @@ export class PanelStore {
       // Remembered so a reopened panel does not ask for the address again. The
       // address is not a credential; the password is never stored.
       await setMeta(LAST_EMAIL_KEY, email);
+      await this.rememberDevice();
       runInAction(() => {
         this.member = member;
         this.status = 'authenticated';
       });
-      await this.loadTimezone();
+      await this.loadProfile();
       void this.syncNow();
     } catch (error) {
       runInAction(() => {
@@ -456,23 +567,75 @@ export class PanelStore {
     }
   }
 
-  async logout(): Promise<void> {
-    await this.auth.logout();
-    await writeTokens(null);
+  /**
+   * Sign out: revoke the session, forget this browser, then clear (FR-009).
+   *
+   * The three steps and their order live in `session.ts`, because the order is
+   * the whole of it — clearing first would throw away the refresh token the
+   * revoke needs and the install id the device delete needs, leaving a live
+   * session and a phantom device on the member's account. Both server calls are
+   * best-effort with a bounded wait, so a member signing out on a plane still
+   * gets their cache cleared.
+   */
+  /**
+   * Sign in with Google (FR-008).
+   *
+   * The id token comes from the browser's own web-auth flow and goes straight
+   * to Botvy, which verifies it against Google. Nothing here inspects it: an
+   * extension that read the claims would be a second thing deciding who the
+   * member is, and the one that matters is the server.
+   *
+   * `link_required` is Botvy saying the address already has a password account.
+   * The panel cannot resolve that on its own — it needs the password — so it
+   * reports the failure and leaves the member on the form, which is where the
+   * password field is.
+   */
+  async loginWithGoogle(clientId: string): Promise<void> {
+    runInAction(() => {
+      this.status = 'pending';
+      this.failure = null;
+    });
 
-    // The cursor is forgotten and both tables are dropped, so the next member to
-    // sign in on this browser gets a full snapshot of their own rows rather than
-    // a delta against somebody else's cursor.
+    await requestBotvyOrigin(this.gateway);
+    const idToken = await googleIdToken(clientId);
+    if (!idToken) {
+      runInAction(() => {
+        this.status = 'idle';
+      });
+      return;
+    }
+
+    try {
+      const member = await this.auth.google(idToken, await this.deviceDescriptor());
+      await this.rememberDevice();
+      runInAction(() => {
+        this.member = member;
+        this.status = 'authenticated';
+      });
+      await this.loadProfile();
+      void this.syncNow();
+    } catch {
+      runInAction(() => {
+        this.status = 'error';
+        this.failure = 'unknown';
+      });
+    }
+  }
+
+  async logout(): Promise<void> {
+    const deviceId = this.deviceId;
+
+    await signOut({
+      revoke: () => this.auth.logout(),
+      forgetDevice: () =>
+        deviceId ? this.auth.removeDevice(deviceId) : Promise.resolve(),
+    });
+
+    // The cursor goes with the database, so the next member to sign in on this
+    // browser gets a full snapshot of their own rows rather than a delta
+    // against somebody else's cursor.
     this.sync?.reset();
     this.profile.clear();
-    await Promise.all([
-      this.tasksTable.clear(),
-      this.labelsTable.clear(),
-      this.meetingsTable.clear(),
-      this.eventsTable.clear(),
-      setMeta(SYNC_LAST_AT_KEY, null),
-      setMeta(TIMEZONE_KEY, null),
-    ]);
     await this.refresh();
 
     runInAction(() => {
@@ -481,6 +644,7 @@ export class PanelStore {
       this.member = null;
       this.meetings = [];
       this.timezone = null;
+      this.deviceId = null;
       this.lastSyncedAt = null;
       this.noticeKey = null;
       this.blockedCount = 0;
@@ -521,10 +685,18 @@ export class PanelStore {
     if (!this.sync) return;
     try {
       const outcome = await this.sync.sync();
+      // The capture outbox rides the same pass. It is flushed *after* the pull,
+      // so a capture that the server has already accepted from the worker is
+      // gone from the queue before this context tries it again — the
+      // idempotency key would make a second attempt harmless anyway, and one
+      // fewer needless request is worth an ordering.
+      await flushCaptures(this.client).catch(() => 0);
       await setMeta(SYNC_LAST_AT_KEY, outcome.cursor);
       await this.refresh();
+      await this.countUnsent();
       runInAction(() => {
         this.lastSyncedAt = outcome.cursor;
+        this.unreachable = false;
         this.noticeKey = outcome.blocked.length ? 'sync.blocked' : null;
       });
     } catch {
@@ -532,6 +704,7 @@ export class PanelStore {
       // judged: the queue is untouched, nothing is counted against the attempt
       // cap, and the next kick tries again.
       runInAction(() => {
+        this.unreachable = true;
         this.noticeKey = 'sync.failed';
       });
     }
@@ -625,6 +798,39 @@ export class PanelStore {
    * matters. `wallClockToUtc` resolves it against the profile's zone instead,
    * which is also the zone the server will record as `authoredTimezone`.
    */
+  /**
+   * A reminder, from the Add form (FR-002).
+   *
+   * Through the **capture outbox** rather than the sync queue, because
+   * `reminders` is not one of the four entities this surface holds: the panel
+   * has no local table to apply it to and the engine has no rejection branch
+   * for it. The outbox keeps it until there is a connection and sends it with
+   * its own id as the idempotency key, which is what makes "kept and sent
+   * exactly once" true of a reminder typed on a train (FR-005).
+   *
+   * The consequence is honest and worth stating: a reminder added here does not
+   * appear in the panel, because the panel does not hold reminders. It appears
+   * on the phone. The strip's unsent count is what says the work is not lost.
+   */
+  async addReminder(title: string, whenWallClock: string): Promise<boolean> {
+    const trimmed = title.trim();
+    if (!trimmed || !this.timezone) return false;
+
+    const at = wallClockToUtc(whenWallClock, this.timezone);
+    if (!at) return false;
+
+    await queueCapture({
+      kind: 'reminder',
+      text: trimmed,
+      url: '',
+      id: newId(),
+      remindAt: at,
+    });
+    await this.countUnsent();
+    void this.syncNow();
+    return true;
+  }
+
   async addMeeting(draft: MeetingDraft): Promise<boolean> {
     const title = draft.title.trim();
     const onlineLink = draft.onlineLink.trim();
@@ -736,7 +942,7 @@ export class PanelStore {
    * would then be right in the member's own city and wrong everywhere else they
    * open a browser.
    */
-  private async loadTimezone(): Promise<void> {
+  private async loadProfile(): Promise<void> {
     const loaded = await this.profile
       .load()
       .then(() => true)
@@ -746,9 +952,60 @@ export class PanelStore {
     const timezone = this.profile.profile?.timezone;
     if (!timezone) return;
 
-    await setMeta(TIMEZONE_KEY, timezone);
+    const locale = this.profile.profile?.locale === 'ar' ? 'ar' : 'en';
+    await writeProfile({
+      timezone,
+      locale,
+      displayName: this.profile.profile?.displayName ?? null,
+    });
+
     runInAction(() => {
       this.timezone = timezone;
+    });
+
+    /*
+     * The member's language follows their profile, not this browser (FR-014).
+     *
+     * Applied only when it actually differs, because `setLocale` writes and
+     * re-lays-out the panel: a member reading Arabic on their phone gets an
+     * Arabic panel, and one who has deliberately switched the panel with the
+     * picker keeps their choice until the profile itself changes.
+     */
+    if (locale !== this.locale) await this.setLocale(locale);
+  }
+
+  /**
+   * Register this browser as a device and remember which row it is.
+   *
+   * `login` already sends the descriptor, and that is what creates the row —
+   * but it answers with the member, not with the device's id, and sign-out has
+   * to be able to delete *this* row. `myDevices` cannot identify it either: the
+   * view carries no install id. So this asks for the id directly; the call is
+   * idempotent on the install id, so it costs one request at sign-in and never
+   * a duplicate row.
+   */
+  private async rememberDevice(): Promise<void> {
+    try {
+      const { deviceId } = await this.auth.registerDevice(
+        await this.deviceDescriptor(),
+      );
+      await writeDeviceId(deviceId);
+      runInAction(() => {
+        this.deviceId = deviceId;
+      });
+    } catch {
+      // A device row that could not be confirmed is not a failed sign-in. The
+      // member is in; sign-out will skip the delete and say nothing.
+    }
+  }
+
+  /** Point this browser at a different Botvy (FR-O, the settings row). */
+  async setGateway(url: string): Promise<void> {
+    const trimmed = url.trim().replace(/\/$/, '');
+    if (!trimmed) return;
+    await writeGateway(trimmed);
+    runInAction(() => {
+      this.gateway = trimmed;
     });
   }
 
@@ -758,6 +1015,24 @@ export class PanelStore {
     runInAction(() => {
       this.syncing = sync.syncing;
       this.blockedCount = sync.blocked.length;
+    });
+    void this.countUnsent();
+  }
+
+  /**
+   * How much work is waiting, across both queues.
+   *
+   * Two queues, because two of the four capture targets are commands against
+   * entities this surface does not hold — and the member does not care which is
+   * which. One number, so the strip can say "3 unsent" and mean it.
+   */
+  private async countUnsent(): Promise<void> {
+    const [rows, captures] = await Promise.all([
+      db.pending_ops.count(),
+      db.captures.count(),
+    ]);
+    runInAction(() => {
+      this.unsentCount = rows + captures;
     });
   }
 
