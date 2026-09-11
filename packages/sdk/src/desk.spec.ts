@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
+import { BotvyClient } from './client.js';
 import { addDays, dayWindow, todayIn, within } from './day.js';
 import {
   NUDGE_DEBOUNCE_MS,
@@ -319,5 +320,69 @@ describe('the member’s own day', () => {
     expect(addDays('2026-01-30', 3)).toBe('2026-02-02');
     expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
     expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+});
+
+// ------------------------------------------------------------------ the client
+
+describe('the client’s fetch', () => {
+  it('calls the platform fetch with the platform as its receiver', async () => {
+    /*
+     * The regression this exists for threw *before any request was sent*.
+     *
+     * A browser's `fetch` is a method of the window: assigning it to a field and
+     * calling `this.fetchImpl(...)` invokes it with the client as the receiver,
+     * and Chrome answers `Illegal invocation`. Node does not check, so the whole
+     * suite passed while every request from a real browser failed with a
+     * sign-in form saying the server was unreachable — which it never was.
+     *
+     * The strict receiver below is what a browser does, so this test fails in
+     * Node exactly when the browser would.
+     */
+    const calls: string[] = [];
+    const strict = function boundOnly(this: unknown, url: string) {
+      if (this !== globalThis) throw new TypeError('Illegal invocation');
+      calls.push(url);
+      return Promise.resolve(
+        new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }),
+      );
+    };
+
+    const original = globalThis.fetch;
+    globalThis.fetch = strict as unknown as typeof fetch;
+    try {
+      const client = new BotvyClient({ baseUrl: 'http://botvy.test' });
+      await client.rest('GET', '/health');
+      expect(calls).toEqual(['http://botvy.test/api/v1/health']);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it('resolves a changing address on every request', async () => {
+    // The extension's Botvy address is a per-browser setting the member can
+    // edit in the panel; a client that pinned it at construction would keep
+    // talking to the old one until something reloaded the panel.
+    const seen: string[] = [];
+    let origin = 'http://first.test';
+    const client = new BotvyClient({
+      baseUrl: () => origin,
+      fetchImpl: (async (url: string) => {
+        seen.push(url);
+        return new Response('{}', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }) as unknown as typeof fetch,
+    });
+
+    await client.rest('GET', '/health');
+    origin = 'http://second.test';
+    await client.rest('GET', '/health');
+
+    expect(seen).toEqual([
+      'http://first.test/api/v1/health',
+      'http://second.test/api/v1/health',
+    ]);
   });
 });

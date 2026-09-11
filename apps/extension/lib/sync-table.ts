@@ -109,9 +109,25 @@ export class DexieSyncTable<Row extends SyncedRow> implements SyncTable<Row> {
     });
   }
 
-  /** Every id held, tombstones included — the delete sweep's input. */
+  /**
+   * Every id held that this client is **not** in the middle of writing.
+   *
+   * Tombstones included; rows carrying a `pendingOp` excluded, and that
+   * exclusion is a bug fix rather than an optimisation. The engine already
+   * skips ids it finds in the push queue — but a local edit is two writes, the
+   * row and the queue entry, and a full pull that lands between them sweeps a
+   * row the member created seconds ago. The end-to-end suite found it exactly
+   * that way: a task typed while the first sync of a fresh sign-in was still in
+   * flight vanished, and typing the same thing a moment later worked.
+   *
+   * A row that carries its own marker is by definition one this client is
+   * holding on to, and the row knows that before the queue does.
+   */
   async heldIds(): Promise<string[]> {
-    return this.rows.toCollection().primaryKeys();
+    const rows = await this.rows.toArray();
+    return rows
+      .filter((row) => !(row as { pendingOp?: string | null }).pendingOp)
+      .map((row) => row.id);
   }
 
   async baseVersion(id: string): Promise<string | null> {

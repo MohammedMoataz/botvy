@@ -97,6 +97,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @botvy/tokens build
+      # The SDK is built rather than pointed at source: the extension imports
+      # `@botvy/sdk` through its `exports` map, which names `dist`.
+      - run: pnpm --filter @botvy/sdk build
+      - run: pnpm --filter @botvy/extension test
+      - run: pnpm --filter @botvy/extension exec tsc --noEmit -p tsconfig.json
       - run: pnpm --filter @botvy/extension build
       - uses: actions/upload-artifact@v4
         with:

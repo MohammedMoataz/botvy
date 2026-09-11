@@ -91,7 +91,22 @@ export class BotvyClient {
 
   constructor(private readonly options: ClientOptions = {}) {
     this.origin = options.baseUrl ?? '';
-    this.fetchImpl = options.fetchImpl ?? globalThis.fetch;
+    /*
+     * **Bound**, because a browser's `fetch` refuses to be called as a method
+     * of anything but the window.
+     *
+     * `this.fetchImpl = globalThis.fetch` and then `this.fetchImpl(url, init)`
+     * calls it with this client as the receiver, and Chrome answers
+     * `TypeError: Failed to execute 'fetch' on 'Window': Illegal invocation`.
+     * Node does not care, so every test passed and every request from a real
+     * browser threw **before it was sent** — no network entry, nothing in the
+     * server log, and a sign-in form that says the server is unreachable when
+     * the server was never asked.
+     *
+     * Found in P9, from the extension's panel. The admin portal builds this
+     * client the same way and had the same failure.
+     */
+    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   }
 
   /** Resolved per request, so a surface whose address can change is correct. */

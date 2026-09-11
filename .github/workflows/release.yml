@@ -119,6 +119,38 @@ jobs:
             apps/extension/.output/*.zip
           fail_on_unmatched_files: false
 
+      # Publishing to the Chrome Web Store is optional and off by default.
+      #
+      # Behind a repository *variable* rather than only the secrets, so that a
+      # fork or a self-hoster who has the secrets set for something else does
+      # not start publishing to a store listing they do not own. The step is
+      # skipped silently when the variable is unset, which is the ordinary case:
+      # the zip on the release is what most installations use.
+      - name: Publish to the Chrome Web Store
+        if: vars.CHROME_WEB_STORE_PUBLISH == 'true'
+        working-directory: apps/extension
+        env:
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: |
+          set -euo pipefail
+          zip=$(ls .output/*.zip | head -n 1)
+          token=$(curl -s -X POST https://oauth2.googleapis.com/token \
+            -d client_id="$CLIENT_ID" -d client_secret="$CLIENT_SECRET" \
+            -d refresh_token="$REFRESH_TOKEN" -d grant_type=refresh_token \
+            | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+          curl -s -f -X PUT \
+            -H "Authorization: Bearer $token" -H "x-goog-api-version: 2" \
+            -T "$zip" \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/$EXTENSION_ID"
+          curl -s -f -X POST \
+            -H "Authorization: Bearer $token" -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/$EXTENSION_ID/publish"
+
+
   deploy:
     name: deploy
     needs: [images, artifacts]

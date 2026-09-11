@@ -24,6 +24,7 @@ import { flushCaptures, queueCapture } from './capture';
 import { googleIdToken, requestBotvyOrigin } from './google';
 import {
   DEFAULT_GATEWAY,
+  KEYS as SESSION_KEYS,
   profileIsStale,
   readDeviceId,
   readGateway,
@@ -90,6 +91,9 @@ export type AuthStatus = 'idle' | 'pending' | 'authenticated' | 'error';
 export type AuthFailure = 'invalid_credentials' | 'session_replay' | 'unknown';
 
 const LAST_EMAIL_KEY = 'auth.lastEmail';
+
+/** The `chrome.storage` key both contexts write the tokens to. */
+const TOKENS_KEY = SESSION_KEYS.tokens;
 const INSTALL_ID_KEY = 'auth.installId';
 
 /**
@@ -248,6 +252,22 @@ export class PanelStore {
    */
   #hydrating = false;
 
+  /** Whether the storage listener is already attached. One per store. */
+  #watchingTokens = false;
+
+  /**
+   * Which session the in-flight work belongs to.
+   *
+   * Bumped by sign-out. Everything that writes the member's data reads it
+   * before it started and checks it again afterwards, because **an await is a
+   * place a sign-out can happen**: the profile load fired at sign-in resolves a
+   * second later, and by then the member may have signed out — and writing the
+   * cache back then puts their name, zone and language on a computer they have
+   * just cleared. The end-to-end suite caught exactly that, as two keys that
+   * reappeared after `clearAll` had removed them.
+   */
+  #session = 0;
+
   constructor() {
     let held: TokenPair | null = null;
 
@@ -347,8 +367,26 @@ export class PanelStore {
       : 'in-step';
   }
 
+  /**
+   * Whether the panel draws the member's day or the sign-in form.
+   *
+   * Read from the **observable** `status` and not from `mirror.signedIn`, and
+   * that is not a preference — it is the difference between a panel that works
+   * and one that does not.
+   *
+   * `makeAutoObservable` turns a getter into a **computed**, and a computed
+   * whose body reads no observable has nothing to invalidate it: the first
+   * evaluation is cached for the life of the store. `mirror` is excluded from
+   * observability on purpose (it is the SDK's, and it holds a credential), so
+   * this getter returned the value it had at mount — `false` — forever. Sign-in
+   * succeeded, the tokens were written, the profile was cached, the first sync
+   * ran, and the panel went on showing the sign-in form until it was reloaded.
+   *
+   * Found by the end-to-end suite on its first real run, which is exactly the
+   * class of failure no unit test sees: every store method was correct.
+   */
   get isAuthenticated(): boolean {
-    return this.mirror.signedIn;
+    return this.status === 'authenticated';
   }
 
   /** What to greet the member with once signed in. */
@@ -487,6 +525,8 @@ export class PanelStore {
     // so its own progress has to reach the indicator somehow. This is that.
     this.sync.subscribe(() => this.readSyncStatus());
 
+    this.watchTokens();
+
     await this.refresh();
 
     runInAction(() => {
@@ -557,6 +597,11 @@ export class PanelStore {
       await this.loadProfile();
       void this.syncNow();
     } catch (error) {
+      // Logged as well as shown. "Sign-in failed. Check that Botvy is
+      // reachable" is the right sentence for a member and a useless one for
+      // whoever has to find out *why* — and the panel's console is the only
+      // place that answer can come from once the extension is installed.
+      console.error('botvy: sign-in failed', error);
       runInAction(() => {
         this.status = 'error';
         this.failure =
@@ -624,6 +669,9 @@ export class PanelStore {
 
   async logout(): Promise<void> {
     const deviceId = this.deviceId;
+    // Anything already in flight belongs to the session being ended, and must
+    // not write after the clear.
+    this.#session += 1;
 
     await signOut({
       revoke: () => this.auth.logout(),
@@ -943,11 +991,17 @@ export class PanelStore {
    * open a browser.
    */
   private async loadProfile(): Promise<void> {
+    const session = this.#session;
     const loaded = await this.profile
       .load()
       .then(() => true)
       .catch(() => false);
     if (!loaded) return;
+
+    // The member signed out while this was in flight. Writing the cache now
+    // would put their zone, language and name back on a computer they have just
+    // cleared — which is the one promise sign-out makes.
+    if (session !== this.#session) return;
 
     const timezone = this.profile.profile?.timezone;
     if (!timezone) return;
@@ -985,10 +1039,12 @@ export class PanelStore {
    * a duplicate row.
    */
   private async rememberDevice(): Promise<void> {
+    const session = this.#session;
     try {
       const { deviceId } = await this.auth.registerDevice(
         await this.deviceDescriptor(),
       );
+      if (session !== this.#session) return;
       await writeDeviceId(deviceId);
       runInAction(() => {
         this.deviceId = deviceId;
@@ -1026,6 +1082,37 @@ export class PanelStore {
    * entities this surface does not hold — and the member does not care which is
    * which. One number, so the strip can say "3 unsent" and mean it.
    */
+  /**
+   * Follow the tokens when the **worker** rotates them.
+   *
+   * Found by the end-to-end suite, and it is the bug the cross-context lock
+   * does not fix on its own. The panel and the worker each keep a synchronous
+   * in-memory mirror of one `chrome.storage` key, because the SDK reads tokens
+   * synchronously. The lock stops them refreshing *at the same time*; it does
+   * nothing about what happens next — the worker rotates, `chrome.storage` now
+   * holds a new pair, and the panel is still holding the old one. Its next
+   * request 401s, it refreshes with a refresh token that has already been
+   * spent, and the API reads that as a stolen token and revokes the whole
+   * family. The member is signed out seconds after signing in, which is exactly
+   * what this suite saw.
+   *
+   * So the mirror follows the store. Compared before setting, because writing
+   * the same pair back would raise another change event and the two would chase
+   * each other for as long as the panel was open.
+   */
+  private watchTokens(): void {
+    if (this.#watchingTokens) return;
+    this.#watchingTokens = true;
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      const next = changes[TOKENS_KEY]?.newValue as TokenPair | undefined;
+      if (!next?.accessToken) return;
+      if (next.accessToken === this.mirror.accessToken) return;
+      this.mirror.set(next);
+    });
+  }
+
   private async countUnsent(): Promise<void> {
     const [rows, captures] = await Promise.all([
       db.pending_ops.count(),
