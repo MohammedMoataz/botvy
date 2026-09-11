@@ -10,23 +10,23 @@ series for the same phase, and the two do not correspond — a `T1102` there is 
 
 ## Phase 1 — Backups (US1)
 
-- [ ] T1101 Nightly backup of both stores and the media volume into a dated directory outside the compose project; retention from `backup.retentionDays`; `infra/backup.sh` and its compose service. Every archive is verified before the night is called good — `mongorestore --archive --gzip --dryRun`, `pg_restore -l`, and a checksum plus file count over the media copy — and the script ends by reporting the outcome to `POST /internal/backups/report` with the service-client token, because a container outside the API cannot write a heartbeat itself
-- [ ] T1102 [P] `docs/restore.md` — the full procedure including the secret set that must accompany the archives (both signing secrets, the service token, the automation webhook secret, the automation tool's encryption key); a section **Restoring onto a different machine** naming everything that carried the old machine's name (tunnel hostname and credential, allowed browser origin, edge site address, the address the app and the extension are pointed at, the sign-in provider's callback); and a section **Rolling back a release** stating that a rollback re-pins the previous immutable image tag and recreates the two services, that the schema is never rolled back so the previous code runs against the current schema and is safe only where that release's migrations were additive, and that where they were not, restoring the last verified backup is the only way back and costs everything written since
+- [x] T1101 Nightly backup of both stores and the media volume into a dated directory outside the compose project; retention from `backup.retentionDays`; `infra/backup.sh` and its compose service. Every archive is verified before the night is called good — `mongorestore --archive --gzip --dryRun`, `pg_restore -l`, and a checksum plus file count over the media copy — and the script ends by reporting the outcome to `POST /internal/backups/report` with the service-client token, because a container outside the API cannot write a heartbeat itself
+- [x] T1102 [P] `docs/restore.md` — the full procedure including the secret set that must accompany the archives (both signing secrets, the service token, the automation webhook secret, the automation tool's encryption key); a section **Restoring onto a different machine** naming everything that carried the old machine's name (tunnel hostname and credential, allowed browser origin, edge site address, the address the app and the extension are pointed at, the sign-in provider's callback); and a section **Rolling back a release** stating that a rollback re-pins the previous immutable image tag and recreates the two services, that the schema is never rolled back so the previous code runs against the current schema and is safe only where that release's migrations were additive, and that where they were not, restoring the last verified backup is the only way back and costs everything written since
 - [ ] T1103 **The rehearsal**: on a clean machine, following `docs/restore.md` only, restore and start; confirm health, sign in as an existing member, confirm their data, and confirm a phone last synced before the backup reconciles to a complete picture; record the elapsed time and every correction the procedure needed
-- [ ] T1104 [P] Registry keys `backup.retentionDays` (14) and `backup.staleHours` (48), both editable, plus the system-written read-only `ops.lastBackupAt`; `POST /internal/backups/report` writes the `backup` heartbeat and that key, and `/health` and the admin overview call the backup stale once `backup.staleHours` has passed
+- [x] T1104 [P] Registry keys `backup.retentionDays` (14) and `backup.staleHours` (48), both editable, plus the system-written read-only `ops.lastBackupAt`; `POST /internal/backups/report` writes the `backup` heartbeat and that key, and `/health` and the admin overview call the backup stale once `backup.staleHours` has passed
 
 ## Phase 2 — Security review (US2)
 
-- [ ] T1110 Write `docs/security-review.md` covering, item by item: exactly one published port with everything else on the compose network; the automation editor reachable only from that network and never through the tunnel; the browser origin policy naming the web app's origin and nothing else, with credentials allowed only for it; the response headers the edge sets (HSTS, `X-Content-Type-Options`, frame, referrer and content-security policies); every credential and what an attacker holding it alone could do; rate limits on every entry point including the socket; the media and fetcher guards; log content; dependency advisories; the default administrator password; and the written procedure for replacing a machine credential without downtime (issue a second service client with the same scopes, move the callers, confirm, revoke the first, confirm the revoked token is refused)
-- [ ] T1111 Fix each finding as a task in its own context; record any accepted risk with an explicit decision and reason
+- [x] T1110 Write `docs/security-review.md` covering, item by item: exactly one published port with everything else on the compose network; the automation editor reachable only from that network and never through the tunnel; the browser origin policy naming the web app's origin and nothing else, with credentials allowed only for it; the response headers the edge sets (HSTS, `X-Content-Type-Options`, frame, referrer and content-security policies); every credential and what an attacker holding it alone could do; rate limits on every entry point including the socket; the media and fetcher guards; log content; dependency advisories; the default administrator password; and the written procedure for replacing a machine credential without downtime (issue a second service client with the same scopes, move the callers, confirm, revoke the first, confirm the revoked token is refused)
+- [x] T1111 Fix each finding as a task in its own context; record any accepted risk with an explicit decision and reason
 - [ ] T1112 [P] Log scrubbing pass over a full day from the edge, the backend, the worker, the automation tool, both database containers and the release build's own device log, grepped for: a JSON Web Token's three dot-separated base64url segments; `Bearer ` followed by a non-empty value; `password`, `refreshToken`, `accessToken`, `serviceToken` or `token=` followed by anything but a redaction marker; an email address; a push registration token's shape; and a sentence planted in a seeded conversation before the sample began, which is how member content is searched for rather than guessed at. Every hit is a redaction to add or a false positive written down in `docs/security-review.md`
 - [ ] T1113 **Rotate the inherited exposed key**: issue a new service-account key, delete the old one at the provider, install the new one, verify notifications still arrive, confirm the old key no longer works, update `secrets/README.md`, and delete the deferred-rotation section from `SETUP.md` together with its entry in the contents — nothing is deferred once this task is done, and a document still calling a live key compromised is worse than one that never raised it
-- [ ] T1114 [P] Rate limits verified per entry point (REST, GraphQL, socket, internal) with a spec each
-- [ ] T1115 [P] Guard specs, one per rule constitution VI states, in the context that owns each: a refresh token replayed after rotation is detected and its whole family revoked; a service token offered in the socket handshake is refused at the handshake, not after connecting; `/internal/*` refuses a member's access token; an admin route refuses a member's
+- [x] T1114 [P] Rate limits verified per entry point (REST, GraphQL, socket, internal) with a spec each
+- [x] T1115 [P] Guard specs, one per rule constitution VI states, in the context that owns each: a refresh token replayed after rotation is detected and its whole family revoked; a service token offered in the socket handshake is refused at the handshake, not after connecting; `/internal/*` refuses a member's access token; an admin route refuses a member's
 
 ## Phase 3 — Retiring v1 (US3)
 
-- [ ] T1120 `docs/parity.md` — every old capability named against its new equivalent, checked off with evidence, including that a member banned in the old system is still banned in the new one: name each of them, confirm the new system refuses their sign-in, and record it
+- [x] T1120 `docs/parity.md` — every old capability named against its new equivalent, checked off with evidence, including that a member banned in the old system is still banned in the new one: name each of them, confirm the new system refuses their sign-in, and record it
 - [ ] T1121 Move remaining members: tell them what changed, point them at the new build, confirm each signs in — and that each member the old system had banned still cannot
 - [ ] T1122 Stop the old stack; archive its database dump and data volumes outside the repository; record where
 - [ ] T1123 Remove `legacy/` in one commit; confirm the build, tests and images are green without it
@@ -94,3 +94,49 @@ T1154 (seven days from the deploy) → T1155.
 10. Every stated outcome from P0–P10 has a recorded measurement in this file, and the
     blueprint's SC-001…SC-010 table is filled in
     `specs/013-platform-v2-blueprint/tasks.md`, right-to-left sweep included.
+
+---
+
+## Progress (2026-09-11)
+
+Branch `025-hardening-release`, from `8b059b0` (P10 merged).
+
+### Done
+
+| Task | What landed |
+|---|---|
+| T1101 | `infra/backup.sh` — both stores **and the media**, into a dated directory on a host path, each archive verified, reporting once as the job `backup`. Replaces P0's two scripts |
+| T1102 | `docs/restore.md` — what you need in front of you, the secrets that are not in the archives, restoring onto a different machine, rolling back a release and what the schema does not roll back |
+| T1104 | `POST /internal/backups/report`: stamps the heartbeat, writes `ops.lastBackupAt` **only on a run that succeeded**, and answers with `backup.retentionDays` so the pruning window stays an operator knob. A migration deletes the two old heartbeat rows |
+| T1110 | `docs/security-review.md`, item by item |
+| T1111 | The review's one finding, fixed: `checkResolvedTarget` resolves a hostname and checks every address, closing the public-name-pointing-at-a-private-address hole in both the media proxy and the link fetcher. Two items are recorded as not closed — the missing CSP (an enhancement, with why it cannot simply be switched on) and the inherited key (deferred at the Owner's instruction) |
+| T1114 | Rate limits on all four entry points, as registry keys, 14 specs plus the socket's own |
+| T1115 | The four guard rules; the socket handshake one strengthened to assert nothing is written to the socket, which is what "refused at the handshake" has to mean |
+| T1120 | `docs/parity.md` — every v1 requirement walked. It found the rate-limit regression |
+
+Green at `abfca0f`: `pnpm --filter @botvy/backend test` **1608 passed** (94 files);
+`pnpm lint` 0/0 over 662 files; backend `tsc --noEmit` clean.
+
+### Blocked on the machine, not on the work
+
+Docker's engine fell over during a rebuild and WSL is wedged with it: the daemon
+answers `500 Internal Server Error`, `wsl -l -v` times out, and restarting
+`WSLService` needs elevation. **A reboot clears it**, and that is the Owner's
+call rather than something to do to a machine unattended.
+
+Every remaining task needs either a running stack or the Owner:
+
+| Task | Needs |
+|---|---|
+| T1103 restore rehearsal | a stack, on a clean machine |
+| T1112 log scrubbing pass | a day of logs from running containers |
+| T1113 rotate the inherited key | **the Owner** — deferred at their explicit instruction |
+| T1120's banned-member check | both stacks running |
+| T1121–T1124 retiring v1 | the old stack, and the Owner telling members |
+| T1130/T1131 optional import | T1122's archive |
+| T1140–T1144 docs, publish, rehearse, deploy, roll back | a stack and a release |
+| T1150–T1155 measurement and the seven-day soak | a deployed system, and seven days |
+
+Also still owed from P10, for the same reason: the portal Playwright suite has
+been written and listed (19 cases) but not yet pointed at a running
+installation. `specs/024-web-admin-public/tasks.md` carries the exact commands.
