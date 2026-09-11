@@ -1,5 +1,21 @@
-import type { BotvyClient } from './client.js';
+import { ApiError, type BotvyClient } from './client.js';
 import type { Role } from './auth-store.js';
+
+/**
+ * The member an act was aimed at is not there any more.
+ *
+ * Distinct from every other refusal because the *answer* is different: a guard
+ * rail says "no, and here is why", and the row stays. This says the row itself
+ * is wrong, so the store drops it and the screen goes back to the list rather
+ * than leaving an Owner pressing a button against an account that has been
+ * deleted — from another tab, from the member's own settings, or by a purge.
+ */
+export class MemberGone extends Error {
+  constructor(readonly userId: string) {
+    super('That account no longer exists.');
+    this.name = 'MemberGone';
+  }
+}
 
 export interface MemberSummary {
   id: string;
@@ -161,10 +177,10 @@ export class AdminStore {
   }
 
   async setRole(userId: string, role: Role): Promise<void> {
-    await this.client.rest(
-      'PATCH',
-      `/admin/users/${encodeURIComponent(userId)}/role`,
-      { role },
+    await this.#against(userId, () =>
+      this.client.rest('PATCH', `/admin/users/${encodeURIComponent(userId)}/role`, {
+        role,
+      }),
     );
     this.#patchMember(userId, { role });
   }
@@ -173,21 +189,44 @@ export class AdminStore {
     userId: string,
     reason?: string,
   ): Promise<{ sessionsEnded: number }> {
-    const result = await this.client.rest<{ sessionsEnded: number }>(
-      'POST',
-      `/admin/users/${encodeURIComponent(userId)}/ban`,
-      reason ? { reason } : {},
+    const result = await this.#against(userId, () =>
+      this.client.rest<{ sessionsEnded: number }>(
+        'POST',
+        `/admin/users/${encodeURIComponent(userId)}/ban`,
+        reason ? { reason } : {},
+      ),
     );
     this.#patchMember(userId, { status: 'banned' });
     return result;
   }
 
   async unban(userId: string): Promise<void> {
-    await this.client.rest(
-      'POST',
-      `/admin/users/${encodeURIComponent(userId)}/unban`,
+    await this.#against(userId, () =>
+      this.client.rest('POST', `/admin/users/${encodeURIComponent(userId)}/unban`),
     );
     this.#patchMember(userId, { status: 'active' });
+  }
+
+  /**
+   * Runs an act aimed at one member, and drops the row if it has gone.
+   *
+   * Here rather than in each of the three, because the three would drift: the
+   * list an Owner is looking at is a snapshot, and any of them can be aimed at
+   * an account that was deleted since it was drawn. A 404 is the only status
+   * that means this — a 409 is a guard rail, a 403 is the Owner's own role —
+   * so it is the only one that removes anything.
+   */
+  async #against<R>(userId: string, act: () => Promise<R>): Promise<R> {
+    try {
+      return await act();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        this.#members = this.#members.filter((member) => member.id !== userId);
+        this.#announce();
+        throw new MemberGone(userId);
+      }
+      throw error;
+    }
   }
 
   async serviceClients(): Promise<ServiceClientSummary[]> {

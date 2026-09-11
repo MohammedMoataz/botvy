@@ -1,13 +1,19 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import { io } from 'socket.io-client';
 import {
+  AdminStore,
   AuthStore as SdkAuthStore,
   BotvyClient,
   EmailTaken,
   GoogleLinkRequired,
+  HealthStore as SdkHealthStore,
   ProfileStore as SdkProfileStore,
   RegistrationClosed,
+  SocketClient,
   TokenStore,
+  type SocketLike,
   type DeviceView,
+  type HealthReport,
   type SignedInMember,
   type TokenPair,
 } from '@botvy/sdk';
@@ -248,11 +254,81 @@ export class ProfileStore {
   }
 }
 
+/**
+ * The platform's state, observable, and shared by whatever is on screen.
+ *
+ * A thin MobX shell over the SDK's `HealthStore`, for the same reason
+ * `ProfileStore` above is one: the polling, the socket subscription and the
+ * rule that a failed heartbeat never erases `lastOkAt` are all behaviour the
+ * extension would need too, and a second copy written against React would
+ * eventually disagree with this one about what "stale" means.
+ */
+export class HealthStore {
+  report: HealthReport | null = null;
+  problem: string | null = null;
+
+  readonly sdk: SdkHealthStore;
+
+  constructor(admin: AdminStore, socket?: SocketClient) {
+    this.sdk = new SdkHealthStore(admin, socket ? { socket } : {});
+    makeAutoObservable(this, { sdk: false });
+
+    this.sdk.subscribe(() => {
+      runInAction(() => {
+        this.report = this.sdk.report;
+        this.problem = this.sdk.problem;
+      });
+    });
+  }
+
+  get staleJobs(): string[] {
+    return this.sdk.staleJobs;
+  }
+
+  start(): void {
+    this.sdk.start();
+  }
+
+  stop(): void {
+    this.sdk.stop();
+  }
+}
+
 export class RootStore {
   readonly auth = new AuthStore();
   readonly profile: ProfileStore;
+  readonly admin: AdminStore;
+  readonly socket: SocketClient;
+  readonly health: HealthStore;
 
   constructor() {
     this.profile = new ProfileStore(this.auth.client);
+    this.admin = new AdminStore(this.auth.client);
+
+    /*
+     * Same origin, always. The portal is served by the same Caddy that proxies
+     * `/ws`, so there is no host to configure and nothing to get wrong in an
+     * environment file — and a socket URL that could point elsewhere would be a
+     * credential sent to wherever that variable said.
+     *
+     * `io` is passed in rather than imported by the SDK so the client stays
+     * usable from a service worker, where the default transport upgrade does
+     * not apply. Here it is an ordinary browser page and the defaults are right.
+     */
+    this.socket = new SocketClient({
+      tokens: this.auth.tokens,
+      connect: (url, auth) =>
+        io(url.replace(/\/ws$/, ''), {
+          path: '/ws',
+          transports: ['websocket'],
+          // The SDK decides when to open and when to back off. A client that
+          // connected itself would be doing both, and the two schedules do not
+          // agree after the first refused handshake.
+          autoConnect: false,
+          auth,
+        }) as unknown as SocketLike,
+    });
+
+    this.health = new HealthStore(this.admin, this.socket);
   }
 }

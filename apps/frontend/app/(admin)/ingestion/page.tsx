@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from 'primereact/button';
 import { Column } from 'primereact/column';
@@ -76,6 +77,8 @@ function IngestionPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  /** The audit action the last act wrote, so the Owner can go and read it. */
+  const [recorded, setRecorded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setBusy('page');
@@ -101,9 +104,11 @@ function IngestionPage() {
     setBusy(row.id);
     setProblem(null);
     setNote(null);
+    setRecorded(null);
     try {
       await auth.client.rest('POST', `/admin/knowledge/${row.id}/retry`);
       setNote(t('retried'));
+      setRecorded('knowledge.retry_link');
       await load();
     } catch (error) {
       // The API's own message: "this link has been refused 3 times; the limit
@@ -125,9 +130,14 @@ function IngestionPage() {
         setBusy(row.id);
         setProblem(null);
         setNote(null);
+        setRecorded(null);
         try {
           await auth.client.rest('DELETE', `/admin/knowledge/${row.id}`);
           setNote(t('cleared'));
+          // Clearing somebody else's link is an administrative act on a member's
+          // data, so it writes an audit row — and the Owner is shown where,
+          // rather than being asked to take it on trust (FR-005, T1024).
+          setRecorded('knowledge.clear_link');
           await load();
         } catch (error) {
           setProblem(error instanceof Error ? error.message : String(error));
@@ -210,6 +220,11 @@ function IngestionPage() {
 
       {problem ? <Message severity="error" text={problem} /> : null}
       {note ? <Message severity="success" text={note} /> : null}
+      {recorded ? (
+        <p className="muted">
+          <Link href={`/audit?action=${recorded}`}>{t('seeRecord')}</Link>
+        </p>
+      ) : null}
 
       <DataTable value={rows} emptyMessage={t('empty')} stripedRows>
         <Column field="title" header={t('what')} body={(row: QueueRow) => (

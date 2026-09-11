@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { AdminStore, type AuditEntry } from '@botvy/sdk';
 import { Button } from 'primereact/button';
@@ -42,9 +43,17 @@ function AuditPage() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
+  /*
+   * An act somewhere else can hand the trail its own filter (T1024): clearing a
+   * stuck link offers "see what was recorded", and the link arrives here as
+   * `?action=knowledge.clear_link`. Read once, as the initial value of a field
+   * the Owner can then edit — a filter that kept snapping back to the URL would
+   * be a filter that cannot be changed.
+   */
+  const params = useSearchParams();
   const [actor, setActor] = useState('');
-  const [action, setAction] = useState('');
-  const [targetType, setTargetType] = useState('');
+  const [action, setAction] = useState(() => params.get('action') ?? '');
+  const [targetType, setTargetType] = useState(() => params.get('targetType') ?? '');
 
   useEffect(() => {
     void load(true);
@@ -145,10 +154,21 @@ function AuditPage() {
   );
 }
 
-export default observer(function Audit() {
+const Audit = observer(function Audit() {
   return (
     <RequireAdmin>
       <AuditPage />
     </RequireAdmin>
   );
 });
+
+export default function AuditRoute() {
+  // `useSearchParams` opts a route into client rendering, and Next demands the
+  // boundary be explicit rather than inferred — without it `next build` refuses
+  // the page outright.
+  return (
+    <Suspense fallback={null}>
+      <Audit />
+    </Suspense>
+  );
+}

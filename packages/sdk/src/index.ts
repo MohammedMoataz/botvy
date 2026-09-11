@@ -42,6 +42,7 @@ export {
 } from './auth-store.js';
 export {
   AdminStore,
+  MemberGone,
   type AuditEntry,
   type SettingControl,
   type UsageRow,
@@ -53,6 +54,7 @@ export {
   type ServiceClientSummary,
   type SettingEntry,
 } from './admin-store.js';
+export { HEALTH_POLL_MS, HealthStore } from './health-store.js';
 export {
   ProfileStore,
   type BodyMetric,
