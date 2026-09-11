@@ -43,13 +43,21 @@ export const RequireAdmin = observer(function RequireAdmin({
    * room on connect. Without this the emit had no listener anywhere, which is
    * the same dead half of a contract as a handler with no producer.
    *
-   * Closed when the portal is left. A socket surviving a sign-out would be a
-   * live connection authenticated by a token the member has revoked.
+   * Tied to the *session* and not to this component. Every admin page mounts
+   * this, so a cleanup that disconnected would open and close a socket on every
+   * navigation; and `SocketClient.connect()` builds a new socket each call
+   * rather than no-opping on a live one, so the state is checked first — the
+   * same guard the extension's `ensureSocket` makes. Signing out drops
+   * `isAuthenticated`, which is what closes it: a socket outliving its token
+   * would be a live connection on a credential the member revoked.
    */
   useEffect(() => {
-    if (!auth.isAuthenticated) return;
+    if (!auth.isAuthenticated) {
+      socket.disconnect();
+      return;
+    }
+    if (socket.state === 'connected' || socket.state === 'connecting') return;
     socket.connect();
-    return () => socket.disconnect();
   }, [auth.isAuthenticated, socket]);
 
   if (!auth.isAuthenticated) {
