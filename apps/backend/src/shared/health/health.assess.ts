@@ -86,6 +86,12 @@ export interface HealthInputs {
  * these jobs.
  */
 const NIGHTLY_JOBS = new Set([
+  // P11's single nightly run: both stores and the media copy, reported once
+  // through `/internal/backups/report`. The two names below are what P0's pair
+  // of scripts stamped; they are listed so an installation that has not yet
+  // pruned those rows is still judged by the right window, and the migration
+  // that removes them is `20261002000000-one-backup-heartbeat`.
+  'backup',
   'backup.mongo',
   'backup.postgres',
   // P5's: reconciles the rolling window of meeting reminders (03:20).

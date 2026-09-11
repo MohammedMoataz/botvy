@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { InternalAlertsController } from './contexts/operations/features/internal-alerts/internal-alerts.controller.js';
+import { InternalBackupsController } from './contexts/operations/features/backup-report/internal-backups.controller.js';
 import { InternalHeartbeatController } from './contexts/operations/features/internal-heartbeat/internal-heartbeat.controller.js';
 import { AdminController } from './contexts/identity/features/admin-members/admin.controller.js';
 import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
@@ -148,6 +149,7 @@ import { WsModule } from './ws/ws.module.js';
     MediaController,
     SyncController,
     InternalAlertsController,
+    InternalBackupsController,
     InternalHeartbeatController,
   ],
   providers: [

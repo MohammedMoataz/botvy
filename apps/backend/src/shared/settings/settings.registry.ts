@@ -431,9 +431,11 @@ export const SETTINGS_REGISTRY = {
     schema: z.string().nullable(),
     default: null,
     description:
-      'When the last backup was verified. The backup container reports its outcome to ' +
-      '/internal/ops/heartbeat, which stamps ops_heartbeats; the code that also writes ' +
-      'this key lands with the backup verification in specs/025 (T1104).',
+      'When the last backup was verified. The nightly run reports to ' +
+      '/internal/backups/report, which stamps the `backup` heartbeat and writes this ' +
+      'key — but only on a run that succeeded. The heartbeat answers "did it run"; ' +
+      'this answers "when was the last one that worked", which is the question asked ' +
+      'before deciding whether a restore is affordable.',
     readOnly: true,
   }),
   'ops.adminPasswordIsDefault': define({

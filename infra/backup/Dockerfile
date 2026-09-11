@@ -14,5 +14,9 @@ RUN apt-get update \
 
 # Copied rather than bind-mounted, so the image is the same on the deploy host
 # as it is here and a half-edited script cannot reach a running container.
-COPY backup-mongo.sh backup-postgres.sh /usr/local/bin/
-RUN chmod 0755 /usr/local/bin/backup-mongo.sh /usr/local/bin/backup-postgres.sh
+#
+# One script since P11: the two stores and the media copy are one backup,
+# because they are only useful together, and they now succeed or fail together
+# and report once.
+COPY backup.sh /usr/local/bin/
+RUN chmod 0755 /usr/local/bin/backup.sh

@@ -16,8 +16,9 @@ the only thing blocking both phases.
 
 ## The permanent record
 
-| Folder | What is in it |
+| File or folder | What is in it |
 |---|---|
+| [**restore.md**](restore.md) | How to bring the system back: what you need in front of you, the secrets that are *not* in the archives, restoring onto a different machine, and what a rollback does and does not put back |
 | [014-foundation/](014-foundation/) | P0's paperwork: what was actually built, what was broken and how it was found, what is still owed |
 | [015-identity-profile/](015-identity-profile/) | P1's: the full pre-016 review with every finding's reasoning, and where the spec was wrong |
 | [onboarding/](onboarding/) | The architecture diagram |
