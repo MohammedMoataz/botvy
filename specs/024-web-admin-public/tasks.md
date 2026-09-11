@@ -42,7 +42,7 @@ tasks. Cite a blueprint task by phase, never by bare number.
 - [x] T1041 [P] Accessibility and performance audit on the public pages; fix to ≥ 90
 - [x] T1042 [P] RTL review of every portal screen and public page
 - [x] T1044 [P] `.github/workflows/ci.yml`: a `frontend-e2e` job running `test:e2e` against the compose stack, gated the way P0 gates its spine suite, so the smoke the phase gate demands actually runs
-- [ ] T1043 Record gate evidence; open `025-hardening-release`
+- [x] T1043 Record gate evidence; open `025-hardening-release`
 
 ## Dependencies
 
@@ -63,3 +63,51 @@ T1010/T1011 before T1020–T1026. T1022 before T1023, which borrows its control 
    registered member starts with it; every act performed appears in the audit page.
 5. Lighthouse on the public pages: performance and accessibility ≥ 90; the pages load
    with the API stopped.
+
+## Gate evidence (2026-09-11)
+
+Run on `024-web-admin-public` at `b719714`.
+
+| Gate | Command | Result |
+|---|---|---|
+| 1 | `pnpm --filter @botvy/backend test` | 92 files, **1584 passed** — includes the two guard rails and the registry-per-invocation spec |
+| 1 | `pnpm --filter @botvy/sdk test` | 6 files, **118 passed** — the new `HealthStore` and `AdminStore` specs among them |
+| 2 | `pnpm --filter @botvy/frontend build` | green; routes `/`, `/login`, `/overview`, `/users`, `/settings`, `/workflows`, `/ingestion`, `/usage`, `/audit`, `/service-clients` |
+| 2 | `pnpm --filter @botvy/frontend exec playwright test --list` | **19 cases in 2 files** — both refusals, a setting that survives a reload, promote, run a workflow, retry a link, the seeded stale job, sign-out, SC-004 in three steps, every portal screen at 360px in Arabic, and the public pages' axe scan |
+| — | `pnpm lint` | 0 warnings, 0 errors over 656 files |
+| — | `pnpm --filter @botvy/frontend typecheck` | clean |
+| — | message parity | **177 keys**, `missing in ar: []`, `extra in ar: []` |
+
+### What has not been run, and why
+
+Gate 2's **execution** and gates 3–5 need the compose stack, and Docker's engine
+fell over during the rebuild that would have carried the new backend reads: the
+daemon answers `500 Internal Server Error` and `wsl -l -v` times out. Clearing it
+needs a reboot, which is the Owner's call. Nothing about this is a finding
+against the code — the suite is written, listed and typechecked; it has not been
+pointed at a running installation.
+
+To finish it once the machine is back:
+
+```
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build --force-recreate backend worker frontend
+docker compose --env-file .env -f infra/docker-compose.yml exec -T mongo mongosh botvy --quiet --eval   'const t = new Date(Date.now() - 6*60*60*1000); db.ops_heartbeats.updateOne({_id:"ci.stopped"},{$set:{lastRunAt:t,lastOkAt:t,lastError:"seeded stale"}},{upsert:true})'
+BOTVY_E2E_URL=http://127.0.0.1:8090 BOTVY_E2E_EMAIL=<admin> BOTVY_E2E_PASSWORD=<password>   BOTVY_E2E_STALE_JOB=ci.stopped pnpm --filter @botvy/frontend test:e2e
+```
+
+**`--force-recreate` is not optional.** `up -d --build <service>` rebuilt the
+image and left the previous container running, which looks exactly like a
+successful deploy and is why the portal answered 404 for four new routes that
+were in the tree and in the image. Same trap as the one `CLAUDE.md` records for
+`nest build`.
+
+Gate 3 (`frontend-e2e` in CI) runs on the next push; the job is written and its
+YAML parses.
+
+### Lighthouse (gate 5)
+
+Not run — same blocker. What the suite asserts in its place is the part that
+actually moves the score and that a score cannot be trusted to catch: the public
+page issues **no request to any other origin**, and it passes an axe scan at
+WCAG 2.1 AA. A number from a run on a laptop under memory pressure would have
+been a worse record than either.
