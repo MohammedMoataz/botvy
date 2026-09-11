@@ -35,6 +35,8 @@ import { IdentityActorLabels } from './infrastructure/operations-audit.adapter.j
 import { AuditReadRepository } from './domain/audit.repository.js';
 import { ActorLabelPort, AuditQueryHandler } from './features/audit/audit.query.js';
 import { UsageQueryHandler } from './features/usage/usage.query.js';
+import { WorkflowsPort } from './domain/workflows.port.js';
+import { N8nWorkflowsAdapter } from './infrastructure/n8n-workflows.adapter.js';
 
 /**
  * Operations: settings, heartbeats, the audit trail and the demonstration
@@ -102,6 +104,17 @@ import { UsageQueryHandler } from './features/usage/usage.query.js';
         new MongoAuditReadRepository(model),
     },
     { provide: ActorLabelPort, useClass: IdentityActorLabels },
+    /*
+     * A factory, because the adapter takes the parsed `Env` and assigns its own
+     * `fetch`. A constructor parameter typed `typeof fetch` emits `Function`,
+     * which Nest tries to resolve and cannot — an `UnknownDependenciesException`
+     * at boot that no typecheck sees.
+     */
+    {
+      provide: WorkflowsPort,
+      inject: [ENV],
+      useFactory: (env: Env) => new N8nWorkflowsAdapter(env),
+    },
     AuditQueryHandler,
     UsageQueryHandler,
     AdminPasswordFlagHandler,
@@ -152,6 +165,12 @@ import { UsageQueryHandler } from './features/usage/usage.query.js';
      */
     AuditQueryHandler,
     UsageQueryHandler,
+    /*
+     * For the admin controller, which `AppModule` declares — Nest resolves a
+     * controller's dependencies from the module that declares it, so a port
+     * merely provided here would be a boot failure over there.
+     */
+    WorkflowsPort,
   ],
 })
 export class OperationsModule {}

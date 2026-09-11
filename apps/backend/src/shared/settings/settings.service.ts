@@ -1,3 +1,4 @@
+import type { SettingControl } from './setting-control.js';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { Principal } from '../auth/principal.js';
 import { AuditPort } from '../audit/audit.port.js';
@@ -152,7 +153,14 @@ export class SettingsService {
 
   /** The read side of the patch: the registry with whatever is currently set. */
   async describe(): Promise<
-    Array<{ key: string; value: unknown; default: unknown; description: string; readOnly: boolean }>
+    Array<{
+      key: string;
+      value: unknown;
+      default: unknown;
+      description: string;
+      readOnly: boolean;
+      control: SettingControl;
+    }>
   > {
     const stored = await this.store.getMany([...SETTING_KEYS]);
     const byKey = new Map(stored.map((row) => [row.key, row.value]));

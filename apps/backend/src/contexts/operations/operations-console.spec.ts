@@ -303,7 +303,7 @@ describe('a setting changed while the system is running (SC-003)', () => {
     expect(await settings.get('rhythm.draftTopN')).toBe(5);
 
     await settings.set('rhythm.draftTopN', 9, {
-      type: 'admin',
+      kind: 'user',
       id: OWNER,
       role: 'admin',
     });
@@ -328,7 +328,7 @@ describe('a setting changed while the system is running (SC-003)', () => {
     const started = await settings.get('rhythm.draftTopN');
 
     await settings.set('rhythm.draftTopN', 11, {
-      type: 'admin',
+      kind: 'user',
       id: OWNER,
       role: 'admin',
     });

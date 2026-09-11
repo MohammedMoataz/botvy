@@ -42,6 +42,10 @@ export {
 } from './auth-store.js';
 export {
   AdminStore,
+  type AuditEntry,
+  type SettingControl,
+  type UsageRow,
+  type WorkflowSummary,
   type HealthReport,
   type MemberFilter,
   type MemberPage,
