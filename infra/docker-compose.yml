@@ -293,6 +293,39 @@ services:
         condition: service_healthy
     networks: [botvy]
 
+  # A tunnel with no Cloudflare account, for showing somebody the running
+  # installation without setting one up. v1 had this beside its named tunnel
+  # (`legacy/infra/docker-compose.yml`, profile `quick`) and the v2 rewrite
+  # dropped it, which left "let me send you a link" needing a domain, a login
+  # and a token.
+  #
+  #   docker compose --env-file .env -f infra/docker-compose.yml --profile quick up -d
+  #   docker compose --env-file .env -f infra/docker-compose.yml logs cloudflared-quick
+  #
+  # The hostname is printed in those logs and is **random and temporary**: it
+  # changes every time the container starts, and Cloudflare may withdraw it. So
+  # it is for a demonstration, never for a client — the phone bakes its gateway
+  # URL in, and a quick tunnel would break every install the next morning.
+  #
+  # `restart: "no"` on purpose, and it is the one line that differs from v1's.
+  # `unless-stopped` brings the tunnel back after a reboot **on a different
+  # hostname**, so the link somebody was given goes dead while the service reads
+  # as healthy. Not coming back is the honest failure of the two.
+  #
+  # It points at caddy rather than at the backend: constitution V says there is
+  # one public surface, and it is the same one whether the request arrives from
+  # the LAN or from Cloudflare. Tunnelling the backend directly would put the
+  # portal and the read edge on different paths and skip the edge's own rules.
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    restart: 'no'
+    profiles: [quick]
+    command: ['tunnel', '--no-autoupdate', '--url', 'http://caddy:80']
+    depends_on:
+      caddy:
+        condition: service_started
+    networks: [botvy]
+
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
