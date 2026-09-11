@@ -36,7 +36,9 @@ dependencies:
   # JWTs, the signed-in email and the gateway URL. The URL is not a secret,
   # but it is one short string and this package is already here — a second
   # storage package for it would be all cost.
-  flutter_secure_storage: ^11.0.0
+  # Pinned to 10.3.2: 11.x requires compileSdk 37, which AGP 9.1.0 (the
+  # version this project pins) does not support. Unpin together with AGP.
+  flutter_secure_storage: 10.3.2
 
   # Offline cache + outbox, typed queries, and a migration mechanism we would
   # otherwise hand-roll.
