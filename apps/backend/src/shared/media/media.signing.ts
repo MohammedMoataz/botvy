@@ -74,6 +74,64 @@ export function checkTarget(rawUrl: string): SsrfVerdict {
   return { allowed: true };
 }
 
+/**
+ * The same question, asked of what the name actually resolves to (P11, T1111).
+ *
+ * `checkTarget` reads the URL. That refuses `http://n8n:5678` and
+ * `http://169.254.169.254/latest/meta-data/`, which is most of the attack — and
+ * it does not refuse `http://evil.example/` when `evil.example` has an A record
+ * pointing at `10.0.0.5`. Registering a public name for a private address costs
+ * nothing and is the textbook way past a string-only guard, so the name is
+ * resolved and every address it gives is checked.
+ *
+ * **The residual risk is DNS rebinding**, and it is stated rather than hidden:
+ * between this lookup and the socket the runtime opens, a hostile resolver can
+ * answer differently, and the fetch would then reach the address this refused.
+ * Closing that needs the check at connect time — an undici dispatcher with a
+ * custom `lookup`, which means taking a direct dependency on undici and keeping
+ * its version in step with the one Node bundles, or two HTTP stacks in one
+ * process. The trade is recorded in `docs/security-review.md`: what remains is
+ * a race against a resolver the attacker controls, on a self-hosted
+ * installation whose outbound fetches are links its own owner saved.
+ *
+ * A lookup that fails is **not** a refusal. DNS being unreachable is our
+ * problem, not the source's, and the fetcher's whole retry model turns on that
+ * distinction — reading it as a refusal would spend one of a link's attempts on
+ * an outage of ours.
+ */
+export async function checkResolvedTarget(
+  rawUrl: string,
+  lookup: (host: string) => Promise<Array<{ address: string }>> = defaultLookup,
+): Promise<SsrfVerdict> {
+  const first = checkTarget(rawUrl);
+  if (!first.allowed) return first;
+
+  const host = new URL(rawUrl).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  // An address literal was already judged by `checkTarget`; resolving it again
+  // asks the resolver a question it has no business answering.
+  if (isIP(host) !== 0) return first;
+
+  let addresses: Array<{ address: string }>;
+  try {
+    addresses = await lookup(host);
+  } catch {
+    return { allowed: true };
+  }
+
+  const offender = addresses.find((entry) => isPrivateAddress(entry.address));
+  return offender
+    ? { allowed: false, reason: `refused a name pointing at ${offender.address}` }
+    : { allowed: true };
+}
+
+async function defaultLookup(host: string): Promise<Array<{ address: string }>> {
+  const { lookup } = await import('node:dns/promises');
+  // Every address, not the first: a name with one public and one private
+  // address would otherwise pass whenever the resolver happened to order the
+  // public one first.
+  return lookup(host, { all: true });
+}
+
 export function isPrivateAddress(address: string): boolean {
   if (isIP(address) === 6) {
     const v6 = address.toLowerCase();
