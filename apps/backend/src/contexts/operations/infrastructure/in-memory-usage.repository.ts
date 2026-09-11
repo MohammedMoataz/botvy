@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { UsageRepository, type UsageRow } from '../domain/usage.repository.js';
+import {
+  UsageRepository,
+  type UsageAggregate,
+  type UsageFilter,
+  type UsageRow,
+} from '../domain/usage.repository.js';
 
 /**
  * The adapter the usage specs bind.
@@ -41,6 +46,46 @@ export class InMemoryUsageRepository extends UsageRepository {
         (total, row) => total + row.promptTokens + row.completionTokens,
         0,
       );
+  }
+
+  /**
+   * The same grouping, and the same UTC day.
+   *
+   * `toISOString().slice(0, 10)` is `$dateToString` with no timezone, which is
+   * what the Mongo adapter does — an in-memory adapter that used the host's own
+   * day would put a row on a different date in Cairo than in London and make
+   * the spec pass wherever it happened to be run.
+   */
+  async aggregate(filter: UsageFilter): Promise<UsageAggregate[]> {
+    const groups = new Map<string, UsageAggregate>();
+
+    for (const row of this.rows) {
+      if (row.createdAt.getTime() < filter.from.getTime()) continue;
+      if (row.createdAt.getTime() >= filter.to.getTime()) continue;
+      if (filter.userId && row.userId !== filter.userId) continue;
+
+      const day = row.createdAt.toISOString().slice(0, 10);
+      const userId = filter.byMember ? row.userId : null;
+      const key = [day, row.kind, row.model, userId ?? ''].join('|');
+
+      const group = groups.get(key) ?? {
+        day,
+        kind: row.kind,
+        model: row.model,
+        promptTokens: 0,
+        completionTokens: 0,
+        calls: 0,
+        userId,
+      };
+      group.promptTokens += row.promptTokens;
+      group.completionTokens += row.completionTokens;
+      group.calls += 1;
+      groups.set(key, group);
+    }
+
+    return [...groups.values()].sort(
+      (a, b) => b.day.localeCompare(a.day) || b.promptTokens - a.promptTokens,
+    );
   }
 
   async removeAllFor(userId: string): Promise<number> {

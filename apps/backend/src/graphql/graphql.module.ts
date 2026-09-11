@@ -25,6 +25,7 @@ import { TrainingModule } from '../contexts/training/training.module.js';
 import { TrainingResolver } from '../contexts/training/features/sessions/training.resolver.js';
 import { KnowledgeModule } from '../contexts/knowledge/knowledge.module.js';
 import { NutritionResolver } from '../contexts/nutrition/features/meals/nutrition.resolver.js';
+import { OperationsAdminResolver } from '../contexts/operations/features/audit/operations-admin.resolver.js';
 import { NutritionModule } from '../contexts/nutrition/nutrition.module.js';
 import { KnowledgeResolver } from '../contexts/knowledge/features/links/knowledge.resolver.js';
 
@@ -188,6 +189,7 @@ export const RESOLVERS = [
    */
   KnowledgeResolver,
   NutritionResolver,
+  OperationsAdminResolver,
 ] as const;
 
 @Module({

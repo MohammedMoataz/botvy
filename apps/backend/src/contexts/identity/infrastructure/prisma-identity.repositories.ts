@@ -136,6 +136,22 @@ export class PrismaUserRepository extends UserRepository {
         rows.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
     };
   }
+
+  async labelsByIds(ids: string[]): Promise<Record<string, string>> {
+    if (ids.length === 0) return {};
+
+    // No `deletedAt: null` filter, on purpose: the caller is the audit trail,
+    // and an act by somebody who has since deleted their account is exactly the
+    // act worth being able to name.
+    const rows = await client(this.prisma).user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, email: true, displayName: true },
+    });
+
+    return Object.fromEntries(
+      rows.map((row) => [row.id, row.displayName ?? row.email]),
+    );
+  }
 }
 
 @Injectable()

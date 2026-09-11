@@ -118,6 +118,23 @@ export class InMemoryUserRepository extends UserRepository {
         matched.length > criteria.limit ? (page.at(-1)?.id ?? null) : null,
     };
   }
+
+  /**
+   * Deleted members included, matching the Prisma adapter.
+   *
+   * `search` above filters them out and this deliberately does not: the caller
+   * is the audit page, where an act by somebody who has since deleted their
+   * account is exactly the act worth naming. An in-memory adapter that hid them
+   * would let a spec pass that the real one fails.
+   */
+  async labelsByIds(ids: string[]): Promise<Record<string, string>> {
+    const wanted = new Set(ids);
+    return Object.fromEntries(
+      [...this.byId.values()]
+        .filter((user) => wanted.has(user.id))
+        .map((user) => [user.id, user.displayName ?? user.email]),
+    );
+  }
 }
 
 @Injectable()

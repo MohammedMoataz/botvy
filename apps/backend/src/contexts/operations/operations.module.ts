@@ -30,6 +30,11 @@ import {
   IdentityAdminPasswordProbe,
 } from './infrastructure/admin-password.probe.js';
 import { MongoUsageRepository } from './infrastructure/mongo-usage.repository.js';
+import { MongoAuditReadRepository } from './infrastructure/mongo-audit-read.repository.js';
+import { IdentityActorLabels } from './infrastructure/operations-audit.adapter.js';
+import { AuditReadRepository } from './domain/audit.repository.js';
+import { ActorLabelPort, AuditQueryHandler } from './features/audit/audit.query.js';
+import { UsageQueryHandler } from './features/usage/usage.query.js';
 
 /**
  * Operations: settings, heartbeats, the audit trail and the demonstration
@@ -82,6 +87,23 @@ import { MongoUsageRepository } from './infrastructure/mongo-usage.repository.js
       useFactory: (model: Model<Record<string, unknown>>) =>
         new MongoUsageRepository(model),
     },
+    /*
+     * The audit *reader*, which is a different port from the writer.
+     *
+     * `AuditPort` lives in `shared/` because four consumers across three
+     * contexts record through it, and giving that shared token a `list` method
+     * would hand every one of them the whole trail. The reader belongs to the
+     * context that owns `audit_log`, which is this one.
+     */
+    {
+      provide: AuditReadRepository,
+      inject: [getModelToken(MODEL_NAMES.auditLog)],
+      useFactory: (model: Model<Record<string, unknown>>) =>
+        new MongoAuditReadRepository(model),
+    },
+    { provide: ActorLabelPort, useClass: IdentityActorLabels },
+    AuditQueryHandler,
+    UsageQueryHandler,
     AdminPasswordFlagHandler,
     OperationsBootstrap,
     RecordUsageHandler,
@@ -118,6 +140,18 @@ import { MongoUsageRepository } from './infrastructure/mongo-usage.repository.js
     RecordUsageHandler,
     UsageTodayQueryHandler,
     OperationsPurgeOnDeletedHandler,
+    /*
+     * The Owner's two reads, for `graphql.module.ts`'s resolver list.
+     *
+     * Exported rather than only provided, for the reason every controller in
+     * `AppModule` needs its handlers exported: Nest resolves a resolver's
+     * dependencies from the module that *declares* it, and the resolvers are
+     * declared over there so the worker can import this module without gaining
+     * a GraphQL surface. The failure is an `UnknownDependenciesException` at
+     * boot that no typecheck sees.
+     */
+    AuditQueryHandler,
+    UsageQueryHandler,
   ],
 })
 export class OperationsModule {}

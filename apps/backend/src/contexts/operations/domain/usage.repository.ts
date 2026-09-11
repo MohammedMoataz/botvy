@@ -73,6 +73,49 @@ export abstract class UsageRepository {
    */
   abstract tokensBetween(userId: string, from: Date, to: Date): Promise<number>;
 
+  /**
+   * What the model was asked to do over a range, grouped (P10, FR-011).
+   *
+   * By **day, kind and model** always, and by member as well when `byMember` is
+   * set — which is the one grouping the Owner uses to find a runaway loop,
+   * because a total that has doubled says nothing about whose it is.
+   *
+   * The day is `YYYY-MM-DD` in **UTC**, deliberately and unlike every other
+   * date in this product. Every other one is a member's own day, resolved
+   * against their zone (principle XI); this one is the *operator's* view across
+   * every member at once, and there is no single member whose midnight it could
+   * use. A per-member row in one member's zone and a total row in another's
+   * would not add up, which is worse than a boundary the Owner has to know
+   * about — so the column says UTC on the screen.
+   *
+   * `[from, to)`, half-open, matching `tokensBetween`: a call at exactly `to`
+   * belongs to the next range, and closing both ends would count it twice on a
+   * screen whose whole purpose is arithmetic.
+   */
+  abstract aggregate(filter: UsageFilter): Promise<UsageAggregate[]>;
+
   /** Every row of a member who no longer exists. Returns how many went. */
   abstract removeAllFor(userId: string): Promise<number>;
+}
+
+export interface UsageFilter {
+  from: Date;
+  to: Date;
+  /** One member, or every member when absent. */
+  userId?: string | null;
+  /** Group by member as well as by day, kind and model. */
+  byMember?: boolean;
+}
+
+/** One group: a day, a kind, a model, and optionally a member. */
+export interface UsageAggregate {
+  /** `YYYY-MM-DD`, UTC. See `aggregate`. */
+  day: string;
+  kind: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  calls: number;
+  /** Non-null only when the query grouped by member. */
+  userId: string | null;
 }

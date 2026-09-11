@@ -53,4 +53,18 @@ export abstract class UserRepository {
 
   /** Admin listing: search by email or name, newest first, cursor by id. */
   abstract search(criteria: MemberSearch): Promise<MemberPage>;
+
+  /**
+   * Addresses for a handful of ids, for a screen that has to name people.
+   *
+   * A map rather than a list, and ids it cannot find are simply absent — the
+   * caller is the audit page, where a **deleted member's acts remain in the
+   * trail** and the id is the honest fallback. Throwing, or returning a row
+   * with an empty email, would make the one page that answers "who did this"
+   * unable to.
+   *
+   * Deleted members are included deliberately, unlike `search`: the question
+   * here is who acted, not who is on the books.
+   */
+  abstract labelsByIds(ids: string[]): Promise<Record<string, string>>;
 }
