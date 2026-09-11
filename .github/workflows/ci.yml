@@ -109,6 +109,103 @@ jobs:
           path: apps/extension/.output/*
           if-no-files-found: warn
 
+  frontend-e2e:
+    name: frontend-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # The portal is tested against the whole stack rather than against a
+      # Next.js server on its own. Every act this suite performs is refused or
+      # allowed by the API — the last-administrator rule, the settings
+      # registry's own schema, the audit trail — so a portal with nothing
+      # behind it would fail every case for reasons that say nothing about the
+      # portal. Ollama and n8n are left out: no case here asks the model
+      # anything, and the automation page is required to say plainly when the
+      # tool is absent, which is one of the cases.
+      - name: Write the environment
+        run: |
+          cp infra/.env.example .env
+          secret() { node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"; }
+          {
+            echo "POSTGRES_PASSWORD=ci-postgres"
+            echo "DATABASE_URL=postgresql://botvy:ci-postgres@postgres:5432/botvy"
+            echo "JWT_ACCESS_SECRET=$(secret)"
+            echo "JWT_REFRESH_SECRET=$(secret)"
+            echo "INTERNAL_SERVICE_TOKEN=$(secret)"
+            echo "AUTOMATION_WEBHOOK_SECRET=$(secret)"
+            echo "MEDIA_SIGNING_SECRET=$(secret)"
+            echo "ADMIN_EMAIL=ci-owner@example.invalid"
+            echo "ADMIN_PASSWORD=${ADMIN_PASSWORD}"
+            echo "EDGE_PORT=8088"
+          } >> .env
+          # One generated password, written to the stack and to the suite from
+          # the same variable. Two copies are two things to change, and the
+          # failure when they disagree is a 401 that looks like a broken login
+          # page rather than a mismatched fixture.
+          echo "BOTVY_E2E_PASSWORD=${ADMIN_PASSWORD}" >> "$GITHUB_ENV"
+        env:
+          ADMIN_PASSWORD: ci-${{ github.run_id }}-Owner!
+
+      - name: Start the stack
+        run: docker compose --env-file .env -f infra/docker-compose.yml up -d --build caddy
+
+      - name: Wait for the edge
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8088/health > /dev/null; then
+              echo "up after ${attempt} attempts"; exit 0
+            fi
+            sleep 5
+          done
+          echo "the stack never answered"; exit 1
+
+      - run: pnpm --filter @botvy/frontend exec playwright install --with-deps chromium
+
+      # A job that has gone quiet, on purpose. SC-001 is that the overview names
+      # it, and the only way to see that is to have one — waiting fifteen
+      # minutes for a real job to go stale is not a test, it is a delay.
+      - name: Seed a job that stopped
+        run: |
+          docker compose --env-file .env -f infra/docker-compose.yml exec -T mongo             mongosh botvy --quiet --eval '
+              // The job name is the _id: one row per job, and an upsert that
+              // keyed on anything else would grow a second row per run.
+              const longAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+              db.ops_heartbeats.updateOne(
+                { _id: "ci.stopped" },
+                { $set: { lastRunAt: longAgo, lastOkAt: longAgo, lastError: "seeded stale" } },
+                { upsert: true },
+              );
+            '
+
+      - name: The operator's acts
+        run: pnpm --filter @botvy/frontend test:e2e
+        env:
+          BOTVY_E2E_URL: http://127.0.0.1:8088
+          BOTVY_E2E_EMAIL: ci-owner@example.invalid
+          BOTVY_E2E_STALE_JOB: ci.stopped
+
+      # Whatever the suite did, the containers' own account of it. A red run
+      # whose only evidence is a browser screenshot leaves the question of
+      # which side failed open.
+      - name: What the stack said
+        if: failure()
+        run: docker compose --env-file .env -f infra/docker-compose.yml logs --tail 200 backend frontend caddy
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: portal-traces
+          path: apps/frontend/test-results/**
+          if-no-files-found: ignore
+
   packages:
     name: packages
     runs-on: ubuntu-latest

@@ -21,10 +21,20 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         <Link className="brand" href="/">
           {t('app.name')}
         </Link>
-        <nav className="row" style={{ gap: 12 }}>
+        {/*
+          Wraps rather than scrolls sideways, which is FR-014 at the one place
+          it is easiest to lose: eight links in a row is what pushes a phone-width
+          portal into a horizontal scroll, and a console nobody can use on a
+          phone is a console nobody uses at three in the morning.
+        */}
+        <nav className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
           <Link href="/overview">{t('admin.overview')}</Link>
           <Link href="/users">{t('admin.users')}</Link>
+          <Link href="/settings">{t('admin.settings')}</Link>
+          <Link href="/workflows">{t('admin.workflows')}</Link>
           <Link href="/ingestion">{t('admin.ingestion')}</Link>
+          <Link href="/usage">{t('admin.usage')}</Link>
+          <Link href="/audit">{t('admin.audit')}</Link>
           <Link href="/service-clients">{t('admin.serviceClients')}</Link>
         </nav>
         <span className="muted">{t('admin.title')}</span>

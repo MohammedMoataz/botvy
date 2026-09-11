@@ -1,5 +1,21 @@
-import type { BotvyClient } from './client.js';
+import { ApiError, type BotvyClient } from './client.js';
 import type { Role } from './auth-store.js';
+
+/**
+ * The member an act was aimed at is not there any more.
+ *
+ * Distinct from every other refusal because the *answer* is different: a guard
+ * rail says "no, and here is why", and the row stays. This says the row itself
+ * is wrong, so the store drops it and the screen goes back to the list rather
+ * than leaving an Owner pressing a button against an account that has been
+ * deleted — from another tab, from the member's own settings, or by a purge.
+ */
+export class MemberGone extends Error {
+  constructor(readonly userId: string) {
+    super('That account no longer exists.');
+    this.name = 'MemberGone';
+  }
+}
 
 export interface MemberSummary {
   id: string;
@@ -39,6 +55,59 @@ export interface SettingEntry {
   default: unknown;
   description: string;
   readOnly: boolean;
+  /**
+   * Which input this key's own rule asks for (P10, FR-006).
+   *
+   * Derived on the server from the zod schema the registry declares, so a key
+   * added there renders correctly here with no change to this package. `kind`
+   * is read and an unknown one falls back to a text box, which is what keeps a
+   * seventh control from being a contract change.
+   */
+  control: SettingControl;
+}
+
+export type SettingControl =
+  | { kind: 'switch' }
+  | { kind: 'number'; min?: number; max?: number; integer: boolean }
+  | { kind: 'choice'; options: string[] }
+  | { kind: 'time' }
+  | { kind: 'text' }
+  | { kind: 'chips' }
+  | { kind: 'json' }
+  /** Anything the server knows about and this build does not. */
+  | { kind: string };
+
+/** One recorded act, as the audit page reads it. */
+export interface AuditEntry {
+  id: string;
+  at: string;
+  actorType: string;
+  actorId: string;
+  actorLabel: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  meta: Record<string, unknown> | null;
+}
+
+/** One group of model calls: a day, a kind, a model, and maybe a member. */
+export interface UsageRow {
+  day: string;
+  kind: string;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  calls: number;
+  userId: string | null;
+}
+
+/** One automation workflow, as the Owner drives it. */
+export interface WorkflowSummary {
+  id: string;
+  name: string;
+  active: boolean;
+  lastRunAt: string | null;
+  lastStatus: string | null;
 }
 
 export interface HealthReport {
@@ -108,10 +177,10 @@ export class AdminStore {
   }
 
   async setRole(userId: string, role: Role): Promise<void> {
-    await this.client.rest(
-      'PATCH',
-      `/admin/users/${encodeURIComponent(userId)}/role`,
-      { role },
+    await this.#against(userId, () =>
+      this.client.rest('PATCH', `/admin/users/${encodeURIComponent(userId)}/role`, {
+        role,
+      }),
     );
     this.#patchMember(userId, { role });
   }
@@ -120,21 +189,44 @@ export class AdminStore {
     userId: string,
     reason?: string,
   ): Promise<{ sessionsEnded: number }> {
-    const result = await this.client.rest<{ sessionsEnded: number }>(
-      'POST',
-      `/admin/users/${encodeURIComponent(userId)}/ban`,
-      reason ? { reason } : {},
+    const result = await this.#against(userId, () =>
+      this.client.rest<{ sessionsEnded: number }>(
+        'POST',
+        `/admin/users/${encodeURIComponent(userId)}/ban`,
+        reason ? { reason } : {},
+      ),
     );
     this.#patchMember(userId, { status: 'banned' });
     return result;
   }
 
   async unban(userId: string): Promise<void> {
-    await this.client.rest(
-      'POST',
-      `/admin/users/${encodeURIComponent(userId)}/unban`,
+    await this.#against(userId, () =>
+      this.client.rest('POST', `/admin/users/${encodeURIComponent(userId)}/unban`),
     );
     this.#patchMember(userId, { status: 'active' });
+  }
+
+  /**
+   * Runs an act aimed at one member, and drops the row if it has gone.
+   *
+   * Here rather than in each of the three, because the three would drift: the
+   * list an Owner is looking at is a snapshot, and any of them can be aimed at
+   * an account that was deleted since it was drawn. A 404 is the only status
+   * that means this — a 409 is a guard rail, a 403 is the Owner's own role —
+   * so it is the only one that removes anything.
+   */
+  async #against<R>(userId: string, act: () => Promise<R>): Promise<R> {
+    try {
+      return await act();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        this.#members = this.#members.filter((member) => member.id !== userId);
+        this.#announce();
+        throw new MemberGone(userId);
+      }
+      throw error;
+    }
   }
 
   async serviceClients(): Promise<ServiceClientSummary[]> {
@@ -169,10 +261,99 @@ export class AdminStore {
     // and the portal's table column is named after the registry's own term.
     const { settings } = await this.client.query<{ settings: SettingEntry[] }>(`
       query Settings {
-        settings { key value default: defaultValue description readOnly }
+        settings { key value default: defaultValue description readOnly control }
       }
     `);
     return settings;
+  }
+
+  /**
+   * The administrative trail, a page at a time (FR-005).
+   *
+   * `after` is the previous page's `endCursor` and nothing else: the rows are
+   * ordered and cursored by id on the server, because acts arrive while the
+   * Owner is reading and an offset would show one twice and hide another.
+   */
+  async audit(
+    filter: {
+      actor?: string;
+      action?: string;
+      targetType?: string;
+      from?: string;
+      to?: string;
+      first?: number;
+      after?: string;
+    } = {},
+  ): Promise<{ nodes: AuditEntry[]; endCursor: string | null; hasNextPage: boolean }> {
+    const { audit } = await this.client.query<{
+      audit: { nodes: AuditEntry[]; endCursor: string | null; hasNextPage: boolean };
+    }>(
+      `query Audit($actor: ID, $action: String, $targetType: String, $from: DateTime, $to: DateTime, $first: Int, $after: String) {
+        audit(actor: $actor, action: $action, targetType: $targetType, from: $from, to: $to, first: $first, after: $after) {
+          nodes { id at actorType actorId actorLabel action targetType targetId meta }
+          endCursor
+          hasNextPage
+        }
+      }`,
+      filter,
+    );
+    return audit;
+  }
+
+  /**
+   * What the model has been asked to do (FR-011).
+   *
+   * `from` and `to` are both **inclusive** dates, which is what an operator
+   * typing "the 1st to the 7th" means; the server turns the second into the
+   * exclusive instant. The day on each row is UTC — an operator-wide view has
+   * no single member whose midnight it could use — and the screen says so.
+   */
+  async usage(range: {
+    from: string;
+    to: string;
+    userId?: string;
+    byMember?: boolean;
+  }): Promise<UsageRow[]> {
+    const { usage } = await this.client.query<{ usage: UsageRow[] }>(
+      `query Usage($from: Date!, $to: Date!, $userId: ID, $byMember: Boolean) {
+        usage(from: $from, to: $to, userId: $userId, byMember: $byMember) {
+          day kind model promptTokens completionTokens calls userId
+        }
+      }`,
+      range,
+    );
+    return usage;
+  }
+
+  /**
+   * The automation, over REST rather than GraphQL.
+   *
+   * The one deliberate exception to "reads are GraphQL" in this client, and the
+   * server's controller carries the argument: this is not a read of the
+   * platform's own data but a question asked of another system that can be
+   * down, and a GraphQL error in the middle of a query that also asked for
+   * something real is the wrong shape for "n8n is not answering".
+   */
+  async workflows(): Promise<WorkflowSummary[]> {
+    const { workflows } = await this.client.rest<{ workflows: WorkflowSummary[] }>(
+      'GET',
+      '/admin/workflows',
+    );
+    return workflows;
+  }
+
+  async setWorkflowActive(id: string, active: boolean): Promise<void> {
+    await this.client.rest(
+      'POST',
+      `/admin/workflows/${encodeURIComponent(id)}/${active ? 'activate' : 'deactivate'}`,
+    );
+  }
+
+  async runWorkflow(id: string): Promise<{ executionId: string | null }> {
+    return this.client.rest(
+      'POST',
+      `/admin/workflows/${encodeURIComponent(id)}/run`,
+    );
   }
 
   async patchSetting(key: string, value: unknown): Promise<void> {

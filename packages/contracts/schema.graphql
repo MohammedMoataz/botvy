@@ -40,6 +40,24 @@ type AthleteProfile {
   sports: [String!]!
 }
 
+type AuditConnection {
+  endCursor: String
+  hasNextPage: Boolean!
+  nodes: [AuditEntry!]!
+}
+
+type AuditEntry {
+  action: String!
+  actorId: ID!
+  actorLabel: String!
+  actorType: String!
+  at: DateTime!
+  id: ID!
+  meta: JSON
+  targetId: ID
+  targetType: String!
+}
+
 type BodyMetric {
   bodyFatPct: Float
   heightCm: Float
@@ -417,6 +435,9 @@ type Query {
   agenda(from: DateTime!, to: DateTime!): [AgendaDay!]!
   athleteProfile: AthleteProfile!
 
+  """Who did what, and when. Administrators only."""
+  audit(action: String, actor: ID, after: String, first: Int = 50, from: DateTime, targetType: String, to: DateTime): AuditConnection!
+
   """The caller's body metric history."""
   bodyMetrics(last: Int = 30): [BodyMetric!]!
   checkins(from: Date!, to: Date!): [Checkin!]!
@@ -483,6 +504,11 @@ type Query {
   todayMeals(date: Date): TodayMeals
   todayPlan(date: Date): DailyPlan!
   tomorrowDraft: DailyPlan!
+
+  """
+  Model use by day, kind and model — and by member when asked. Administrators only.
+  """
+  usage(byMember: Boolean = false, from: Date!, to: Date!, userId: ID): [UsageRow!]!
 
   """Every member. Administrators only."""
   users(after: String, first: Int = 50, role: Role, search: String, status: UserStatus): UserConnection!
@@ -712,6 +738,16 @@ type TodayMeals {
   meals: [ChosenMeal!]!
   mode: MealMode!
   withheldReason: WithheldReason
+}
+
+type UsageRow {
+  calls: Int!
+  completionTokens: Int!
+  day: Date!
+  kind: String!
+  model: String!
+  promptTokens: Int!
+  userId: ID
 }
 
 type User {

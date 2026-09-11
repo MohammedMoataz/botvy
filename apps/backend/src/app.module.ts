@@ -27,6 +27,7 @@ import { AdminKnowledgeController } from './contexts/knowledge/features/admin-cl
 import { InternalIngestController } from './contexts/knowledge/features/ingest-link/internal-ingest.controller.js';
 import { KnowledgeModule } from './contexts/knowledge/knowledge.module.js';
 import { MealsController } from './contexts/nutrition/features/add-meal/meals.controller.js';
+import { AdminWorkflowsController } from './contexts/operations/features/workflows/admin-workflows.controller.js';
 import { NutritionModule } from './contexts/nutrition/nutrition.module.js';
 import { InternalReconcileController } from './contexts/notifications/features/reconcile-meeting-alerts/internal-reconcile.controller.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
@@ -128,6 +129,7 @@ import { WsModule } from './ws/ws.module.js';
     InternalMaterialiseController,
     LinksController,
     MealsController,
+    AdminWorkflowsController,
     SuggestionsController,
     AdminKnowledgeController,
     InternalIngestController,

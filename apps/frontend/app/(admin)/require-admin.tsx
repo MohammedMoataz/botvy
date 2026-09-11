@@ -26,12 +26,39 @@ export const RequireAdmin = observer(function RequireAdmin({
   children: ReactNode;
 }) {
   const t = useTranslations('admin');
-  const { auth } = useStores();
+  const { auth, socket } = useStores();
   const router = useRouter();
 
   useEffect(() => {
     if (!auth.isAuthenticated) router.replace('/login');
   }, [auth.isAuthenticated, router]);
+
+  /*
+   * One socket for the portal, opened here because this is the one component
+   * every administrative page goes through — the layout above is a server
+   * component and cannot hold a connection.
+   *
+   * What it is for is `ops.heartbeat`: the backend emits one to the `ops` room
+   * every time a scheduled job stamps, and an administrator's socket joins that
+   * room on connect. Without this the emit had no listener anywhere, which is
+   * the same dead half of a contract as a handler with no producer.
+   *
+   * Tied to the *session* and not to this component. Every admin page mounts
+   * this, so a cleanup that disconnected would open and close a socket on every
+   * navigation; and `SocketClient.connect()` builds a new socket each call
+   * rather than no-opping on a live one, so the state is checked first — the
+   * same guard the extension's `ensureSocket` makes. Signing out drops
+   * `isAuthenticated`, which is what closes it: a socket outliving its token
+   * would be a live connection on a credential the member revoked.
+   */
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      socket.disconnect();
+      return;
+    }
+    if (socket.state === 'connected' || socket.state === 'connecting') return;
+    socket.connect();
+  }, [auth.isAuthenticated, socket]);
 
   if (!auth.isAuthenticated) {
     // Not the children, and not a spinner either: a flash of admin chrome

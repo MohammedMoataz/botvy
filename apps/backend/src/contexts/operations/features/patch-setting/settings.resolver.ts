@@ -31,6 +31,22 @@ export class SettingType {
 
   @Field()
   readOnly!: boolean;
+
+  /**
+   * Which control this key's own rule asks for (P10, FR-006).
+   *
+   * `JSON` rather than a typed union, for the same reason `value` is: the
+   * descriptor is a small open shape — a kind, and bounds or options where they
+   * exist — and typing it here would freeze the set of controls in the schema.
+   * The portal reads `kind` and falls back to a text box for one it does not
+   * know, which is what makes adding a seventh kind a frontend change rather
+   * than a contract change.
+   *
+   * Derived from the zod schema the registry already declares, so a key added
+   * without touching the portal still renders the right input.
+   */
+  @Field(() => JSONScalar)
+  control!: unknown;
 }
 
 /**

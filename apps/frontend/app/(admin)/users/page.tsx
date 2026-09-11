@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useTranslations } from 'next-intl';
-import { AdminStore, type MemberSummary, type Role } from '@botvy/sdk';
+import { AdminStore, MemberGone, type MemberSummary, type Role } from '@botvy/sdk';
 import { Button } from 'primereact/button';
 import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
@@ -44,6 +44,18 @@ function UsersPage() {
     try {
       await action();
     } catch (error) {
+      if (error instanceof MemberGone) {
+        /*
+         * Not a guard rail — the account itself is gone, deleted from another
+         * tab or by the member themselves since this list was drawn. The store
+         * has already removed the row, so the Owner is back at the list with
+         * one line saying what happened rather than pressing a button against
+         * something that is not there.
+         */
+        setNote(null);
+        setProblem(t('gone'));
+        return;
+      }
       // The API's own message, deliberately: "this is the only administrator"
       // and "an administrator cannot ban their own account" are the two an
       // Owner most needs to read, and paraphrasing them here would mean

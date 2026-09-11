@@ -4,7 +4,42 @@
     "tagline": "One assistant for your day."
   },
   "marketing": {
-    "body": "Botvy keeps your tasks, meetings and reminders in one place, on your phone, in your browser and on the web — and it runs its own model, on your own machine.",
+    "headline": "Your day, on your own machine.",
+    "body": "Botvy keeps your tasks, meetings and reminders in one place — on your phone, in your browser, and on the web. It coaches, plans your week and reads what you save, using a language model that runs on your own hardware. Nothing leaves it.",
+    "featuresTitle": "What it does",
+    "features": {
+      "day": {
+        "title": "A day that plans itself",
+        "body": "Tasks, reminders and meetings in one list, with an evening prompt for tomorrow and a briefing in the morning — on your clock, wherever you are."
+      },
+      "coach": {
+        "title": "A coach you can talk to",
+        "body": "Ask in your own words and it acts: a task, a reminder, a meeting, a note about yourself. It remembers what you told it."
+      },
+      "training": {
+        "title": "A training week",
+        "body": "Say when you train and the sessions appear. Log what you did, and the week fills itself in around it."
+      },
+      "food": {
+        "title": "Ordinary food",
+        "body": "Your own meals, or plain suggestions for the day — never a portion, never a calorie, and never something you told it you are allergic to."
+      },
+      "reading": {
+        "title": "What you saved to read",
+        "body": "Paste a link and it reads it for you, then suggests a session drawn from what you actually saved."
+      }
+    },
+    "downloadTitle": "Get it",
+    "downloadBody": "The phone app and the browser extension are built from the same release. Both talk only to the Botvy you run.",
+    "downloadAndroid": "Android app (APK)",
+    "downloadExtension": "Chrome extension",
+    "privacyTitle": "Where everything runs",
+    "privacyBody": "On the machine you install it on. There is no Botvy service, no account with us, and nowhere else for your data to be.",
+    "privacyPoints": {
+      "ownMachine": "Your notes, tasks and conversations stay in your own database.",
+      "ownModel": "The language model runs locally — no request goes to a model provider.",
+      "noAnalytics": "No analytics, no tracking, and no third-party scripts on this page."
+    },
     "signIn": "Sign in",
     "docs": "Documentation"
   },
@@ -14,7 +49,11 @@
     "overview": "Overview",
     "users": "Members",
     "serviceClients": "Service clients",
-    "ingestion": "Reading queue"
+    "ingestion": "Reading queue",
+    "settings": "Settings",
+    "workflows": "Automation",
+    "usage": "Model use",
+    "audit": "What changed"
   },
   "login": {
     "title": "Sign in",
@@ -47,7 +86,12 @@
     "registrationOpen": "Open",
     "registrationClosed": "Closed",
     "you": "Signed in as",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "inZone": "Times in {zone}",
+    "todayTitle": "Today",
+    "todayExplain": "What the model has been asked to do since midnight in {zone}.",
+    "countCalls": "Model calls",
+    "countTokens": "Tokens"
   },
   "users": {
     "title": "Members",
@@ -71,7 +115,8 @@
     "unbanned": "Unbanned. They will need to sign in again — the ban ended their sessions.",
     "none": "No members match.",
     "loadMore": "Load more",
-    "banResult": "Banned. {count, plural, =0 {No active sessions were ended} one {One session was ended} other {# sessions were ended}}."
+    "banResult": "Banned. {count, plural, =0 {No active sessions were ended} one {One session was ended} other {# sessions were ended}}.",
+    "gone": "That account no longer exists. It has been removed from the list."
   },
   "serviceClients": {
     "title": "Service clients",
@@ -114,6 +159,63 @@
       "summarising": "Summarising",
       "done": "Done",
       "failed": "Failed"
-    }
+    },
+    "seeRecord": "See what was recorded"
+  },
+  "settings": {
+    "title": "Settings",
+    "explain": "Every operator knob, with what it means and what it is set to. A change takes effect on the next use — nothing restarts.",
+    "filter": "Filter by key or meaning",
+    "loading": "Reading the registry…",
+    "save": "Save",
+    "saved": "Saved",
+    "default": "Default: {value}",
+    "systemWritten": "Written by the system"
+  },
+  "workflows": {
+    "title": "Automation",
+    "explain": "The scheduled work, whether it is switched on, and when it last ran.",
+    "name": "Workflow",
+    "active": "Active",
+    "lastRun": "Last run",
+    "neverRan": "Never run",
+    "actions": "Actions",
+    "run": "Run now",
+    "ran": "“{name}” was run.",
+    "refresh": "Refresh",
+    "none": "No workflows.",
+    "notConfigured": "No automation key is configured on this installation, so there is nothing to show. Set N8N_API_KEY and run the bootstrap to import the workflows.",
+    "unreachable": "The automation tool is not answering, so this list cannot be shown. It is not empty — it is unknown."
+  },
+  "usage": {
+    "title": "Model use",
+    "explain": "How much the model has been asked to do. Tokens, not money — this is here so a runaway loop is visible before it becomes a problem.",
+    "from": "From",
+    "to": "To",
+    "apply": "Show",
+    "byDay": "By day",
+    "byMember": "By member",
+    "utcNote": "Days are counted in UTC, because this view spans every member at once.",
+    "day": "Day",
+    "kind": "Kind",
+    "model": "Model",
+    "calls": "Calls",
+    "tokens": "Tokens",
+    "member": "Member",
+    "none": "Nothing in this range."
+  },
+  "audit": {
+    "title": "What changed",
+    "explain": "Every administrative act, with who did it and when.",
+    "actor": "Who",
+    "action": "Action",
+    "targetType": "Target kind",
+    "apply": "Filter",
+    "when": "When",
+    "who": "Who",
+    "target": "Target",
+    "detail": "Detail",
+    "loadMore": "Load more",
+    "none": "Nothing recorded yet."
   }
 }

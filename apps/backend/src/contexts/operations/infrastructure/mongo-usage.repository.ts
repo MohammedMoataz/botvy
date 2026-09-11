@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { Model } from 'mongoose';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
-import { UsageRepository, type UsageRow } from '../domain/usage.repository.js';
+import {
+  UsageRepository,
+  type UsageAggregate,
+  type UsageFilter,
+  type UsageRow,
+} from '../domain/usage.repository.js';
 
 /**
  * `usage_log` against MongoDB, using the model directly.
@@ -92,6 +97,65 @@ export class MongoUsageRepository extends UsageRepository {
     // No rows in the window is not an error and not a missing value: a member
     // who has not spoken today has spent nothing.
     return rows[0]?.total ?? 0;
+  }
+
+  /**
+   * Grouped in the database, for the same reason the sum is (P10, FR-011).
+   *
+   * The Owner's range is typically a week across every member, which is every
+   * row in the retention window; loading that into this process to group it in
+   * JavaScript would be a screen that gets slower the more the installation is
+   * used, which is exactly backwards.
+   *
+   * The day comes from `$dateToString` with **no timezone argument**, so it is
+   * UTC — see the port for why an operator-wide view cannot use a member's own
+   * midnight and why the column says so on screen.
+   */
+  async aggregate(filter: UsageFilter): Promise<UsageAggregate[]> {
+    const match: Record<string, unknown> = {
+      createdAt: { $gte: filter.from, $lt: filter.to },
+    };
+    if (filter.userId) match.userId = filter.userId;
+
+    const group: Record<string, unknown> = {
+      day: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+      kind: '$kind',
+      model: '$model',
+    };
+    if (filter.byMember) group.userId = '$userId';
+
+    const rows = await this.model
+      .aggregate<{
+        _id: { day: string; kind: string; model: string; userId?: string };
+        promptTokens: number;
+        completionTokens: number;
+        calls: number;
+      }>([
+        { $match: match },
+        {
+          $group: {
+            _id: group,
+            promptTokens: { $sum: '$promptTokens' },
+            completionTokens: { $sum: '$completionTokens' },
+            calls: { $sum: 1 },
+          },
+        },
+        // Newest day first, then the biggest spender: the Owner opens this
+        // screen to find what changed, and what changed is at the top.
+        { $sort: { '_id.day': -1, promptTokens: -1 } },
+      ])
+      .session(MongoUnitOfWork.currentSession())
+      .exec();
+
+    return rows.map((row) => ({
+      day: row._id.day,
+      kind: row._id.kind,
+      model: row._id.model,
+      promptTokens: row.promptTokens,
+      completionTokens: row.completionTokens,
+      calls: row.calls,
+      userId: row._id.userId ?? null,
+    }));
   }
 
   async removeAllFor(userId: string): Promise<number> {

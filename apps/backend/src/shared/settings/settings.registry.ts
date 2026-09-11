@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { controlFor, type SettingControl } from './setting-control.js';
 import { isValidTimezone } from '../time/time.js';
 
 /**
@@ -468,6 +469,7 @@ export function describeRegistry(): Array<{
   default: unknown;
   description: string;
   readOnly: boolean;
+  control: SettingControl;
 }> {
   return SETTING_KEYS.map((key) => {
     const definition = definitionOf(key);
@@ -476,6 +478,18 @@ export function describeRegistry(): Array<{
       default: definition.default,
       description: definition.description,
       readOnly: definition.readOnly === true,
+      /*
+       * Derived from the key's own zod schema rather than annotated per key
+       * (P10, FR-006).
+       *
+       * The portal renders a control per setting and must not hold its own map
+       * of which is a switch and which is a dropdown: that map would be a
+       * second copy of this registry, in another repository, and it would go
+       * wrong the first time somebody added a key without remembering it. The
+       * schema is the description that cannot go stale, because it is what the
+       * server validates against.
+       */
+      control: controlFor(definition.schema),
     };
   });
 }
