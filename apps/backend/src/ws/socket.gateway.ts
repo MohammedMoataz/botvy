@@ -12,6 +12,8 @@ import { Public } from '../shared/auth/decorators.js';
 import { WsAuthGuard, WsUnauthorized, type HandshakeLike } from '../shared/auth/ws-auth.guard.js';
 import type { Principal } from '../shared/auth/principal.js';
 import { RegisterDeviceHandler } from '../contexts/identity/features/register-device/register-device.handler.js';
+import { RateLimiter } from '../shared/rate-limit/rate-limiter.js';
+import { SettingsService } from '../shared/settings/settings.service.js';
 import { NudgeService, OPS_ROOM, roomForUser } from './nudge.service.js';
 
 /** How long before a token expires the client is told to refresh. */
@@ -76,7 +78,46 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     private readonly auth: WsAuthGuard,
     private readonly nudge: NudgeService,
     private readonly devices: RegisterDeviceHandler,
+    private readonly limiter: RateLimiter,
+    private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * Counts one inbound message against this socket's minute (P11, T1114).
+   *
+   * Counted **per socket** and not per member, deliberately: the extension
+   * pings to keep its service worker alive and a phone re-subscribes on every
+   * reconnect, so a member with three devices legitimately sends three times as
+   * much as a member with one. Per member would punish exactly the case the
+   * product is built for.
+   *
+   * A refused message is answered with `rate_limited` and dropped. It is not a
+   * disconnect: a client that is merely going too fast needs to slow down, and
+   * closing its socket makes it reconnect — which is more work for the server,
+   * not less. Nor is it an exception: a Socket.IO event has no response to
+   * carry a status, so the refusal has to be a frame the client can read.
+   *
+   * Fails open when the registry cannot be read, on the same grounds as the
+   * HTTP guard: this is a ceiling on abuse, not an authorisation decision.
+   */
+  private async withinLimit(client: SocketLike, event: string): Promise<boolean> {
+    let limit: number;
+    try {
+      limit = await this.settings.get('limits.socketPerMinute');
+    } catch {
+      return true;
+    }
+
+    const verdict = this.limiter.take('socket', client.id, limit, 60_000);
+    if (verdict.allowed) return true;
+
+    client.emit('rate_limited', {
+      code: 'rate_limited',
+      event,
+      retryAfterSeconds: Math.max(Math.ceil(verdict.retryAfterMs / 1000), 1),
+    });
+    return false;
+  }
 
   afterInit(server: ServerLike): void {
     // What makes every other emit in the application reach anybody. Nothing
@@ -140,7 +181,10 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    */
   @SubscribeMessage('presence.ping')
   @Public()
-  presencePing(): { serverTime: string } {
+  async presencePing(
+    @ConnectedSocket() client: SocketLike,
+  ): Promise<{ serverTime: string } | { ok: false }> {
+    if (!(await this.withinLimit(client, 'presence.ping'))) return { ok: false };
     return { serverTime: new Date().toISOString() };
   }
 
@@ -154,10 +198,12 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    */
   @SubscribeMessage('sync.subscribe')
   @Public()
-  syncSubscribe(
+  async syncSubscribe(
     @MessageBody() body: { entities?: unknown },
     @ConnectedSocket() client: SocketLike,
-  ): { ok: true } {
+  ): Promise<{ ok: boolean }> {
+    if (!(await this.withinLimit(client, 'sync.subscribe'))) return { ok: false };
+
     const entities = Array.isArray(body?.entities)
       ? body.entities.filter((entity): entity is string => typeof entity === 'string')
       : [];

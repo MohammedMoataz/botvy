@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { JwtVerifier } from '../shared/auth/jwt.verifier.js';
 import { WsAuthGuard } from '../shared/auth/ws-auth.guard.js';
+import { RateLimiter } from '../shared/rate-limit/rate-limiter.js';
+import type { SettingsService } from '../shared/settings/settings.service.js';
 import { NudgeService, OPS_ROOM, roomForUser } from './nudge.service.js';
 import {
   EXPIRY_WARNING_SECONDS,
@@ -20,7 +22,15 @@ function tokenFor(
   return jwt.sign(claims, SECRET, options);
 }
 
-/** A socket with only what the gateway touches, and a record of what it did. */
+/**
+ * A socket with only what the gateway touches, and a record of what it did.
+ *
+ * Each one gets its own id, because the rate limit is counted per socket: a
+ * shared id would make two fakes one bucket and hide the case that matters —
+ * a member's phone and their browser are two sockets and must not silence each
+ * other.
+ */
+let sockets = 0;
 function fakeSocket(auth: Record<string, unknown> = {}): SocketLike & {
   rooms: string[];
   emitted: Array<{ event: string; payload: unknown }>;
@@ -28,8 +38,9 @@ function fakeSocket(auth: Record<string, unknown> = {}): SocketLike & {
 } {
   const rooms: string[] = [];
   const emitted: Array<{ event: string; payload: unknown }> = [];
+  sockets += 1;
   return {
-    id: 'socket-1',
+    id: `socket-${sockets}`,
     handshake: { auth },
     data: {},
     rooms,
@@ -50,13 +61,19 @@ function fakeSocket(auth: Record<string, unknown> = {}): SocketLike & {
   };
 }
 
-function build() {
+function build(socketLimit = 600) {
   const verifier = new JwtVerifier({ JWT_ACCESS_SECRET: SECRET });
   const nudge = new NudgeService();
   const seen = vi.fn(async (_installId: string) => 'device-1');
-  const gateway = new SocketGateway(new WsAuthGuard(verifier), nudge, {
-    seen,
-  } as never);
+  const limiter = new RateLimiter();
+  const settings = { get: async () => socketLimit } as unknown as SettingsService;
+  const gateway = new SocketGateway(
+    new WsAuthGuard(verifier),
+    nudge,
+    { seen } as never,
+    limiter,
+    settings,
+  );
 
   let middleware: SocketMiddleware | undefined;
   const server: ServerLike = {
@@ -180,6 +197,8 @@ describe('the socket handshake', () => {
       new WsAuthGuard(serviceVerifier as never),
       new NudgeService(),
       { seen: async () => 'device-1' } as never,
+      new RateLimiter(),
+      { get: async () => 600 } as unknown as SettingsService,
     );
     let middleware: SocketMiddleware | undefined;
     gateway.afterInit({
@@ -192,14 +211,29 @@ describe('the socket handshake', () => {
       },
     });
 
+    const socket = fakeSocket({ token: 'whatever' });
     let refusal: Error | undefined;
-    middleware?.(fakeSocket({ token: 'whatever' }), (error) => {
+    middleware?.(socket, (error) => {
       refusal = error;
     });
 
     expect((refusal as (Error & { data?: { code?: string } }) | undefined)?.data?.code).toBe(
       'unauthorized',
     );
+
+    /*
+     * Refused **at the handshake**, and not after connecting (P11, T1115).
+     *
+     * The distinction is the whole rule rather than a detail of it. A socket
+     * that is admitted and then disconnected has already joined its rooms and
+     * already had a principal hung on it, so anything emitted in that window
+     * reaches a machine caller — and the window is however long the next
+     * lifecycle hook takes. Nothing is written to the socket here, which is
+     * what "refused at the handshake" has to mean for it to be worth anything.
+     */
+    expect(socket.data.principal).toBeUndefined();
+    expect(socket.rooms).toEqual([]);
+    expect(socket.emitted).toEqual([]);
   });
 
   it('stamps the install as seen, which is what the alert sweep reads', async () => {
@@ -231,11 +265,17 @@ describe('the socket handshake', () => {
   /** A phone with an unreachable store must still get a socket. */
   it('connects even when the device stamp fails', async () => {
     const verifier = new JwtVerifier({ JWT_ACCESS_SECRET: SECRET });
-    const gateway = new SocketGateway(new WsAuthGuard(verifier), new NudgeService(), {
-      seen: async () => {
-        throw new Error('postgres is down');
-      },
-    } as never);
+    const gateway = new SocketGateway(
+      new WsAuthGuard(verifier),
+      new NudgeService(),
+      {
+        seen: async () => {
+          throw new Error('postgres is down');
+        },
+      } as never,
+      new RateLimiter(),
+      { get: async () => 600 } as unknown as SettingsService,
+    );
     let middleware: SocketMiddleware | undefined;
     gateway.afterInit({
       use(fn) {
@@ -325,26 +365,57 @@ describe('the socket and its token expiring', () => {
 });
 
 describe('the socket messages', () => {
-  it('answers a presence ping with the server time', () => {
+  it('answers a presence ping with the server time', async () => {
     const { gateway } = build();
-    const answer = gateway.presencePing();
+    const answer = (await gateway.presencePing(fakeSocket())) as { serverTime: string };
 
     expect(Number.isNaN(Date.parse(answer.serverTime))).toBe(false);
   });
 
-  it('records the entities a client wants nudges for, and tolerates nonsense', () => {
+  /**
+   * Per socket, not per member (P11, T1114).
+   *
+   * The extension pings to keep its service worker alive and a phone
+   * re-subscribes on every reconnect, so a member with three devices
+   * legitimately sends three times as much as one with a phone. Counting per
+   * member would punish exactly the case the product is built for.
+   *
+   * A refusal is a frame, not a disconnect: a client going too fast needs to
+   * slow down, and closing its socket only makes it reconnect.
+   */
+  it('refuses a socket that is going too fast, without disconnecting it', async () => {
+    const { gateway } = build(2);
+    const socket = fakeSocket();
+
+    await gateway.presencePing(socket);
+    await gateway.presencePing(socket);
+    const third = await gateway.presencePing(socket);
+
+    expect(third).toEqual({ ok: false });
+    expect(socket.disconnected).toBe(false);
+    expect(socket.emitted.at(-1)?.event).toBe('rate_limited');
+
+    // A second socket is a second bucket, so one busy device never silences
+    // the member's other ones.
+    const other = fakeSocket();
+    expect(await gateway.presencePing(other)).toMatchObject({
+      serverTime: expect.any(String),
+    });
+  });
+
+  it('records the entities a client wants nudges for, and tolerates nonsense', async () => {
     const { gateway } = build();
     const socket = fakeSocket();
 
-    expect(gateway.syncSubscribe({ entities: ['tasks', 'reminders'] }, socket)).toEqual({
+    expect(await gateway.syncSubscribe({ entities: ['tasks', 'reminders'] }, socket)).toEqual({
       ok: true,
     });
     expect(socket.data.entities).toEqual(['tasks', 'reminders']);
 
-    gateway.syncSubscribe({ entities: ['tasks', 7, null] as unknown[] }, socket);
+    await gateway.syncSubscribe({ entities: ['tasks', 7, null] as unknown[] }, socket);
     expect(socket.data.entities).toEqual(['tasks']);
 
-    gateway.syncSubscribe({}, socket);
+    await gateway.syncSubscribe({}, socket);
     expect(socket.data.entities).toEqual([]);
   });
 });
