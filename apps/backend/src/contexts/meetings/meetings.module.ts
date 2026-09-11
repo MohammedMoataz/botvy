@@ -13,6 +13,8 @@ import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { PlanningModule } from '../planning/planning.module.js';
 import { ProfileModule } from '../profile/profile.module.js';
+import { SessionsInRangeQueryHandler } from '../training/features/sessions/sessions-in-range.query.js';
+import { TrainingModule } from '../training/training.module.js';
 import {
   MeetingDefaultsPort,
   TimedTasksPort,
@@ -51,9 +53,9 @@ import {
   type MeetingDoc,
 } from './infrastructure/mongo-meetings.repositories.js';
 import {
-  NoTrainingSessions,
   PlanningTimedTasks,
   ProfileMeetingDefaults,
+  TrainingSessions,
 } from './infrastructure/meetings.adapters.js';
 
 /**
@@ -95,6 +97,8 @@ import {
     OperationsModule,
     ProfileModule,
     PlanningModule,
+    // The agenda's fourth source, from P6. One-directional; no `forwardRef`.
+    TrainingModule,
     MongooseModule.forFeature([
       { name: MODEL_NAMES.meeting, schema: MeetingSchema },
       { name: MODEL_NAMES.calendarEvent, schema: CalendarEventSchema },
@@ -125,13 +129,22 @@ import {
     // ---- the three outward ports, bound in this context's infrastructure ---
     { provide: TimedTasksPort, useClass: PlanningTimedTasks },
     /*
-     * Training does not exist until P6, and the agenda renders correctly
-     * without a session row. Bound to an empty-list stub rather than left
-     * unbound, because Nest would refuse to boot without it and rightly: an
-     * unsatisfied dependency is not the same statement as "the answer is
-     * nothing yet". P6 replaces this one line.
+     * **P6 replaced the stub**, exactly as the comment here promised it would.
+     *
+     * The agenda has been asking `TrainingSessionsPort.between` since P5 and
+     * getting an empty list; it now gets the member's sessions, and not one
+     * line of the agenda changed. The spec that asserted the stub contributes
+     * nothing rather than throwing is now three cases — the session lands
+     * beside the meeting in time order, a day without one renders meeting-only,
+     * and one outside the window is left out — and the "a thrower would take
+     * the whole agenda down" guard survives in the middle case.
      */
-    { provide: TrainingSessionsPort, useClass: NoTrainingSessions },
+    {
+      provide: TrainingSessionsPort,
+      inject: [SessionsInRangeQueryHandler],
+      useFactory: (sessions: SessionsInRangeQueryHandler) =>
+        new TrainingSessions(sessions),
+    },
     { provide: MeetingDefaultsPort, useClass: ProfileMeetingDefaults },
 
     // Every handler takes its dependencies by class token, so Nest builds them

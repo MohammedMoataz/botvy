@@ -11,6 +11,7 @@ import '../../rhythm/application/rhythm_cubit.dart';
 import '../../rhythm/presentation/checkin_sheet.dart';
 import '../../rhythm/presentation/confirm_plan_sheet.dart';
 import '../application/home_cubit.dart';
+import '../widgets/training_row.dart';
 import 'home_dials.dart';
 
 /// The day at a glance (US5).
@@ -71,6 +72,11 @@ class HomePage extends StatelessWidget {
                 onPressed: () => context.push(Routes.calendar),
               ),
               IconButton(
+                icon: const Icon(Icons.fitness_center),
+                tooltip: t.athleteTitle,
+                onPressed: () => context.push(Routes.athlete),
+              ),
+              IconButton(
                 icon: const Icon(Icons.person_outline),
                 tooltip: t.profileTitle,
                 onPressed: () => context.push(Routes.profile),
@@ -91,6 +97,12 @@ class HomePage extends StatelessWidget {
                       if (state.draft != null) const _PlanTomorrowCard(),
                       if (state.awaitingCheckin) const _CheckinCard(),
                       _TodayCard(state: state),
+                      // Today's training, as its own kind of row and never as
+                      // a task (FR-010, story 6 scenario 1). It draws itself
+                      // from the phone's `sessions` table rather than from the
+                      // plan snapshot, so completing or skipping a session
+                      // offline changes it at once — see [TrainingRow].
+                      TrainingRow(date: state.today, timezone: state.timezone),
                       if (state.agenda.isNotEmpty) _ScheduleCard(state: state),
                       _StreakCard(state: state),
                     ],

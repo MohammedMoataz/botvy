@@ -11,7 +11,7 @@ member endpoints reject service principals. Scopes gate routes:
 | Scope | Routes |
 |---|---|
 | `internal:sweep` | `POST /internal/notifications/sweep` |
-| `internal:tick` | `POST /internal/rhythm/tick`, `POST /internal/rhythm/prompt` |
+| `internal:tick` | `POST /internal/rhythm/tick`, `POST /internal/rhythm/prompt`, `POST /internal/notifications/reconcile-meeting-alerts` (P5), `POST /internal/training/materialise` (P6) |
 | `internal:ingest` | `POST /internal/knowledge/ingest/:linkId` |
 | `internal:alerts` | `POST /internal/alerts` |
 | `internal:events` | `POST /internal/events/ack` (webhook delivery acks, optional) |
@@ -20,6 +20,14 @@ member endpoints reject service principals. Scopes gate routes:
 Every internal job writes `ops_heartbeats[job]` on completion; `/health` marks a
 job stale after 15 minutes and the admin overview shows the same.
 
+**A per-member failure in a sweeping pass is logged and skipped rather than fatal**, the
+call the rhythm tick, the meeting reconcile and the session materialiser all make: one
+member with an unreadable time zone must not stop the pass for the installation. The
+consequence is worth stating, because it is the sort of thing read wrongly at three in
+the morning — **the counters can be short while the writes stand**, since each is
+incremented as its member returns. The rows the pass wrote are the record of what it
+did; the counters are a summary that a partial failure makes conservative.
+
 ## Endpoints
 
 | Method & path | Scope | Behaviour | Response |
@@ -27,6 +35,8 @@ job stale after 15 minutes and the admin overview shows the same.
 | `POST /internal/notifications/sweep` | sweep | Find due unsent alerts (batch `settings.notifications.sweepBatch`), skip users with no push device (leave unsent), skip devices with `lastSeenAt >= plannedAt`, **claim** each row atomically, send FCM, expire alerts older than `expiryHours`, purge tombstones past `tombstoneDays`, delete devices whose tokens FCM reports invalid | `{ claimed, sent, skippedLocal, expired, purged, ms }` |
 | `POST /internal/rhythm/tick` | tick | For each member: local `today`/`HH:mm`; plan prompt (21:00) if due and not yet claimed today; end-of-day summary (22:00) likewise, auto-confirming an unanswered draft and asking the check-in when `checkinEnabled`; morning briefing (08:00) likewise | `{ users, planPrompts, endOfDay, morning, checkins, ms }` |
 | `POST /internal/rhythm/prompt` | tick | `{ userId?, kind: 'plan'\|'end_of_day'\|'morning' }` unconditional (operator "Run") | `{ sent }` |
+| `POST /internal/notifications/reconcile-meeting-alerts` | tick | For every member with a meeting: expand the next `settings.meetings.alertWindowDays` from the rule and reconcile the alert set against it, so the rolling window advances on a day when nothing happens. Keyed on `(occurrenceAt, label)`, so running it twice changes nothing | `{ members, meetings, planned, removed, ms }` |
+| `POST /internal/training/materialise` | tick | For every member with a slot: create the `planned` sessions for the next `settings.training.materialiseDays` in their own zone, upserting a **derived** `_id` so a redelivery collapses onto one row; fill each new one from the active program's week for that date; tombstone the future `planned` sessions whose slot is gone, restoring one whose slot came back; recompute `plannedAt` when the member's zone changed | `{ members, created, filled, removed, ms }` |
 | `POST /internal/knowledge/ingest/:linkId` | ingest | Re-run the ingestion pipeline for one link regardless of state | `{ status }` |
 | `POST /internal/alerts` | alerts | `{ workflow, error, executionId? }` → push to all admin devices + `audit_log` | `{ notified }` |
 

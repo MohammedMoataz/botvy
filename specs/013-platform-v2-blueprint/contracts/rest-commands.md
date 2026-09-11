@@ -113,12 +113,15 @@ for the path to have hung off.
 | Method & path | Auth | Body |
 |---|---|---|
 | `PUT /athlete/sports` | user | `{ sports: string[] }` |
-| `PUT /athlete/slots` | user | `{ slots: [{ id, weekday, start, durationMin, sport, location? }] }` → re-materialises upcoming sessions |
+| `PUT /athlete/slots` | user | `{ slots: [{ id, weekday, start, durationMin, sport, location? }] }` — replaces the whole timetable, and a slot keeping its id keeps its sessions. `start` is a **wall-clock time in the member's zone**, never an instant: "gym at 18:00 on Mondays" is a statement about their clock, so it survives a move and the materialiser resolves it against their current zone on every pass. Changing slots affects **future** sessions only (FR-002) |
 | `POST /sessions` | user | `{ id, plannedAt, durationMin, sport, title, focus?, exercises? }` |
 | `PATCH /sessions/:id` | user | edits + `baseUpdatedAt` |
 | `POST /sessions/:id/log` | user | `{ exercises: [{ id, sets: [{ actualReps?, actualWeightKg?, ..., done }] }], notes? }` |
-| `POST /sessions/:id/complete` · `/cancel` · `/skip` | user | |
-| `POST /programs` · `PATCH /programs/:id` · `POST /programs/:id/apply` · `POST /programs/:id/archive` · `DELETE /programs/:id` | user | apply: `{ startDate }` fills upcoming slot sessions from week templates |
+| `POST /sessions/:id/complete` · `/cancel` · `/skip` · `/reopen` | user | Skipping **keeps the row** and marks it, so the week is an honest record (FR-005); deleting never touches the status |
+| `DELETE /sessions/:id` · `POST /sessions/:id/restore` · `DELETE /sessions/:id/purge` | user | Purge refuses a row that is not a tombstone (`409 not_deleted`) |
+| `POST /sessions/:id/apply-workout` | user | `{ workoutId }` — the library entry's exercises, copied with fresh ids so editing the session cannot rewrite the entry (FR-009) |
+| `POST /programs` · `PATCH /programs/:id` · `POST /programs/:id/archive` · `POST /programs/:id/activate` · `DELETE /programs/:id` | user | Archiving stops the materialiser consulting the program and **leaves the sessions it already filled exactly as they are** (FR-008, story 4 scenario 4) |
+| `POST /programs/:id/apply` | user | `{ startDate, force? }` → `{ applied: boolean, wouldReplace: [{ sessionId, plannedAt, title }] }`. P6 extends the blueprint's `{ startDate }`, because a warning the member must see before content is replaced cannot be delivered by a command that only ever succeeds. Without `force` an apply that would replace planned content answers **409** carrying the list; a session with anything *logged* is never in it and never replaced. The extension is additive — an old caller sending `{ startDate }` gets the refusal and the list, which is the safe half |
 | `POST /workouts` · `PATCH /workouts/:id` · `DELETE /workouts/:id` | user | library items |
 
 ## Knowledge

@@ -32,6 +32,12 @@ Today is {{today}} and the local time is {{now}} ({{timezone}}).
 
 {{day}}
 
+The `Training:` line is their week: the sports they practise, the session that
+is next with its focus, and how many sessions they have completed in a row. Use
+it — name the session and the day when you talk about training, and if it says
+they have not set up a week yet, offer to set one up instead of asking what they
+train.
+
 Use those numbers. A portion size, a calorie figure, a starting weight on the
 bar, how hard a session should be — all of it depends on their body and their
 history, and what is known is written above.

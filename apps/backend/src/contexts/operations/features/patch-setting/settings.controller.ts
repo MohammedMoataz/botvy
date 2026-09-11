@@ -9,6 +9,7 @@ import {
   Patch,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { Allow } from 'class-validator';
 import {
   CurrentPrincipal,
   Roles,
@@ -28,7 +29,28 @@ export class PatchSettingDto {
    * the registry, so a DTO here would be a second copy of forty-one rules that
    * drifts from the first — and the useful error message is the one the schema
    * produces, naming the key and what it wanted.
+   *
+   * ## `@Allow()` is not decoration, and leaving it off broke the endpoint
+   *
+   * The global pipe runs `whitelist: true` with `forbidNonWhitelisted: true`,
+   * and *whitelisted* means "carries at least one class-validator decorator".
+   * A property with none is not a property the pipe can see, so this endpoint
+   * answered every single request — the portal's, the gate's, an operator's —
+   * with `400 property value should not exist`. The one write path to the
+   * settings registry, refusing the only field it takes.
+   *
+   * That is the exact failure the file's own comment below says these routes
+   * exist to prevent: with `SettingsService.set` unreachable, every registry
+   * key is a de-facto hard-coded default, and principle XII says a hard-coded
+   * default is a bug. It survived because the whole suite binds handlers
+   * directly and the gates that touch settings write them through the store —
+   * neither goes through the HTTP pipe, which is the only place this rule
+   * lives.
+   *
+   * `@Allow()` says "this property is declared" and validates nothing, which
+   * is precisely the intent: the zod schema in the registry is the validator.
    */
+  @Allow()
   value!: unknown;
 }
 

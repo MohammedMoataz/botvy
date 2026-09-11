@@ -147,6 +147,22 @@ export const SETTINGS_REGISTRY = {
     description:
       "How far ahead meeting reminders are planned. A meeting's occurrences are computed from its repeat rule rather than stored, so a series with no end date has infinitely many of them and its reminders have to be planned for a window that a nightly pass advances. Raise it and members' phones hold alarms further ahead, so a device that has been offline for longer still fires them; lower it and there are fewer alerts to keep in step. It does not change when anybody is warned about a given meeting.",
   }),
+  /*
+   * Registered here in P6, not P0, and the difference is worth a line.
+   *
+   * The blueprint and this phase's own plan both say "a registry key P0
+   * registers"; it was not there — 42 keys and no `training.*`. That is the
+   * failure mode CLAUDE.md names outright: a capability three phases each
+   * credit to another phase is a capability nobody builds. The materialiser
+   * reads this by name and holds no literal, so the key has to exist wherever
+   * it is declared, and the phase that first reads it is the honest place.
+   */
+  'training.materialiseDays': define({
+    schema: z.number().int().min(1).max(120),
+    default: 14,
+    description:
+      "How far ahead training sessions are created from the member's weekly slots. A slot is a weekly rule rather than a row, so the sessions it produces have to be materialised for a window that a nightly pass advances — and a program longer than this window has its later weeks filled as the window reaches them, not at apply time. Raise it and members see further into their week and their phones hold alarms earlier; lower it and there are fewer planned sessions to keep in step. It never changes when a given session happens.",
+  }),
   'rhythm.checkinWindowHours': define({
     schema: z.number().int().min(1).max(48),
     default: 12,

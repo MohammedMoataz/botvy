@@ -57,6 +57,48 @@ describe('assessHealth', () => {
     expect(report.status).toBe('ok');
   });
 
+  /**
+   * The same defect, reintroduced by the shape of the fix rather than by its
+   * value.
+   *
+   * The nightly window was selected by a **name prefix**, `backup.` — so P5's
+   * `notifications.meeting-alerts` (03:20) and P6's `training.materialise`
+   * (03:40) were judged by the fifteen-minute rule and were therefore stale for
+   * twenty-three hours out of every twenty-four. `/health` answered `degraded`
+   * almost always, and `verify.mjs`'s "no stale jobs" check would have failed
+   * every day — which is the original defect wearing the opposite sign, and it
+   * is what a permanently red signal costs: an operator stops reading it.
+   *
+   * The cadence of a job is not a fact about its name. It is a set now, and
+   * this case is what stops the next nightly job being added without a thought
+   * about which window judges it.
+   */
+  it('measures every nightly job in hours, not just the backups', () => {
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [
+        heartbeat('notifications.meeting-alerts', 9 * 60),
+        heartbeat('training.materialise', 9 * 60),
+      ],
+    });
+
+    expect(report.jobs.map((job) => job.stale)).toEqual([false, false]);
+    expect(report.status).toBe('ok');
+  });
+
+  it('still holds a five-minute job to the minute window', () => {
+    // The other side of the same set: widening the window for a job that runs
+    // every few minutes would let it go quiet for a day unnoticed, which is
+    // exactly what the fifteen-minute rule is for.
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [heartbeat('rhythm.tick', 3 * 60), heartbeat('notifications.sweep', 3 * 60)],
+    });
+
+    expect(report.jobs.map((job) => job.stale)).toEqual([true, true]);
+    expect(report.status).toBe('degraded');
+  });
+
   it('still calls a backup stale once its own window has passed', () => {
     const report = assessHealth({
       ...healthy,

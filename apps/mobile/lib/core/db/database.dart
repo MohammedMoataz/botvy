@@ -639,6 +639,174 @@ class CalendarEvents extends Table with SyncColumns {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+/// One training session — planned, and then logged (data-model §2.6).
+///
+/// **There is no `missed` column, and there must not be.** "Missed" is a
+/// `planned` session whose moment has passed with nothing logged, and it is a
+/// reading of the clock rather than an outcome anybody records (FR-018): the
+/// server's `Session.isMissed(now, tz)` answers it, `isMissed` in
+/// `features/athlete/application/athlete.dart` is the phone's copy of that one
+/// line, and nothing on either side writes it. A column would need a sweep to
+/// set it and a second one to un-set it the moment the member logged the
+/// session late — and the card, the week view and Today would then have three
+/// chances to disagree.
+///
+/// [exercisesJson] holds `[{id,name,notes,mediaRefs,sets:[…]}]` as the JSON the
+/// server sent, for the reason [Tasks.recurrenceJson] gives: it is read whole,
+/// every time, and never queried across sessions. A set is one shape for every
+/// sport with optional fields — the *sport* decides which pair the editor draws
+/// — so a table of sets would be forty nullable columns and a join for a list
+/// that is always shown in full.
+///
+/// [slotId] is null for a session the member made by hand, which is what keeps
+/// it out of the materialiser's way; [suggestionId] is carried and written by
+/// nothing until P7.
+@DataClassName('LocalSession')
+@TableIndex(name: 'sessions_planned_at', columns: {#plannedAt})
+@TableIndex(name: 'sessions_status_planned', columns: {#status, #plannedAt})
+@TableIndex(name: 'sessions_pending', columns: {#pendingOp})
+class Sessions extends Table with SyncColumns {
+  DateTimeColumn get plannedAt => dateTime()();
+
+  IntColumn get durationMin => integer().withDefault(const Constant(60))();
+
+  /// One of the seven known names or the member's own word. A text column and
+  /// not an enum, for the reason [Conversations.kind] gives — and here it is
+  /// the product rule as well: "other" in the picker is a text field, not a
+  /// bucket, so a member whose sport is padel stores `padel`.
+  TextColumn get sport => text()();
+
+  TextColumn get title => text()();
+  TextColumn get focus => text().nullable()();
+
+  /// Which program filled this, and which of its weeks. Null for a bare slot.
+  TextColumn get programId => text().nullable()();
+  IntColumn get weekIndex => integer().nullable()();
+
+  /// Which weekly slot produced it. Null for a session made by hand.
+  TextColumn get slotId => text().nullable()();
+
+  TextColumn get suggestionId => text().nullable()();
+
+  TextColumn get exercisesJson => text().withDefault(const Constant('[]'))();
+
+  /// `planned` | `completed` | `cancelled` | `skipped`. Four, and a delete
+  /// never touches it: a skipped session stays in the week marked skipped,
+  /// which is the whole of FR-005's honesty.
+  TextColumn get status => text().withDefault(const Constant('planned'))();
+  DateTimeColumn get completedAt => dateTime().nullable()();
+
+  TextColumn get notes => text().nullable()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// One program: weeks of session templates (data-model §2.6).
+///
+/// [weeksJson] is `[{index, sessions:[{templateId, weekday, title, focus,
+/// exercises:[…]}]}]`, stored whole for the reason [Sessions.exercisesJson]
+/// gives. Nothing on the phone queries inside it.
+///
+/// [appliedStartDate] is the local date the member applied it from, `YYYY-MM-DD`
+/// — a text column and not an instant, because a date is a date. It is what
+/// lets the server's materialiser compute a week index long after the apply, so
+/// week four of a four-week program lands on the day the horizon reaches it;
+/// the phone carries it so the detail screen can say which week is running.
+@DataClassName('LocalProgram')
+@TableIndex(name: 'programs_status', columns: {#status})
+@TableIndex(name: 'programs_pending', columns: {#pendingOp})
+class Programs extends Table with SyncColumns {
+  TextColumn get title => text()();
+  TextColumn get sport => text()();
+
+  /// `user` | `suggestion` | `link`.
+  TextColumn get source => text().withDefault(const Constant('user'))();
+
+  /// The ids only, never the links themselves: Knowledge owns those and does
+  /// not exist until P7. A client that wants them asks Knowledge.
+  TextColumn get sourceLinkIdsJson =>
+      text().withDefault(const Constant('[]'))();
+
+  TextColumn get weeksJson => text().withDefault(const Constant('[]'))();
+
+  /// `active` | `archived`. Archiving stops the program filling anything new
+  /// and never rewrites a week the member can already see (FR-008).
+  TextColumn get status => text().withDefault(const Constant('active'))();
+
+  TextColumn get appliedStartDate => text().nullable()();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// One entry in the member's own workout library (FR-009).
+@DataClassName('LocalWorkout')
+@TableIndex(name: 'workouts_sport', columns: {#sport})
+@TableIndex(name: 'workouts_pending', columns: {#pendingOp})
+class Workouts extends Table with SyncColumns {
+  TextColumn get name => text()();
+  TextColumn get sport => text()();
+  TextColumn get exercisesJson => text().withDefault(const Constant('[]'))();
+  TextColumn get tagsJson => text().withDefault(const Constant('[]'))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// What the member practises and when (data-model §2.6).
+///
+/// One row, keyed by `userId`, and the one entity in this phase the server
+/// takes as a **patch** rather than as a row: `sync.md`'s push slot is
+/// `{"athlete_profile": {"patch": {…}}}` over an allowlist of `sports` and
+/// `slots`, with no conflict check — the fields a client writes and the fields
+/// server jobs write are disjoint sets — and no delete sweep, because there is
+/// nothing to delete.
+///
+/// So it carries **some** of [SyncColumns] and deliberately not the mixin.
+/// [pendingOp] and [pushAttempts] are here because the phone really does push
+/// this — a member picks their sports on a plane and the patch waits — and the
+/// blocked-row badge and the retry both read those two columns. What is absent
+/// is `id` (the key is the member's), `updatedAt` and `baseUpdatedAt` (there is
+/// no conflict rule to feed them to; sending them would be two columns the
+/// server is contractually obliged to ignore) and `deletedAt` (a profile goes
+/// when the member does, which `purge-on-deleted` handles). [Profiles] states
+/// the general form of that reasoning: columns a table nothing pushes as a row
+/// would only be speculation every later migration has to step over.
+///
+/// [slotsJson] is `[{id,weekday,start,durationMin,sport,location}]`, where
+/// `start` is `HH:mm` **in the member's own zone and never an instant** — "gym
+/// at 18:00 on Mondays" is a statement about their clock, so it survives a move
+/// and the server resolves it against their current zone on every pass.
+@DataClassName('LocalAthleteProfile')
+class AthleteProfile extends Table {
+  TextColumn get userId => text()();
+
+  TextColumn get sportsJson => text().withDefault(const Constant('[]'))();
+  TextColumn get slotsJson => text().withDefault(const Constant('[]'))();
+
+  /// `update`, or null for a row with nothing queued. Only ever `update`: a
+  /// patch has no create, no delete and no purge — the server writes the empty
+  /// profile when the member registers, which is what lets every reader
+  /// promise a document rather than a null.
+  TextColumn get pendingOp => text().nullable()();
+
+  IntColumn get pushAttempts => integer().withDefault(const Constant(0))();
+
+  /// When this copy was last filled from the server. As on [Profiles], this is
+  /// about the copy and not about the record.
+  DateTimeColumn get fetchedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {userId};
+}
+
 /// One message, mirroring the server's `messages` shape (data-model §2.9).
 ///
 /// **Immutable, and that is load-bearing.** There is no [SyncColumns] here and
@@ -789,6 +957,10 @@ class MigrationLadderError extends Error {
     PendingMessages,
     Meetings,
     CalendarEvents,
+    AthleteProfile,
+    Programs,
+    Workouts,
+    Sessions,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -798,7 +970,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -943,6 +1115,34 @@ class AppDatabase extends _$AppDatabase {
         await m.create(meetingsPending);
         await m.create(calendarEventsStart);
         await m.create(calendarEventsPending);
+      }
+
+      // 6 -> 7: training (P6, `specs/020-training` T650) — the athlete
+      // profile, the programs, the workout library and the sessions.
+      //
+      // `from < 7` and the seven indexes listed explicitly, for the two
+      // reasons every branch above gives: drift calls `onUpgrade` once with the
+      // pair it has, so a `createTable` is guarded `from < N` and never
+      // `from >= N-1 && from < N`; and `createTable` builds the table and
+      // *not* its indexes, which drift keeps as separate schema entities that
+      // only `createAll` picks up on a fresh install.
+      //
+      // `athlete_profile` declares no index: it holds one row per member and
+      // is only ever read by its primary key, so an index over it would be a
+      // second copy of the key.
+      if (from < 7) {
+        await m.createTable(athleteProfile);
+        await m.createTable(programs);
+        await m.createTable(workouts);
+        await m.createTable(sessions);
+
+        await m.create(programsStatus);
+        await m.create(programsPending);
+        await m.create(workoutsSport);
+        await m.create(workoutsPending);
+        await m.create(sessionsPlannedAt);
+        await m.create(sessionsStatusPlanned);
+        await m.create(sessionsPending);
       }
 
       // Anything the ladder above did not cover.

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.SessionCompleted",
+  "description": "Payload of training.SessionCompleted. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "at": {},
+    "sport": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "at",
+    "sport"
+  ],
+  "additionalProperties": false
+}

@@ -35,6 +35,11 @@ type AgendaKindCounts {
   task: Int!
 }
 
+type AthleteProfile {
+  slots: [Slot!]!
+  sports: [String!]!
+}
+
 type BodyMetric {
   bodyFatPct: Float
   heightCm: Float
@@ -114,6 +119,14 @@ enum DeviceKind {
   web
 }
 
+type Exercise {
+  id: ID!
+  mediaRefs: [MediaRef!]!
+  name: String!
+  notes: String
+  sets: [SetEntry!]!
+}
+
 """
 Arbitrary JSON, used for a settings value and an audit entry’s metadata.
 """
@@ -137,6 +150,12 @@ type LabelSnapshot {
 type Location {
   address: String
   onlineLink: String
+}
+
+type MediaRef {
+  caption: String
+  type: String!
+  url: String!
 }
 
 type Meeting {
@@ -216,6 +235,14 @@ type MonthDay {
   total: Int!
 }
 
+type NextPractice {
+  isToday: Boolean!
+
+  """'today' | 'after-cutoff' | 'none-scheduled'"""
+  reason: String!
+  session: Session
+}
+
 type Override {
   durationMin: Int
   location: Location
@@ -280,8 +307,33 @@ type Profile {
   userId: ID!
 }
 
+type Program {
+  appliedStartDate: String
+  id: ID!
+  source: String!
+  sourceLinkIds: [ID!]!
+  sport: String!
+  status: String!
+  title: String!
+  weeks: [ProgramWeek!]!
+}
+
+type ProgramSessionTemplate {
+  exercises: [TemplateExercise!]!
+  focus: String
+  templateId: ID!
+  title: String!
+  weekday: Int
+}
+
+type ProgramWeek {
+  index: Int!
+  sessions: [ProgramSessionTemplate!]!
+}
+
 type Query {
   agenda(from: DateTime!, to: DateTime!): [AgendaDay!]!
+  athleteProfile: AthleteProfile!
 
   """The caller's body metric history."""
   bodyMetrics(last: Int = 30): [BodyMetric!]!
@@ -303,6 +355,7 @@ type Query {
 
   """The caller's own registered devices."""
   myDevices: [Device!]!
+  nextPractice: NextPractice!
   plans(from: Date!, to: Date!): [DailyPlan!]!
 
   """The caller's own preferences."""
@@ -310,12 +363,16 @@ type Query {
 
   """The caller's own profile."""
   profile: Profile!
+  program(id: ID!): Program
+  programs(includeArchived: Boolean): [Program!]!
   quickQuestions(scope: ConversationKind!): [QuickQuestion!]!
   reminder(id: ID!): Reminder
   reminders(cursor: String, limit: Int, view: ReminderViewName!): ReminderPage!
 
   """Registered machine callers. Administrators only."""
   serviceClients: [ServiceClient!]!
+  session(id: ID!): Session
+  sessions(from: DateTime!, to: DateTime!): [Session!]!
 
   """The settings registry. Administrators only."""
   settings: [Setting!]!
@@ -327,6 +384,7 @@ type Query {
 
   """Every member. Administrators only."""
   users(after: String, first: Int = 50, role: Role, search: String, status: UserStatus): UserConnection!
+  workouts(sport: String): [Workout!]!
 }
 
 type QuickQuestion {
@@ -382,12 +440,60 @@ type ServiceClient {
   scopes: [String!]!
 }
 
+type Session {
+  completedAt: DateTime
+  durationMin: Int!
+  exercises: [Exercise!]!
+  focus: String
+  id: ID!
+  isMissed: Boolean!
+  notes: String
+  plannedAt: DateTime!
+  programId: ID
+  sport: String!
+  status: SessionStatus!
+  suggestionId: ID
+  title: String!
+  weekIndex: Int
+}
+
+"""
+Planned, done, called off, or deliberately not done. A skipped session stays in the week so the record is honest, and deleting one never changes its status.
+"""
+enum SessionStatus {
+  cancelled
+  completed
+  planned
+  skipped
+}
+
+type SetEntry {
+  actualDistanceM: Int
+  actualDurationSec: Int
+  actualReps: Int
+  actualWeightKg: Float
+  done: Boolean!
+  targetDistanceM: Int
+  targetDurationSec: Int
+  targetReps: Int
+  targetWeightKg: Float
+}
+
 type Setting {
   defaultValue: JSON
   description: String!
   key: String!
   readOnly: Boolean!
   value: JSON
+}
+
+type Slot {
+  durationMin: Int!
+  id: ID!
+  location: String
+  sport: String!
+  start: String!
+  weekday: Int!
 }
 
 type Streak {
@@ -433,6 +539,20 @@ enum TaskViewName {
   upcoming
 }
 
+type TemplateExercise {
+  mediaRefs: [MediaRef!]!
+  name: String!
+  notes: String
+  sets: [TemplateSet!]!
+}
+
+type TemplateSet {
+  targetDistanceM: Int
+  targetDurationSec: Int
+  targetReps: Int
+  targetWeightKg: Float
+}
+
 type User {
   createdAt: DateTime!
   deviceCount: Int!
@@ -453,4 +573,12 @@ type UserConnection {
 enum UserStatus {
   active
   banned
+}
+
+type Workout {
+  exercises: [Exercise!]!
+  id: ID!
+  name: String!
+  sport: String!
+  tags: [String!]!
 }

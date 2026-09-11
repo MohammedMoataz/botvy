@@ -1,0 +1,169 @@
+{
+  "name": "Botvy Training Materialise",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 40
+            }
+          ]
+        }
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000041",
+      "name": "Nightly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -420,
+        -100
+      ],
+      "notes": "Nightly rather than every five minutes, and its own workflow rather than a branch of an existing tick. The plan said \"the materialiser runs on the existing nightly tick\" and there is no such thing: rhythm_tick and notifications_sweep fire every five minutes, and meeting_alerts_reconcile is Notifications' own job. A five-minute pulse would need a claimed date to stop this walking every member's fortnight all day; a nightly schedule needs no claim, because the pass is idempotent -- the session ids are derived, so creating one is an upsert.\n\nWhat it exists for is the day nothing happens. A slot is a weekly rule, so the far edge of `training.materialiseDays` has to be filled by something even on a quiet week -- and that is the whole of FR-008's second half: week four of a four-week program is filled on the day the horizon reaches it, not at apply time. Every actual change to a member's sports, slots or program is already materialised the moment its event is relayed.\n\n03:40 rather than 03:00 or 03:20: the sweep fires on every fifth minute, the backup runs on the hour and the meeting-alert reconcile has 03:20. There is nothing to gain from landing on the same minute as any of them."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "botvy/training-materialise",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000042",
+      "name": "Run Now",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -420,
+        100
+      ],
+      "webhookId": "botvy-training-materialise",
+      "notes": "The way a person runs the pass without waiting until tomorrow morning -- and the way the phase gate runs it, since calling /internal/* directly is the right thing for a gate to do. Unconditional on purpose: it takes no input and the pass is idempotent, so running it twice by hand creates nothing twice."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BOTVY_API_BASE }}/internal/training/materialise",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.BOTVY_SERVICE_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000,
+          "response": {
+            "response": {
+              "neverError": false
+            }
+          }
+        }
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000043",
+      "name": "Materialise",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 15000,
+      "notes": "`BOTVY_SERVICE_TOKEN` and `BOTVY_API_BASE` are the names the other three cron workflows read and the names compose sets -- the pair once disagreed (`BOTVY_INTERNAL_TOKEN` in compose, `BOTVY_SERVICE_TOKEN` here), which is an empty `Bearer ` and a silent 401 nobody noticed for days. Reading them at all needs `N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'`, which compose sets: n8n blocks `$env` inside node expressions by default, and until that was set every execution of every cron workflow here failed with `access to env vars denied`.\n\nFive minutes of timeout because this walks every member who has a weekly slot; three tries a quarter-minute apart because a retry is free -- the pass is idempotent.\n\n`neverError` is off deliberately. A 401 or a 500 has to FAIL here so the error workflow fires and the heartbeat `training.materialise` goes stale, which is what /health reports after fifteen minutes."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "members",
+              "value": "={{ $json.members }}",
+              "type": "number"
+            },
+            {
+              "id": "a2",
+              "name": "created",
+              "value": "={{ $json.created }}",
+              "type": "number"
+            },
+            {
+              "id": "a3",
+              "name": "filled",
+              "value": "={{ $json.filled }}",
+              "type": "number"
+            },
+            {
+              "id": "a4",
+              "name": "removed",
+              "value": "={{ $json.removed }}",
+              "type": "number"
+            },
+            {
+              "id": "a5",
+              "name": "ms",
+              "value": "={{ $json.ms }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5a1e0000-0000-4000-8000-000000000044",
+      "name": "Counts",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        0
+      ],
+      "notes": "Kept as the execution's output so n8n's own log is the record of what each night's pass did. Note the counters are incremented as each member returns, so a member whose pass threw leaves these short while whatever it saved before throwing stands -- read the sessions, not this line, when asking what a 03:40 pass actually created. A steady-state night is all zeroes except `members` and `ms`, because a second pass over an unchanged week writes nothing."
+    }
+  ],
+  "connections": {
+    "Nightly": {
+      "main": [
+        [
+          {
+            "node": "Materialise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Now": {
+      "main": [
+        [
+          {
+            "node": "Materialise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Materialise": {
+      "main": [
+        [
+          {
+            "node": "Counts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": "Botvy Error Handler"
+  }
+}

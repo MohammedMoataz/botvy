@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.ProgramApplied",
+  "description": "Payload of training.ProgramApplied. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "programId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "title": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "string"
+    },
+    "weeks": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "programId",
+    "title",
+    "startDate",
+    "weeks"
+  ],
+  "additionalProperties": false
+}

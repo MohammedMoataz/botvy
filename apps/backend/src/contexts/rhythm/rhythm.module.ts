@@ -18,6 +18,8 @@ import { TasksDueQueryHandler } from '../planning/features/tasks-due-query/tasks
 import { PlanningModule } from '../planning/planning.module.js';
 import { MeetingOccurrencesQueryHandler } from '../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
 import { MeetingsModule } from '../meetings/meetings.module.js';
+import { SessionsInRangeQueryHandler } from '../training/features/sessions/sessions-in-range.query.js';
+import { TrainingModule } from '../training/training.module.js';
 import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { ProfileModule } from '../profile/profile.module.js';
 import {
@@ -58,7 +60,7 @@ import {
   type RhythmStateDoc,
 } from './infrastructure/mongo-rhythm.repositories.js';
 import { ProfileMemberSchedule } from './infrastructure/rhythm-member-schedule.adapter.js';
-import { NoTrainingYet } from './infrastructure/rhythm-next-session.stub.js';
+import { TrainingNextSession } from './infrastructure/rhythm-next-session.stub.js';
 import { MeetingsOnDate } from './infrastructure/rhythm-meetings.adapter.js';
 import { PlanningPlannedTasks } from './infrastructure/rhythm-planned-tasks.adapter.js';
 import { NoMealsYet } from './infrastructure/rhythm-today-meals.stub.js';
@@ -115,6 +117,12 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
      * introduced.
      */
     MeetingsModule,
+    /*
+     * Training, one-directionally: the rhythm asks where the next session is,
+     * and nothing in Training knows the rhythm exists. No `forwardRef` — see
+     * the note in `training.module.ts`.
+     */
+    TrainingModule,
     // The other half of the cycle — see the note in `conversations.module.ts`.
     forwardRef(() => ConversationsModule),
     MongooseModule.forFeature([
@@ -186,9 +194,23 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
       useFactory: (occurrences: MeetingOccurrencesQueryHandler) =>
         new MeetingsOnDate(occurrences),
     },
-    // Rebound in P6 and P8. One line each, and every call site is already
-    // correct because they have been calling a port all along.
-    { provide: NextSessionPort, useClass: NoTrainingYet },
+    /*
+     * **P6 rebound this**, and it is worth marking because the file promised it
+     * would be one line and it was.
+     *
+     * `NextSessionPort` held a null-returning stub from P3 to P6. Nothing in
+     * the rhythm changed to bind it: the tick, the draft builder and the three
+     * touch sentences have been calling a port all along, and the specs that
+     * asserted a plan renders without training still do — the stub they bind is
+     * settable now and still answers null by default. `TodayMealsPort` is the
+     * remaining one, and P8 replaces it the same way.
+     */
+    {
+      provide: NextSessionPort,
+      inject: [SessionsInRangeQueryHandler],
+      useFactory: (sessions: SessionsInRangeQueryHandler) =>
+        new TrainingNextSession(sessions),
+    },
     { provide: TodayMealsPort, useClass: NoMealsYet },
 
     // ---- the slices ------------------------------------------------------

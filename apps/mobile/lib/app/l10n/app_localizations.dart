@@ -357,6 +357,112 @@ class AppLocalizations {
   /// the sentence, and a string assembled with `+` reads backwards in one.
   String chatMovedBody(String title) => _f('chatMovedBody', {'title': title});
 
+  // -- training (P6) ---------------------------------------------------------
+
+  /// The seven known sports, by their stored name.
+  ///
+  /// A lookup and not a getter each, because the stored value is the member's
+  /// own word whenever it is not one of the seven — "other" in the picker is a
+  /// text field and not a bucket — so an unrecognised name has to fall through
+  /// to itself rather than to a key that does not exist. `_t` would answer the
+  /// key back, which is right by accident for `padel` and wrong for anything
+  /// with a capital letter in it.
+  ///
+  /// "Do I have a translation for this" is asked of the table rather than of a
+  /// second copy of the seven names. A list here would be `kKnownSports`
+  /// duplicated — and this file must not import a feature to find it, which
+  /// would point the dependency backwards.
+  String sportName(String sport) => _strings['en']!.containsKey('sport_$sport')
+      ? _t('sport_$sport')
+      : sport;
+
+  /// Monday is 1, Sunday is 7 — ISO 8601, as the slot stores it.
+  String weekdayName(int weekday) =>
+      _t('weekday_${weekday.clamp(1, 7)}');
+
+  String get athleteTitle => _t('athleteTitle');
+  String get athleteNextPractice => _t('athleteNextPractice');
+  String get athleteToday => _t('athleteToday');
+  String get athleteNext => _t('athleteNext');
+  String get athleteNoneTitle => _t('athleteNoneTitle');
+  String get athleteNoneBody => _t('athleteNoneBody');
+  String get athleteAddSession => _t('athleteAddSession');
+  String get athleteNoSlotsTitle => _t('athleteNoSlotsTitle');
+  String get athleteNoSlotsBody => _t('athleteNoSlotsBody');
+  String get athleteSetSlots => _t('athleteSetSlots');
+  String get athleteSports => _t('athleteSports');
+  String get athleteChooseSports => _t('athleteChooseSports');
+  String get athleteOtherSport => _t('athleteOtherSport');
+  String get athleteSlots => _t('athleteSlots');
+  String get athleteAddSlot => _t('athleteAddSlot');
+  String get athleteSlotDay => _t('athleteSlotDay');
+  String get athleteSlotTime => _t('athleteSlotTime');
+  String get athleteSlotLength => _t('athleteSlotLength');
+  String get athleteSlotPlace => _t('athleteSlotPlace');
+  String get athleteWeek => _t('athleteWeek');
+  String get athleteRestDay => _t('athleteRestDay');
+  String get athleteThisWeek => _t('athleteThisWeek');
+  String get athleteSave => _t('athleteSave');
+
+  /// The four statuses, plus the derived reading that is not one of them.
+  ///
+  /// `athleteMissed` is deliberately in the same group and is deliberately not
+  /// a status: it is `planned` plus a clock, answered by `isMissed` and stored
+  /// nowhere (FR-018). Wording it like the four is right for the member and the
+  /// comment is here so nobody adds a fifth column to match the fifth word.
+  String get athletePlanned => _t('athletePlanned');
+  String get athleteCompleted => _t('athleteCompleted');
+  String get athleteCancelled => _t('athleteCancelled');
+  String get athleteSkipped => _t('athleteSkipped');
+  String get athleteMissed => _t('athleteMissed');
+
+  String athleteMinutes(int minutes) =>
+      _f('athleteMinutes', {'count': '$minutes'});
+
+  // -- the session logger ----------------------------------------------------
+  String get sessionAddExercise => _t('sessionAddExercise');
+  String get sessionExerciseName => _t('sessionExerciseName');
+  String get sessionAddSet => _t('sessionAddSet');
+  String get sessionRepeatLast => _t('sessionRepeatLast');
+  String get sessionRepeatLastNone => _t('sessionRepeatLastNone');
+  String get sessionNotes => _t('sessionNotes');
+  String get sessionNoExercises => _t('sessionNoExercises');
+  String get sessionPlannedLabel => _t('sessionPlannedLabel');
+  String get sessionReps => _t('sessionReps');
+  String get sessionWeight => _t('sessionWeight');
+  String get sessionDistance => _t('sessionDistance');
+  String get sessionDuration => _t('sessionDuration');
+  String get sessionComplete => _t('sessionComplete');
+  String get sessionCancel => _t('sessionCancel');
+  String get sessionSkip => _t('sessionSkip');
+  String get sessionReopen => _t('sessionReopen');
+  String get sessionApplyWorkout => _t('sessionApplyWorkout');
+  String get sessionMissedStillLoggable => _t('sessionMissedStillLoggable');
+
+  // -- programs and the workout library --------------------------------------
+  String get programsTitle => _t('programsTitle');
+  String get programsActive => _t('programsActive');
+  String get programsArchived => _t('programsArchived');
+  String get programsNone => _t('programsNone');
+  String get programApply => _t('programApply');
+  String get programApplyFrom => _t('programApplyFrom');
+  String get programArchive => _t('programArchive');
+  String get programApplied => _t('programApplied');
+  String get programReplaceTitle => _t('programReplaceTitle');
+  String get programReplaceBody => _t('programReplaceBody');
+  String get programReplaceConfirm => _t('programReplaceConfirm');
+  String get programKeep => _t('programKeep');
+  String get workoutsTitle => _t('workoutsTitle');
+  String get workoutsNone => _t('workoutsNone');
+  String get workoutApplied => _t('workoutApplied');
+
+  String programWeeks(int count) => _f('programWeeks', {'count': '$count'});
+
+  // -- onboarding, the sports-and-slots step (FR-016) ------------------------
+  String get onboardingSports => _t('onboardingSports');
+  String get onboardingSportsBody => _t('onboardingSportsBody');
+  String get onboardingSlotsBody => _t('onboardingSlotsBody');
+
   /// The tables, for the parity test and nothing else.
   ///
   /// Every key must exist in every locale, because `_t` falls back to English
@@ -629,6 +735,93 @@ class AppLocalizations {
       'chatCardOther': 'Results',
       'chatLinkRefused': 'That link was not opened. Botvy only opens web links.',
       'chatLinkCopied': 'Link copied.',
+
+      // -- training (P6) -----------------------------------------------------
+      'sport_gym': 'Gym',
+      'sport_football': 'Football',
+      'sport_crossfit': 'CrossFit',
+      'sport_calisthenics': 'Calisthenics',
+      'sport_swimming': 'Swimming',
+      'sport_running': 'Running',
+      'sport_cycling': 'Cycling',
+
+      'weekday_1': 'Monday',
+      'weekday_2': 'Tuesday',
+      'weekday_3': 'Wednesday',
+      'weekday_4': 'Thursday',
+      'weekday_5': 'Friday',
+      'weekday_6': 'Saturday',
+      'weekday_7': 'Sunday',
+
+      'athleteTitle': 'Training',
+      'athleteNextPractice': 'Next practice',
+      'athleteToday': 'Today',
+      'athleteNext': 'Next',
+      'athleteNoneTitle': 'Nothing scheduled',
+      'athleteNoneBody': 'You have no training coming up. Add a session, or set the days you train.',
+      'athleteAddSession': 'Add a session',
+      'athleteNoSlotsTitle': 'Tell Botvy when you train',
+      'athleteNoSlotsBody': 'Set the days, times and sports, and the weeks fill themselves.',
+      'athleteSetSlots': 'Set your slots',
+      'athleteSports': 'Sports',
+      'athleteChooseSports': 'Which sports do you practise?',
+      'athleteOtherSport': 'Another sport',
+      'athleteSlots': 'Weekly slots',
+      'athleteAddSlot': 'Add a slot',
+      'athleteSlotDay': 'Day',
+      'athleteSlotTime': 'Time',
+      'athleteSlotLength': 'Length',
+      'athleteSlotPlace': 'Place (optional)',
+      'athleteWeek': 'Week',
+      'athleteRestDay': 'Rest day',
+      'athleteThisWeek': 'This week',
+      'athleteSave': 'Save',
+      'athletePlanned': 'Planned',
+      'athleteCompleted': 'Done',
+      'athleteCancelled': 'Cancelled',
+      'athleteSkipped': 'Skipped',
+      'athleteMissed': 'Missed',
+      'athleteMinutes': '{count} min',
+
+      'sessionAddExercise': 'Add an exercise',
+      'sessionExerciseName': 'Exercise',
+      'sessionAddSet': 'Add a set',
+      'sessionRepeatLast': 'Repeat last',
+      'sessionRepeatLastNone': 'No earlier record of that exercise.',
+      'sessionNotes': 'Notes',
+      'sessionNoExercises': 'Nothing planned for this session yet.',
+      'sessionPlannedLabel': 'Planned',
+      'sessionReps': 'Reps',
+      'sessionWeight': 'Weight (kg)',
+      'sessionDistance': 'Distance (m)',
+      'sessionDuration': 'Minutes',
+      'sessionComplete': 'Completed',
+      'sessionCancel': 'Cancel it',
+      'sessionSkip': 'Skip it',
+      'sessionReopen': 'Put it back',
+      'sessionApplyWorkout': 'Use a saved workout',
+      'sessionMissedStillLoggable': 'This one passed unlogged. You can still log it.',
+
+      'programsTitle': 'Programs',
+      'programsActive': 'Active',
+      'programsArchived': 'Archived',
+      'programsNone': 'No programs yet.',
+      'programApply': 'Apply',
+      'programApplyFrom': 'Start from',
+      'programArchive': 'Archive',
+      'programApplied': 'Applied. Your weeks are filling in.',
+      'programReplaceTitle': 'This would replace planned sessions',
+      'programReplaceBody': 'These sessions already hold planned content. Anything you have logged is left alone.',
+      'programReplaceConfirm': 'Replace them',
+      'programKeep': 'Keep them',
+      'programWeeks': '{count} weeks',
+      'workoutsTitle': 'My workouts',
+      'workoutsNone': 'No saved workouts yet.',
+      'workoutApplied': 'Added to the session.',
+
+      'onboardingSports': 'What do you train?',
+      'onboardingSportsBody': 'Pick the sports you practise. You can add your own.',
+      'onboardingSlotsBody': 'Add the days and times you usually train. Botvy fills the weeks ahead from them.',
     },
     'ar': {
       'appTitle': 'بوتفي',
@@ -888,6 +1081,93 @@ class AppLocalizations {
     'chatCardOther': 'النتائج',
     'chatLinkRefused': 'لم يُفتح هذا الرابط. بوتفي لا يفتح إلا روابط الويب.',
     'chatLinkCopied': 'تم نسخ الرابط.',
+
+    // -- التدريب --------------------------------------------------------------
+    'sport_gym': 'الجيم',
+    'sport_football': 'كرة القدم',
+    'sport_crossfit': 'كروس فيت',
+    'sport_calisthenics': 'تمارين الجسم',
+    'sport_swimming': 'السباحة',
+    'sport_running': 'الجري',
+    'sport_cycling': 'الدراجة',
+
+    'weekday_1': 'الإثنين',
+    'weekday_2': 'الثلاثاء',
+    'weekday_3': 'الأربعاء',
+    'weekday_4': 'الخميس',
+    'weekday_5': 'الجمعة',
+    'weekday_6': 'السبت',
+    'weekday_7': 'الأحد',
+
+    'athleteTitle': 'التدريب',
+    'athleteNextPractice': 'التدريب القادم',
+    'athleteToday': 'اليوم',
+    'athleteNext': 'التالي',
+    'athleteNoneTitle': 'لا يوجد تدريب مجدول',
+    'athleteNoneBody': 'ليس لديك تدريب قادم. أضف حصة، أو حدّد أيام تدريبك.',
+    'athleteAddSession': 'أضف حصة',
+    'athleteNoSlotsTitle': 'أخبر بوتفي بمواعيد تدريبك',
+    'athleteNoSlotsBody': 'حدّد الأيام والأوقات والرياضات، وستُملأ الأسابيع تلقائيًا.',
+    'athleteSetSlots': 'حدّد مواعيدك',
+    'athleteSports': 'الرياضات',
+    'athleteChooseSports': 'ما الرياضات التي تمارسها؟',
+    'athleteOtherSport': 'رياضة أخرى',
+    'athleteSlots': 'المواعيد الأسبوعية',
+    'athleteAddSlot': 'أضف موعدًا',
+    'athleteSlotDay': 'اليوم',
+    'athleteSlotTime': 'الوقت',
+    'athleteSlotLength': 'المدة',
+    'athleteSlotPlace': 'المكان (اختياري)',
+    'athleteWeek': 'الأسبوع',
+    'athleteRestDay': 'يوم راحة',
+    'athleteThisWeek': 'هذا الأسبوع',
+    'athleteSave': 'حفظ',
+    'athletePlanned': 'مجدولة',
+    'athleteCompleted': 'مكتملة',
+    'athleteCancelled': 'ملغاة',
+    'athleteSkipped': 'متروكة',
+    'athleteMissed': 'فائتة',
+    'athleteMinutes': '{count} دقيقة',
+
+    'sessionAddExercise': 'أضف تمرينًا',
+    'sessionExerciseName': 'التمرين',
+    'sessionAddSet': 'أضف مجموعة',
+    'sessionRepeatLast': 'كرّر الأخيرة',
+    'sessionRepeatLastNone': 'لا يوجد سجل سابق لهذا التمرين.',
+    'sessionNotes': 'ملاحظات',
+    'sessionNoExercises': 'لا شيء مخطط لهذه الحصة بعد.',
+    'sessionPlannedLabel': 'المخطط',
+    'sessionReps': 'التكرارات',
+    'sessionWeight': 'الوزن (كجم)',
+    'sessionDistance': 'المسافة (م)',
+    'sessionDuration': 'الدقائق',
+    'sessionComplete': 'أُنجزت',
+    'sessionCancel': 'ألغِها',
+    'sessionSkip': 'اتركها',
+    'sessionReopen': 'أعِدها',
+    'sessionApplyWorkout': 'استخدم تمرينًا محفوظًا',
+    'sessionMissedStillLoggable': 'فاتت هذه الحصة دون تسجيل. ما زال بإمكانك تسجيلها.',
+
+    'programsTitle': 'البرامج',
+    'programsActive': 'نشطة',
+    'programsArchived': 'مؤرشفة',
+    'programsNone': 'لا توجد برامج بعد.',
+    'programApply': 'تطبيق',
+    'programApplyFrom': 'ابدأ من',
+    'programArchive': 'أرشفة',
+    'programApplied': 'تم التطبيق. تُملأ أسابيعك الآن.',
+    'programReplaceTitle': 'سيستبدل هذا حصصًا مجدولة',
+    'programReplaceBody': 'هذه الحصص تحتوي بالفعل على محتوى مخطط. ما سجّلته يبقى كما هو.',
+    'programReplaceConfirm': 'استبدلها',
+    'programKeep': 'أبقِها',
+    'programWeeks': '{count} أسابيع',
+    'workoutsTitle': 'تماريني',
+    'workoutsNone': 'لا توجد تمارين محفوظة بعد.',
+    'workoutApplied': 'أُضيف إلى الحصة.',
+
+    'onboardingSports': 'ما الذي تتدرب عليه؟',
+    'onboardingSportsBody': 'اختر الرياضات التي تمارسها. ويمكنك إضافة رياضتك.',
+    'onboardingSlotsBody': 'أضف الأيام والأوقات التي تتدرب فيها عادة، ليملأ بوتفي الأسابيع القادمة منها.',
     },
   };
 }

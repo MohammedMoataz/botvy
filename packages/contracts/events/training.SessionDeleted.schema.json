@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.SessionDeleted",
+  "description": "Payload of training.SessionDeleted. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "at": {}
+  },
+  "required": [
+    "sessionId",
+    "at"
+  ],
+  "additionalProperties": false
+}

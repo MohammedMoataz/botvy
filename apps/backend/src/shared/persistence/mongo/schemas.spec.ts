@@ -134,6 +134,26 @@ describe('the schemas and the repository base agree', () => {
       'outbox',
       'audit_log',
       'idempotency_keys',
+      /*
+       * `athlete_profiles` is a member's, and carries no `userId` column,
+       * because **`_id` *is* the `userId`** (data-model §2.6): one document per
+       * member, written on `identity.UserRegistered`. A `userId` field beside
+       * it would be the same string twice, and two copies of one value is how
+       * they come to disagree.
+       *
+       * The cost is named rather than hidden: it is the one Training
+       * collection whose adapter cannot use `MongoRepositoryBase`, whose
+       * filter is `{ _id, userId }` and would match nothing here. See
+       * `MongoAthleteProfileRepository`, which keeps the base's optimistic
+       * `updatedAt` filter and drops only the ownership half — safely, since
+       * the id it filters on is the ownership.
+       *
+       * `profiles` and `user_preferences` are keyed the same way and do carry
+       * the column, which is why they are not in this list; they went through
+       * the base for it. This collection trades that for one source of truth
+       * about who owns the row.
+       */
+      'athlete_profiles',
     ]);
 
     const missing = all

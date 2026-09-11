@@ -5,6 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/notifications/alert_plan.dart' show memberZone;
+import '../features/athlete/application/athlete_cubit.dart';
+import '../features/athlete/application/programs_cubit.dart';
+import '../features/athlete/presentation/athlete_page.dart';
+import '../features/athlete/presentation/programs_page.dart';
+import '../features/athlete/presentation/session_page.dart';
 import '../features/auth/application/auth_cubit.dart';
 import '../features/auth/presentation/sign_in_page.dart';
 import '../features/calendar/application/calendar_cubit.dart';
@@ -52,6 +57,18 @@ abstract final class Routes {
 
   /// The month, the week and the day (story 3).
   static const String calendar = '/calendar';
+
+  /// The athlete's week, one session, and the programs and workout library.
+  ///
+  /// A route for the single session and not only a pushed page, for the reason
+  /// the meeting has one: a session's reminder arrives with a deep link, on a
+  /// cold start, with no screen behind it — and the point of that notification
+  /// is that the set logger is one tap away.
+  static const String athlete = '/athlete';
+
+  static String session(String sessionId) => '$athlete/session/$sessionId';
+
+  static const String programs = '$athlete/programs';
 
   /// The chat list, and one conversation.
   ///
@@ -131,6 +148,14 @@ String? routeForDeepLink(String deepLink) {
     ['meeting', final String id] || ['meetings', final String id] =>
       Routes.meeting(id),
     ['meeting', ...] || ['meetings', ...] => Routes.meetings,
+    // Both spellings the server may produce for a training session: `session`
+    // is what a session's own alerts carry, `sessions` is the REST path and is
+    // what a chat card of kind `sessions` may hold.
+    ['session', final String id] || ['sessions', final String id] =>
+      Routes.session(id),
+    ['session', ...] || ['sessions', ...] => Routes.athlete,
+    ['athlete', ...] || ['training', ...] => Routes.athlete,
+    ['programs', ...] => Routes.programs,
     ['calendar', ...] => Routes.calendar,
     ['tasks', ...] => Routes.tasks,
     ['reminders', ...] => Routes.reminders,
@@ -216,6 +241,11 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
           // on Home would still read as open on the list behind it.
           BlocProvider<HomeCubit>.value(value: sl<HomeCubit>()),
           BlocProvider<RhythmCubit>.value(value: sl<RhythmCubit>()),
+          // Today's training row watches the `sessions` table through this
+          // cubit, for the reason `training_row.dart` gives: the plan snapshot
+          // is the evening's summary and a session completed at seven in the
+          // morning has to change the row now, not tomorrow.
+          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
         ],
         child: const HomePage(),
       ),
@@ -344,6 +374,47 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
         child: const CalendarPage(),
       ),
     ),
+    // The athlete's week. `.value` for both cubits, as everywhere else: they
+    // are singletons from the container and already listening to the sync
+    // engine, and a second instance built by the route would hold its own copy
+    // of the week — so a session skipped from its own screen would still read
+    // as planned on the list behind it.
+    GoRoute(
+      path: Routes.athlete,
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
+          // The session screen's library picker reads it, and it is cheap to
+          // provide here so the whole feature has one.
+          BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
+        ],
+        child: const AthletePage(),
+      ),
+    ),
+    GoRoute(
+      path: Routes.programs,
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
+          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
+        ],
+        child: const ProgramsPage(),
+      ),
+    ),
+    // One session, by id — the set logger. A page of its own rather than a
+    // sheet over the list, unlike the meeting: logging six exercises is not a
+    // thing to do in a sheet, and a notification tap that lands here has
+    // somewhere to go back to because `go_router` gives it the athlete route.
+    GoRoute(
+      path: '${Routes.athlete}/session/:id',
+      builder: (context, state) => MultiBlocProvider(
+        providers: [
+          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
+          BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
+        ],
+        child: SessionPage(sessionId: state.pathParameters['id'] ?? ''),
+      ),
+    ),
     GoRoute(
       path: Routes.server,
       builder: (context, state) => const ServerPage(),
@@ -390,6 +461,7 @@ class _SheetOverHomeState extends State<_SheetOverHome> {
     providers: [
       BlocProvider<HomeCubit>.value(value: sl<HomeCubit>()),
       BlocProvider<RhythmCubit>.value(value: sl<RhythmCubit>()),
+      BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
     ],
     child: const HomePage(),
   );

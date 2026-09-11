@@ -42,17 +42,17 @@ absence; the cut-off is a preference
 | Principle | Status | How |
 |---|---|---|
 | I. Store per context | PASS | Training owns its four collections; the rhythm and the calendar read it through its query ports |
-| II. n8n | PASS | The materialiser runs on the existing nightly tick |
+| II. n8n | PASS | **Corrected while building:** there was no existing nightly tick for it to run on — `rhythm_tick` and `notifications_sweep` are five-minute passes and `meeting_alerts_reconcile` is Notifications'. So this phase adds `POST /internal/training/materialise`, service-only, and one nightly workflow calling it, stamping `ops_heartbeats['training.materialise']`. Still one credential, no data node, no volume |
 | III. Local-first LLM | PASS | No inference here; suggestions arrive in P7 |
 | IV. Forward-only migrations | PASS | One `migrate-mongo` script; drift 6 → 7 guarded |
 | V. Single public surface | PASS | Behind Caddy |
 | VI. Multi-user, principals | PASS | Scoped per member |
 | VII. Test-then-verify | PASS | The cut-off rule and the materialiser are specced against a fixture calendar built relative to the current clock |
 | VIII. YAGNI | PASS | No progression, no wearables, no sharing; media referenced but not fetched; no new package on either side |
-| IX. Contexts, slices, ports | PASS | `NextSessionQuery` is the port P3 declared and this phase binds; `SessionsInRangeQuery` is declared here, where the first real implementation lives, and P5's agenda swaps its null-safe stub for it |
+| IX. Contexts, slices, ports | PASS | **With one correction:** the § below said both tokens live in Training's `domain/ports`, and that would be backwards. A port belongs to the context that *needs* the answer — `NextSessionPort` is in Rhythm's `domain/`, `TrainingSessionsPort` in Meetings' — and each is bound in its own `infrastructure/` to Training's published query handler. P3 and P5 already built it that way; only the plan's sentence was wrong |
 | X. Commands / queries / streams | PASS | Writes REST, reads GraphQL, everything synced |
 | XI. Times belong to the user | PASS | Slots are wall-clock times in the member's zone; the cut-off is compared in their zone; a zone or cut-off change re-materialises through `profile.PreferencesChanged` |
-| XII. Configuration | PASS | `training.materialiseDays` and `defaults.nextPracticeCutoff` are registry keys P0 registers; this phase reads them by name and hard-codes neither |
+| XII. Configuration | PASS | **`training.materialiseDays` was not registered by P0.** The claim was checked — 42 keys in the registry, no `training.*` — so this phase registers it (default 14). `defaults.nextPracticeCutoff` does exist, seeded into `user_preferences` as FR-007 requires. Neither is hard-coded here, which was the point of the row |
 
 ## Design
 
@@ -92,13 +92,40 @@ gets one history and the coach one vocabulary.
 
 ### Materialiser saga
 
-On `SportsChanged`, `SlotsChanged`, `ProgramApplied`, `profile.PreferencesChanged`
-whose `changed[]` names the time zone or `nextPracticeCutoff`, and the nightly tick:
+**Corrected while building, and this one would have been a live defect.** This said
+the saga listens to `profile.PreferencesChanged` "whose `changed[]` names the time
+zone". It cannot: `timezone` lives on the **profile**, not in `PREFERENCE_FIELDS`, so a
+member who moves raises `profile.ProfileUpdated` — which is why `plan-alerts.saga.ts`
+subscribes to that event for its own re-plan, and Rhythm's
+`preferences-changed.handler.ts` says as much in a comment. Implemented as written, the
+zone recompute below would never once have run, and a member who flew would have kept a
+fortnight of sessions on the clock of the city they left. So the saga takes **both**
+event names and branches on the field named: `timezone` from `ProfileUpdated` triggers
+the recompute, `nextPracticeCutoff` from `PreferencesChanged` triggers an ordinary
+pass. If `timezone` ever moves onto preferences, nothing about the saga changes.
+
+On `SportsChanged`, `SlotsChanged`, `ProgramApplied`, `profile.ProfileUpdated` or
+`profile.PreferencesChanged` whose `changed[]` names the time zone or
+`nextPracticeCutoff`, and the nightly pass:
 for each member, expand the slots over the next `training.materialiseDays` in the
 member's own zone through `shared/time`, create the `planned` sessions that do not yet
-exist, and remove future `planned` sessions whose slot no longer exists — never
+exist, and **tombstone** future `planned` sessions whose slot no longer exists — never
 touching sessions that have been logged, completed, cancelled or skipped, and never
-touching the past. On a zone change it also recomputes `plannedAt` for every future
+touching the past.
+
+Tombstone rather than delete, and it matters: sessions sync, the pull is a delta by
+cursor, and the client's delete sweep runs only against a full snapshot — so a hard
+`remove` would leave the row on every device for ever, with an alarm it will still
+fire. A deletion reaches a client as a tombstone or not at all. `tombstone()` also
+raises `SessionDeleted`, which is what drops the alerts, where `remove` announces
+nothing; and it keeps the status, so the Deleted view can show the member what
+happened — they did not delete these, their *slot* went.
+
+**And the corollary the derived id forces:** a re-added slot computes the same `_id`, so
+the pass finds the tombstoned row rather than nothing. It therefore **restores** it and
+re-announces, instead of quietly declining to create a session that "already exists" —
+without that, a member who edited their week and put a slot back would silently lose a
+fortnight. On a zone change it also recomputes `plannedAt` for every future
 `planned` session from the slot's wall-clock time, because the instant that was 18:00
 in Cairo is not 18:00 in Berlin and nobody re-reads the slot at alert time.
 
@@ -168,12 +195,26 @@ command that only ever succeeds. The extension is additive — an old caller sen
 
 ### Binding the open ports
 
-`rhythm.module.ts` rebinds `NextSessionQuery` from its P3 stub to Training's
-implementation. `SessionsInRangeQuery` is declared here, in the context that owns
-sessions, and `meetings.module.ts` swaps the null-safe placeholder P5 has been holding
-in the agenda for it — a one-line change in each, which is the point of having agreed
-the shape before the implementation existed. Both tokens live in Training's
-`domain/ports`; the consuming modules import the token, never the collection.
+`rhythm.module.ts` rebinds `NextSessionPort` from its P3 stub to an adapter over
+Training's published query, and `meetings.module.ts` swaps the null-safe placeholder P5
+has been holding in the agenda for one over `SessionsInRangeQueryHandler` — a one-line
+change in each module, which is the point of having agreed the shape before the
+implementation existed.
+
+**The last sentence of this section was wrong and is worth correcting rather than
+deleting**, because the mistake is an easy one to make again. It said both tokens live
+in Training's `domain/ports`. They do not, and they must not: a port belongs to the
+context that *needs* the answer, so `NextSessionPort` is declared in Rhythm's `domain/`
+and `TrainingSessionsPort` in Meetings', each bound in its own `infrastructure/` — the
+one layer constitution IX lets know another context exists. Putting the token in
+Training would invert the dependency: Rhythm would import Training's domain to describe
+its own need, and the stub P3 shipped could not have existed at all, because there
+would have been nothing to declare it against. P3 and P5 both built it the right way
+round; only this sentence was upside down.
+
+What Training publishes is therefore *query handlers*, not tokens: `NextPracticeQuery`
+and `SessionsInRangeQuery`. The consuming modules bind their own port to one of those,
+and never to the collection.
 
 ### Sync
 
@@ -190,9 +231,17 @@ tombstoned session, `invalid` for a slot the profile no longer holds, and never
 
 ### Where the indexes live
 
-The mongo schemas declare the indexes so a reader of the context sees them, and the
-`migrate-mongo` script is the only thing that creates them; nothing builds an index at
-boot. That is one declaration and one forward migration, not two sources of truth.
+**Corrected while building.** This section said "the mongo schemas declare the indexes
+so a reader of the context sees them", and a literal reading of that contradicts both
+constitution IV and the check that enforces it: `shared/persistence/mongo/schemas.spec.ts`
+asserts that **no schema declares an index**, because an index created by Mongoose's
+`autoIndex` is an index created differently on every deploy, at a moment nobody chose,
+against whatever the code said that day.
+
+So the arrangement is the one every other context already uses, and it does give a
+reader of the context what the sentence was reaching for: the `migrate-mongo` script is
+the only thing that creates an index, and each one carries a comment naming the read it
+serves. One declaration, one forward migration, and the schemas describe shape only.
 
 ### The seam P7 will use
 

@@ -448,15 +448,59 @@ describe('the agenda for one day', () => {
   });
 });
 
-describe("training, before Training exists", () => {
-  it('contributes nothing rather than throwing, and the rest of the day still renders', async () => {
+describe('training on the agenda (T641)', () => {
+  it('puts the session on the day beside the meeting, in time order', async () => {
     /*
-     * The stub is the whole of P6's presence in this phase, and the failure
-     * mode it guards against is not a missing row — it is a thrower. A port
-     * bound to `throw new Error('not implemented')` would take the *entire*
-     * agenda down: no meeting, no task, no event, for a context nobody has
-     * built yet. P6 replaces one line in the module and every call site here
-     * is already correct.
+     * What the stub could not say. `TrainingSessionsPort` was bound to an
+     * empty-list placeholder from P5 to P6, so the case that stood here
+     * asserted only that the port *did not throw* — which was the right thing
+     * to assert about a context nobody had built, and says nothing about the
+     * requirement.
+     *
+     * FR-011 is the requirement, and it is a claim about this composition
+     * rather than about either side of it: the agenda already knew the
+     * `session` kind and the day view already ordered by time, so the only
+     * thing that was missing was rows. This is the case that fails if the
+     * binding is ever pointed back at a constant.
+     */
+    const app = rig();
+    const date = today(CAIRO);
+    await scheduleMeeting(app, { startAt: at(date, '09:00', CAIRO) });
+    (app.sessions as FakeTrainingSessions).rows = [
+      {
+        id: 'session-1',
+        title: 'Upper body',
+        sport: 'gym',
+        startAt: at(date, '18:00', CAIRO),
+        durationMin: 60,
+      },
+    ];
+
+    const days = await app.agenda.between(
+      USER,
+      at(date, '00:00', CAIRO),
+      at(addLocalDays(date, 1), '00:00', CAIRO),
+    );
+
+    expect(days[0]!.items.map((item) => item.kind)).toEqual([
+      'meeting',
+      'session',
+    ]);
+    expect(days[0]!.items[1]!.title).toBe('Upper body');
+  });
+
+  it('contributes nothing on a day with no session, and the rest of it still renders', async () => {
+    /*
+     * The half of the old case that still means something, and it means two
+     * things now.
+     *
+     * A day with no training is the ordinary case — a rest day is stored as
+     * nothing at all — so the agenda has to render a meeting-only day without
+     * an empty training row on it. And the failure mode the original case was
+     * written against survives the binding: a port bound to something that
+     * *throws* would take the entire agenda down, no meeting, no task, no
+     * event. `StubbedTrainingSessions` is still written out so the shape the
+     * module needs stays stated somewhere that fails if it changes.
      */
     const app = rig(CAIRO, new StubbedTrainingSessions());
     const date = today(CAIRO);
@@ -472,6 +516,31 @@ describe("training, before Training exists", () => {
     expect(
       days[0]!.items.some((item) => item.kind === 'session'),
     ).toBe(false);
+  });
+
+  it('leaves out a session that falls outside the window asked about', async () => {
+    // The range is the port's contract and the agenda trusts it, so the fake
+    // filters the way the real query does. A day view that showed next week's
+    // session would be an adapter passing the window through unread.
+    const app = rig();
+    const date = today(CAIRO);
+    (app.sessions as FakeTrainingSessions).rows = [
+      {
+        id: 'session-2',
+        title: 'Long ride',
+        sport: 'cycling',
+        startAt: at(addLocalDays(date, 3), '06:00', CAIRO),
+        durationMin: 120,
+      },
+    ];
+
+    const days = await app.agenda.between(
+      USER,
+      at(date, '00:00', CAIRO),
+      at(addLocalDays(date, 1), '00:00', CAIRO),
+    );
+
+    expect(days.flatMap((day) => day.items)).toEqual([]);
   });
 });
 

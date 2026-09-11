@@ -59,6 +59,21 @@ export abstract class MemberFactsPort {
 export interface MemberDay {
   /** One line per task, already ordered. Empty when there is nothing. */
   tasks: string[];
+  /**
+   * The member's training, as one unlabelled clause.
+   *
+   * From P6 this is the *training week* rather than only today's session —
+   * the sports they practise, the session that is next with its focus, and the
+   * streak of completed sessions (FR-017) — because that is what a coach needs
+   * to answer a question about training and a single day is not it. The day's
+   * own session is still in here: it is the next planned one whenever it has
+   * not happened yet, and once it has, the streak is what says so.
+   *
+   * Null only if no adapter can answer at all. Training answers a sentence even
+   * for a member with no slots, saying exactly that — an absent line does not
+   * read to a model as "they do not train", it reads as a gap, and a model
+   * fills a gap by assuming.
+   */
   trainingLine: string | null;
   mealLine: string | null;
   streakCurrent: number;
@@ -69,6 +84,27 @@ export interface MemberDay {
 
 export abstract class MemberDayPort {
   abstract forMember(userId: string, now: Date): Promise<MemberDay>;
+}
+
+/**
+ * The member's training week, for the prompt (FR-017).
+ *
+ * Bound to Training's `TrainingSummaryQueryHandler` — the sibling of Profile's
+ * `summary`, and a `*.query.ts` handler rather than a feature service, because
+ * the query handler is the published half.
+ *
+ * Its own port rather than a field on `TrainingActionsPort`, which the chat also
+ * binds to Training: that one is what the *planner* calls to set slots and log a
+ * session, and its methods write. This one is read by the prompt on every single
+ * turn in every conversation. Two callers with nothing in common beyond the
+ * context that answers them, and a port whose consumer set is "everything" is a
+ * port nobody can change.
+ *
+ * Never null, so the prompt has no branch: see the handler's own note on why a
+ * member with no training week gets a sentence saying so.
+ */
+export abstract class TrainingSummaryPort {
+  abstract lineFor(userId: string, now: Date): Promise<string>;
 }
 
 /**
@@ -189,6 +225,131 @@ export abstract class MeetingActionsPort {
    * collection, and the answer comes from the same expansion the calendar
    * uses — the adapter is bound to the published occurrence query, so the chat
    * and the calendar cannot disagree about where a meeting is.
+   */
+  abstract listUpcoming(
+    userId: string,
+    now: Date,
+    days: number,
+  ): Promise<CardItem[]>;
+}
+
+/**
+ * One weekly training slot, as a sentence can describe one.
+ *
+ * A copy of `TrainingSlot`'s shape and not an import: this file is `domain/`
+ * and constitution IX refuses a cross-context import here. Two copies is the
+ * rule until the third, and the fields are the ones a member can say out loud.
+ *
+ * `id` is absent for a slot the sentence has just invented and present for one
+ * the member already had. That distinction is the whole of the merge below —
+ * **a slot that keeps its id keeps its future sessions**, because the
+ * materialiser's reconcile matches on it, so re-timing an existing Monday must
+ * carry its id across rather than mint a new one and lose the week. The adapter
+ * mints the ids for the new ones, exactly as it mints a task's.
+ *
+ * `start` is `HH:mm` on the member's own clock and never an instant — a slot is
+ * a statement about their watch, so a member who flies still trains at six.
+ */
+export interface ChatTrainingSlot {
+  id?: string;
+  /** 1 (Monday) to 7 (Sunday), matching ISO 8601 and Training's own field. */
+  weekday: number;
+  start: string;
+  durationMin: number;
+  sport: string;
+  location?: string | null;
+}
+
+/** A session the chat can name, as stored. */
+export interface TrainingSessionRef {
+  id: string;
+  title: string;
+  sport: string;
+  at: Date;
+  /**
+   * Training's own status word — `planned`, `completed`, `cancelled`,
+   * `skipped`.
+   *
+   * A `string` and not a union, for the reason `CheckinCapture.reason` gives:
+   * the values belong to another context and a union retyped here is the copy
+   * that goes stale. The executor compares against `'planned'` and treats
+   * everything else as "already dealt with", which is a reading that survives a
+   * fifth status being added.
+   */
+  status: string;
+}
+
+/**
+ * What the coach chat can do about training (FR-015).
+ *
+ * Its own port rather than more methods on `PlannerActionsPort`, for the reason
+ * `MeetingActionsPort` gives: the DI wiring is where a reviewer reads which
+ * contexts a chat turn can write into, and one port per context keeps that
+ * readable. And a port rather than an event for the same reason again — FR-004
+ * wants the confirmation to name the values that were **actually stored**, and
+ * the relay is eventual.
+ *
+ * ## Why the week is read as well as written
+ *
+ * `AthleteProfile.setSlots` replaces the whole timetable, because that is how
+ * the editor works. A sentence is not the editor: "gym Monday and Wednesday at
+ * six" names two days of one sport and says nothing about the swimming on
+ * Sunday or the gym on Friday. So the executor reads the week, merges the
+ * sentence into it and writes the result — and the merge is in the executor
+ * rather than in this adapter because it is a decision about the member's own
+ * words, which is the kind of thing a spec should be able to drive without a
+ * store.
+ */
+export abstract class TrainingActionsPort {
+  /** The member's timetable as it stands, for the merge. Empty is normal. */
+  abstract week(userId: string): Promise<ChatTrainingSlot[]>;
+
+  /**
+   * The whole timetable, replaced — and the slots as they were **stored**.
+   *
+   * `null` when Training refused it on a rule of its own, exactly as
+   * `MeetingActionsPort.createMeeting` does: `AthleteProfileRuleError` is
+   * Training's vocabulary and this file may not import its codes, so the
+   * adapter logs the code and the executor tells the member nothing was saved.
+   */
+  abstract setSlots(
+    userId: string,
+    slots: ChatTrainingSlot[],
+  ): Promise<ChatTrainingSlot[] | null>;
+
+  /**
+   * Every session on the member's own local today, whatever its status.
+   *
+   * Their local day and not a 24-hour window around `now`, which is the whole
+   * of principle XI here: "I trained today" said at half past midnight is about
+   * the day the member is in, and the adapter resolves it through their zone.
+   */
+  abstract todaysSessions(
+    userId: string,
+    now: Date,
+  ): Promise<TrainingSessionRef[]>;
+
+  /**
+   * This session happened, with the member's own words kept as its note.
+   *
+   * `null` when it could not be recorded — gone, or already refused — for the
+   * same reason `PlannerActionsPort.cancel` returns `false`: a member told
+   * their session was logged when it was not goes looking for a record that
+   * does not exist.
+   */
+  abstract completeSession(
+    userId: string,
+    sessionId: string,
+    note?: string,
+  ): Promise<TrainingSessionRef | null>;
+
+  /**
+   * What training is coming, for `chat.card { kind: 'sessions' }` (FR-015).
+   *
+   * The same shape as `MeetingActionsPort.listUpcoming` and for the same
+   * reasons: rows from the published query, so the chat and the week view
+   * cannot disagree, and `at` a wall-clock string in the member's zone, because
+   * a card carrying an instant is rendered against the *device's* zone.
    */
   abstract listUpcoming(
     userId: string,

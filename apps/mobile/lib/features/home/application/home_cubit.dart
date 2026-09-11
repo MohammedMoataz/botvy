@@ -47,6 +47,7 @@ class HomeState {
     this.displayName,
     this.today = '',
     this.tomorrow = '',
+    this.timezone,
     this.plan,
     this.planTasks = const [],
     this.training,
@@ -74,6 +75,12 @@ class HomeState {
   /// XI exists to stop and which cost v1 three hours once already.
   final String today;
   final String tomorrow;
+
+  /// The member's IANA zone from the profile mirror, carried for the same
+  /// reason [today] is: a widget that needs a day's window — the training row
+  /// does — must resolve it against the *profile's* zone and never the
+  /// handset's.
+  final String? timezone;
 
   final LocalDailyPlan? plan;
   final List<PlanTask> planTasks;
@@ -177,6 +184,7 @@ class HomeCubit extends Cubit<HomeState> {
         displayName: profile?.displayName,
         today: today,
         tomorrow: tomorrow,
+        timezone: profile?.timezone,
         plan: plan,
         planTasks: await decodePlanTasks(_db, plan),
         training: decodeTraining(plan),

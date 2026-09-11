@@ -807,6 +807,279 @@ export const CalendarEventSchema = new Schema(
   { collection: 'calendar_events', versionKey: false, _id: false },
 );
 
+/**
+ * The four shapes Training stores, and the four it shares between them.
+ *
+ * One `SetEntry` type across every sport (data-model §2.6), which is the
+ * decision `set-entry.ts` argues at length: a schema per sport multiplies the
+ * model, the editor, every query and every migration by the number of sports,
+ * and gives a member who lifts *and* swims two histories that cannot be read
+ * together. The *sport* decides which pair of fields the editor draws; the
+ * stored row is the same either way.
+ *
+ * Targets and actuals are both declared and neither overwrites the other, so a
+ * logged session shows what was done beside what was planned (FR-004).
+ */
+const targetSetShape = {
+  _id: false,
+  /** Repetitions — gym, calisthenics, crossfit. */
+  targetReps: { type: Number, default: null },
+  targetWeightKg: { type: Number, default: null },
+  /** Seconds — a plank, an interval, a game. */
+  targetDurationSec: { type: Number, default: null },
+  /** Metres — swimming, running, cycling. */
+  targetDistanceM: { type: Number, default: null },
+};
+
+/**
+ * A set on a session or a library entry: the targets above plus what happened.
+ *
+ * `done` is declared separately from the `actual*` fields rather than inferred
+ * from them, because a member can tick three sets off without typing numbers
+ * and a set with a weight typed but not ticked is one they are part way
+ * through. Inferring it would collapse those two into one.
+ */
+const setShape = {
+  ...targetSetShape,
+  actualReps: { type: Number, default: null },
+  actualWeightKg: { type: Number, default: null },
+  actualDurationSec: { type: Number, default: null },
+  actualDistanceM: { type: Number, default: null },
+  done: { type: Boolean, required: true, default: false },
+};
+
+/**
+ * A picture or a clip an exercise refers to. Nothing fetches it in this phase.
+ *
+ * `type` is a path *named* `type`, which is the one name Mongoose reads as a
+ * declaration rather than as a field — hence the `{ type: { type: String } }`
+ * spelling, the same escape `AuditLogSchema.target` uses above.
+ */
+const mediaRefShape = {
+  _id: false,
+  type: { type: String, required: true },
+  url: { type: String, required: true },
+  caption: { type: String, default: null },
+};
+
+/**
+ * One exercise on a session or a workout, with its sets in order.
+ *
+ * `id` is declared because the editor reorders exercises and a member logging a
+ * set has to say *which* one — an array index is not a name, and reordering
+ * while a set is being typed would move the numbers under their fingers.
+ */
+const exerciseShape = {
+  _id: false,
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  notes: { type: String, default: null },
+  mediaRefs: { type: [mediaRefShape], default: [] },
+  sets: { type: [setShape], default: [] },
+};
+
+/**
+ * An exercise inside a *program* week: targets only, and no `id`.
+ *
+ * Not `exerciseShape`, and the difference is deliberate rather than an
+ * oversight. A template has nothing to record — `actual*` on a template is a
+ * field that can only ever be null, and a field that can only be null is a
+ * field somebody will one day fill — and it has no identity to carry, because
+ * the materialiser mints fresh exercise ids when it copies a template onto a
+ * session, so editing that session cannot rewrite the program it came from.
+ */
+const templateExerciseShape = {
+  _id: false,
+  name: { type: String, required: true },
+  notes: { type: String, default: null },
+  mediaRefs: { type: [mediaRefShape], default: [] },
+  sets: { type: [targetSetShape], default: [] },
+};
+
+/**
+ * What the member practises and when — **keyed by the member** (data-model
+ * §2.6): `_id` is the `userId`, one document each.
+ *
+ * So it is the one member-owned collection here with **no `userId` field of its
+ * own**, and that has two visible consequences. It needs an exemption in
+ * `schemas.spec.ts`'s `platform` set, where its reason is written down; and its
+ * adapter cannot go through `MongoRepositoryBase`, whose filter is
+ * `{ _id, userId }` — see the comment on `MongoAthleteProfileRepository`.
+ *
+ * `updatedAt` is still here and still required: the adapter keeps the same
+ * optimistic filter the base uses, because two devices editing the weekly
+ * timetable is ordinary and a lost update there silently drops a training day.
+ *
+ * No tombstone, and no `createdAt`. There is nothing to create twice and
+ * nothing to delete short of the member themselves, which `purge-on-deleted`
+ * handles; the row is written on `identity.UserRegistered`, so its creation is
+ * the member's own and Identity already records it.
+ *
+ * `slots[].start` is `HH:mm` in the member's own zone and **never an instant**
+ * (principle XI): "gym at 18:00 on Mondays" is a statement about the member's
+ * clock, so a member who flies to Berlin still trains at 18:00. A stored
+ * instant would have made a zone change a data migration.
+ */
+export const AthleteProfileSchema = new Schema(
+  {
+    /** The member's id. See the note above. */
+    _id: { type: String, required: true },
+    sports: { type: [String], default: [] },
+    slots: {
+      type: [
+        {
+          _id: false,
+          /** The client's id. A slot that keeps it keeps its sessions. */
+          id: { type: String, required: true },
+          /** 1 (Monday) to 7 (Sunday) — ISO 8601, not JavaScript's 0-is-Sunday. */
+          weekday: { type: Number, required: true },
+          start: { type: String, required: true },
+          durationMin: { type: Number, required: true },
+          sport: { type: String, required: true },
+          location: { type: String, default: null },
+        },
+      ],
+      default: [],
+    },
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'athlete_profiles', versionKey: false, _id: false },
+);
+
+/**
+ * One scheduled or logged practice (data-model §2.6) — the source of truth for
+ * "next practice".
+ *
+ * A syncable row like every other: the client mints `_id`, `deletedAt` is the
+ * tombstone a delta carries to the phone, and `updatedAt` is the cursor.
+ *
+ * `slotId` is null for a session the member made by hand, and that null is
+ * load-bearing: it is what keeps the materialiser's reconcile away from it.
+ * `suggestionId` is written by nothing in this phase — P7 fills it, and
+ * carrying the field now is what means P7 needs no migration.
+ *
+ * `status` is `planned | completed | cancelled | skipped`. There is no
+ * `missed`: a planned session whose moment has passed is a reading of the
+ * clock, not an outcome anybody recorded. And a delete never touches the
+ * status, because the status is the only record of what became of the session.
+ */
+export const SessionSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    plannedAt: { type: Date, required: true },
+    durationMin: { type: Number, required: true },
+    sport: { type: String, required: true },
+    title: { type: String, required: true },
+    focus: { type: String, default: null },
+    /** Which program filled this, and which of its weeks. Null for a bare slot. */
+    programId: { type: String, default: null },
+    weekIndex: { type: Number, default: null },
+    /** Which slot produced it. Null for a session the member made by hand. */
+    slotId: { type: String, default: null },
+    /** Carried for P7; written by nothing here. */
+    suggestionId: { type: String, default: null },
+    exercises: { type: [exerciseShape], default: [] },
+    status: { type: String, required: true, default: 'planned' },
+    completedAt: { type: Date, default: null },
+    notes: { type: String, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'sessions', versionKey: false, _id: false },
+);
+
+/**
+ * A structured plan: weeks of session templates, applied onto the member's own
+ * slots (data-model §2.6).
+ *
+ * `appliedStartDate` is a **local date string** (`YYYY-MM-DD`) and not a Date,
+ * which is principle XI once more: the week arithmetic counts from the day the
+ * member said "start now" on their own clock, and an instant would put a member
+ * who applies a program at 23:30 into week two a day early. It sorts
+ * chronologically as a string, which is what `activeFor` reads it as.
+ *
+ * **Archiving does not clear it.** Archiving stops the materialiser consulting
+ * the program; clearing the date would additionally make re-activating it fill
+ * from the wrong week, and the member never said to forget when they started.
+ *
+ * `weekday` on a template is 1..7 or **null**, and the null is what makes a
+ * program portable: a template with no weekday fills whichever slot comes next
+ * in order, so one four-week plan works for a member who trains
+ * Monday/Wednesday/Friday and one who trains Tuesday/Thursday/Saturday.
+ *
+ * `source` and `sourceLinkIds` are the other half of the P7 seam.
+ */
+export const ProgramSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    title: { type: String, required: true },
+    sport: { type: String, required: true },
+    /** `user` | `suggestion` | `link`. The last two arrive with P7. */
+    source: { type: String, required: true, default: 'user' },
+    sourceLinkIds: { type: [String], default: [] },
+    weeks: {
+      type: [
+        {
+          _id: false,
+          index: { type: Number, required: true },
+          sessions: {
+            type: [
+              {
+                _id: false,
+                templateId: { type: String, required: true },
+                weekday: { type: Number, default: null },
+                title: { type: String, required: true },
+                focus: { type: String, default: null },
+                exercises: { type: [templateExerciseShape], default: [] },
+              },
+            ],
+            default: [],
+          },
+        },
+      ],
+      default: [],
+    },
+    /** `active` | `archived`. */
+    status: { type: String, required: true, default: 'active' },
+    appliedStartDate: { type: String, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'programs', versionKey: false, _id: false },
+);
+
+/**
+ * The member's own library of workouts (data-model §2.6, FR-009).
+ *
+ * It holds `exerciseShape` — targets *and* actuals — rather than the program's
+ * template shape, because a library entry is most often saved from a session
+ * the member has just done: the numbers they actually lifted are there to
+ * become next time's targets. `actual*` on a library entry is meaningful, which
+ * is exactly what it is not on a program template.
+ */
+export const WorkoutSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    name: { type: String, required: true },
+    sport: { type: String, required: true },
+    exercises: { type: [exerciseShape], default: [] },
+    tags: { type: [String], default: [] },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'workouts', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -830,4 +1103,8 @@ export const MODEL_NAMES = {
   quickQuestion: 'QuickQuestion',
   meeting: 'Meeting',
   calendarEvent: 'CalendarEvent',
+  athleteProfile: 'AthleteProfile',
+  session: 'Session',
+  program: 'Program',
+  workout: 'Workout',
 } as const;

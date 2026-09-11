@@ -106,10 +106,7 @@ Future<List<AgendaItem>> localAgenda(
     ...await _meetings(db, from, to, timezone),
     ...await _events(db, from, to, timezone),
     ...await _timedTasks(db, from, to),
-    // Training sessions: nothing until P6. An empty list rather than a missing
-    // branch, so the day the table arrives this is one function and not a
-    // change to the merge.
-    ..._trainingSessions(),
+    ...await _trainingSessions(db, from, to),
   ];
 
   items.sort((left, right) {
@@ -370,13 +367,50 @@ Future<List<AgendaItem>> _timedTasks(
   ];
 }
 
-/// Nothing, until P6's Training context lands its own table.
+/// Training sessions, beside the meetings (FR-011, story 6).
 ///
-/// A function rather than an inline `const []` so the day it has a body, the
-/// merge above does not change — and so a reader looking for "where are the
-/// training sessions" finds this comment instead of concluding they were
-/// forgotten.
-List<AgendaItem> _trainingSessions() => const [];
+/// Read straight from the phone's `sessions` rows and not expanded: a session
+/// is a materialised row rather than a rule, because the timetable's expansion
+/// happens on the server where the alerts and the program filling are — so
+/// there is nothing here for `core/recurrence` to do.
+///
+/// Cancelled and skipped sessions are drawn rather than filtered, unlike a
+/// cancelled meeting. That asymmetry is deliberate and it is the honest half of
+/// FR-005: a skipped session **stays in the week marked skipped**, and a
+/// calendar that quietly dropped it would make the record a list of the days
+/// that went well. The row's status is what says which it is, and `isMissed` in
+/// `features/athlete/application/athlete.dart` is what says a planned one has
+/// passed.
+Future<List<AgendaItem>> _trainingSessions(
+  AppDatabase db,
+  DateTime from,
+  DateTime to,
+) async {
+  final rows = await (db.select(db.sessions)..where(
+    (r) =>
+        r.deletedAt.isNull() &
+        notPendingOp(r.pendingOp, PendingOps.purge) &
+        r.plannedAt.isBiggerOrEqualValue(from) &
+        r.plannedAt.isSmallerOrEqualValue(to),
+  )).get();
+
+  return [
+    for (final row in rows)
+      AgendaItem(
+        kind: AgendaKind.training,
+        id: row.id,
+        // A session with no name is still a session, and the sport reads fine
+        // on its own — the sport is not translated here because this list is
+        // built without a `BuildContext`; the screens translate it.
+        title: row.title.isEmpty ? row.sport : row.title,
+        startAt: row.plannedAt,
+        // A real length, unlike a task: a session occupies the member's evening
+        // and the day view should show it doing so.
+        endAt: row.plannedAt.add(Duration(minutes: row.durationMin)),
+        notes: row.focus,
+      ),
+  ];
+}
 
 DateTime _utc(tz.TZDateTime at) =>
     DateTime.fromMillisecondsSinceEpoch(at.millisecondsSinceEpoch, isUtc: true);

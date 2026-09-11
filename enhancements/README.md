@@ -36,3 +36,9 @@ pagination cursor — and none of them is in this directory.
 | [E-011](E-011-sdk-stores-cannot-use-dexie.md) | The SDK stores cannot use Dexie | architecture | "Today" is now defined in four places |
 | [E-012](E-012-server-composed-messages-are-english-only.md) | Server-composed coach messages are English only | product | An Arabic-reading member gets three English sentences a day from the coach |
 | [E-013](E-013-an-aborted-turn-is-never-metered.md) | An aborted or blocked turn is never metered | product | Stopped answers cost GPU time and count nothing against the member's allowance |
+| [E-014](E-014-three-recurrence-expanders-two-of-them-typescript.md) | Three recurrence expanders, two of them TypeScript | architecture | A semantic fix is three edits; the SDK's hand-rolled parser degrades a series it cannot read to one occurrence, silently |
+| [E-015](E-015-the-meetings-ui-chrome-is-not-localised.md) | The meetings UI's chrome never reached the string table | product | An Arabic-reading member gets an English form in an RTL column, with one Arabic sentence in it |
+| [E-016](E-016-an-edit-pushed-onto-a-tombstone-is-silently-lost.md) | An edit pushed onto a tombstone is accepted and then silently lost | architecture | A member's offline edit is acknowledged, erased by the next pull, and reported to nobody |
+| [E-017](E-017-a-back-dated-at-becomes-a-500.md) | A back-dated `at` on a status command becomes a 500 | build | A well-formed request pages somebody instead of being refused; unreachable from any current client |
+| [E-018](E-018-a-jobs-cadence-is-a-table-somewhere-else.md) | A job's cadence lives in a table somewhere else | build | A nightly job added without editing the health module reports the platform broken 23 hours a day |
+| [E-019](E-019-a-new-member-has-no-preferences-for-a-few-seconds.md) | A new member has no preferences for a few seconds | architecture | Onboarding can set a preference before the row exists and be told 404 |

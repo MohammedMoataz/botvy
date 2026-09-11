@@ -223,6 +223,11 @@ export class IntentExtractor extends IntentExtractorPort {
       // to this list is a field the model can never deliver.
       'onlineLink',
       'address',
+      // `set_slots`' and `log_session`' sport. Deliberately not narrowed to
+      // `KNOWN_SPORTS`: "other" in the picker is a text field rather than a
+      // bucket, so a member whose sport is padel keeps the word padel. The
+      // aggregate refuses an empty name and `str` has already dropped one.
+      'sport',
     ] as const) {
       const value = str(source[key]);
       if (value !== null) args[key] = value;
@@ -256,6 +261,31 @@ export class IntentExtractor extends IntentExtractorPort {
       const value = strings(source[key]);
       if (value !== null) args[key] = value;
     }
+    /*
+     * `set_slots`' weekdays, normalised however they arrive.
+     *
+     * The schema constrains them to integers 1..7, and this runs anyway for the
+     * reason `metric` does: the grammar is enforced by the *server*, so an
+     * older Ollama or a different backend may hand over `["monday"]`, a 0, or
+     * the same day twice. Out of range is **dropped and never clamped** — a 0
+     * or an 8 is a model holding a different convention about where the week
+     * starts, and pinning it to Monday or Sunday would set the member's week on
+     * a day they did not name. Nothing usable leaves the field absent, and the
+     * executor asks which days (FR-006).
+     *
+     * Sorted and de-duplicated because the stored slots are read back into a
+     * confirmation the member checks, and "Monday, Monday and Wednesday" reads
+     * as a bug in the product rather than in the model.
+     */
+    const weekdays = [
+      ...new Set(
+        (Array.isArray(source.weekdays) ? source.weekdays : [])
+          .map((day) => Number(day))
+          .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7),
+      ),
+    ].sort((a, b) => a - b);
+    if (weekdays.length > 0) args.weekdays = weekdays;
+
     if (source.allDay === true) args.allDay = true;
     if (LIST_KINDS.has(source.listKind as string)) {
       args.listKind = source.listKind as ListKind;

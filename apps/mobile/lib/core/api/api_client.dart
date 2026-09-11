@@ -203,6 +203,48 @@ class TokenStore {
   }
 }
 
+/// One session an apply would overwrite (story 4 scenario 2).
+class ReplacedSession {
+  const ReplacedSession({
+    required this.sessionId,
+    required this.title,
+    this.plannedAt,
+  });
+
+  factory ReplacedSession.fromJson(Map<String, dynamic> json) =>
+      ReplacedSession(
+        sessionId: json['sessionId'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        plannedAt: DateTime.tryParse(json['plannedAt'] as String? ?? '')?.toUtc(),
+      );
+
+  final String sessionId;
+  final String title;
+  final DateTime? plannedAt;
+}
+
+/// The answer to `POST /programs/:id/apply`.
+///
+/// Two fields rather than one, because "it did not happen" and "here is what
+/// it would have done" are different pieces of news and the screen says both:
+/// [applied] false with a non-empty [wouldReplace] is the warning the member
+/// has to agree to, and `force: true` is the retry.
+class ProgramApply {
+  const ProgramApply({required this.applied, this.wouldReplace = const []});
+
+  factory ProgramApply.fromJson(Map<String, dynamic> json) => ProgramApply(
+    applied: json['applied'] == true,
+    wouldReplace: [
+      for (final raw
+          in (json['wouldReplace'] as List? ?? const []).whereType<Map>())
+        ReplacedSession.fromJson(Map<String, dynamic>.from(raw)),
+    ],
+  );
+
+  final bool applied;
+  final List<ReplacedSession> wouldReplace;
+}
+
 /// Thrown for anything the UI should show the user verbatim.
 class ApiException implements Exception {
   ApiException(
@@ -701,6 +743,58 @@ class ApiClient {
         },
       ),
     );
+  }
+
+  // -- training --------------------------------------------------------------
+
+  /// Applies a program from a start date (`rest-commands.md`, Training).
+  ///
+  /// A REST command and deliberately not a sync push, unlike everything else
+  /// the phone does to a session or a program: the **refusal** is the point.
+  /// Without [force], an apply that would replace *planned* content answers
+  /// `409` carrying the list of what it would replace, and story 4 scenario 2
+  /// requires the member sees that list and agrees before it happens. A
+  /// rejection arriving on the next sync pass, with no screen still open, can
+  /// ask nobody anything.
+  ///
+  /// So the 409 is **not an error here** — it is the answer with
+  /// `applied: false` and a list. That is why this does not go through
+  /// [_guard], which turns every `DioException` into an [ApiException] and
+  /// would throw the list away. Anything else still does.
+  ///
+  /// A session with anything *logged* is never in the list and never replaced,
+  /// which is the server's rule and not repeated here.
+  Future<ProgramApply> applyProgram(
+    String programId, {
+    required String startDate,
+    bool force = false,
+  }) async {
+    try {
+      final response = await dio.post<dynamic>(
+        '/programs/$programId/apply',
+        data: {'startDate': startDate, if (force) 'force': true},
+      );
+      final data = response.data;
+      return ProgramApply.fromJson(
+        data is Map ? Map<String, dynamic>.from(data) : const {},
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (e.response?.statusCode == 409 && data is Map) {
+        return ProgramApply.fromJson(Map<String, dynamic>.from(data));
+      }
+      throw translate(e);
+    }
+  }
+
+  /// Archives a program.
+  ///
+  /// REST for the same reason applying is: `status` is a field the sync adapter
+  /// may or may not accept, and archiving has a consequence the member is told
+  /// about — it stops the program filling anything new and leaves the sessions
+  /// it already filled exactly as they are (FR-008, story 4 scenario 4).
+  Future<void> archiveProgram(String programId) async {
+    await _guard(() => dio.post<dynamic>('/programs/$programId/archive'));
   }
 
   // -- reads -----------------------------------------------------------------

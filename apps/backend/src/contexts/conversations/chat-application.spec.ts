@@ -19,11 +19,14 @@ import {
   MemberDayPort,
   PlannerActionsPort,
   ProfileWritesPort,
+  TrainingActionsPort,
   type CancellableItem,
   type CardItem,
+  type ChatTrainingSlot,
   type CreatedItem,
   type MemberDay,
   type MemberFacts,
+  type TrainingSessionRef,
 } from './domain/chat.ports.js';
 import { isAction, type Intent } from './domain/intent.js';
 import { Message } from './domain/message.aggregate.js';
@@ -221,6 +224,66 @@ class FakeMeetings extends MeetingActionsPort {
     _now: Date,
     _days: number,
   ): Promise<CardItem[]> {
+    return this.upcoming;
+  }
+}
+
+/**
+ * Training, as the chat sees it.
+ *
+ * The week is held as state rather than returned from a canned list, because
+ * the assertions worth having about `set_slots` are all about the **merge**: a
+ * sentence names one sport and some days, and what must survive is everything
+ * it did not name. So `setSlots` stores what it was given and `week` answers
+ * it, which is the smallest thing that can catch a merge that ate a slot.
+ *
+ * `refuse` models an `AthleteProfileRuleError` — Training's vocabulary, which
+ * `chat.ports.ts` may not name, so the port's contract is `null`.
+ */
+class FakeTraining extends TrainingActionsPort {
+  slots: ChatTrainingSlot[] = [];
+  readonly writes: ChatTrainingSlot[][] = [];
+  refuse = false;
+  sessions: TrainingSessionRef[] = [];
+  readonly completed: Array<{ id: string; note?: string }> = [];
+  completeResult: TrainingSessionRef | null | 'echo' = 'echo';
+  upcoming: CardItem[] = [];
+
+  async week(): Promise<ChatTrainingSlot[]> {
+    return this.slots.map((slot) => ({ ...slot }));
+  }
+
+  async setSlots(
+    _userId: string,
+    slots: ChatTrainingSlot[],
+  ): Promise<ChatTrainingSlot[] | null> {
+    if (this.refuse) return null;
+    this.writes.push(slots.map((slot) => ({ ...slot })));
+    // Ids minted for the new ones, exactly as the real adapter does — the
+    // executor sends a slot with no id and reads one back.
+    this.slots = slots.map((slot, index) => ({
+      ...slot,
+      id: slot.id ?? `new-${index}`,
+    }));
+    return this.week();
+  }
+
+  async todaysSessions(): Promise<TrainingSessionRef[]> {
+    return this.sessions;
+  }
+
+  async completeSession(
+    _userId: string,
+    sessionId: string,
+    note?: string,
+  ): Promise<TrainingSessionRef | null> {
+    this.completed.push({ id: sessionId, ...(note ? { note } : {}) });
+    if (this.completeResult !== 'echo') return this.completeResult;
+    const found = this.sessions.find((session) => session.id === sessionId);
+    return found ? { ...found, status: 'completed' } : null;
+  }
+
+  async listUpcoming(): Promise<CardItem[]> {
     return this.upcoming;
   }
 }
@@ -602,6 +665,86 @@ describe('IntentExtractor', () => {
     expect(sent.model).toBe(await settings.get('llm.extractModel'));
     expect(sent.options.num_ctx).toBe(await settings.get('llm.numCtx'));
   });
+
+  // ------------------------------------------------------------------ T662
+
+  it('normalises weekdays the grammar was supposed to have constrained', async () => {
+    /*
+     * `INTENT_SCHEMA` bounds `weekdays` to integers 1..7, and this runs anyway
+     * for the reason `metric` does: the grammar is enforced by the *server*, so
+     * an older Ollama or a different backend can hand over anything.
+     *
+     * Out of range is **dropped and never clamped** — a 0 or an 8 is a model
+     * holding a different convention about where the week starts, and pinning
+     * it to Monday or Sunday would put the member's training on a day they did
+     * not name. Sorted and de-duplicated because the days get read back into a
+     * confirmation the member checks.
+     */
+    const { llm } = stubLlm({
+      name: 'set_slots',
+      scope: 'coaching',
+      args: { sport: '  gym  ', weekdays: [3, 0, 1, 3, 8, 'monday'] },
+    });
+    const extractor = new IntentExtractor(llm, settingsService());
+
+    const result = await extractor.extract({
+      text: 'gym Monday and Wednesday at six',
+      now: new Date(),
+      timezone: FIXED,
+    });
+
+    expect(result.name).toBe('set_slots');
+    expect(result.args.weekdays).toEqual([1, 3]);
+    expect(result.args.sport).toBe('gym');
+    /*
+     * And it is an action. A name in `IntentName` that nobody added to
+     * `ACTIONS` is the quiet failure worth one assertion: `TurnRunner` routes
+     * on `isAction`, so the turn would go to the coach prompt instead of the
+     * executor — and the coach is under standing instructions that it cannot
+     * create anything, so the member would be told to try again by a model that
+     * had no idea what was missing.
+     */
+    expect(isAction(result)).toBe(true);
+    expect(isAction({ ...result, name: 'log_session' })).toBe(true);
+  });
+
+  it('leaves weekdays absent when nothing usable arrived, rather than guessing one', async () => {
+    const { llm } = stubLlm({
+      name: 'set_slots',
+      scope: 'coaching',
+      args: { sport: 'football', weekdays: [0, 9] },
+    });
+    const extractor = new IntentExtractor(llm, settingsService());
+
+    const result = await extractor.extract({
+      text: 'I do football on Fridays',
+      now: new Date(),
+      timezone: FIXED,
+    });
+
+    // Absent, so the executor asks which days (FR-006). A slot becomes a
+    // fortnight of sessions, so a guessed day is two weeks of the wrong plan.
+    expect(result.args.weekdays).toBeUndefined();
+  });
+
+  it('drops a slot time invented for a sentence that names no moment', async () => {
+    // `mentionsAMoment` again, and it matters more for a slot than for a
+    // reminder: an invented hour here is materialised across the coming weeks.
+    const { llm } = stubLlm({
+      name: 'set_slots',
+      scope: 'coaching',
+      args: { sport: 'gym', weekdays: [1], when: `${localToday(FIXED)}T18:00` },
+    });
+    const extractor = new IntentExtractor(llm, settingsService());
+
+    const result = await extractor.extract({
+      text: 'I want to start going to the gym',
+      now: new Date(),
+      timezone: FIXED,
+    });
+
+    expect(result.args.when).toBeUndefined();
+  });
 });
 
 // -------------------------------------------------------------------- T412
@@ -610,13 +753,15 @@ describe('IntentExecutor', () => {
   let planner: FakePlanner;
   let profile: FakeProfile;
   let meetings: FakeMeetings;
+  let training: FakeTraining;
   let executor: IntentExecutor;
 
   beforeEach(() => {
     planner = new FakePlanner();
     profile = new FakeProfile();
     meetings = new FakeMeetings();
-    executor = new IntentExecutor(planner, profile, meetings);
+    training = new FakeTraining();
+    executor = new IntentExecutor(planner, profile, meetings, training);
   });
 
   it('asks for a missing time and dispatches nothing', async () => {
@@ -913,15 +1058,34 @@ describe('IntentExecutor', () => {
     expect(result.asking).toBe(false);
   });
 
-  it('still refuses to list training sessions, and names only those', async () => {
-    // P6's. The refusal is kept and narrowed: a member asking for their
-    // meetings and being told the feature is coming later would be the product
-    // lying about itself.
+  it('lists training as a sessions card, with no refusal left anywhere', async () => {
+    /*
+     * The other half of the rule the meetings test above is about. `meetings`
+     * and `sessions` shared one "coming in a later version"; P5 narrowed it to
+     * name only training, and P6 built training, so the sentence goes. A "not
+     * yet" outlives the capability it was written about unless the phase that
+     * ships it deletes the sentence — which is why this test asserts the
+     * absence as well as the card.
+     *
+     * FR-015 says a card and not prose, and `chat.card { kind: 'sessions' }` is
+     * the kind `ws-chat.md` has defined since the blueprint with nothing
+     * producing it.
+     */
+    training.upcoming = [
+      {
+        id: 's1',
+        title: 'Push day',
+        at: 'Mon 14 Sep, 18:00',
+        status: 'planned',
+        deepLink: 'botvy://sessions/s1',
+      },
+    ];
+
     const result = await executor.execute({
       userId: MEMBER,
       intent: intent({
         name: 'list',
-        scope: 'planning',
+        scope: 'coaching',
         args: { listKind: 'sessions' },
       }),
       text: 'what training have I got?',
@@ -929,9 +1093,10 @@ describe('IntentExecutor', () => {
       facts: facts(),
     });
 
-    expect(result.reply).toContain('later version');
-    expect(result.reply).toContain('training');
-    expect(result.card).toBeUndefined();
+    expect(result.card).toEqual({ kind: 'sessions', items: training.upcoming });
+    expect(result.reply).toContain('Push day');
+    expect(result.reply).not.toContain('later version');
+    expect(result.asking).toBe(false);
   });
 
   it('lists the plan when the member did not say what kind, in Arabic', async () => {
@@ -1310,6 +1475,351 @@ describe('IntentExecutor', () => {
 
     expect(result.reply).toContain("couldn't cancel");
     expect(result.asking).toBe(false);
+  });
+
+  // ------------------------------------------------------------------ T662
+
+  /** "gym Monday and Wednesday at six", as the pipeline hands it over. */
+  function slotsIntent(args: Partial<Intent['args']> = {}): Intent {
+    return intent({
+      name: 'set_slots',
+      scope: 'coaching',
+      args: {
+        sport: 'gym',
+        weekdays: [1, 3],
+        // A full wall clock, because that is what `args.when` is everywhere:
+        // the date half is the model's and the executor keeps only the hour.
+        when: `${localToday(ZONE)}T18:00`,
+        durationMin: 60,
+        ...args,
+      },
+    });
+  }
+
+  it('sets the slots the member named and confirms them as stored', async () => {
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent(),
+      text: 'gym Monday and Wednesday at six',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(training.writes).toHaveLength(1);
+    expect(training.writes[0]).toEqual([
+      { weekday: 1, start: '18:00', durationMin: 60, sport: 'gym', location: null },
+      { weekday: 3, start: '18:00', durationMin: 60, sport: 'gym', location: null },
+    ]);
+    // FR-004: the days in the reply are read back from the store, not from the
+    // sentence — which is also the cheapest check that the merge did not eat a
+    // slot.
+    expect(result.reply).toContain('Mon 18:00');
+    expect(result.reply).toContain('Wed 18:00');
+    expect(result.reply).toContain('60 minutes');
+    expect(result.actions).toEqual([{ kind: 'slots.updated' }]);
+    expect(result.asking).toBe(false);
+  });
+
+  it('keeps every slot the sentence did not name, and re-times the ones it did', async () => {
+    /*
+     * The merge, which is the decision in this branch.
+     *
+     * `AthleteProfile.setSlots` replaces the whole timetable, so a sentence
+     * written straight over it would delete the Friday gym and the Sunday
+     * swim — and with them, per the materialiser's reconcile, every future
+     * session those slots had produced. **A named day keeps its id**, because
+     * the reconcile matches on it: a new id for the same Monday throws the
+     * week away and rebuilds it.
+     */
+    training.slots = [
+      { id: 'gym-mon', weekday: 1, start: '07:00', durationMin: 45, sport: 'gym', location: 'Downtown' },
+      { id: 'gym-fri', weekday: 5, start: '07:00', durationMin: 45, sport: 'gym', location: 'Downtown' },
+      { id: 'swim-sun', weekday: 7, start: '08:00', durationMin: 60, sport: 'swimming', location: null },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ durationMin: undefined }),
+      text: 'gym Monday and Wednesday at six',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    const written = training.writes[0]!;
+    expect(written).toContainEqual(
+      expect.objectContaining({ id: 'gym-fri', weekday: 5, start: '07:00' }),
+    );
+    expect(written).toContainEqual(
+      expect.objectContaining({ id: 'swim-sun', weekday: 7, sport: 'swimming' }),
+    );
+    // Monday keeps its id and its place, and takes the new hour.
+    expect(written).toContainEqual(
+      expect.objectContaining({ id: 'gym-mon', weekday: 1, start: '18:00' }),
+    );
+    // Wednesday is new: no id, so the adapter mints one.
+    expect(written.find((slot) => slot.weekday === 3)?.id).toBeUndefined();
+    // The length came from their own week rather than from a number this code
+    // invented — the member said nothing about it.
+    expect(written.every((slot) => slot.durationMin === 45 || slot.sport === 'swimming')).toBe(true);
+    // And the confirmation names Friday too, because Friday is in their gym
+    // week whether this sentence mentioned it or not.
+    expect(result.reply).toContain('Fri 07:00');
+  });
+
+  it('matches the sport across Arabic letter forms rather than storing it twice', async () => {
+    // `fold` strips the Arabic definite article, so a member who stored "جيم"
+    // and typed "الجيم" has one sport. Without it the merge leaves two gym
+    // slots on the same Monday, one of them the old time.
+    training.slots = [
+      { id: 'g1', weekday: 1, start: '07:00', durationMin: 45, sport: 'جيم', location: null },
+    ];
+
+    await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ sport: 'الجيم', weekdays: [1] }),
+      text: 'الجيم الاثنين الساعة ستة',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    const written = training.writes[0]!;
+    expect(written).toHaveLength(1);
+    expect(written[0]).toEqual(
+      // Their own word, kept: they said "الجيم" this time and did not ask for
+      // the stored name to change.
+      expect.objectContaining({ id: 'g1', sport: 'جيم', start: '18:00' }),
+    );
+  });
+
+  it('asks for the sport, the days and the hour rather than inventing any of them', async () => {
+    const now = new Date();
+    const noSport = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ sport: undefined }),
+      text: 'Monday and Wednesday at six',
+      now,
+      facts: facts(),
+    });
+    expect(noSport.asking).toBe(true);
+    expect(noSport.reply).toContain('Which sport');
+
+    const noDays = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ weekdays: undefined }),
+      text: 'gym at six',
+      now,
+      facts: facts(),
+    });
+    expect(noDays.asking).toBe(true);
+    expect(noDays.reply).toContain('Which days');
+
+    const noHour = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ when: undefined }),
+      text: 'I do football on Fridays',
+      now,
+      facts: facts(),
+    });
+    expect(noHour.asking).toBe(true);
+    expect(noHour.reply).toContain('What time');
+
+    // A weekly slot becomes a fortnight of sessions, so a guess here is two
+    // weeks of alarms at an hour nobody chose. Nothing was written by any of
+    // the three.
+    expect(training.writes).toEqual([]);
+  });
+
+  it('refuses a midnight or all-day start, which is what a model writes for "no hour"', async () => {
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ when: `${localToday(ZONE)}T00:00`, allDay: true }),
+      text: 'I do football on Fridays',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.asking).toBe(true);
+    expect(training.writes).toEqual([]);
+  });
+
+  it('asks how long a first session is rather than defaulting it', async () => {
+    // There is no `defaults.sessionDurationMin` in the registry, and a
+    // hard-coded sixty would be stored — a member whose sessions are all
+    // ninety minutes would find every slot they set by sentence an hour short.
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ durationMin: undefined }),
+      text: 'gym Monday and Wednesday at six',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.asking).toBe(true);
+    expect(result.reply).toContain('How long');
+    expect(training.writes).toEqual([]);
+  });
+
+  it('confirms the slots in Arabic when the member wrote Arabic', async () => {
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent({ sport: 'جيم' }),
+      text: 'الجيم الاثنين والأربعاء الساعة ستة',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.reply).toContain('الاثنين 18:00');
+    expect(result.reply).toContain('الأربعاء 18:00');
+    expect(result.asking).toBe(false);
+  });
+
+  it('reports slots Training refused rather than throwing', async () => {
+    training.refuse = true;
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: slotsIntent(),
+      text: 'gym Monday and Wednesday at six',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.reply).toContain("couldn't save");
+    expect(result.actions).toEqual([]);
+    expect(result.asking).toBe(false);
+  });
+
+  it('logs today’s session as done and keeps the member’s own words as its note', async () => {
+    /*
+     * What `log_session` does, and why it is this and not `Session.log`.
+     *
+     * The set logger needs an exercise id and a list of sets, and "I trained
+     * legs today" carries neither — so inventing an exercise called "legs"
+     * would be a fabricated record of the member's own training. The sentence
+     * asserts exactly one thing, which is that the session happened.
+     */
+    training.sessions = [
+      { id: 's1', title: 'Push day', sport: 'gym', at: todayAt('18:00', ZONE), status: 'planned' },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'log_session',
+        scope: 'coaching',
+        args: { notes: 'legs' },
+      }),
+      text: 'I trained legs today',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(training.completed).toEqual([{ id: 's1', note: 'legs' }]);
+    // FR-004: exactly what was recorded, and the title comes back from the
+    // store rather than from the sentence.
+    expect(result.reply).toContain('Push day');
+    expect(result.reply).toContain('legs');
+    expect(result.actions).toEqual([{ kind: 'session.completed', id: 's1' }]);
+    expect(result.asking).toBe(false);
+  });
+
+  it('says so rather than creating a session when today holds none', async () => {
+    // A session carries a time, a length, a sport and a title; "I trained
+    // today" carries none of them, so a created one would be four invented
+    // fields — and it would raise `SessionScheduled`, planning an alert for a
+    // practice that has already happened.
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({ name: 'log_session', scope: 'coaching', args: {} }),
+      text: 'I trained today',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(training.completed).toEqual([]);
+    expect(result.reply).toContain('no training scheduled today');
+    expect(result.asking).toBe(false);
+  });
+
+  it('asks which one when today holds two planned sessions, and logs nothing', async () => {
+    // The same rule as two matches for a `cancel`: marking the wrong one done
+    // leaves the real one looking undone, which is two wrong facts from one
+    // turn.
+    training.sessions = [
+      { id: 's1', title: 'Swim', sport: 'swimming', at: todayAt('07:00', ZONE), status: 'planned' },
+      { id: 's2', title: 'Push day', sport: 'gym', at: todayAt('18:00', ZONE), status: 'planned' },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({ name: 'log_session', scope: 'coaching', args: {} }),
+      text: 'I trained today',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.asking).toBe(true);
+    expect(result.reply).toContain('Swim');
+    expect(result.reply).toContain('Push day');
+    expect(training.completed).toEqual([]);
+  });
+
+  it('leaves a session that is already settled alone, and names its status', async () => {
+    training.sessions = [
+      { id: 's1', title: 'Push day', sport: 'gym', at: todayAt('18:00', ZONE), status: 'skipped' },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({ name: 'log_session', scope: 'coaching', args: {} }),
+      text: 'I trained today',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(training.completed).toEqual([]);
+    expect(result.reply).toContain('skipped');
+    expect(result.asking).toBe(false);
+  });
+
+  it('reports a log the store refused rather than claiming it happened', async () => {
+    training.sessions = [
+      { id: 's1', title: 'Push day', sport: 'gym', at: todayAt('18:00', ZONE), status: 'planned' },
+    ];
+    training.completeResult = null;
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({ name: 'log_session', scope: 'coaching', args: {} }),
+      text: 'I trained today',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(result.reply).toContain("couldn't log");
+    expect(result.actions).toEqual([]);
+  });
+
+  it('logs a session in Arabic', async () => {
+    training.sessions = [
+      { id: 's1', title: 'تمرين رجل', sport: 'جيم', at: todayAt('18:00', ZONE), status: 'planned' },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'log_session',
+        scope: 'coaching',
+        args: { notes: 'رجل' },
+      }),
+      text: 'عملت تمرين رجل النهاردة',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(training.completed).toEqual([{ id: 's1', note: 'رجل' }]);
+    expect(result.reply).toContain('سجّلت');
+    expect(result.reply).toContain('تمرين رجل');
   });
 });
 

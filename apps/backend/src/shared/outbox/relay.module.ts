@@ -13,6 +13,10 @@ import { RemindersPurgeOnDeletedHandler } from '../../contexts/reminders/feature
 import { RemindersModule } from '../../contexts/reminders/reminders.module.js';
 import { MeetingsPurgeOnDeletedHandler } from '../../contexts/meetings/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { MeetingsModule } from '../../contexts/meetings/meetings.module.js';
+import { BootstrapAthleteProfileHandler } from '../../contexts/training/features/bootstrap-athlete-profile/bootstrap-athlete-profile.handler.js';
+import { SessionMaterialiserSaga } from '../../contexts/training/features/materialise/materialise.saga.js';
+import { TrainingPurgeOnDeletedHandler } from '../../contexts/training/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { TrainingModule } from '../../contexts/training/training.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
 import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
@@ -92,6 +96,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     ConversationsModule,
     RhythmModule,
     MeetingsModule,
+    TrainingModule,
     SyncModule,
   ],
   providers: [
@@ -148,6 +153,9 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         RecordUsageHandler,
         OperationsPurgeOnDeletedHandler,
         MeetingsPurgeOnDeletedHandler,
+        SessionMaterialiserSaga,
+        BootstrapAthleteProfileHandler,
+        TrainingPurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -174,6 +182,9 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         recordUsage: RecordUsageHandler,
         operationsPurge: OperationsPurgeOnDeletedHandler,
         meetingsPurge: MeetingsPurgeOnDeletedHandler,
+        materialiser: SessionMaterialiserSaga,
+        trainingBootstrap: BootstrapAthleteProfileHandler,
+        trainingPurge: TrainingPurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -226,6 +237,18 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await profileBootstrap.handle(event);
                 await conversationsBootstrap.handle(event);
                 await rhythmBootstrap.handle(event);
+                /*
+                 * The fourth, from P6: an empty athlete profile.
+                 *
+                 * It is what lets every read promise a document rather than a
+                 * null — no sports and no slots is an answer the Athlete
+                 * screen, the coach prompt and the materialiser can all
+                 * render, where a nullable profile is the same "have they set
+                 * this up" branch written four times. Idempotent, like the
+                 * three above, which is what makes replaying all four after a
+                 * partial failure the correct recovery.
+                 */
+                await trainingBootstrap.handle(event);
                 return;
               /*
                * Four contexts hold something about a member, and all four are
@@ -250,6 +273,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await conversationsPurge.handle(event);
                 await operationsPurge.handle(event);
                 await meetingsPurge.handle(event);
+                await trainingPurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -305,12 +329,31 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               // correct instant depends on facts those contexts do not own:
               // the member's zone is Profile's, and whether they are banned or
               // have a phone at all is Identity's.
+              /*
+               * `profile.ProfileUpdated` now has two subscribers, which is
+               * exactly what `profileTimezone` above was kept as a named
+               * function for.
+               *
+               * The second is P6's materialiser, and it is here rather than on
+               * `PreferencesChanged` because **`timezone` lives on the
+               * profile, not in `PREFERENCE_FIELDS`.** P6's plan said
+               * otherwise; written that way the zone recompute would never
+               * once have run, and a member who flew would have kept a
+               * fortnight of sessions on the clock of the city they left. The
+               * saga takes both event names and branches on the field.
+               */
               case 'profile.ProfileUpdated':
                 await profileTimezone(event, alertPlanning);
+                await materialiser.onMemberContextChanged(event);
                 return;
               case 'profile.PreferencesChanged':
                 await alertPlanning.onPreferencesChanged(event);
                 await rhythmPreferences.handle(event);
+                // The cut-off half: a changed `nextPracticeCutoff` does not move
+                // a session, but the pass is idempotent and cheap, and having
+                // one entry point for "the member's context moved" is worth
+                // more than the write it saves.
+                await materialiser.onMemberContextChanged(event);
                 return;
               /*
                * Two reactions, and the second is the one that would have
@@ -391,6 +434,45 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
               case 'meetings.MeetingCancelled':
               case 'meetings.MeetingDeleted':
                 await alertPlanning.onMeetingClosed(event);
+                return;
+
+              /*
+               * ---- training ---------------------------------------------
+               *
+               * Three names into one method, because they ask the saga the same
+               * question — "here is what this member's fortnight should be now"
+               * — and the pass is idempotent, so distinguishing them would buy
+               * a narrower write at the cost of a second code path to keep in
+               * step. `ProgramApplied` is here rather than doing its filling at
+               * apply time, which is what lets a program outlive the
+               * materialisation horizon: week four is filled on the day the
+               * horizon reaches it (FR-008).
+               */
+              case 'training.SportsChanged':
+              case 'training.SlotsChanged':
+              case 'training.ProgramApplied':
+                await materialiser.onTrainingChanged(event);
+                return;
+              /*
+               * And the alerts. `SessionRescheduled` carries the same payload as
+               * `SessionScheduled` and reaches the same method, because
+               * reconciling makes them one operation.
+               *
+               * `SessionDeleted` in the closed branch is load-bearing rather
+               * than tidy: the materialiser **tombstones** a future session
+               * whose slot the member removed, and that raises this and nothing
+               * else — so without the row, a slot deleted at noon would leave
+               * its alarms to fire all week.
+               */
+              case 'training.SessionScheduled':
+              case 'training.SessionRescheduled':
+                await alertPlanning.onSessionScheduled(event);
+                return;
+              case 'training.SessionCompleted':
+              case 'training.SessionCancelled':
+              case 'training.SessionSkipped':
+              case 'training.SessionDeleted':
+                await alertPlanning.onSessionClosed(event);
                 return;
 
               /*

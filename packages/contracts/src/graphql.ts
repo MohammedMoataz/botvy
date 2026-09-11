@@ -21,6 +21,50 @@ export type Scalars = {
   JSON: { input: any; output: any; }
 };
 
+export type AgendaDay = {
+  __typename?: 'AgendaDay';
+  date: Scalars['Date']['output'];
+  items: Array<AgendaItem>;
+};
+
+export type AgendaItem = {
+  __typename?: 'AgendaItem';
+  allDay: Scalars['Boolean']['output'];
+  color?: Maybe<Scalars['String']['output']>;
+  endAt?: Maybe<Scalars['DateTime']['output']>;
+  event?: Maybe<CalendarEvent>;
+  id: Scalars['ID']['output'];
+  kind: AgendaKind;
+  meeting?: Maybe<Meeting>;
+  occurrenceAt: Scalars['DateTime']['output'];
+  subtitle?: Maybe<Scalars['String']['output']>;
+  title: Scalars['String']['output'];
+};
+
+/** What a row on the agenda is. `prep` is its own kind rather than an attribute of a meeting, because half an hour of preparation is half an hour that is not free (FR-002). */
+export enum AgendaKind {
+  Event = 'event',
+  Meeting = 'meeting',
+  Prep = 'prep',
+  Session = 'session',
+  Task = 'task'
+}
+
+export type AgendaKindCounts = {
+  __typename?: 'AgendaKindCounts';
+  event: Scalars['Int']['output'];
+  meeting: Scalars['Int']['output'];
+  prep: Scalars['Int']['output'];
+  session: Scalars['Int']['output'];
+  task: Scalars['Int']['output'];
+};
+
+export type AthleteProfile = {
+  __typename?: 'AthleteProfile';
+  slots: Array<Slot>;
+  sports: Array<Scalars['String']['output']>;
+};
+
 export type BodyMetric = {
   __typename?: 'BodyMetric';
   bodyFatPct?: Maybe<Scalars['Float']['output']>;
@@ -28,6 +72,18 @@ export type BodyMetric = {
   note?: Maybe<Scalars['String']['output']>;
   recordedAt: Scalars['DateTime']['output'];
   weightKg?: Maybe<Scalars['Float']['output']>;
+};
+
+export type CalendarEvent = {
+  __typename?: 'CalendarEvent';
+  allDay: Scalars['Boolean']['output'];
+  color?: Maybe<Scalars['String']['output']>;
+  endAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  recurrence?: Maybe<MeetingRecurrence>;
+  startAt: Scalars['DateTime']['output'];
+  title: Scalars['String']['output'];
 };
 
 export type Checkin = {
@@ -88,6 +144,15 @@ export enum DeviceKind {
   Web = 'web'
 }
 
+export type Exercise = {
+  __typename?: 'Exercise';
+  id: Scalars['ID']['output'];
+  mediaRefs: Array<MediaRef>;
+  name: Scalars['String']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  sets: Array<SetEntry>;
+};
+
 export type Label = {
   __typename?: 'Label';
   color: Scalars['String']['output'];
@@ -104,6 +169,67 @@ export type LabelSnapshot = {
   color: Scalars['String']['output'];
   name: Scalars['String']['output'];
 };
+
+export type Location = {
+  __typename?: 'Location';
+  address?: Maybe<Scalars['String']['output']>;
+  onlineLink?: Maybe<Scalars['String']['output']>;
+};
+
+export type MediaRef = {
+  __typename?: 'MediaRef';
+  caption?: Maybe<Scalars['String']['output']>;
+  type: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type Meeting = {
+  __typename?: 'Meeting';
+  allDay: Scalars['Boolean']['output'];
+  description?: Maybe<Scalars['String']['output']>;
+  durationMin: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  location: Location;
+  lockTimezone?: Maybe<Scalars['String']['output']>;
+  nextOccurrence?: Maybe<Scalars['DateTime']['output']>;
+  prepMinutes: Scalars['Int']['output'];
+  prepNotes?: Maybe<Scalars['String']['output']>;
+  recurrence?: Maybe<MeetingRecurrence>;
+  reminderOffsets: Array<Scalars['Int']['output']>;
+  startAt: Scalars['DateTime']['output'];
+  status: MeetingStatus;
+  title: Scalars['String']['output'];
+};
+
+export type MeetingOccurrence = {
+  __typename?: 'MeetingOccurrence';
+  durationMin: Scalars['Int']['output'];
+  endAt: Scalars['DateTime']['output'];
+  location: Location;
+  meetingId: Scalars['ID']['output'];
+  moved: Scalars['Boolean']['output'];
+  originalStart: Scalars['DateTime']['output'];
+  prepMinutes: Scalars['Int']['output'];
+  reminderOffsets: Array<Scalars['Int']['output']>;
+  startAt: Scalars['DateTime']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type MeetingRecurrence = {
+  __typename?: 'MeetingRecurrence';
+  dtstart: Scalars['DateTime']['output'];
+  exdates: Array<Scalars['DateTime']['output']>;
+  humanText: Scalars['String']['output'];
+  overrides: Array<Override>;
+  rrule: Scalars['String']['output'];
+};
+
+/** In the diary, it happened, or it is off. Deleting never changes it — the status is the only record of which, and the Deleted view exists to show exactly that. */
+export enum MeetingStatus {
+  Cancelled = 'cancelled',
+  Completed = 'completed',
+  Scheduled = 'scheduled'
+}
 
 export type Message = {
   __typename?: 'Message';
@@ -129,6 +255,31 @@ export enum MessageRole {
   System = 'system',
   User = 'user'
 }
+
+export type MonthDay = {
+  __typename?: 'MonthDay';
+  busy: Scalars['Boolean']['output'];
+  byKind: AgendaKindCounts;
+  date: Scalars['Date']['output'];
+  total: Scalars['Int']['output'];
+};
+
+export type NextPractice = {
+  __typename?: 'NextPractice';
+  isToday: Scalars['Boolean']['output'];
+  /** 'today' | 'after-cutoff' | 'none-scheduled' */
+  reason: Scalars['String']['output'];
+  session?: Maybe<Session>;
+};
+
+export type Override = {
+  __typename?: 'Override';
+  durationMin?: Maybe<Scalars['Int']['output']>;
+  location?: Maybe<Location>;
+  originalStart: Scalars['DateTime']['output'];
+  startAt?: Maybe<Scalars['DateTime']['output']>;
+  title?: Maybe<Scalars['String']['output']>;
+};
 
 /** What the member decided about a day: proposed and unanswered, agreed, or declined. A day with no plan at all reads as `draft` with no `promptedAt`. */
 export enum PlanStatus {
@@ -188,8 +339,37 @@ export type Profile = {
   userId: Scalars['ID']['output'];
 };
 
+export type Program = {
+  __typename?: 'Program';
+  appliedStartDate?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  source: Scalars['String']['output'];
+  sourceLinkIds: Array<Scalars['ID']['output']>;
+  sport: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+  weeks: Array<ProgramWeek>;
+};
+
+export type ProgramSessionTemplate = {
+  __typename?: 'ProgramSessionTemplate';
+  exercises: Array<TemplateExercise>;
+  focus?: Maybe<Scalars['String']['output']>;
+  templateId: Scalars['ID']['output'];
+  title: Scalars['String']['output'];
+  weekday?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ProgramWeek = {
+  __typename?: 'ProgramWeek';
+  index: Scalars['Int']['output'];
+  sessions: Array<ProgramSessionTemplate>;
+};
+
 export type Query = {
   __typename?: 'Query';
+  agenda: Array<AgendaDay>;
+  athleteProfile: AthleteProfile;
   /** The caller's body metric history. */
   bodyMetrics: Array<BodyMetric>;
   checkins: Array<Checkin>;
@@ -200,19 +380,28 @@ export type Query = {
   labels: Array<Label>;
   /** The authenticated member. */
   me: User;
+  meeting?: Maybe<Meeting>;
+  meetingOccurrences: Array<MeetingOccurrence>;
+  meetings: Array<Meeting>;
   messages: MessageConnection;
+  monthOverview: Array<MonthDay>;
   /** The caller's own registered devices. */
   myDevices: Array<Device>;
+  nextPractice: NextPractice;
   plans: Array<DailyPlan>;
   /** The caller's own preferences. */
   preferences: Preferences;
   /** The caller's own profile. */
   profile: Profile;
+  program?: Maybe<Program>;
+  programs: Array<Program>;
   quickQuestions: Array<QuickQuestion>;
   reminder?: Maybe<Reminder>;
   reminders: ReminderPage;
   /** Registered machine callers. Administrators only. */
   serviceClients: Array<ServiceClient>;
+  session?: Maybe<Session>;
+  sessions: Array<Session>;
   /** The settings registry. Administrators only. */
   settings: Array<Setting>;
   streak: Streak;
@@ -222,6 +411,13 @@ export type Query = {
   tomorrowDraft: DailyPlan;
   /** Every member. Administrators only. */
   users: UserConnection;
+  workouts: Array<Workout>;
+};
+
+
+export type QueryAgendaArgs = {
+  from: Scalars['DateTime']['input'];
+  to: Scalars['DateTime']['input'];
 };
 
 
@@ -251,6 +447,22 @@ export type QueryLabelsArgs = {
 };
 
 
+export type QueryMeetingArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryMeetingOccurrencesArgs = {
+  from: Scalars['DateTime']['input'];
+  to: Scalars['DateTime']['input'];
+};
+
+
+export type QueryMeetingsArgs = {
+  includeCompleted?: InputMaybe<Scalars['Boolean']['input']>;
+};
+
+
 export type QueryMessagesArgs = {
   afterSeq?: InputMaybe<Scalars['Int']['input']>;
   conversationId: Scalars['ID']['input'];
@@ -258,9 +470,25 @@ export type QueryMessagesArgs = {
 };
 
 
+export type QueryMonthOverviewArgs = {
+  month: Scalars['Int']['input'];
+  year: Scalars['Int']['input'];
+};
+
+
 export type QueryPlansArgs = {
   from: Scalars['Date']['input'];
   to: Scalars['Date']['input'];
+};
+
+
+export type QueryProgramArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QueryProgramsArgs = {
+  includeArchived?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 
@@ -278,6 +506,17 @@ export type QueryRemindersArgs = {
   cursor?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   view: ReminderViewName;
+};
+
+
+export type QuerySessionArgs = {
+  id: Scalars['ID']['input'];
+};
+
+
+export type QuerySessionsArgs = {
+  from: Scalars['DateTime']['input'];
+  to: Scalars['DateTime']['input'];
 };
 
 
@@ -305,6 +544,11 @@ export type QueryUsersArgs = {
   role?: InputMaybe<Role>;
   search?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<UserStatus>;
+};
+
+
+export type QueryWorkoutsArgs = {
+  sport?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type QuickQuestion = {
@@ -365,6 +609,45 @@ export type ServiceClient = {
   scopes: Array<Scalars['String']['output']>;
 };
 
+export type Session = {
+  __typename?: 'Session';
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  durationMin: Scalars['Int']['output'];
+  exercises: Array<Exercise>;
+  focus?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  isMissed: Scalars['Boolean']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  plannedAt: Scalars['DateTime']['output'];
+  programId?: Maybe<Scalars['ID']['output']>;
+  sport: Scalars['String']['output'];
+  status: SessionStatus;
+  suggestionId?: Maybe<Scalars['ID']['output']>;
+  title: Scalars['String']['output'];
+  weekIndex?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Planned, done, called off, or deliberately not done. A skipped session stays in the week so the record is honest, and deleting one never changes its status. */
+export enum SessionStatus {
+  Cancelled = 'cancelled',
+  Completed = 'completed',
+  Planned = 'planned',
+  Skipped = 'skipped'
+}
+
+export type SetEntry = {
+  __typename?: 'SetEntry';
+  actualDistanceM?: Maybe<Scalars['Int']['output']>;
+  actualDurationSec?: Maybe<Scalars['Int']['output']>;
+  actualReps?: Maybe<Scalars['Int']['output']>;
+  actualWeightKg?: Maybe<Scalars['Float']['output']>;
+  done: Scalars['Boolean']['output'];
+  targetDistanceM?: Maybe<Scalars['Int']['output']>;
+  targetDurationSec?: Maybe<Scalars['Int']['output']>;
+  targetReps?: Maybe<Scalars['Int']['output']>;
+  targetWeightKg?: Maybe<Scalars['Float']['output']>;
+};
+
 export type Setting = {
   __typename?: 'Setting';
   defaultValue?: Maybe<Scalars['JSON']['output']>;
@@ -372,6 +655,16 @@ export type Setting = {
   key: Scalars['String']['output'];
   readOnly: Scalars['Boolean']['output'];
   value?: Maybe<Scalars['JSON']['output']>;
+};
+
+export type Slot = {
+  __typename?: 'Slot';
+  durationMin: Scalars['Int']['output'];
+  id: Scalars['ID']['output'];
+  location?: Maybe<Scalars['String']['output']>;
+  sport: Scalars['String']['output'];
+  start: Scalars['String']['output'];
+  weekday: Scalars['Int']['output'];
 };
 
 export type Streak = {
@@ -420,6 +713,22 @@ export enum TaskViewName {
   Upcoming = 'upcoming'
 }
 
+export type TemplateExercise = {
+  __typename?: 'TemplateExercise';
+  mediaRefs: Array<MediaRef>;
+  name: Scalars['String']['output'];
+  notes?: Maybe<Scalars['String']['output']>;
+  sets: Array<TemplateSet>;
+};
+
+export type TemplateSet = {
+  __typename?: 'TemplateSet';
+  targetDistanceM?: Maybe<Scalars['Int']['output']>;
+  targetDurationSec?: Maybe<Scalars['Int']['output']>;
+  targetReps?: Maybe<Scalars['Int']['output']>;
+  targetWeightKg?: Maybe<Scalars['Float']['output']>;
+};
+
 export type User = {
   __typename?: 'User';
   createdAt: Scalars['DateTime']['output'];
@@ -443,3 +752,12 @@ export enum UserStatus {
   Active = 'active',
   Banned = 'banned'
 }
+
+export type Workout = {
+  __typename?: 'Workout';
+  exercises: Array<Exercise>;
+  id: Scalars['ID']['output'];
+  name: Scalars['String']['output'];
+  sport: Scalars['String']['output'];
+  tags: Array<Scalars['String']['output']>;
+};

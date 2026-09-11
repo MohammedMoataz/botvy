@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.ProgramCreated",
+  "description": "Payload of training.ProgramCreated. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "programId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "title": {
+      "type": "string"
+    },
+    "weeks": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "programId",
+    "title",
+    "weeks"
+  ],
+  "additionalProperties": false
+}

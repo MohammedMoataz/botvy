@@ -87,12 +87,27 @@ class SyncEngine {
   /// server's `applyOrder` (30, 32, 34) and `contracts/sync.md`'s list. Neither
   /// references anything, so the position buys nothing but a sequence that
   /// nobody will "fix" in the wrong direction.
+  /// `athlete_profile`, `programs`, `workouts` and `sessions` are P6's, and
+  /// all four are push-and-pull. The order is `sync.md`'s own — "programs
+  /// before sessions", because a session names the program that filled it and
+  /// the week of it, and a session written before that program would render a
+  /// row referring to nothing. `athlete_profile` precedes both for the same
+  /// reason: a session carries the `slotId` that produced it.
+  ///
+  /// `athlete_profile` is the one **patch** in this list rather than a row —
+  /// one document per member, pushed as `{"patch": {…}}` over an allowlist of
+  /// `sports` and `slots`, with no conflict check and no delete sweep. See
+  /// [_EntityApplier.patchShaped] and [_AthleteProfileApplier].
   static const List<String> entities = [
     'labels',
     'tasks',
     'reminders',
     'meetings',
     'calendar_events',
+    'athlete_profile',
+    'programs',
+    'workouts',
+    'sessions',
     'daily_plans',
     'checkins',
     'rhythm_state',
@@ -238,7 +253,14 @@ class SyncEngine {
     for (final entity in entities) {
       final rows = await _pendingRows(entity);
       if (rows.isEmpty) continue;
-      push[entity] = rows.map((row) => row.payload).toList();
+      // A list of rows for a collection, and the bare object for a singleton
+      // the server takes as a patch. `sync.md` spells the second one
+      // `"athlete_profile": {"patch": {…}}`, so wrapping it in a list would be
+      // a patch the server reads as absent — and the member's sports would
+      // stay pending for ever, silently.
+      push[entity] = _appliers[entity]!.patchShaped
+          ? rows.first.payload
+          : rows.map((row) => row.payload).toList();
       pushedIds[entity] = {for (final row in rows) row.id};
     }
 
@@ -564,6 +586,10 @@ class SyncEngine {
     'reminders': _ReminderApplier(),
     'meetings': _MeetingApplier(),
     'calendar_events': _CalendarEventApplier(),
+    'athlete_profile': _AthleteProfileApplier(),
+    'programs': _ProgramApplier(),
+    'workouts': _WorkoutApplier(),
+    'sessions': _SessionApplier(),
     'daily_plans': _DailyPlanApplier(),
     'checkins': _CheckinApplier(),
     'rhythm_state': _RhythmStateApplier(),
@@ -700,6 +726,16 @@ class _PendingRow {
 /// type checking that makes the generated code worth having. Six short
 /// overrides per entity is the cheaper trade.
 abstract class _EntityApplier {
+  /// True for a singleton the server takes as a **patch** rather than as a list
+  /// of rows — `profile`, `preferences`, `athlete_profile`.
+  ///
+  /// It changes one thing: the shape [SyncEngine._roundTrip] puts in `push`.
+  /// A flag rather than a second port, because that is the whole of the
+  /// difference on the push side; the rest of a patch entity's behaviour — no
+  /// conflict columns, no sweep — is expressed by what its applier does, which
+  /// is where a reader looks for it.
+  bool get patchShaped => false;
+
   /// This row's primary key, or null when the response carried something that
   /// is not a row of this entity at all.
   ///
@@ -1369,6 +1405,517 @@ class _CalendarEventApplier extends _EntityApplier {
   @override
   Future<void> sweep(AppDatabase db, Set<String> seen) async {
     await (db.delete(db.calendarEvents)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
+/// The member's sports and weekly slots, pushed as a **patch** (P6, T650).
+///
+/// The one entity in this phase that is not a row, and the shape `profile` and
+/// `preferences` will use when they move off REST: the server holds one
+/// document per member and `sync.md` gives it the push slot
+/// `{"athlete_profile": {"patch": {…}}}` over an allowlist of `sports` and
+/// `slots`. Three consequences, and each is a method below doing less than its
+/// siblings:
+///
+/// * **No conflict check.** The fields a client may write and the fields
+///   server jobs write are disjoint, so there is no `baseUpdatedAt` to send and
+///   nothing to be `stale` about. A re-pushed patch is the same patch.
+/// * **No delete sweep.** There is nothing to delete: the server writes the
+///   empty profile when the member registers, which is what lets the Athlete
+///   screen, the coach prompt and the materialiser all read a document rather
+///   than branch on a null.
+/// * **No id on the wire.** The response is already scoped to the principal,
+///   so the pulled record carries no key — the same problem
+///   [_RhythmStateApplier] has, solved the same way: [keyOf] falls back to a
+///   sentinel for the apply loop's `seen` set, and [writeServerRow] resolves
+///   the real key from the account this install is signed in as.
+///
+/// The push *does* need an id, because the engine clears `pendingOp` only for
+/// the ids the server named and the server answers `accepted.athlete_profile`
+/// with the patch adapter's own id — the member's. So [pending] keys the row by
+/// its `userId`, which is the column it is stored under anyway.
+class _AthleteProfileApplier extends _EntityApplier {
+  static const String _singleton = 'athlete_profile';
+
+  @override
+  bool get patchShaped => true;
+
+  @override
+  String? keyOf(Map<String, dynamic> row) {
+    final userId = row['userId'] ?? row['id'];
+    return userId is String && userId.isNotEmpty ? userId : _singleton;
+  }
+
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final row = await (db.select(db.athleteProfile)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).getSingleOrNull();
+    if (row == null) return const [];
+
+    return [
+      _PendingRow(row.userId, {
+        // The allowlist, and only the allowlist. Anything else here is a field
+        // the server is contractually obliged to drop, which is worse than not
+        // sending it: it reads as a write that happened.
+        'patch': {
+          'sports': decodeStringList(row.sportsJson),
+          'slots': _decodeJson(row.slotsJson) ?? const [],
+        },
+      }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows = await (db.select(db.athleteProfile)
+          ..where((r) => r.pendingOp.isNotNull()))
+        .get();
+    return {for (final row in rows) row.userId};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.athleteProfile)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.userId};
+  }
+
+  /// Never. A patch has no purge — see the class note.
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async =>
+      const {};
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.athleteProfile)..where((r) => r.userId.isIn(ids)))
+        .write(
+      const AthleteProfileCompanion(
+        pendingOp: Value(null),
+        pushAttempts: Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.athleteProfile)..where((r) => r.userId.equals(id)))
+        .write(AthleteProfileCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.athleteProfile)..where((r) => r.userId.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final wireId = row['userId'] ?? row['id'];
+    final userId = wireId is String && wireId.isNotEmpty
+        ? wireId
+        : await db.getValue(DbKeys.userId);
+    // A member with no session is skipped rather than guessed at: a row keyed
+    // by the sentinel would collide with the next account to sign in on this
+    // handset. Same rule [_RhythmStateApplier] follows, for the same reason.
+    if (userId == null || userId.isEmpty) return;
+
+    await db.into(db.athleteProfile).insertOnConflictUpdate(
+      AthleteProfileCompanion.insert(
+        userId: userId,
+        sportsJson: Value(jsonEncode(row['sports'] ?? const [])),
+        slotsJson: Value(jsonEncode(row['slots'] ?? const [])),
+        fetchedAt: DateTime.now().toUtc(),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  /// Nothing, and deliberately: one document per member, so there is nothing a
+  /// snapshot could reveal the absence of.
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {}
+}
+
+/// One program, push and pull (P6).
+///
+/// `appliedStartDate` is deliberately **not** sent. It is written by
+/// `POST /programs/:id/apply` on the server and read by the materialiser to
+/// work out which week a session created three weeks later belongs to; a phone
+/// that could rewrite it would move a member's whole program by a week with
+/// nothing visibly changing on the row.
+///
+/// Applying and archiving are REST commands rather than pushes for the reason
+/// [_ConversationApplier] gives about a chat: the **refusal** is the point. An
+/// apply that would replace planned content comes back `409` with the list of
+/// what it would replace, and the member has to see that list and agree before
+/// it happens (story 4 scenario 2) — which a rejection arriving on the next
+/// sync pass, with no screen still open, cannot do.
+class _ProgramApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.programs)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          'data': {
+            'title': row.title,
+            'sport': row.sport,
+            'source': row.source,
+            // Objects, not strings: the adapter reads inside `weeks`, so a
+            // string here would arrive as a program with no weeks at all.
+            'weeks': _decodeJson(row.weeksJson) ?? const [],
+            'sourceLinkIds': decodeStringList(row.sourceLinkIdsJson),
+            'status': row.status,
+          },
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows = await (db.select(db.programs)
+          ..where((r) => r.pendingOp.isNotNull()))
+        .get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.programs)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.programs)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.programs)..where((r) => r.id.isIn(ids))).write(
+      const ProgramsCompanion(pendingOp: Value(null), pushAttempts: Value(0)),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.programs)..where((r) => r.id.equals(id)))
+        .write(ProgramsCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.programs)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+
+    await db.into(db.programs).insertOnConflictUpdate(
+      ProgramsCompanion.insert(
+        id: row['id'] as String,
+        title: row['title'] as String? ?? '',
+        sport: row['sport'] as String? ?? '',
+        source: Value(row['source'] as String? ?? 'user'),
+        sourceLinkIdsJson: Value(
+          jsonEncode(
+            (row['sourceLinkIds'] as List? ?? const [])
+                .map((raw) => '$raw')
+                .toList(),
+          ),
+        ),
+        weeksJson: Value(jsonEncode(row['weeks'] ?? const [])),
+        status: Value(row['status'] as String? ?? 'active'),
+        appliedStartDate: Value(row['appliedStartDate'] as String?),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.programs)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
+/// One library workout, push and pull (P6, FR-009).
+class _WorkoutApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.workouts)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          'data': {
+            'name': row.name,
+            'sport': row.sport,
+            'exercises': _decodeJson(row.exercisesJson) ?? const [],
+            'tags': decodeStringList(row.tagsJson),
+          },
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows = await (db.select(db.workouts)
+          ..where((r) => r.pendingOp.isNotNull()))
+        .get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.workouts)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.workouts)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.workouts)..where((r) => r.id.isIn(ids))).write(
+      const WorkoutsCompanion(pendingOp: Value(null), pushAttempts: Value(0)),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.workouts)..where((r) => r.id.equals(id)))
+        .write(WorkoutsCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.workouts)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+
+    await db.into(db.workouts).insertOnConflictUpdate(
+      WorkoutsCompanion.insert(
+        id: row['id'] as String,
+        name: row['name'] as String? ?? '',
+        sport: row['sport'] as String? ?? '',
+        exercisesJson: Value(jsonEncode(row['exercises'] ?? const [])),
+        tagsJson: Value(
+          jsonEncode(
+            (row['tags'] as List? ?? const []).map((raw) => '$raw').toList(),
+          ),
+        ),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.workouts)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
+/// One training session, push and pull (P6, FR-012).
+///
+/// Everything a member does to a session is an edit to this row — logging a
+/// set, completing it, cancelling it, skipping it, reordering its exercises,
+/// dropping a library workout into it — so all of it works with no network, the
+/// same way [_MeetingApplier] carries a meeting's whole life. SC-004 is the
+/// requirement that makes it a row edit rather than a command: a six-exercise
+/// gym session logged offline has to appear on another device **exactly once**
+/// when the phone reconnects, and the client-minted UUIDv7 in [Sessions.id] is
+/// the whole of what guarantees it — the push is an upsert on an id the server
+/// has never seen, so a retried request writes the same row twice and produces
+/// one session.
+///
+/// `suggestionId` is carried on the row and never sent, for the reason a
+/// meeting's `authoredTimezone` is not: it names a Knowledge suggestion that
+/// only the server can have accepted, and nothing on the phone can mint one.
+///
+/// There is no `missed` here either, on the wire or in the column. See
+/// [Sessions].
+class _SessionApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.sessions)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          'data': {
+            'plannedAt': row.plannedAt.toUtc().toIso8601String(),
+            'durationMin': row.durationMin,
+            'sport': row.sport,
+            'title': row.title,
+            'focus': row.focus,
+            'programId': row.programId,
+            'weekIndex': row.weekIndex,
+            'slotId': row.slotId,
+            // An object, not a string: the adapter reads
+            // `fields.exercises[].sets[].actualReps`, so a JSON string here
+            // would arrive as a session with no sets and the member's whole log
+            // would be dropped without an error.
+            'exercises': _decodeJson(row.exercisesJson) ?? const [],
+            // Written by the server rather than re-transitioned: the phone has
+            // already applied the local effects and is reporting an outcome,
+            // the same way a meeting completed offline is.
+            'status': row.status,
+            'completedAt': row.completedAt?.toUtc().toIso8601String(),
+            'notes': row.notes,
+          },
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows = await (db.select(db.sessions)
+          ..where((r) => r.pendingOp.isNotNull()))
+        .get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.sessions)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.sessions)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.sessions)..where((r) => r.id.isIn(ids))).write(
+      const SessionsCompanion(pendingOp: Value(null), pushAttempts: Value(0)),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.sessions)..where((r) => r.id.equals(id)))
+        .write(SessionsCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.sessions)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+
+    await db.into(db.sessions).insertOnConflictUpdate(
+      SessionsCompanion.insert(
+        id: row['id'] as String,
+        plannedAt: _date(row['plannedAt']) ?? updatedAt,
+        durationMin: Value(row['durationMin'] as int? ?? 60),
+        sport: row['sport'] as String? ?? '',
+        title: row['title'] as String? ?? '',
+        focus: Value(row['focus'] as String?),
+        programId: Value(row['programId'] as String?),
+        weekIndex: Value(row['weekIndex'] as int?),
+        slotId: Value(row['slotId'] as String?),
+        suggestionId: Value(row['suggestionId'] as String?),
+        exercisesJson: Value(jsonEncode(row['exercises'] ?? const [])),
+        // Written, never transitioned, for the reason the task applier gives:
+        // the pulled row *is* the outcome of whatever happened elsewhere.
+        status: Value(row['status'] as String? ?? 'planned'),
+        completedAt: Value(_date(row['completedAt'])),
+        notes: Value(row['notes'] as String?),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.sessions)..where(
       (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
     )).go();
   }

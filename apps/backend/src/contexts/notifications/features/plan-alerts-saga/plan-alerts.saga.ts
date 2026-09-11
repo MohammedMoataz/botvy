@@ -271,6 +271,96 @@ export class PlanAlertsSaga {
     );
   }
 
+  // ------------------------------------------------------------------ Training
+
+  /**
+   * `training.SessionScheduled` and `SessionRescheduled` (FR-014).
+   *
+   * The task branch's shape, and for the same reason: reconciling makes the two
+   * events one operation, "here is what this session's reminders should be
+   * now". A session has exactly **one** occurrence, so this is `plan` and not
+   * P5's multi-occurrence sibling — a slot's weekly repetition is materialised
+   * as separate session rows, each with its own id and its own moment, which is
+   * precisely what makes a rule expander unnecessary here.
+   *
+   * ## Always timed, and that is a property of the model rather than an omission
+   *
+   * `timed: true` unconditionally, because there is no such thing as an all-day
+   * session: `Session.plannedAt` is a moment and `durationMin` is required. So
+   * the member's default lead times all apply, which is what FR-014 asks for —
+   * "reminded of a session before it starts, at their own lead time". The
+   * absence of `allDay` from `Session.alertFacts()` is therefore not the P2
+   * defect repeating itself; the field has no meaning to state.
+   *
+   * ## The `status` guard is the half that is easy to leave out
+   *
+   * `Session.restore()` re-raises `SessionScheduled` with the status the row
+   * already had, and `edit()` raises `SessionRescheduled` the same way — so a
+   * member who restores a *cancelled* session, or renames a *completed* one,
+   * arrives here asking for reminders about something they have already dealt
+   * with. Reconciling to an empty set is the same answer `onSessionClosed`
+   * gives and it keeps FR-014 true on both paths, rather than leaving one event
+   * name able to resurrect a dropped alarm.
+   */
+  async onSessionScheduled(event: DomainEvent): Promise<void> {
+    const payload = event.payload as {
+      sessionId?: string;
+      plannedAt?: Date | string;
+      title?: string;
+      sport?: string;
+      status?: string;
+    };
+    const userId = event.userId;
+    if (!userId || !payload.sessionId) return;
+
+    const plannedAt = asDate(payload.plannedAt);
+    const source = { kind: 'session' as const, id: payload.sessionId };
+
+    if (!plannedAt || (payload.status && payload.status !== 'planned')) {
+      await this.reconcile(userId, source, []);
+      return;
+    }
+
+    await this.plan(userId, {
+      ...source,
+      occurrenceAt: plannedAt,
+      moment: plannedAt,
+      title: payload.title ?? 'Training',
+      timed: true,
+      deepLink: `botvy://sessions/${payload.sessionId}`,
+    });
+  }
+
+  /**
+   * `training.SessionCompleted`, `SessionCancelled`, `SessionSkipped` and
+   * `SessionDeleted`: the pending reminders go (FR-014).
+   *
+   * Four names, one method, and the fourth is the one that has to be here
+   * rather than somewhere else. A slot the member removes takes its future
+   * sessions with it, and the materialiser removes those by tombstoning them —
+   * which raises `SessionDeleted` and nothing else. Without this name in the
+   * branch, a member who deletes their Friday slot keeps every Friday alarm for
+   * as long as the horizon was materialised.
+   *
+   * Straight to `deletePendingForSource` rather than through `reconcile`,
+   * exactly as the meeting and reminder branches do: these payloads carry
+   * `{ sessionId, at }`, there is no moment to expand, and an empty desired set
+   * is one delete either way. A *sent* alert is untouched — an alert already
+   * delivered is a thing that happened.
+   */
+  async onSessionClosed(event: DomainEvent): Promise<void> {
+    const payload = event.payload as { sessionId?: string };
+    const userId = event.userId;
+    if (!userId || !payload.sessionId) return;
+
+    await this.uow.run(() =>
+      this.alerts.deletePendingForSource(userId, {
+        kind: 'session',
+        id: payload.sessionId!,
+      }),
+    );
+  }
+
   // -------------------------------------------------------------- Daily Rhythm
 
   /**
@@ -599,6 +689,15 @@ export class PlanAlertsSaga {
          * warning is always future-dated, so the phone pulls it and schedules
          * its own alarm — unlike a rhythm touch, whose alert is planned for
          * *now* and therefore depends on the server sweep.
+         *
+         * A **session** is rebuilt from here and is deliberately not a second
+         * exception. Its `occurrenceAt` is a real stored instant on a row, so
+         * this recomputes its lead times correctly against the new zone; the
+         * instant itself moving is Training's own problem, and Training solves
+         * it — the materialiser recomputes `plannedAt` for future planned
+         * sessions on a zone change and raises `SessionRescheduled`, which
+         * reconciles this source again with the moment it has now. Skipping
+         * sessions here would leave the interim wrong for no gain.
          */
         if (alert.source.kind === 'meeting') continue;
 

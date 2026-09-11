@@ -18,6 +18,14 @@ import { ReminderLifecycleHandler } from '../../reminders/features/reminder-life
 import { RemindersQueryHandler } from '../../reminders/features/reminders-query/reminders.query.js';
 import { ProfileQueryHandler } from '../../profile/features/profile-query/profile.query.js';
 import { UpdateProfileHandler } from '../../profile/features/update-profile/update-profile.handler.js';
+import { AthleteProfileQueryHandler } from '../../training/features/athlete-profile/athlete-profile.query.js';
+import { CompleteSessionHandler } from '../../training/features/complete-session/complete-session.handler.js';
+import { LogSessionHandler } from '../../training/features/log-session/log-session.handler.js';
+import { SessionQueryHandler } from '../../training/features/session/session.query.js';
+import { SessionsQueryHandler } from '../../training/features/sessions/sessions.query.js';
+import { SetSlotsHandler } from '../../training/features/set-slots/set-slots.handler.js';
+import { TrainingSummaryQueryHandler } from '../../training/features/training-summary/training-summary.query.js';
+import { SessionNotFound } from '../../training/features/update-session/update-session.handler.js';
 import { StreakQueryHandler } from '../../rhythm/features/streak/streak.query.js';
 import { TodayPlanQueryHandler } from '../../rhythm/features/today-plan/today-plan.query.js';
 import { CaptureCheckinReplyHandler } from '../../rhythm/features/capture-checkin-reply/capture-checkin-reply.handler.js';
@@ -31,13 +39,17 @@ import {
   MemberFactsPort,
   PlannerActionsPort,
   ProfileWritesPort,
+  TrainingActionsPort,
+  TrainingSummaryPort,
   UsagePort,
   type CancellableItem,
   type CardItem,
+  type ChatTrainingSlot,
   type CheckinCapture,
   type CreatedItem,
   type MemberDay,
   type MemberFacts,
+  type TrainingSessionRef,
 } from '../domain/chat.ports.js';
 
 /**
@@ -104,6 +116,18 @@ export class RhythmMemberDay extends MemberDayPort {
     private readonly plans: TodayPlanQueryHandler,
     private readonly streaks: StreakQueryHandler,
     private readonly profiles: ProfileQueryHandler,
+    /**
+     * Training's own account of the week, which replaces what the plan
+     * snapshot could say about it (T661, FR-017).
+     *
+     * The rhythm's `plan.training` is the evening's *snapshot* of what today
+     * was going to hold, which is the right thing for the Home card and the
+     * wrong thing for a coach: it names one session and knows nothing about the
+     * sports, the focus, or whether the member has trained at all this month.
+     * It is also a day old by the time the coach is asked anything, so a
+     * session completed or skipped since is still in it.
+     */
+    private readonly training: TrainingSummaryPort,
   ) {
     super();
   }
@@ -113,9 +137,10 @@ export class RhythmMemberDay extends MemberDayPort {
     const timezone = profile?.timezone ?? 'Africa/Cairo';
     const today = localDate(now, timezone);
 
-    const [plan, streak] = await Promise.all([
+    const [plan, streak, trainingLine] = await Promise.all([
       this.plans.handle(userId, today),
       this.streaks.handle(userId, now),
+      this.training.lineFor(userId, now),
     ]);
 
     return {
@@ -126,14 +151,32 @@ export class RhythmMemberDay extends MemberDayPort {
         // will happily quote it back at them.
         return `P${task.priority} ${task.title}${at && at !== '00:00' ? ` at ${at}` : ''}`;
       }),
-      trainingLine: plan.training
-        ? `${plan.training.title} (${plan.training.sport})`
-        : null,
+      trainingLine,
       mealLine: plan.mealLine ?? null,
       streakCurrent: streak.current,
       streakBest: streak.best,
       today,
     };
+  }
+}
+
+/**
+ * Training answers what the member's week of practice looks like (FR-017).
+ *
+ * A one-line adapter over a `*.query.ts` handler, which is the point: the
+ * sentence itself is composed in Training, where the sports, the sessions and
+ * the streak live, so the coach and every later reader of the same fact describe
+ * a training week identically. Composing it here would put Training's vocabulary
+ * in Conversations and give the next caller a reason to write a second version.
+ */
+@Injectable()
+export class TrainingWeekSummary extends TrainingSummaryPort {
+  constructor(private readonly training: TrainingSummaryQueryHandler) {
+    super();
+  }
+
+  async lineFor(userId: string, now: Date): Promise<string> {
+    return this.training.summary(userId, now);
   }
 }
 
@@ -418,6 +461,205 @@ export class MeetingsChatActions extends MeetingActionsPort {
       deepLink: `botvy://meetings/${occurrence.meetingId}`,
     }));
   }
+}
+
+/**
+ * Training answers what the member practises, and records that they did.
+ *
+ * Five published surfaces and no repository, which is the rule
+ * `CLAUDE.md` states as "a `*.query.ts` handler is the published surface": the
+ * timetable comes from `AthleteProfileQueryHandler`, the week from
+ * `SessionsQueryHandler`, and the two writes from the command handlers the REST
+ * surface uses. Nothing here opens `athlete_profiles` or `sessions`.
+ *
+ * **The chat mints a new slot's id.** The same argument as the task and the
+ * meeting: `AthleteProfile.setSlots` keys future sessions to a slot's id, so a
+ * retried write must not re-mint one — and an *existing* slot's id arrives from
+ * the executor's merge, which is what keeps its already-materialised sessions.
+ *
+ * **A domain refusal becomes `null`.** `AthleteProfileRuleError` is Training's
+ * vocabulary and `chat.ports.ts` may not import its codes, so the code is
+ * logged here and the executor tells the member nothing was saved. Anything
+ * that is not a rule refusal is rethrown, because a store that is down is not a
+ * sentence the member typed wrongly.
+ */
+@Injectable()
+export class TrainingChatActions extends TrainingActionsPort {
+  private readonly logger = new Logger(TrainingChatActions.name);
+
+  constructor(
+    private readonly profiles: AthleteProfileQueryHandler,
+    private readonly slots: SetSlotsHandler,
+    private readonly sessions: SessionsQueryHandler,
+    private readonly session: SessionQueryHandler,
+    private readonly logs: LogSessionHandler,
+    private readonly completions: CompleteSessionHandler,
+    private readonly member: MemberContextPort,
+  ) {
+    super();
+  }
+
+  async week(userId: string): Promise<ChatTrainingSlot[]> {
+    // Never null — `AthleteProfileQueryHandler` promises a document and answers
+    // an empty one for a member mid-bootstrap. So "no week yet" and "a week
+    // with nothing in it" are the same thing here, which is what the executor's
+    // merge already treats them as.
+    const profile = await this.profiles.handle(userId);
+    return profile.slots.map((slot) => ({ ...slot }));
+  }
+
+  async setSlots(
+    userId: string,
+    slots: ChatTrainingSlot[],
+  ): Promise<ChatTrainingSlot[] | null> {
+    try {
+      await this.slots.handle(
+        userId,
+        slots.map((slot) => ({
+          id: slot.id ?? newId(),
+          weekday: slot.weekday,
+          start: slot.start,
+          durationMin: slot.durationMin,
+          sport: slot.sport,
+          location: slot.location ?? null,
+        })),
+      );
+    } catch (error) {
+      if ((error as Error).name !== 'AthleteProfileRuleError') throw error;
+      this.logger.debug(
+        `Training refused chat-set slots: ${(error as Error).message}`,
+      );
+      return null;
+    }
+
+    // Read back rather than echoing the command, because FR-004's confirmation
+    // names the timetable the store now holds — a sport name it trimmed or a
+    // location it dropped is confirmed as it is.
+    return this.week(userId);
+  }
+
+  /**
+   * Every session on the member's own local today.
+   *
+   * The bounds are their midnights, built through `shared/time` from their own
+   * zone rather than as a window around `now` — principle XI, and the reason
+   * "I trained today" said at 00:30 is about the day the member is in. The
+   * upper bound is the next midnight less a millisecond because
+   * `SessionRepository.between` is inclusive at both ends, and a session at
+   * exactly 00:00 tomorrow is not today's.
+   */
+  async todaysSessions(
+    userId: string,
+    now: Date,
+  ): Promise<TrainingSessionRef[]> {
+    const { timezone } = await this.member.clock(userId);
+    const today = localDate(now, timezone);
+    const from = wallClockToUtc(`${today}T00:00`, timezone);
+    const to = wallClockToUtc(`${nextDate(today)}T00:00`, timezone);
+    // Unreachable: both strings are built from `localDate`'s own output. A
+    // guard rather than a `!` because an `Invalid Date` reaching the repository
+    // matches nothing silently, and the member would be told they have no
+    // training on a day they do.
+    if (!from || !to) return [];
+
+    const views = await this.sessions.between(
+      userId,
+      from,
+      new Date(to.getTime() - 1),
+      now,
+    );
+    return views.map((view) => ({
+      id: view.id,
+      title: view.title,
+      sport: view.sport,
+      at: view.plannedAt,
+      status: view.status,
+    }));
+  }
+
+  /**
+   * The session happened, and the member's own sentence is kept as its note.
+   *
+   * Two calls and one decision worth writing down: the note goes through
+   * `LogSessionHandler` with **no exercises**, which is that handler's own
+   * "notes ride in the same request" path, and it is **appended** rather than
+   * assigned. `Session.edit` replaces the field, and a planned session's note
+   * can already hold the program's instruction for the day ("tempo work") — so
+   * writing "legs" over it would delete a coach's words to record the member's.
+   */
+  async completeSession(
+    userId: string,
+    sessionId: string,
+    note?: string,
+  ): Promise<TrainingSessionRef | null> {
+    try {
+      if (note && note.trim() !== '') {
+        const existing = await this.session.byId(userId, sessionId);
+        const before = existing?.notes?.trim();
+        await this.logs.handle(userId, sessionId, {
+          exercises: [],
+          notes: before ? `${before}\n${note.trim()}` : note.trim(),
+        });
+      }
+      await this.completions.handle(userId, sessionId);
+    } catch (error) {
+      if (!(error instanceof SessionNotFound)) throw error;
+      // Gone between the read and the write — another device deleted it. The
+      // executor says so rather than reporting a log that did not happen.
+      this.logger.debug(`session ${sessionId} was gone before it was logged`);
+      return null;
+    }
+
+    const stored = await this.session.byId(userId, sessionId);
+    if (!stored) return null;
+    return {
+      id: stored.id,
+      title: stored.title,
+      sport: stored.sport,
+      at: stored.plannedAt,
+      status: stored.status,
+    };
+  }
+
+  /**
+   * What training is coming, for `chat.card { kind: 'sessions' }`.
+   *
+   * `at` is a wall-clock string in the member's zone for the reason
+   * `MeetingsChatActions.listUpcoming` gives: `CardItem.at` is rendered as
+   * given, so a card carrying an instant is rendered against the *device's*
+   * zone.
+   *
+   * `planned` only, and that is the difference from the week view. The card
+   * answers "what is coming", and a session the member has already cancelled or
+   * skipped is not coming — where the week view keeps every status because it is
+   * a record. A completed future session cannot exist.
+   */
+  async listUpcoming(
+    userId: string,
+    now: Date,
+    days: number,
+  ): Promise<CardItem[]> {
+    const { timezone } = await this.member.clock(userId);
+    const to = new Date(now.getTime() + days * 86_400_000);
+    const views = await this.sessions.between(userId, now, to, now);
+
+    return views
+      .filter((view) => view.status === 'planned')
+      .map((view) => ({
+        id: view.id,
+        title: view.title,
+        at: formatInTz(view.plannedAt, timezone),
+        status: view.status,
+        deepLink: `botvy://sessions/${view.id}`,
+      }));
+  }
+}
+
+/** Tomorrow, as a date string. Calendar arithmetic, no zone involved. */
+function nextDate(date: string): string {
+  const at = new Date(`${date}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + 1);
+  return at.toISOString().slice(0, 10);
 }
 
 /** Profile records what the member says about themselves. */

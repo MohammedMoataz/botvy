@@ -4,6 +4,7 @@ import { ReapPushTokenHandler } from '../../identity/features/register-device/re
 import { MeetingRepository } from '../../meetings/domain/meetings.repositories.js';
 import { MeetingOccurrencesQueryHandler } from '../../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
 import { PurgeMeetingHandler } from '../../meetings/features/purge-meeting/purge-meeting.handler.js';
+import { PurgeTrainingTombstonesHandler } from '../../training/features/purge-tombstones/purge-tombstones.handler.js';
 import { PurgeTaskHandler } from '../../planning/features/purge-task/purge-task.handler.js';
 import { ReminderLifecycleHandler } from '../../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import {
@@ -114,6 +115,24 @@ export class MeetingsTombstonePurge extends TombstonePurgePort {
 
   async purgeBefore(before: Date): Promise<number> {
     return this.meetings.purgeTombstones(before);
+  }
+}
+
+/**
+ * Training purging its own three syncable collections, on request.
+ *
+ * The fourth owner. `athlete_profiles` is not among them and has nothing to
+ * sweep — one document per member, no tombstone — which is why the count comes
+ * back from three collections and not four.
+ */
+@Injectable()
+export class TrainingTombstonePurge extends TombstonePurgePort {
+  constructor(private readonly training: PurgeTrainingTombstonesHandler) {
+    super();
+  }
+
+  async purgeBefore(before: Date): Promise<number> {
+    return this.training.purgeTombstones(before);
   }
 }
 

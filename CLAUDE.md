@@ -409,6 +409,90 @@ finds it, with a test, and named in the commit; it does not go there.
   `sessions` from the same branch, so building meetings left the chat denying a
   feature that existed. Split the branch when you build the first half, and let
   the refusal name only what is actually missing.
+- **A port belongs to the context that needs the answer, not the one that gives
+  it.** P6's plan said both of its cross-context tokens lived in Training's
+  `domain/ports`, and that is upside down: `NextSessionPort` is Rhythm's and
+  `TrainingSessionsPort` is Meetings', each bound in its own `infrastructure/`.
+  Putting the token in the answering context inverts the dependency — Rhythm
+  would import Training's domain to describe its *own* need — and it makes the
+  null-returning stub impossible, because there would be nothing to declare it
+  against. P3 and P5 both built it the right way round; only the sentence was
+  wrong. What a context publishes is a **query handler**; the consumer declares
+  the port.
+- **`timezone` lives on the profile, not in preferences.** A member who moves
+  raises `profile.ProfileUpdated`, and `PREFERENCE_FIELDS` has no `timezone` in
+  it — so anything that must recompute on a zone change subscribes to
+  `ProfileUpdated`, as the alert saga already did. P6's plan said the session
+  materialiser would listen for `PreferencesChanged` naming the zone; written
+  that way the recompute would never once have run, and a member who flew would
+  have kept a fortnight of sessions on the clock of the city they left. Both
+  events reach one method that branches on the field named, so the day
+  `timezone` moves onto preferences nothing changes.
+- **A guard's vocabulary needs a test for the false negatives, not only the
+  true positives.** P5's `mentionsAMoment` refuses a model-supplied clock when
+  the sentence names no moment. P6 found it *satisfied by a weekday* — "I do
+  football on Fridays" names a moment — so a training-slot sentence kept an
+  invented hour, which for a slot is a fortnight of alarms rather than one. The
+  narrower `mentionsAClock` fixed that and immediately refused **"gym Monday and
+  Wednesday at six"**, the feature's own headline example, because a spelled-out
+  hour has no digit in it. Both directions are now pinned, and the number words
+  are shared with the relative parser rather than listed twice. The errors are
+  asymmetric — a false negative costs one question, a false positive costs an
+  alarm nobody set — and asymmetric is not the same as free.
+- **A fixture that grades the pipeline has to be updated when the pipeline
+  gains a guard.** P4 fixed `intent-fixture.mjs` to apply the compiled
+  `relative-time` *resolution*, and wrote the rule down. P5 then added
+  `mentionsAMoment` and P6 `mentionsAClock`, and neither reached the runner — so
+  it scored silent time errors against a pipeline that drops them, and the
+  phase's own numbers were pessimistic for two phases. The fixture now asserts
+  each helper is a function before it starts, because a missing export from a
+  *compiled* module is `undefined` at the call site and nothing would otherwise
+  say so.
+- **A test that resolves each zone's own "today" flakes when the zones disagree
+  about the date.** P3's two-zone case built Cairo's 22:00 and Berlin's 22:00
+  from each zone's own current day; for the couple of hours after midnight in
+  the eastern zone those are different dates, Cairo's instant lands *after*
+  Berlin's, and the second tick goes backwards. Pin the day and ask both zones
+  for the same one. A red line that depends on the hour the suite runs at
+  teaches whoever sees it to ignore red, which costs more than the case was
+  worth.
+- **A derived id means a deletion is still found, so the create path must
+  restore.** The session materialiser keys a slot's session on
+  `uuidv5(userId:slotId:localDate)`, which is what makes creation an upsert and
+  a redelivered event a no-op. It also means a *tombstoned* row answers the
+  existence check — so a member who removed a slot and put it back would have
+  had every session declined for ever as "already there". The pass restores and
+  re-announces instead. Any derived-id collection has this corollary.
+- **A contract can promise a field nothing serves, which is the mirror of a
+  read no client can reach.** The blueprint SDL typed `PlanTraining.status` and
+  `Program.sourceLinks: [Link!]!`; the first was never generated and the second
+  cannot be — `Link` is another context's type, and a `features/` file declaring
+  it is what `no-restricted-imports` refuses. Both had sat unread since the
+  planning phase. `packages/contracts/schema.graphql` is the generated file and
+  therefore the truth; when the blueprint disagrees with it, correct the
+  blueprint and say which way round the mistake was, because the next reader
+  will otherwise implement the promise.
+- **A DTO property with no class-validator decorator does not exist.** The
+  global pipe runs `whitelist: true` with `forbidNonWhitelisted: true`, and
+  *whitelisted* means "carries at least one decorator" — so a bare
+  `value!: unknown` makes the endpoint answer `400 property value should not
+  exist` to every request, including the correct one. `PatchSettingDto` was
+  written that way deliberately (the settings registry's own zod schema is the
+  validator) and **the only write path to the registry refused the only field it
+  takes**, which made every key a hard-coded default for three phases.
+  `@Allow()` declares a property and validates nothing, which is the intent.
+  Invisible to the suite, because handler specs bind handlers directly and never
+  go through the pipe — a controller taking an unconstrained body needs a spec
+  that runs the real `ValidationPipe` against its DTO.
+- **A warning that promises a replacement must be produced by the code that
+  replaces.** `POST /programs/:id/apply` listed five planned sessions it would
+  overwrite, took the member's `force` — and the materialiser filled a session
+  *only at the moment it created it*, so nothing that already existed was ever
+  rewritten. The warning and the action were two arithmetics over the same rule
+  and only one of them ran. They now share the predicate (`isUntouched`), the
+  window (never the past) and the source (`fill`); a list the member agreed to
+  and a set of rows actually written that can disagree is worse than no warning,
+  because they believe it happened.
 - **v2 is its own compose project, `botvy-v2`.** v1 declares `name: botvy`, and
   while v2 did too the pair were one project sharing `pg_data` and `n8n_data` —
   v2 served v1's live database and neither could run beside the other. Keep the

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.SlotsChanged",
+  "description": "Payload of training.SlotsChanged. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "weekday": {
+            "type": "integer"
+          },
+          "start": {
+            "type": "string"
+          },
+          "durationMin": {
+            "type": "integer"
+          },
+          "sport": {
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "weekday",
+          "start",
+          "durationMin",
+          "sport",
+          "location"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "slots"
+  ],
+  "additionalProperties": false
+}

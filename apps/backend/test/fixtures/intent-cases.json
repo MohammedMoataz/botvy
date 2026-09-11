@@ -371,5 +371,105 @@
     "expect": {
       "name": "chat"
     }
+  },
+  {
+    "id": "S01",
+    "text": "gym Monday and Wednesday at six",
+    "expect": {
+      "name": "set_slots",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "S02",
+    "text": "الجيم الاثنين والأربعاء الساعة ستة",
+    "expect": {
+      "name": "set_slots",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "S03",
+    "text": "I swim on Tuesdays and Thursdays at 6 in the morning",
+    "expect": {
+      "name": "set_slots",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "S04",
+    "text": "أنا بعمل كروسفت يوم السبت الساعة ٥",
+    "expect": {
+      "name": "set_slots",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "S05",
+    "text": "I do football on Fridays",
+    "expect": {
+      "name": "set_slots",
+      "scope": "coaching",
+      "whenAbsent": true
+    }
+  },
+  {
+    "id": "S06",
+    "text": "بعمل جيم يوم الحد",
+    "expect": {
+      "name": "set_slots",
+      "scope": "coaching",
+      "whenAbsent": true
+    }
+  },
+  {
+    "id": "G01",
+    "text": "I trained legs today",
+    "expect": {
+      "name": "log_session",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "G02",
+    "text": "عملت تمرين رجل النهاردة",
+    "expect": {
+      "name": "log_session",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "G03",
+    "text": "finished my swim session",
+    "expect": {
+      "name": "log_session",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "G04",
+    "text": "خلصت تمريني النهاردة",
+    "expect": {
+      "name": "log_session",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "S07",
+    "text": "what training have I got coming up?",
+    "expect": {
+      "name": "list",
+      "scope": "coaching",
+      "listKind": "sessions"
+    }
+  },
+  {
+    "id": "S08",
+    "text": "إيه التمرين الجاي؟",
+    "expect": {
+      "name": "list",
+      "scope": "coaching",
+      "listKind": "sessions"
+    }
   }
 ]

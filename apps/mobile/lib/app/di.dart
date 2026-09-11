@@ -11,6 +11,8 @@ import '../core/db/database.dart';
 import '../core/notifications/local_notifications.dart';
 import '../core/push.dart';
 import '../core/sync/sync_engine.dart';
+import '../features/athlete/application/athlete_cubit.dart';
+import '../features/athlete/application/programs_cubit.dart';
 import '../features/auth/application/auth_cubit.dart';
 import '../features/calendar/application/calendar_cubit.dart';
 import '../features/chat/application/chat_cubit.dart';
@@ -18,6 +20,7 @@ import '../features/chat/application/conversations_cubit.dart';
 import '../features/chat/data/chat_outbox.dart';
 import '../features/home/application/home_cubit.dart';
 import '../features/meetings/application/meetings_cubit.dart';
+import '../features/onboarding/application/athlete_steps.dart';
 import '../features/onboarding/application/identity_steps.dart';
 import '../features/onboarding/application/onboarding_steps.dart';
 import '../features/profile/data/profile_mirror.dart';
@@ -88,6 +91,21 @@ Future<void> configureDependencies({required String baseUrl}) async {
     ..registerSingleton<CalendarCubit>(
       CalendarCubit(sl<AppDatabase>(), sl<SyncEngine>()),
     )
+    // Singletons for the same reason the others are: both listen to the sync
+    // engine, and Today's training row watches the same `sessions` table the
+    // week view and the session screen write — two instances would each hold
+    // their own copy, so a session skipped from its own screen would still
+    // read as planned on Home behind it.
+    ..registerSingleton<AthleteCubit>(
+      AthleteCubit(sl<AppDatabase>(), sl<SyncEngine>()),
+    )
+    // The one cubit in this feature that talks to the network: applying a
+    // program and archiving one are REST commands, because the refusal — the
+    // list of sessions an apply would replace — is what the member has to
+    // agree to before it happens.
+    ..registerSingleton<ProgramsCubit>(
+      ProgramsCubit(sl<AppDatabase>(), sl<SyncEngine>(), sl<ApiClient>()),
+    )
     // Home reads the day and writes nothing of its own: ticking a task off goes
     // through [TasksCubit], so there is one writer for the `tasks` table rather
     // than two copies of the recurrence and `pendingOp` rules.
@@ -132,6 +150,8 @@ Future<void> configureDependencies({required String baseUrl}) async {
   sl<MeetingsCubit>().listenToSync();
   sl<CalendarCubit>().listenToSync();
   sl<HomeCubit>().listenToSync();
+  sl<AthleteCubit>().listenToSync();
+  sl<ProgramsCubit>().listenToSync();
   sl<ConversationsCubit>().listenToSync();
   sl<ChatCubit>().listen();
 
@@ -157,6 +177,9 @@ Future<void> configureDependencies({required String baseUrl}) async {
   // than inside the onboarding page is what lets a later phase contribute one
   // without the walkthrough importing every feature to find it.
   registerIdentitySteps(sl<OnboardingRegistry>(), sl<ProfileMirror>());
+  // P6's sports-and-slots step, at order 400 — after P1's three. A member who
+  // already has slots is not asked again; see `athlete_steps.dart`.
+  registerAthleteSteps(sl<OnboardingRegistry>(), sl<AthleteCubit>());
 
   // The API client discovers a dead session from inside an interceptor, where
   // it has no way to reach the cubit. Wired here, once, rather than passed
@@ -186,6 +209,13 @@ Future<void> completeFromChat(String kind, String id) async {
       await sl<TasksCubit>().complete(id);
     case 'reminder':
       await sl<RemindersCubit>().complete(id);
+    case 'session':
+      // A training session, from a chat card of kind `sessions` (FR-015). The
+      // write belongs to the context that owns the row, as every other branch
+      // here does — and "complete" is the only one of a session's three
+      // outcomes a card can ask for: cancelling and skipping are decisions
+      // about the future that belong on the session's own screen.
+      await sl<AthleteCubit>().complete(id);
     case 'meeting':
       // "It happened" — the whole meeting, series included (FR-013). A chat
       // card names a meeting and never one of its dates, because an outcome
@@ -222,6 +252,12 @@ Future<void> handleAlertAction(String actionId, String payload) async {
       await sl<RemindersCubit>().complete(alert.id);
     case ('reminder', AlertActions.snooze):
       await sl<RemindersCubit>().snooze(alert.id);
+    case ('session', AlertActions.complete):
+      // The training reminder's own button. A session has no snooze either,
+      // for the reason a meeting has none: the moment it carries is when it
+      // starts, and moving that is a move of the session rather than a delay
+      // to a warning.
+      await sl<AthleteCubit>().complete(alert.id);
     case ('meeting', AlertActions.complete):
       // The whole meeting, as everywhere else (FR-013). A meeting alert
       // carries the occurrence in its payload, and completing "this

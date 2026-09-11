@@ -289,6 +289,107 @@ export const eventSchemas = {
     at: z.coerce.date(),
   }),
 
+  /*
+   * ---- Training ---------------------------------------------------------
+   *
+   * `SessionScheduled` is the only announcement a new session gets, and three
+   * things hang off it: the alert pipeline, the rhythm's tomorrow draft, and
+   * P7's suggestion saga. A session that appears without one is a session
+   * nobody is reminded about — which is the shape of a defect this codebase
+   * shipped in P2, where a whole notification pipeline was dead for a phase.
+   *
+   * `SessionRescheduled` carries the same payload deliberately: the alert saga
+   * reconciles on either, and one builder on the aggregate feeds both raise
+   * sites so neither can omit a field the consumer reads.
+   *
+   * `SessionDeleted` is load-bearing rather than tidy. The materialiser
+   * *tombstones* a future session whose slot the member removed, and that
+   * raises this and nothing else — so without a subscriber, a slot deleted at
+   * noon would leave its alarms to fire all week.
+   */
+  'training.SportsChanged': z.object({
+    sports: z.array(z.string()),
+  }),
+  'training.SlotsChanged': z.object({
+    slots: z.array(
+      z.object({
+        id: z.string(),
+        /** 1 (Monday) to 7 (Sunday), ISO 8601 rather than JavaScript's. */
+        weekday: z.number().int().min(1).max(7),
+        /** `HH:mm` **in the member's own zone**, never an instant. */
+        start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+        durationMin: z.number().int(),
+        sport: z.string(),
+        location: z.string().nullable(),
+      }),
+    ),
+  }),
+  'training.SessionScheduled': z.object({
+    sessionId: z.string().uuid(),
+    plannedAt: z.coerce.date(),
+    durationMin: z.number().int(),
+    sport: z.string(),
+    title: z.string(),
+    focus: z.string().nullable(),
+    status: z.enum(['planned', 'completed', 'cancelled', 'skipped']),
+  }),
+  'training.SessionRescheduled': z.object({
+    sessionId: z.string().uuid(),
+    plannedAt: z.coerce.date(),
+    durationMin: z.number().int(),
+    sport: z.string(),
+    title: z.string(),
+    focus: z.string().nullable(),
+    status: z.enum(['planned', 'completed', 'cancelled', 'skipped']),
+  }),
+  'training.SessionCompleted': z.object({
+    sessionId: z.string().uuid(),
+    at: z.coerce.date(),
+    sport: z.string(),
+  }),
+  'training.SessionCancelled': z.object({
+    sessionId: z.string().uuid(),
+    at: z.coerce.date(),
+  }),
+  'training.SessionSkipped': z.object({
+    sessionId: z.string().uuid(),
+    at: z.coerce.date(),
+  }),
+  'training.SessionDeleted': z.object({
+    sessionId: z.string().uuid(),
+    at: z.coerce.date(),
+  }),
+  /** Informational; nothing subscribes. Logging is not completing. */
+  'training.SessionLogged': z.object({
+    sessionId: z.string().uuid(),
+    exerciseId: z.string(),
+    sets: z.number().int(),
+  }),
+  'training.ProgramCreated': z.object({
+    programId: z.string().uuid(),
+    title: z.string(),
+    weeks: z.number().int(),
+  }),
+  /**
+   * The materialiser consumes this and Conversations turns it into a coach
+   * message. It does **not** carry the sessions it filled, because it fills
+   * none: the weeks are applied as the horizon reaches them, which is what lets
+   * a program outlive `training.materialiseDays` (FR-008).
+   */
+  'training.ProgramApplied': z.object({
+    programId: z.string().uuid(),
+    title: z.string(),
+    /** The member's local `YYYY-MM-DD`, which week arithmetic counts from. */
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    weeks: z.number().int(),
+  }),
+  'training.ProgramArchived': z.object({
+    programId: z.string().uuid(),
+  }),
+  'training.ProgramDeleted': z.object({
+    programId: z.string().uuid(),
+  }),
+
   // ---- Sync -------------------------------------------------------------
   'sync.ChangesApplied': z.object({
     installId: z.string(),

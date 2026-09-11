@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SettingsService } from '../../../shared/settings/settings.service.js';
 import { TasksDueQueryHandler } from '../../planning/features/tasks-due-query/tasks-due.query.js';
 import { ProfileQueryHandler } from '../../profile/features/profile-query/profile.query.js';
+import { SessionsInRangeQueryHandler } from '../../training/features/sessions/sessions-in-range.query.js';
 import {
   MeetingDefaultsPort,
   TimedTasksPort,
@@ -74,48 +75,57 @@ export class PlanningTimedTasks extends TimedTasksPort {
 }
 
 /**
- * Training sessions on the agenda — **stubbed until P6 (Training)**.
+ * Training's sessions on the agenda — **bound as of P6 (T641)**.
  *
- * P6 owns sessions, and it replaces this binding with an adapter over its own
- * session query: one line in `meetings.module.ts`, and every call site here is
- * already correct. Nothing else in the calendar changes, which is the entire
- * reason this file has a class in it that returns a constant.
+ * This class was `NoTrainingSessions`, an empty-list stub from P5 to P6, and its
+ * comment promised that closing it would be "one line in `meetings.module.ts`,
+ * and every call site here is already correct". Both halves held: the agenda's
+ * assembly, the day view and the month grid are all unchanged, and the `session`
+ * item kind they already handle now has rows in it. It is renamed rather than
+ * kept, because a class called `NoTrainingSessions` that returns sessions is a
+ * comment a reader stops trusting.
  *
- * ## Why an empty-list stub beats a branch in the agenda
+ * ## `between`, and the shape that made this a one-liner
  *
- * The alternative is an optional dependency and a question inside the agenda's
- * assembly: "has Training been built yet?" That question has three costs and no
- * benefit.
+ * `SessionsInRangeQueryHandler.between` answers `{ id, title, sport, startAt,
+ * durationMin }` — `AgendaSession`'s fields, named on purpose in the phase that
+ * declared the query, because the two contexts may not import each other's
+ * interface in either direction (constitution IX) and an adapter that had to
+ * translate would be the place a field went missing. So the mapping is the
+ * identity, and it is written out rather than passed through: this file is the
+ * only thing that would fail to compile if either side dropped a field, which is
+ * the whole reason two structurally identical shapes are acceptable.
  *
- * It would still be there in P9. Nobody deletes a defensive branch once it is
- * written, because deleting it requires being sure it can no longer be false,
- * and the way to be sure is to trace every module — so it stays, and by P9 the
- * agenda carries a question about a context that has existed for three phases.
+ * A window rather than a day at a time, which is why `between` exists at all: an
+ * agenda spans a month, and asking day by day would be thirty round trips
+ * against a collection that answers once.
  *
- * It moves a wiring decision into a per-request path. Whether Training exists
- * is a fact about the module graph, settled once at boot; asking it on every
- * calendar read is asking a constant, and the answer cannot differ between two
- * members or two days.
+ * ## Every status, deliberately
  *
- * And it would be the second place that knows the day renders without a
- * training row. The day view already does: the spec builds it from what is
- * present rather than from a template with a hole in it, so an empty list is an
- * ordinary state the assembly handles rather than an absence the caller has to
- * work around. A stub returning that same value asks nothing new of anybody.
- *
- * The port is bound rather than left unbound because Nest would refuse to boot
- * without it (`UnknownDependenciesException`), and rightly: an unsatisfied
- * dependency is not the same statement as "the answer is nothing yet". Same
- * reasoning, same shape, as P3's `rhythm-next-session.stub.ts`.
+ * `between` does not filter to `planned`, and the agenda should not want it to.
+ * A skipped or cancelled session stays on the calendar for the same reason a
+ * cancelled meeting stays in the diary and the week view keeps a skipped
+ * session: it is a fact about a day the member may well be looking for, and a
+ * calendar that dropped it would make a skipped week and a quiet week look
+ * identical. Tombstoned rows are excluded by Training's repository, because
+ * those the member did ask to stop seeing. The rhythm's *proposal* is the caller
+ * that needs `planned` only, and it asks a different method.
  */
 @Injectable()
-export class NoTrainingSessions extends TrainingSessionsPort {
-  async between(
-    _userId: string,
-    _from: Date,
-    _to: Date,
-  ): Promise<AgendaSession[]> {
-    return [];
+export class TrainingSessions extends TrainingSessionsPort {
+  constructor(private readonly sessions: SessionsInRangeQueryHandler) {
+    super();
+  }
+
+  async between(userId: string, from: Date, to: Date): Promise<AgendaSession[]> {
+    const rows = await this.sessions.between(userId, from, to);
+    return rows.map((session) => ({
+      id: session.id,
+      title: session.title,
+      sport: session.sport,
+      startAt: session.startAt,
+      durationMin: session.durationMin,
+    }));
   }
 }
 

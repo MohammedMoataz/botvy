@@ -61,7 +61,14 @@ enum ReminderView { active deleted all }
 
 enum PlanStatus { draft confirmed skipped }
 type PlanTask { id: ID!, title: String!, priority: Int!, dueAt: DateTime, status: TaskStatus! }
-type PlanTraining { sessionId: ID!, title: String!, sport: String!, startAt: DateTime!, status: SessionStatus! }
+# `status` was listed here and is NOT served, and the reason is worth keeping:
+# a daily plan's `training` is a **snapshot** of what the day was going to hold,
+# written the night before, and a status copied into it goes stale the moment
+# the member completes or skips the session. The live status is on `Session`,
+# which the client reads by `sessionId` — and P6's Today row deliberately
+# watches the sessions table rather than this snapshot for exactly that reason
+# (see `specs/020-training/plan.md` § Mobile).
+type PlanTraining { sessionId: ID!, title: String!, sport: String!, startAt: DateTime! }
 type DailyPlan {
   date: Date!, status: PlanStatus!, autoConfirmed: Boolean!, tasks: [PlanTask!]!, training: PlanTraining
   workoutLine: String, mealLine: String, promptedAt: DateTime, confirmedAt: DateTime, summarisedAt: DateTime, briefedAt: DateTime
@@ -77,14 +84,36 @@ enum SessionStatus { planned completed cancelled skipped }
 type SetEntry { targetReps: Int, targetWeightKg: Float, targetDurationSec: Int, targetDistanceM: Int, actualReps: Int, actualWeightKg: Float, actualDurationSec: Int, actualDistanceM: Int, done: Boolean! }
 type MediaRef { type: String!, url: String!, caption: String }
 type Exercise { id: ID!, name: String!, notes: String, sets: [SetEntry!]!, mediaRefs: [MediaRef!]! }
+# `isMissed` is P6's addition and is **derived at render, never stored**: a
+# `planned` session whose moment has passed with nothing logged (FR-018). Storing
+# it would mean a sweep rewriting rows the member never touched, and then
+# un-writing them when they log it late. The card, the week view and Today all
+# read this one field, so they cannot disagree.
 type Session {
   id: ID!, plannedAt: DateTime!, durationMin: Int!, sport: String!, title: String!, focus: String
   programId: ID, weekIndex: Int, suggestionId: ID, exercises: [Exercise!]!, status: SessionStatus!, completedAt: DateTime, notes: String
 }
+# `isToday` is derived from `reason`, never stored — two fields, one truth.
+# `after-cutoff` means "this is a future session", which is also the honest
+# answer when today simply holds nothing; the alternative was a fourth code
+# every client would have to handle to say the same sentence.
 type NextPractice { session: Session, isToday: Boolean!, reason: String! }   # reason: 'today' | 'after-cutoff' | 'none-scheduled'
 type ProgramSessionTemplate { templateId: ID!, weekday: Int, title: String!, focus: String, exercises: [Exercise!]! }
 type ProgramWeek { index: Int!, sessions: [ProgramSessionTemplate!]! }
-type Program { id: ID!, title: String!, sport: String!, source: String!, sourceLinks: [Link!]!, weeks: [ProgramWeek!]!, status: String! }
+# `sourceLinks` was typed `[Link!]!` and is served as **`sourceLinkIds: [ID!]!`**.
+# `Link` is Knowledge's type and does not exist until P7, and a Training
+# `features/` file declaring it is what the constitution-IX lint rule refuses —
+# the same wall P5's `AgendaItem` hit with `Task` and `Session`. The ids are
+# what the document holds; a client that wants the links asks Knowledge.
+#
+# `appliedStartDate` is additive to the blueprint's shape and P6 adds it: FR-008
+# fills a program's later weeks *as the materialisation horizon reaches them*,
+# which means computing a week index long after the apply, which needs the date
+# the apply left behind.
+type Program {
+  id: ID!, title: String!, sport: String!, source: String!, sourceLinkIds: [ID!]!
+  weeks: [ProgramWeek!]!, status: String!, appliedStartDate: Date
+}
 type Workout { id: ID!, name: String!, sport: String!, exercises: [Exercise!]!, tags: [String!]! }
 
 # ---------- Knowledge ----------

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.SessionLogged",
+  "description": "Payload of training.SessionLogged. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "exerciseId": {
+      "type": "string"
+    },
+    "sets": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "sessionId",
+    "exerciseId",
+    "sets"
+  ],
+  "additionalProperties": false
+}

@@ -4,6 +4,7 @@ import 'package:botvy/app/l10n/app_localizations.dart';
 import 'package:botvy/core/db/database.dart';
 import 'package:botvy/core/notifications/alert_plan.dart' show memberDate;
 import 'package:botvy/core/sync/sync_engine.dart';
+import 'package:botvy/features/athlete/application/athlete_cubit.dart';
 import 'package:botvy/features/home/application/home_cubit.dart';
 import 'package:botvy/features/home/presentation/home_dials.dart';
 import 'package:botvy/features/home/presentation/home_page.dart';
@@ -393,18 +394,53 @@ void main() {
   // ── the screen ─────────────────────────────────────────────────────────────
 
   group('the screen', () {
+    /*
+     * The two cubits Home needs besides its own, held rather than constructed
+     * inline — because one of them has to be *closed*.
+     *
+     * P6's training row is a `StreamBuilder` over a drift `watch()`, and drift
+     * schedules a timer to coalesce stream updates. A subscription still open
+     * when the test body ends leaves that timer pending, and
+     * `flutter_test`'s own invariant check fails the test with *"A Timer is
+     * still pending even after the widget tree was disposed"* — which is what
+     * took out all four widget cases in this file, and which reads nothing like
+     * its cause.
+     *
+     * So: one instance per test, closed in `tearDown`, and every widget case
+     * ends by unmounting through [unmount] so the subscription is cancelled
+     * inside the body where it still counts.
+     */
+    late RhythmCubit rhythm;
+    late AthleteCubit athlete;
+
+    setUp(() {
+      rhythm = RhythmCubit(db, OfflineApi(), engine);
+      athlete = AthleteCubit(db, engine);
+    });
+
+    tearDown(() async {
+      await rhythm.close();
+      await athlete.close();
+    });
+
     Widget page() => MaterialApp(
       localizationsDelegates: const [AppLocalizations.delegate],
       home: MultiBlocProvider(
         providers: [
           BlocProvider<HomeCubit>.value(value: cubit),
-          BlocProvider<RhythmCubit>.value(
-            value: RhythmCubit(db, OfflineApi(), engine),
-          ),
+          BlocProvider<RhythmCubit>.value(value: rhythm),
+          // P6's training row watches the `sessions` table through this cubit
+          // (T642). Provided here because Home builds it unconditionally: the
+          // row draws nothing on a day with no session, which is the case
+          // every fixture in this file is.
+          BlocProvider<AthleteCubit>.value(value: athlete),
         ],
         child: const HomePage(),
       ),
     );
+
+    /// Unmounts and lets drift's timers drain. See [drainStreams].
+    Future<void> unmount(WidgetTester tester) => drainStreams(tester);
 
     testWidgets('draws the greeting, the plan, the ring and the strip',
         (tester) async {
@@ -432,6 +468,7 @@ void main() {
       expect(find.text('Carried over 3×'), findsOneWidget);
       expect(find.textContaining('Upper body'), findsOneWidget);
       expect(find.textContaining('Oats'), findsOneWidget);
+      await unmount(tester);
     });
 
     testWidgets('says a quiet day plainly and draws no ring', (tester) async {
@@ -448,6 +485,7 @@ void main() {
       );
       // 0/0 is a shape that says nothing next to a sentence that says it all.
       expect(find.byType(CompletionRing), findsNothing);
+      await unmount(tester);
     });
 
     testWidgets('offers the draft card only while one awaits', (tester) async {
@@ -465,6 +503,7 @@ void main() {
       await cubit.refresh();
       await tester.pump();
       expect(find.text('Plan tomorrow'), findsNothing);
+      await unmount(tester);
     });
   });
 
@@ -483,6 +522,7 @@ void main() {
             BlocProvider<RhythmCubit>.value(
               value: RhythmCubit(db, OfflineApi(), engine),
             ),
+            BlocProvider<AthleteCubit>.value(value: AthleteCubit(db, engine)),
           ],
           child: const HomePage(),
         ),
@@ -639,6 +679,35 @@ void main() {
         '${query.elapsedMilliseconds} ms was the database; the same screen '
         'with nothing on it takes $baseline ms, so a full day added $added ms.',
       );
+
+      // Unmounted before the body ends, for the reason the note beside `page`
+      // in the group above gives: the training row's drift stream leaves a
+      // pending timer otherwise, and `flutter_test` fails the case with a
+      // message that reads nothing like its cause. Inline rather than through
+      // that group's helper, because this group has its own `page`.
+      await drainStreams(tester);
     });
   });
+}
+
+/// Unmounts the tree and lets drift's real timers drain.
+///
+/// A `StreamBuilder` over a drift `watch()` that has actually **emitted**
+/// leaves a real timer behind — drift coalesces stream updates through one —
+/// and `flutter_test` then fails the case with *"A Timer is still pending even
+/// after the widget tree was disposed"*, which reads nothing like its cause.
+///
+/// `pumpWidget` with an empty tree cancels the subscription, but the timer is
+/// already scheduled and the fake clock will never fire it. `runAsync` steps
+/// outside the fake clock so it can, which is why a plain `pump()` is not
+/// enough — and why only the cases whose stream had data were failing.
+Future<void> drainStreams(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  // Two pumps, on the *fake* clock. Cancelling the subscription is a microtask
+  // behind the unmount, and drift schedules its cleanup with `Timer.run` — so
+  // the first pump gets the cancel through and the second runs the timer it
+  // scheduled. `runAsync` was tried here and does not do it: it steps outside
+  // the fake clock entirely, which is the one clock the pending timer is on.
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 50));
 }

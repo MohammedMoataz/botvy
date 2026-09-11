@@ -9530,6 +9530,2589 @@ class CalendarEventsCompanion extends UpdateCompanion<LocalCalendarEvent> {
   }
 }
 
+class $AthleteProfileTable extends AthleteProfile
+    with TableInfo<$AthleteProfileTable, LocalAthleteProfile> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AthleteProfileTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sportsJsonMeta =
+      const VerificationMeta('sportsJson');
+  @override
+  late final GeneratedColumn<String> sportsJson = GeneratedColumn<String>(
+      'sports_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _slotsJsonMeta =
+      const VerificationMeta('slotsJson');
+  @override
+  late final GeneratedColumn<String> slotsJson = GeneratedColumn<String>(
+      'slots_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _fetchedAtMeta =
+      const VerificationMeta('fetchedAt');
+  @override
+  late final GeneratedColumn<DateTime> fetchedAt = GeneratedColumn<DateTime>(
+      'fetched_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [userId, sportsJson, slotsJson, pendingOp, pushAttempts, fetchedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'athlete_profile';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<LocalAthleteProfile> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('sports_json')) {
+      context.handle(
+          _sportsJsonMeta,
+          sportsJson.isAcceptableOrUnknown(
+              data['sports_json']!, _sportsJsonMeta));
+    }
+    if (data.containsKey('slots_json')) {
+      context.handle(_slotsJsonMeta,
+          slotsJson.isAcceptableOrUnknown(data['slots_json']!, _slotsJsonMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('fetched_at')) {
+      context.handle(_fetchedAtMeta,
+          fetchedAt.isAcceptableOrUnknown(data['fetched_at']!, _fetchedAtMeta));
+    } else if (isInserting) {
+      context.missing(_fetchedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {userId};
+  @override
+  LocalAthleteProfile map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalAthleteProfile(
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id'])!,
+      sportsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sports_json'])!,
+      slotsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}slots_json'])!,
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      fetchedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}fetched_at'])!,
+    );
+  }
+
+  @override
+  $AthleteProfileTable createAlias(String alias) {
+    return $AthleteProfileTable(attachedDatabase, alias);
+  }
+}
+
+class LocalAthleteProfile extends DataClass
+    implements Insertable<LocalAthleteProfile> {
+  final String userId;
+  final String sportsJson;
+  final String slotsJson;
+
+  /// `update`, or null for a row with nothing queued. Only ever `update`: a
+  /// patch has no create, no delete and no purge — the server writes the empty
+  /// profile when the member registers, which is what lets every reader
+  /// promise a document rather than a null.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// When this copy was last filled from the server. As on [Profiles], this is
+  /// about the copy and not about the record.
+  final DateTime fetchedAt;
+  const LocalAthleteProfile(
+      {required this.userId,
+      required this.sportsJson,
+      required this.slotsJson,
+      this.pendingOp,
+      required this.pushAttempts,
+      required this.fetchedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['user_id'] = Variable<String>(userId);
+    map['sports_json'] = Variable<String>(sportsJson);
+    map['slots_json'] = Variable<String>(slotsJson);
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    map['fetched_at'] = Variable<DateTime>(fetchedAt);
+    return map;
+  }
+
+  AthleteProfileCompanion toCompanion(bool nullToAbsent) {
+    return AthleteProfileCompanion(
+      userId: Value(userId),
+      sportsJson: Value(sportsJson),
+      slotsJson: Value(slotsJson),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      fetchedAt: Value(fetchedAt),
+    );
+  }
+
+  factory LocalAthleteProfile.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalAthleteProfile(
+      userId: serializer.fromJson<String>(json['userId']),
+      sportsJson: serializer.fromJson<String>(json['sportsJson']),
+      slotsJson: serializer.fromJson<String>(json['slotsJson']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      fetchedAt: serializer.fromJson<DateTime>(json['fetchedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'userId': serializer.toJson<String>(userId),
+      'sportsJson': serializer.toJson<String>(sportsJson),
+      'slotsJson': serializer.toJson<String>(slotsJson),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'fetchedAt': serializer.toJson<DateTime>(fetchedAt),
+    };
+  }
+
+  LocalAthleteProfile copyWith(
+          {String? userId,
+          String? sportsJson,
+          String? slotsJson,
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          DateTime? fetchedAt}) =>
+      LocalAthleteProfile(
+        userId: userId ?? this.userId,
+        sportsJson: sportsJson ?? this.sportsJson,
+        slotsJson: slotsJson ?? this.slotsJson,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        fetchedAt: fetchedAt ?? this.fetchedAt,
+      );
+  LocalAthleteProfile copyWithCompanion(AthleteProfileCompanion data) {
+    return LocalAthleteProfile(
+      userId: data.userId.present ? data.userId.value : this.userId,
+      sportsJson:
+          data.sportsJson.present ? data.sportsJson.value : this.sportsJson,
+      slotsJson: data.slotsJson.present ? data.slotsJson.value : this.slotsJson,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      fetchedAt: data.fetchedAt.present ? data.fetchedAt.value : this.fetchedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalAthleteProfile(')
+          ..write('userId: $userId, ')
+          ..write('sportsJson: $sportsJson, ')
+          ..write('slotsJson: $slotsJson, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('fetchedAt: $fetchedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      userId, sportsJson, slotsJson, pendingOp, pushAttempts, fetchedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalAthleteProfile &&
+          other.userId == this.userId &&
+          other.sportsJson == this.sportsJson &&
+          other.slotsJson == this.slotsJson &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.fetchedAt == this.fetchedAt);
+}
+
+class AthleteProfileCompanion extends UpdateCompanion<LocalAthleteProfile> {
+  final Value<String> userId;
+  final Value<String> sportsJson;
+  final Value<String> slotsJson;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime> fetchedAt;
+  final Value<int> rowid;
+  const AthleteProfileCompanion({
+    this.userId = const Value.absent(),
+    this.sportsJson = const Value.absent(),
+    this.slotsJson = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.fetchedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AthleteProfileCompanion.insert({
+    required String userId,
+    this.sportsJson = const Value.absent(),
+    this.slotsJson = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    required DateTime fetchedAt,
+    this.rowid = const Value.absent(),
+  })  : userId = Value(userId),
+        fetchedAt = Value(fetchedAt);
+  static Insertable<LocalAthleteProfile> custom({
+    Expression<String>? userId,
+    Expression<String>? sportsJson,
+    Expression<String>? slotsJson,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? fetchedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (userId != null) 'user_id': userId,
+      if (sportsJson != null) 'sports_json': sportsJson,
+      if (slotsJson != null) 'slots_json': slotsJson,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (fetchedAt != null) 'fetched_at': fetchedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AthleteProfileCompanion copyWith(
+      {Value<String>? userId,
+      Value<String>? sportsJson,
+      Value<String>? slotsJson,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime>? fetchedAt,
+      Value<int>? rowid}) {
+    return AthleteProfileCompanion(
+      userId: userId ?? this.userId,
+      sportsJson: sportsJson ?? this.sportsJson,
+      slotsJson: slotsJson ?? this.slotsJson,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (sportsJson.present) {
+      map['sports_json'] = Variable<String>(sportsJson.value);
+    }
+    if (slotsJson.present) {
+      map['slots_json'] = Variable<String>(slotsJson.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (fetchedAt.present) {
+      map['fetched_at'] = Variable<DateTime>(fetchedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AthleteProfileCompanion(')
+          ..write('userId: $userId, ')
+          ..write('sportsJson: $sportsJson, ')
+          ..write('slotsJson: $slotsJson, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('fetchedAt: $fetchedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProgramsTable extends Programs
+    with TableInfo<$ProgramsTable, LocalProgram> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProgramsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sportMeta = const VerificationMeta('sport');
+  @override
+  late final GeneratedColumn<String> sport = GeneratedColumn<String>(
+      'sport', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('user'));
+  static const VerificationMeta _sourceLinkIdsJsonMeta =
+      const VerificationMeta('sourceLinkIdsJson');
+  @override
+  late final GeneratedColumn<String> sourceLinkIdsJson =
+      GeneratedColumn<String>('source_link_ids_json', aliasedName, false,
+          type: DriftSqlType.string,
+          requiredDuringInsert: false,
+          defaultValue: const Constant('[]'));
+  static const VerificationMeta _weeksJsonMeta =
+      const VerificationMeta('weeksJson');
+  @override
+  late final GeneratedColumn<String> weeksJson = GeneratedColumn<String>(
+      'weeks_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('active'));
+  static const VerificationMeta _appliedStartDateMeta =
+      const VerificationMeta('appliedStartDate');
+  @override
+  late final GeneratedColumn<String> appliedStartDate = GeneratedColumn<String>(
+      'applied_start_date', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        title,
+        sport,
+        source,
+        sourceLinkIdsJson,
+        weeksJson,
+        status,
+        appliedStartDate,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'programs';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalProgram> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('sport')) {
+      context.handle(
+          _sportMeta, sport.isAcceptableOrUnknown(data['sport']!, _sportMeta));
+    } else if (isInserting) {
+      context.missing(_sportMeta);
+    }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    }
+    if (data.containsKey('source_link_ids_json')) {
+      context.handle(
+          _sourceLinkIdsJsonMeta,
+          sourceLinkIdsJson.isAcceptableOrUnknown(
+              data['source_link_ids_json']!, _sourceLinkIdsJsonMeta));
+    }
+    if (data.containsKey('weeks_json')) {
+      context.handle(_weeksJsonMeta,
+          weeksJson.isAcceptableOrUnknown(data['weeks_json']!, _weeksJsonMeta));
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('applied_start_date')) {
+      context.handle(
+          _appliedStartDateMeta,
+          appliedStartDate.isAcceptableOrUnknown(
+              data['applied_start_date']!, _appliedStartDateMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalProgram map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalProgram(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      sport: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sport'])!,
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      sourceLinkIdsJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}source_link_ids_json'])!,
+      weeksJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}weeks_json'])!,
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      appliedStartDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}applied_start_date']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $ProgramsTable createAlias(String alias) {
+    return $ProgramsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalProgram extends DataClass implements Insertable<LocalProgram> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String title;
+  final String sport;
+
+  /// `user` | `suggestion` | `link`.
+  final String source;
+
+  /// The ids only, never the links themselves: Knowledge owns those and does
+  /// not exist until P7. A client that wants them asks Knowledge.
+  final String sourceLinkIdsJson;
+  final String weeksJson;
+
+  /// `active` | `archived`. Archiving stops the program filling anything new
+  /// and never rewrites a week the member can already see (FR-008).
+  final String status;
+  final String? appliedStartDate;
+  final DateTime createdAt;
+  const LocalProgram(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.title,
+      required this.sport,
+      required this.source,
+      required this.sourceLinkIdsJson,
+      required this.weeksJson,
+      required this.status,
+      this.appliedStartDate,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['title'] = Variable<String>(title);
+    map['sport'] = Variable<String>(sport);
+    map['source'] = Variable<String>(source);
+    map['source_link_ids_json'] = Variable<String>(sourceLinkIdsJson);
+    map['weeks_json'] = Variable<String>(weeksJson);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || appliedStartDate != null) {
+      map['applied_start_date'] = Variable<String>(appliedStartDate);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ProgramsCompanion toCompanion(bool nullToAbsent) {
+    return ProgramsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      title: Value(title),
+      sport: Value(sport),
+      source: Value(source),
+      sourceLinkIdsJson: Value(sourceLinkIdsJson),
+      weeksJson: Value(weeksJson),
+      status: Value(status),
+      appliedStartDate: appliedStartDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(appliedStartDate),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalProgram.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalProgram(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      title: serializer.fromJson<String>(json['title']),
+      sport: serializer.fromJson<String>(json['sport']),
+      source: serializer.fromJson<String>(json['source']),
+      sourceLinkIdsJson: serializer.fromJson<String>(json['sourceLinkIdsJson']),
+      weeksJson: serializer.fromJson<String>(json['weeksJson']),
+      status: serializer.fromJson<String>(json['status']),
+      appliedStartDate: serializer.fromJson<String?>(json['appliedStartDate']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'title': serializer.toJson<String>(title),
+      'sport': serializer.toJson<String>(sport),
+      'source': serializer.toJson<String>(source),
+      'sourceLinkIdsJson': serializer.toJson<String>(sourceLinkIdsJson),
+      'weeksJson': serializer.toJson<String>(weeksJson),
+      'status': serializer.toJson<String>(status),
+      'appliedStartDate': serializer.toJson<String?>(appliedStartDate),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalProgram copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? title,
+          String? sport,
+          String? source,
+          String? sourceLinkIdsJson,
+          String? weeksJson,
+          String? status,
+          Value<String?> appliedStartDate = const Value.absent(),
+          DateTime? createdAt}) =>
+      LocalProgram(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        title: title ?? this.title,
+        sport: sport ?? this.sport,
+        source: source ?? this.source,
+        sourceLinkIdsJson: sourceLinkIdsJson ?? this.sourceLinkIdsJson,
+        weeksJson: weeksJson ?? this.weeksJson,
+        status: status ?? this.status,
+        appliedStartDate: appliedStartDate.present
+            ? appliedStartDate.value
+            : this.appliedStartDate,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalProgram copyWithCompanion(ProgramsCompanion data) {
+    return LocalProgram(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      title: data.title.present ? data.title.value : this.title,
+      sport: data.sport.present ? data.sport.value : this.sport,
+      source: data.source.present ? data.source.value : this.source,
+      sourceLinkIdsJson: data.sourceLinkIdsJson.present
+          ? data.sourceLinkIdsJson.value
+          : this.sourceLinkIdsJson,
+      weeksJson: data.weeksJson.present ? data.weeksJson.value : this.weeksJson,
+      status: data.status.present ? data.status.value : this.status,
+      appliedStartDate: data.appliedStartDate.present
+          ? data.appliedStartDate.value
+          : this.appliedStartDate,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalProgram(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('title: $title, ')
+          ..write('sport: $sport, ')
+          ..write('source: $source, ')
+          ..write('sourceLinkIdsJson: $sourceLinkIdsJson, ')
+          ..write('weeksJson: $weeksJson, ')
+          ..write('status: $status, ')
+          ..write('appliedStartDate: $appliedStartDate, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      updatedAt,
+      baseUpdatedAt,
+      pendingOp,
+      pushAttempts,
+      deletedAt,
+      title,
+      sport,
+      source,
+      sourceLinkIdsJson,
+      weeksJson,
+      status,
+      appliedStartDate,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalProgram &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.title == this.title &&
+          other.sport == this.sport &&
+          other.source == this.source &&
+          other.sourceLinkIdsJson == this.sourceLinkIdsJson &&
+          other.weeksJson == this.weeksJson &&
+          other.status == this.status &&
+          other.appliedStartDate == this.appliedStartDate &&
+          other.createdAt == this.createdAt);
+}
+
+class ProgramsCompanion extends UpdateCompanion<LocalProgram> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> title;
+  final Value<String> sport;
+  final Value<String> source;
+  final Value<String> sourceLinkIdsJson;
+  final Value<String> weeksJson;
+  final Value<String> status;
+  final Value<String?> appliedStartDate;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const ProgramsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.title = const Value.absent(),
+    this.sport = const Value.absent(),
+    this.source = const Value.absent(),
+    this.sourceLinkIdsJson = const Value.absent(),
+    this.weeksJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.appliedStartDate = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProgramsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String title,
+    required String sport,
+    this.source = const Value.absent(),
+    this.sourceLinkIdsJson = const Value.absent(),
+    this.weeksJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.appliedStartDate = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        title = Value(title),
+        sport = Value(sport),
+        createdAt = Value(createdAt);
+  static Insertable<LocalProgram> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? title,
+    Expression<String>? sport,
+    Expression<String>? source,
+    Expression<String>? sourceLinkIdsJson,
+    Expression<String>? weeksJson,
+    Expression<String>? status,
+    Expression<String>? appliedStartDate,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (title != null) 'title': title,
+      if (sport != null) 'sport': sport,
+      if (source != null) 'source': source,
+      if (sourceLinkIdsJson != null) 'source_link_ids_json': sourceLinkIdsJson,
+      if (weeksJson != null) 'weeks_json': weeksJson,
+      if (status != null) 'status': status,
+      if (appliedStartDate != null) 'applied_start_date': appliedStartDate,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProgramsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? title,
+      Value<String>? sport,
+      Value<String>? source,
+      Value<String>? sourceLinkIdsJson,
+      Value<String>? weeksJson,
+      Value<String>? status,
+      Value<String?>? appliedStartDate,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return ProgramsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      title: title ?? this.title,
+      sport: sport ?? this.sport,
+      source: source ?? this.source,
+      sourceLinkIdsJson: sourceLinkIdsJson ?? this.sourceLinkIdsJson,
+      weeksJson: weeksJson ?? this.weeksJson,
+      status: status ?? this.status,
+      appliedStartDate: appliedStartDate ?? this.appliedStartDate,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (sport.present) {
+      map['sport'] = Variable<String>(sport.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (sourceLinkIdsJson.present) {
+      map['source_link_ids_json'] = Variable<String>(sourceLinkIdsJson.value);
+    }
+    if (weeksJson.present) {
+      map['weeks_json'] = Variable<String>(weeksJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (appliedStartDate.present) {
+      map['applied_start_date'] = Variable<String>(appliedStartDate.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProgramsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('title: $title, ')
+          ..write('sport: $sport, ')
+          ..write('source: $source, ')
+          ..write('sourceLinkIdsJson: $sourceLinkIdsJson, ')
+          ..write('weeksJson: $weeksJson, ')
+          ..write('status: $status, ')
+          ..write('appliedStartDate: $appliedStartDate, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $WorkoutsTable extends Workouts
+    with TableInfo<$WorkoutsTable, LocalWorkout> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WorkoutsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sportMeta = const VerificationMeta('sport');
+  @override
+  late final GeneratedColumn<String> sport = GeneratedColumn<String>(
+      'sport', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _exercisesJsonMeta =
+      const VerificationMeta('exercisesJson');
+  @override
+  late final GeneratedColumn<String> exercisesJson = GeneratedColumn<String>(
+      'exercises_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _tagsJsonMeta =
+      const VerificationMeta('tagsJson');
+  @override
+  late final GeneratedColumn<String> tagsJson = GeneratedColumn<String>(
+      'tags_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        name,
+        sport,
+        exercisesJson,
+        tagsJson,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'workouts';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalWorkout> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('sport')) {
+      context.handle(
+          _sportMeta, sport.isAcceptableOrUnknown(data['sport']!, _sportMeta));
+    } else if (isInserting) {
+      context.missing(_sportMeta);
+    }
+    if (data.containsKey('exercises_json')) {
+      context.handle(
+          _exercisesJsonMeta,
+          exercisesJson.isAcceptableOrUnknown(
+              data['exercises_json']!, _exercisesJsonMeta));
+    }
+    if (data.containsKey('tags_json')) {
+      context.handle(_tagsJsonMeta,
+          tagsJson.isAcceptableOrUnknown(data['tags_json']!, _tagsJsonMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalWorkout map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalWorkout(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      sport: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sport'])!,
+      exercisesJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}exercises_json'])!,
+      tagsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tags_json'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $WorkoutsTable createAlias(String alias) {
+    return $WorkoutsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalWorkout extends DataClass implements Insertable<LocalWorkout> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String name;
+  final String sport;
+  final String exercisesJson;
+  final String tagsJson;
+  final DateTime createdAt;
+  const LocalWorkout(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.name,
+      required this.sport,
+      required this.exercisesJson,
+      required this.tagsJson,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['name'] = Variable<String>(name);
+    map['sport'] = Variable<String>(sport);
+    map['exercises_json'] = Variable<String>(exercisesJson);
+    map['tags_json'] = Variable<String>(tagsJson);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  WorkoutsCompanion toCompanion(bool nullToAbsent) {
+    return WorkoutsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      name: Value(name),
+      sport: Value(sport),
+      exercisesJson: Value(exercisesJson),
+      tagsJson: Value(tagsJson),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalWorkout.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalWorkout(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      name: serializer.fromJson<String>(json['name']),
+      sport: serializer.fromJson<String>(json['sport']),
+      exercisesJson: serializer.fromJson<String>(json['exercisesJson']),
+      tagsJson: serializer.fromJson<String>(json['tagsJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'name': serializer.toJson<String>(name),
+      'sport': serializer.toJson<String>(sport),
+      'exercisesJson': serializer.toJson<String>(exercisesJson),
+      'tagsJson': serializer.toJson<String>(tagsJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalWorkout copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? name,
+          String? sport,
+          String? exercisesJson,
+          String? tagsJson,
+          DateTime? createdAt}) =>
+      LocalWorkout(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        name: name ?? this.name,
+        sport: sport ?? this.sport,
+        exercisesJson: exercisesJson ?? this.exercisesJson,
+        tagsJson: tagsJson ?? this.tagsJson,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalWorkout copyWithCompanion(WorkoutsCompanion data) {
+    return LocalWorkout(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      name: data.name.present ? data.name.value : this.name,
+      sport: data.sport.present ? data.sport.value : this.sport,
+      exercisesJson: data.exercisesJson.present
+          ? data.exercisesJson.value
+          : this.exercisesJson,
+      tagsJson: data.tagsJson.present ? data.tagsJson.value : this.tagsJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalWorkout(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('name: $name, ')
+          ..write('sport: $sport, ')
+          ..write('exercisesJson: $exercisesJson, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, updatedAt, baseUpdatedAt, pendingOp,
+      pushAttempts, deletedAt, name, sport, exercisesJson, tagsJson, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalWorkout &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.name == this.name &&
+          other.sport == this.sport &&
+          other.exercisesJson == this.exercisesJson &&
+          other.tagsJson == this.tagsJson &&
+          other.createdAt == this.createdAt);
+}
+
+class WorkoutsCompanion extends UpdateCompanion<LocalWorkout> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> name;
+  final Value<String> sport;
+  final Value<String> exercisesJson;
+  final Value<String> tagsJson;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const WorkoutsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sport = const Value.absent(),
+    this.exercisesJson = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  WorkoutsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String name,
+    required String sport,
+    this.exercisesJson = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        name = Value(name),
+        sport = Value(sport),
+        createdAt = Value(createdAt);
+  static Insertable<LocalWorkout> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? name,
+    Expression<String>? sport,
+    Expression<String>? exercisesJson,
+    Expression<String>? tagsJson,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (name != null) 'name': name,
+      if (sport != null) 'sport': sport,
+      if (exercisesJson != null) 'exercises_json': exercisesJson,
+      if (tagsJson != null) 'tags_json': tagsJson,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  WorkoutsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? name,
+      Value<String>? sport,
+      Value<String>? exercisesJson,
+      Value<String>? tagsJson,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return WorkoutsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      name: name ?? this.name,
+      sport: sport ?? this.sport,
+      exercisesJson: exercisesJson ?? this.exercisesJson,
+      tagsJson: tagsJson ?? this.tagsJson,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sport.present) {
+      map['sport'] = Variable<String>(sport.value);
+    }
+    if (exercisesJson.present) {
+      map['exercises_json'] = Variable<String>(exercisesJson.value);
+    }
+    if (tagsJson.present) {
+      map['tags_json'] = Variable<String>(tagsJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WorkoutsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('name: $name, ')
+          ..write('sport: $sport, ')
+          ..write('exercisesJson: $exercisesJson, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SessionsTable extends Sessions
+    with TableInfo<$SessionsTable, LocalSession> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _plannedAtMeta =
+      const VerificationMeta('plannedAt');
+  @override
+  late final GeneratedColumn<DateTime> plannedAt = GeneratedColumn<DateTime>(
+      'planned_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _durationMinMeta =
+      const VerificationMeta('durationMin');
+  @override
+  late final GeneratedColumn<int> durationMin = GeneratedColumn<int>(
+      'duration_min', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(60));
+  static const VerificationMeta _sportMeta = const VerificationMeta('sport');
+  @override
+  late final GeneratedColumn<String> sport = GeneratedColumn<String>(
+      'sport', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+      'title', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _focusMeta = const VerificationMeta('focus');
+  @override
+  late final GeneratedColumn<String> focus = GeneratedColumn<String>(
+      'focus', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _programIdMeta =
+      const VerificationMeta('programId');
+  @override
+  late final GeneratedColumn<String> programId = GeneratedColumn<String>(
+      'program_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _weekIndexMeta =
+      const VerificationMeta('weekIndex');
+  @override
+  late final GeneratedColumn<int> weekIndex = GeneratedColumn<int>(
+      'week_index', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _slotIdMeta = const VerificationMeta('slotId');
+  @override
+  late final GeneratedColumn<String> slotId = GeneratedColumn<String>(
+      'slot_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _suggestionIdMeta =
+      const VerificationMeta('suggestionId');
+  @override
+  late final GeneratedColumn<String> suggestionId = GeneratedColumn<String>(
+      'suggestion_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _exercisesJsonMeta =
+      const VerificationMeta('exercisesJson');
+  @override
+  late final GeneratedColumn<String> exercisesJson = GeneratedColumn<String>(
+      'exercises_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('planned'));
+  static const VerificationMeta _completedAtMeta =
+      const VerificationMeta('completedAt');
+  @override
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+      'completed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        plannedAt,
+        durationMin,
+        sport,
+        title,
+        focus,
+        programId,
+        weekIndex,
+        slotId,
+        suggestionId,
+        exercisesJson,
+        status,
+        completedAt,
+        notes,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sessions';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalSession> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('planned_at')) {
+      context.handle(_plannedAtMeta,
+          plannedAt.isAcceptableOrUnknown(data['planned_at']!, _plannedAtMeta));
+    } else if (isInserting) {
+      context.missing(_plannedAtMeta);
+    }
+    if (data.containsKey('duration_min')) {
+      context.handle(
+          _durationMinMeta,
+          durationMin.isAcceptableOrUnknown(
+              data['duration_min']!, _durationMinMeta));
+    }
+    if (data.containsKey('sport')) {
+      context.handle(
+          _sportMeta, sport.isAcceptableOrUnknown(data['sport']!, _sportMeta));
+    } else if (isInserting) {
+      context.missing(_sportMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+          _titleMeta, title.isAcceptableOrUnknown(data['title']!, _titleMeta));
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('focus')) {
+      context.handle(
+          _focusMeta, focus.isAcceptableOrUnknown(data['focus']!, _focusMeta));
+    }
+    if (data.containsKey('program_id')) {
+      context.handle(_programIdMeta,
+          programId.isAcceptableOrUnknown(data['program_id']!, _programIdMeta));
+    }
+    if (data.containsKey('week_index')) {
+      context.handle(_weekIndexMeta,
+          weekIndex.isAcceptableOrUnknown(data['week_index']!, _weekIndexMeta));
+    }
+    if (data.containsKey('slot_id')) {
+      context.handle(_slotIdMeta,
+          slotId.isAcceptableOrUnknown(data['slot_id']!, _slotIdMeta));
+    }
+    if (data.containsKey('suggestion_id')) {
+      context.handle(
+          _suggestionIdMeta,
+          suggestionId.isAcceptableOrUnknown(
+              data['suggestion_id']!, _suggestionIdMeta));
+    }
+    if (data.containsKey('exercises_json')) {
+      context.handle(
+          _exercisesJsonMeta,
+          exercisesJson.isAcceptableOrUnknown(
+              data['exercises_json']!, _exercisesJsonMeta));
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+          _completedAtMeta,
+          completedAt.isAcceptableOrUnknown(
+              data['completed_at']!, _completedAtMeta));
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalSession(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      plannedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}planned_at'])!,
+      durationMin: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}duration_min'])!,
+      sport: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sport'])!,
+      title: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}title'])!,
+      focus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}focus']),
+      programId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}program_id']),
+      weekIndex: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}week_index']),
+      slotId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}slot_id']),
+      suggestionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}suggestion_id']),
+      exercisesJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}exercises_json'])!,
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      completedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}completed_at']),
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $SessionsTable createAlias(String alias) {
+    return $SessionsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalSession extends DataClass implements Insertable<LocalSession> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final DateTime plannedAt;
+  final int durationMin;
+
+  /// One of the seven known names or the member's own word. A text column and
+  /// not an enum, for the reason [Conversations.kind] gives — and here it is
+  /// the product rule as well: "other" in the picker is a text field, not a
+  /// bucket, so a member whose sport is padel stores `padel`.
+  final String sport;
+  final String title;
+  final String? focus;
+
+  /// Which program filled this, and which of its weeks. Null for a bare slot.
+  final String? programId;
+  final int? weekIndex;
+
+  /// Which weekly slot produced it. Null for a session made by hand.
+  final String? slotId;
+  final String? suggestionId;
+  final String exercisesJson;
+
+  /// `planned` | `completed` | `cancelled` | `skipped`. Four, and a delete
+  /// never touches it: a skipped session stays in the week marked skipped,
+  /// which is the whole of FR-005's honesty.
+  final String status;
+  final DateTime? completedAt;
+  final String? notes;
+  final DateTime createdAt;
+  const LocalSession(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.plannedAt,
+      required this.durationMin,
+      required this.sport,
+      required this.title,
+      this.focus,
+      this.programId,
+      this.weekIndex,
+      this.slotId,
+      this.suggestionId,
+      required this.exercisesJson,
+      required this.status,
+      this.completedAt,
+      this.notes,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['planned_at'] = Variable<DateTime>(plannedAt);
+    map['duration_min'] = Variable<int>(durationMin);
+    map['sport'] = Variable<String>(sport);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || focus != null) {
+      map['focus'] = Variable<String>(focus);
+    }
+    if (!nullToAbsent || programId != null) {
+      map['program_id'] = Variable<String>(programId);
+    }
+    if (!nullToAbsent || weekIndex != null) {
+      map['week_index'] = Variable<int>(weekIndex);
+    }
+    if (!nullToAbsent || slotId != null) {
+      map['slot_id'] = Variable<String>(slotId);
+    }
+    if (!nullToAbsent || suggestionId != null) {
+      map['suggestion_id'] = Variable<String>(suggestionId);
+    }
+    map['exercises_json'] = Variable<String>(exercisesJson);
+    map['status'] = Variable<String>(status);
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  SessionsCompanion toCompanion(bool nullToAbsent) {
+    return SessionsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      plannedAt: Value(plannedAt),
+      durationMin: Value(durationMin),
+      sport: Value(sport),
+      title: Value(title),
+      focus:
+          focus == null && nullToAbsent ? const Value.absent() : Value(focus),
+      programId: programId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(programId),
+      weekIndex: weekIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(weekIndex),
+      slotId:
+          slotId == null && nullToAbsent ? const Value.absent() : Value(slotId),
+      suggestionId: suggestionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(suggestionId),
+      exercisesJson: Value(exercisesJson),
+      status: Value(status),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalSession.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalSession(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      plannedAt: serializer.fromJson<DateTime>(json['plannedAt']),
+      durationMin: serializer.fromJson<int>(json['durationMin']),
+      sport: serializer.fromJson<String>(json['sport']),
+      title: serializer.fromJson<String>(json['title']),
+      focus: serializer.fromJson<String?>(json['focus']),
+      programId: serializer.fromJson<String?>(json['programId']),
+      weekIndex: serializer.fromJson<int?>(json['weekIndex']),
+      slotId: serializer.fromJson<String?>(json['slotId']),
+      suggestionId: serializer.fromJson<String?>(json['suggestionId']),
+      exercisesJson: serializer.fromJson<String>(json['exercisesJson']),
+      status: serializer.fromJson<String>(json['status']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'plannedAt': serializer.toJson<DateTime>(plannedAt),
+      'durationMin': serializer.toJson<int>(durationMin),
+      'sport': serializer.toJson<String>(sport),
+      'title': serializer.toJson<String>(title),
+      'focus': serializer.toJson<String?>(focus),
+      'programId': serializer.toJson<String?>(programId),
+      'weekIndex': serializer.toJson<int?>(weekIndex),
+      'slotId': serializer.toJson<String?>(slotId),
+      'suggestionId': serializer.toJson<String?>(suggestionId),
+      'exercisesJson': serializer.toJson<String>(exercisesJson),
+      'status': serializer.toJson<String>(status),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+      'notes': serializer.toJson<String?>(notes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalSession copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          DateTime? plannedAt,
+          int? durationMin,
+          String? sport,
+          String? title,
+          Value<String?> focus = const Value.absent(),
+          Value<String?> programId = const Value.absent(),
+          Value<int?> weekIndex = const Value.absent(),
+          Value<String?> slotId = const Value.absent(),
+          Value<String?> suggestionId = const Value.absent(),
+          String? exercisesJson,
+          String? status,
+          Value<DateTime?> completedAt = const Value.absent(),
+          Value<String?> notes = const Value.absent(),
+          DateTime? createdAt}) =>
+      LocalSession(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        plannedAt: plannedAt ?? this.plannedAt,
+        durationMin: durationMin ?? this.durationMin,
+        sport: sport ?? this.sport,
+        title: title ?? this.title,
+        focus: focus.present ? focus.value : this.focus,
+        programId: programId.present ? programId.value : this.programId,
+        weekIndex: weekIndex.present ? weekIndex.value : this.weekIndex,
+        slotId: slotId.present ? slotId.value : this.slotId,
+        suggestionId:
+            suggestionId.present ? suggestionId.value : this.suggestionId,
+        exercisesJson: exercisesJson ?? this.exercisesJson,
+        status: status ?? this.status,
+        completedAt: completedAt.present ? completedAt.value : this.completedAt,
+        notes: notes.present ? notes.value : this.notes,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalSession copyWithCompanion(SessionsCompanion data) {
+    return LocalSession(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      plannedAt: data.plannedAt.present ? data.plannedAt.value : this.plannedAt,
+      durationMin:
+          data.durationMin.present ? data.durationMin.value : this.durationMin,
+      sport: data.sport.present ? data.sport.value : this.sport,
+      title: data.title.present ? data.title.value : this.title,
+      focus: data.focus.present ? data.focus.value : this.focus,
+      programId: data.programId.present ? data.programId.value : this.programId,
+      weekIndex: data.weekIndex.present ? data.weekIndex.value : this.weekIndex,
+      slotId: data.slotId.present ? data.slotId.value : this.slotId,
+      suggestionId: data.suggestionId.present
+          ? data.suggestionId.value
+          : this.suggestionId,
+      exercisesJson: data.exercisesJson.present
+          ? data.exercisesJson.value
+          : this.exercisesJson,
+      status: data.status.present ? data.status.value : this.status,
+      completedAt:
+          data.completedAt.present ? data.completedAt.value : this.completedAt,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalSession(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('plannedAt: $plannedAt, ')
+          ..write('durationMin: $durationMin, ')
+          ..write('sport: $sport, ')
+          ..write('title: $title, ')
+          ..write('focus: $focus, ')
+          ..write('programId: $programId, ')
+          ..write('weekIndex: $weekIndex, ')
+          ..write('slotId: $slotId, ')
+          ..write('suggestionId: $suggestionId, ')
+          ..write('exercisesJson: $exercisesJson, ')
+          ..write('status: $status, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      updatedAt,
+      baseUpdatedAt,
+      pendingOp,
+      pushAttempts,
+      deletedAt,
+      plannedAt,
+      durationMin,
+      sport,
+      title,
+      focus,
+      programId,
+      weekIndex,
+      slotId,
+      suggestionId,
+      exercisesJson,
+      status,
+      completedAt,
+      notes,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalSession &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.plannedAt == this.plannedAt &&
+          other.durationMin == this.durationMin &&
+          other.sport == this.sport &&
+          other.title == this.title &&
+          other.focus == this.focus &&
+          other.programId == this.programId &&
+          other.weekIndex == this.weekIndex &&
+          other.slotId == this.slotId &&
+          other.suggestionId == this.suggestionId &&
+          other.exercisesJson == this.exercisesJson &&
+          other.status == this.status &&
+          other.completedAt == this.completedAt &&
+          other.notes == this.notes &&
+          other.createdAt == this.createdAt);
+}
+
+class SessionsCompanion extends UpdateCompanion<LocalSession> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<DateTime> plannedAt;
+  final Value<int> durationMin;
+  final Value<String> sport;
+  final Value<String> title;
+  final Value<String?> focus;
+  final Value<String?> programId;
+  final Value<int?> weekIndex;
+  final Value<String?> slotId;
+  final Value<String?> suggestionId;
+  final Value<String> exercisesJson;
+  final Value<String> status;
+  final Value<DateTime?> completedAt;
+  final Value<String?> notes;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const SessionsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.plannedAt = const Value.absent(),
+    this.durationMin = const Value.absent(),
+    this.sport = const Value.absent(),
+    this.title = const Value.absent(),
+    this.focus = const Value.absent(),
+    this.programId = const Value.absent(),
+    this.weekIndex = const Value.absent(),
+    this.slotId = const Value.absent(),
+    this.suggestionId = const Value.absent(),
+    this.exercisesJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SessionsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required DateTime plannedAt,
+    this.durationMin = const Value.absent(),
+    required String sport,
+    required String title,
+    this.focus = const Value.absent(),
+    this.programId = const Value.absent(),
+    this.weekIndex = const Value.absent(),
+    this.slotId = const Value.absent(),
+    this.suggestionId = const Value.absent(),
+    this.exercisesJson = const Value.absent(),
+    this.status = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.notes = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        plannedAt = Value(plannedAt),
+        sport = Value(sport),
+        title = Value(title),
+        createdAt = Value(createdAt);
+  static Insertable<LocalSession> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<DateTime>? plannedAt,
+    Expression<int>? durationMin,
+    Expression<String>? sport,
+    Expression<String>? title,
+    Expression<String>? focus,
+    Expression<String>? programId,
+    Expression<int>? weekIndex,
+    Expression<String>? slotId,
+    Expression<String>? suggestionId,
+    Expression<String>? exercisesJson,
+    Expression<String>? status,
+    Expression<DateTime>? completedAt,
+    Expression<String>? notes,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (plannedAt != null) 'planned_at': plannedAt,
+      if (durationMin != null) 'duration_min': durationMin,
+      if (sport != null) 'sport': sport,
+      if (title != null) 'title': title,
+      if (focus != null) 'focus': focus,
+      if (programId != null) 'program_id': programId,
+      if (weekIndex != null) 'week_index': weekIndex,
+      if (slotId != null) 'slot_id': slotId,
+      if (suggestionId != null) 'suggestion_id': suggestionId,
+      if (exercisesJson != null) 'exercises_json': exercisesJson,
+      if (status != null) 'status': status,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (notes != null) 'notes': notes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SessionsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<DateTime>? plannedAt,
+      Value<int>? durationMin,
+      Value<String>? sport,
+      Value<String>? title,
+      Value<String?>? focus,
+      Value<String?>? programId,
+      Value<int?>? weekIndex,
+      Value<String?>? slotId,
+      Value<String?>? suggestionId,
+      Value<String>? exercisesJson,
+      Value<String>? status,
+      Value<DateTime?>? completedAt,
+      Value<String?>? notes,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return SessionsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      plannedAt: plannedAt ?? this.plannedAt,
+      durationMin: durationMin ?? this.durationMin,
+      sport: sport ?? this.sport,
+      title: title ?? this.title,
+      focus: focus ?? this.focus,
+      programId: programId ?? this.programId,
+      weekIndex: weekIndex ?? this.weekIndex,
+      slotId: slotId ?? this.slotId,
+      suggestionId: suggestionId ?? this.suggestionId,
+      exercisesJson: exercisesJson ?? this.exercisesJson,
+      status: status ?? this.status,
+      completedAt: completedAt ?? this.completedAt,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (plannedAt.present) {
+      map['planned_at'] = Variable<DateTime>(plannedAt.value);
+    }
+    if (durationMin.present) {
+      map['duration_min'] = Variable<int>(durationMin.value);
+    }
+    if (sport.present) {
+      map['sport'] = Variable<String>(sport.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (focus.present) {
+      map['focus'] = Variable<String>(focus.value);
+    }
+    if (programId.present) {
+      map['program_id'] = Variable<String>(programId.value);
+    }
+    if (weekIndex.present) {
+      map['week_index'] = Variable<int>(weekIndex.value);
+    }
+    if (slotId.present) {
+      map['slot_id'] = Variable<String>(slotId.value);
+    }
+    if (suggestionId.present) {
+      map['suggestion_id'] = Variable<String>(suggestionId.value);
+    }
+    if (exercisesJson.present) {
+      map['exercises_json'] = Variable<String>(exercisesJson.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('plannedAt: $plannedAt, ')
+          ..write('durationMin: $durationMin, ')
+          ..write('sport: $sport, ')
+          ..write('title: $title, ')
+          ..write('focus: $focus, ')
+          ..write('programId: $programId, ')
+          ..write('weekIndex: $weekIndex, ')
+          ..write('slotId: $slotId, ')
+          ..write('suggestionId: $suggestionId, ')
+          ..write('exercisesJson: $exercisesJson, ')
+          ..write('status: $status, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9550,6 +12133,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $PendingMessagesTable(this);
   late final $MeetingsTable meetings = $MeetingsTable(this);
   late final $CalendarEventsTable calendarEvents = $CalendarEventsTable(this);
+  late final $AthleteProfileTable athleteProfile = $AthleteProfileTable(this);
+  late final $ProgramsTable programs = $ProgramsTable(this);
+  late final $WorkoutsTable workouts = $WorkoutsTable(this);
+  late final $SessionsTable sessions = $SessionsTable(this);
   late final Index labelsSort =
       Index('labels_sort', 'CREATE INDEX labels_sort ON labels (sort_order)');
   late final Index labelsPending = Index(
@@ -9596,6 +12183,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX calendar_events_start ON calendar_events (start_at)');
   late final Index calendarEventsPending = Index('calendar_events_pending',
       'CREATE INDEX calendar_events_pending ON calendar_events (pending_op)');
+  late final Index programsStatus = Index(
+      'programs_status', 'CREATE INDEX programs_status ON programs (status)');
+  late final Index programsPending = Index('programs_pending',
+      'CREATE INDEX programs_pending ON programs (pending_op)');
+  late final Index workoutsSport = Index(
+      'workouts_sport', 'CREATE INDEX workouts_sport ON workouts (sport)');
+  late final Index workoutsPending = Index('workouts_pending',
+      'CREATE INDEX workouts_pending ON workouts (pending_op)');
+  late final Index sessionsPlannedAt = Index('sessions_planned_at',
+      'CREATE INDEX sessions_planned_at ON sessions (planned_at)');
+  late final Index sessionsStatusPlanned = Index('sessions_status_planned',
+      'CREATE INDEX sessions_status_planned ON sessions (status, planned_at)');
+  late final Index sessionsPending = Index('sessions_pending',
+      'CREATE INDEX sessions_pending ON sessions (pending_op)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -9616,6 +12217,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         pendingMessages,
         meetings,
         calendarEvents,
+        athleteProfile,
+        programs,
+        workouts,
+        sessions,
         labelsSort,
         labelsPending,
         tasksDue,
@@ -9638,7 +12243,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         meetingsStatusStart,
         meetingsPending,
         calendarEventsStart,
-        calendarEventsPending
+        calendarEventsPending,
+        programsStatus,
+        programsPending,
+        workoutsSport,
+        workoutsPending,
+        sessionsPlannedAt,
+        sessionsStatusPlanned,
+        sessionsPending
       ];
   @override
   DriftDatabaseOptions get options =>
@@ -13854,6 +16466,1154 @@ typedef $$CalendarEventsTableProcessedTableManager = ProcessedTableManager<
     ),
     LocalCalendarEvent,
     PrefetchHooks Function()>;
+typedef $$AthleteProfileTableCreateCompanionBuilder = AthleteProfileCompanion
+    Function({
+  required String userId,
+  Value<String> sportsJson,
+  Value<String> slotsJson,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  required DateTime fetchedAt,
+  Value<int> rowid,
+});
+typedef $$AthleteProfileTableUpdateCompanionBuilder = AthleteProfileCompanion
+    Function({
+  Value<String> userId,
+  Value<String> sportsJson,
+  Value<String> slotsJson,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime> fetchedAt,
+  Value<int> rowid,
+});
+
+class $$AthleteProfileTableFilterComposer
+    extends Composer<_$AppDatabase, $AthleteProfileTable> {
+  $$AthleteProfileTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sportsJson => $composableBuilder(
+      column: $table.sportsJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get slotsJson => $composableBuilder(
+      column: $table.slotsJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get fetchedAt => $composableBuilder(
+      column: $table.fetchedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$AthleteProfileTableOrderingComposer
+    extends Composer<_$AppDatabase, $AthleteProfileTable> {
+  $$AthleteProfileTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sportsJson => $composableBuilder(
+      column: $table.sportsJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get slotsJson => $composableBuilder(
+      column: $table.slotsJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get fetchedAt => $composableBuilder(
+      column: $table.fetchedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$AthleteProfileTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AthleteProfileTable> {
+  $$AthleteProfileTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get sportsJson => $composableBuilder(
+      column: $table.sportsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get slotsJson =>
+      $composableBuilder(column: $table.slotsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get fetchedAt =>
+      $composableBuilder(column: $table.fetchedAt, builder: (column) => column);
+}
+
+class $$AthleteProfileTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $AthleteProfileTable,
+    LocalAthleteProfile,
+    $$AthleteProfileTableFilterComposer,
+    $$AthleteProfileTableOrderingComposer,
+    $$AthleteProfileTableAnnotationComposer,
+    $$AthleteProfileTableCreateCompanionBuilder,
+    $$AthleteProfileTableUpdateCompanionBuilder,
+    (
+      LocalAthleteProfile,
+      BaseReferences<_$AppDatabase, $AthleteProfileTable, LocalAthleteProfile>
+    ),
+    LocalAthleteProfile,
+    PrefetchHooks Function()> {
+  $$AthleteProfileTableTableManager(
+      _$AppDatabase db, $AthleteProfileTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AthleteProfileTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AthleteProfileTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AthleteProfileTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> userId = const Value.absent(),
+            Value<String> sportsJson = const Value.absent(),
+            Value<String> slotsJson = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime> fetchedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              AthleteProfileCompanion(
+            userId: userId,
+            sportsJson: sportsJson,
+            slotsJson: slotsJson,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            fetchedAt: fetchedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String userId,
+            Value<String> sportsJson = const Value.absent(),
+            Value<String> slotsJson = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            required DateTime fetchedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              AthleteProfileCompanion.insert(
+            userId: userId,
+            sportsJson: sportsJson,
+            slotsJson: slotsJson,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            fetchedAt: fetchedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$AthleteProfileTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $AthleteProfileTable,
+    LocalAthleteProfile,
+    $$AthleteProfileTableFilterComposer,
+    $$AthleteProfileTableOrderingComposer,
+    $$AthleteProfileTableAnnotationComposer,
+    $$AthleteProfileTableCreateCompanionBuilder,
+    $$AthleteProfileTableUpdateCompanionBuilder,
+    (
+      LocalAthleteProfile,
+      BaseReferences<_$AppDatabase, $AthleteProfileTable, LocalAthleteProfile>
+    ),
+    LocalAthleteProfile,
+    PrefetchHooks Function()>;
+typedef $$ProgramsTableCreateCompanionBuilder = ProgramsCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String title,
+  required String sport,
+  Value<String> source,
+  Value<String> sourceLinkIdsJson,
+  Value<String> weeksJson,
+  Value<String> status,
+  Value<String?> appliedStartDate,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$ProgramsTableUpdateCompanionBuilder = ProgramsCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> title,
+  Value<String> sport,
+  Value<String> source,
+  Value<String> sourceLinkIdsJson,
+  Value<String> weeksJson,
+  Value<String> status,
+  Value<String?> appliedStartDate,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$ProgramsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProgramsTable> {
+  $$ProgramsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sport => $composableBuilder(
+      column: $table.sport, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sourceLinkIdsJson => $composableBuilder(
+      column: $table.sourceLinkIdsJson,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get weeksJson => $composableBuilder(
+      column: $table.weeksJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get appliedStartDate => $composableBuilder(
+      column: $table.appliedStartDate,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$ProgramsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProgramsTable> {
+  $$ProgramsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sport => $composableBuilder(
+      column: $table.sport, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sourceLinkIdsJson => $composableBuilder(
+      column: $table.sourceLinkIdsJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get weeksJson => $composableBuilder(
+      column: $table.weeksJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get appliedStartDate => $composableBuilder(
+      column: $table.appliedStartDate,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ProgramsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProgramsTable> {
+  $$ProgramsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get sport =>
+      $composableBuilder(column: $table.sport, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceLinkIdsJson => $composableBuilder(
+      column: $table.sourceLinkIdsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get weeksJson =>
+      $composableBuilder(column: $table.weeksJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get appliedStartDate => $composableBuilder(
+      column: $table.appliedStartDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ProgramsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ProgramsTable,
+    LocalProgram,
+    $$ProgramsTableFilterComposer,
+    $$ProgramsTableOrderingComposer,
+    $$ProgramsTableAnnotationComposer,
+    $$ProgramsTableCreateCompanionBuilder,
+    $$ProgramsTableUpdateCompanionBuilder,
+    (LocalProgram, BaseReferences<_$AppDatabase, $ProgramsTable, LocalProgram>),
+    LocalProgram,
+    PrefetchHooks Function()> {
+  $$ProgramsTableTableManager(_$AppDatabase db, $ProgramsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProgramsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProgramsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProgramsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String> sport = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<String> sourceLinkIdsJson = const Value.absent(),
+            Value<String> weeksJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String?> appliedStartDate = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProgramsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            title: title,
+            sport: sport,
+            source: source,
+            sourceLinkIdsJson: sourceLinkIdsJson,
+            weeksJson: weeksJson,
+            status: status,
+            appliedStartDate: appliedStartDate,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String title,
+            required String sport,
+            Value<String> source = const Value.absent(),
+            Value<String> sourceLinkIdsJson = const Value.absent(),
+            Value<String> weeksJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<String?> appliedStartDate = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProgramsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            title: title,
+            sport: sport,
+            source: source,
+            sourceLinkIdsJson: sourceLinkIdsJson,
+            weeksJson: weeksJson,
+            status: status,
+            appliedStartDate: appliedStartDate,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ProgramsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ProgramsTable,
+    LocalProgram,
+    $$ProgramsTableFilterComposer,
+    $$ProgramsTableOrderingComposer,
+    $$ProgramsTableAnnotationComposer,
+    $$ProgramsTableCreateCompanionBuilder,
+    $$ProgramsTableUpdateCompanionBuilder,
+    (LocalProgram, BaseReferences<_$AppDatabase, $ProgramsTable, LocalProgram>),
+    LocalProgram,
+    PrefetchHooks Function()>;
+typedef $$WorkoutsTableCreateCompanionBuilder = WorkoutsCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String name,
+  required String sport,
+  Value<String> exercisesJson,
+  Value<String> tagsJson,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$WorkoutsTableUpdateCompanionBuilder = WorkoutsCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> name,
+  Value<String> sport,
+  Value<String> exercisesJson,
+  Value<String> tagsJson,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$WorkoutsTableFilterComposer
+    extends Composer<_$AppDatabase, $WorkoutsTable> {
+  $$WorkoutsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sport => $composableBuilder(
+      column: $table.sport, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get exercisesJson => $composableBuilder(
+      column: $table.exercisesJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tagsJson => $composableBuilder(
+      column: $table.tagsJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$WorkoutsTableOrderingComposer
+    extends Composer<_$AppDatabase, $WorkoutsTable> {
+  $$WorkoutsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sport => $composableBuilder(
+      column: $table.sport, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get exercisesJson => $composableBuilder(
+      column: $table.exercisesJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tagsJson => $composableBuilder(
+      column: $table.tagsJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$WorkoutsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WorkoutsTable> {
+  $$WorkoutsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get sport =>
+      $composableBuilder(column: $table.sport, builder: (column) => column);
+
+  GeneratedColumn<String> get exercisesJson => $composableBuilder(
+      column: $table.exercisesJson, builder: (column) => column);
+
+  GeneratedColumn<String> get tagsJson =>
+      $composableBuilder(column: $table.tagsJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$WorkoutsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $WorkoutsTable,
+    LocalWorkout,
+    $$WorkoutsTableFilterComposer,
+    $$WorkoutsTableOrderingComposer,
+    $$WorkoutsTableAnnotationComposer,
+    $$WorkoutsTableCreateCompanionBuilder,
+    $$WorkoutsTableUpdateCompanionBuilder,
+    (LocalWorkout, BaseReferences<_$AppDatabase, $WorkoutsTable, LocalWorkout>),
+    LocalWorkout,
+    PrefetchHooks Function()> {
+  $$WorkoutsTableTableManager(_$AppDatabase db, $WorkoutsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WorkoutsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WorkoutsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WorkoutsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> sport = const Value.absent(),
+            Value<String> exercisesJson = const Value.absent(),
+            Value<String> tagsJson = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              WorkoutsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            name: name,
+            sport: sport,
+            exercisesJson: exercisesJson,
+            tagsJson: tagsJson,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String name,
+            required String sport,
+            Value<String> exercisesJson = const Value.absent(),
+            Value<String> tagsJson = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              WorkoutsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            name: name,
+            sport: sport,
+            exercisesJson: exercisesJson,
+            tagsJson: tagsJson,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$WorkoutsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $WorkoutsTable,
+    LocalWorkout,
+    $$WorkoutsTableFilterComposer,
+    $$WorkoutsTableOrderingComposer,
+    $$WorkoutsTableAnnotationComposer,
+    $$WorkoutsTableCreateCompanionBuilder,
+    $$WorkoutsTableUpdateCompanionBuilder,
+    (LocalWorkout, BaseReferences<_$AppDatabase, $WorkoutsTable, LocalWorkout>),
+    LocalWorkout,
+    PrefetchHooks Function()>;
+typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required DateTime plannedAt,
+  Value<int> durationMin,
+  required String sport,
+  required String title,
+  Value<String?> focus,
+  Value<String?> programId,
+  Value<int?> weekIndex,
+  Value<String?> slotId,
+  Value<String?> suggestionId,
+  Value<String> exercisesJson,
+  Value<String> status,
+  Value<DateTime?> completedAt,
+  Value<String?> notes,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$SessionsTableUpdateCompanionBuilder = SessionsCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<DateTime> plannedAt,
+  Value<int> durationMin,
+  Value<String> sport,
+  Value<String> title,
+  Value<String?> focus,
+  Value<String?> programId,
+  Value<int?> weekIndex,
+  Value<String?> slotId,
+  Value<String?> suggestionId,
+  Value<String> exercisesJson,
+  Value<String> status,
+  Value<DateTime?> completedAt,
+  Value<String?> notes,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$SessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $SessionsTable> {
+  $$SessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get plannedAt => $composableBuilder(
+      column: $table.plannedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get durationMin => $composableBuilder(
+      column: $table.durationMin, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sport => $composableBuilder(
+      column: $table.sport, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get focus => $composableBuilder(
+      column: $table.focus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get programId => $composableBuilder(
+      column: $table.programId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get weekIndex => $composableBuilder(
+      column: $table.weekIndex, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get slotId => $composableBuilder(
+      column: $table.slotId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get suggestionId => $composableBuilder(
+      column: $table.suggestionId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get exercisesJson => $composableBuilder(
+      column: $table.exercisesJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$SessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SessionsTable> {
+  $$SessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get plannedAt => $composableBuilder(
+      column: $table.plannedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get durationMin => $composableBuilder(
+      column: $table.durationMin, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sport => $composableBuilder(
+      column: $table.sport, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get title => $composableBuilder(
+      column: $table.title, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get focus => $composableBuilder(
+      column: $table.focus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get programId => $composableBuilder(
+      column: $table.programId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get weekIndex => $composableBuilder(
+      column: $table.weekIndex, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get slotId => $composableBuilder(
+      column: $table.slotId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get suggestionId => $composableBuilder(
+      column: $table.suggestionId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get exercisesJson => $composableBuilder(
+      column: $table.exercisesJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SessionsTable> {
+  $$SessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get plannedAt =>
+      $composableBuilder(column: $table.plannedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get durationMin => $composableBuilder(
+      column: $table.durationMin, builder: (column) => column);
+
+  GeneratedColumn<String> get sport =>
+      $composableBuilder(column: $table.sport, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get focus =>
+      $composableBuilder(column: $table.focus, builder: (column) => column);
+
+  GeneratedColumn<String> get programId =>
+      $composableBuilder(column: $table.programId, builder: (column) => column);
+
+  GeneratedColumn<int> get weekIndex =>
+      $composableBuilder(column: $table.weekIndex, builder: (column) => column);
+
+  GeneratedColumn<String> get slotId =>
+      $composableBuilder(column: $table.slotId, builder: (column) => column);
+
+  GeneratedColumn<String> get suggestionId => $composableBuilder(
+      column: $table.suggestionId, builder: (column) => column);
+
+  GeneratedColumn<String> get exercisesJson => $composableBuilder(
+      column: $table.exercisesJson, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+      column: $table.completedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$SessionsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SessionsTable,
+    LocalSession,
+    $$SessionsTableFilterComposer,
+    $$SessionsTableOrderingComposer,
+    $$SessionsTableAnnotationComposer,
+    $$SessionsTableCreateCompanionBuilder,
+    $$SessionsTableUpdateCompanionBuilder,
+    (LocalSession, BaseReferences<_$AppDatabase, $SessionsTable, LocalSession>),
+    LocalSession,
+    PrefetchHooks Function()> {
+  $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SessionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<DateTime> plannedAt = const Value.absent(),
+            Value<int> durationMin = const Value.absent(),
+            Value<String> sport = const Value.absent(),
+            Value<String> title = const Value.absent(),
+            Value<String?> focus = const Value.absent(),
+            Value<String?> programId = const Value.absent(),
+            Value<int?> weekIndex = const Value.absent(),
+            Value<String?> slotId = const Value.absent(),
+            Value<String?> suggestionId = const Value.absent(),
+            Value<String> exercisesJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            plannedAt: plannedAt,
+            durationMin: durationMin,
+            sport: sport,
+            title: title,
+            focus: focus,
+            programId: programId,
+            weekIndex: weekIndex,
+            slotId: slotId,
+            suggestionId: suggestionId,
+            exercisesJson: exercisesJson,
+            status: status,
+            completedAt: completedAt,
+            notes: notes,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required DateTime plannedAt,
+            Value<int> durationMin = const Value.absent(),
+            required String sport,
+            required String title,
+            Value<String?> focus = const Value.absent(),
+            Value<String?> programId = const Value.absent(),
+            Value<int?> weekIndex = const Value.absent(),
+            Value<String?> slotId = const Value.absent(),
+            Value<String?> suggestionId = const Value.absent(),
+            Value<String> exercisesJson = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<DateTime?> completedAt = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            plannedAt: plannedAt,
+            durationMin: durationMin,
+            sport: sport,
+            title: title,
+            focus: focus,
+            programId: programId,
+            weekIndex: weekIndex,
+            slotId: slotId,
+            suggestionId: suggestionId,
+            exercisesJson: exercisesJson,
+            status: status,
+            completedAt: completedAt,
+            notes: notes,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SessionsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SessionsTable,
+    LocalSession,
+    $$SessionsTableFilterComposer,
+    $$SessionsTableOrderingComposer,
+    $$SessionsTableAnnotationComposer,
+    $$SessionsTableCreateCompanionBuilder,
+    $$SessionsTableUpdateCompanionBuilder,
+    (LocalSession, BaseReferences<_$AppDatabase, $SessionsTable, LocalSession>),
+    LocalSession,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -13888,4 +17648,12 @@ class $AppDatabaseManager {
       $$MeetingsTableTableManager(_db, _db.meetings);
   $$CalendarEventsTableTableManager get calendarEvents =>
       $$CalendarEventsTableTableManager(_db, _db.calendarEvents);
+  $$AthleteProfileTableTableManager get athleteProfile =>
+      $$AthleteProfileTableTableManager(_db, _db.athleteProfile);
+  $$ProgramsTableTableManager get programs =>
+      $$ProgramsTableTableManager(_db, _db.programs);
+  $$WorkoutsTableTableManager get workouts =>
+      $$WorkoutsTableTableManager(_db, _db.workouts);
+  $$SessionsTableTableManager get sessions =>
+      $$SessionsTableTableManager(_db, _db.sessions);
 }

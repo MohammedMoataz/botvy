@@ -2265,6 +2265,847 @@
         ]
       }
     },
+    "/api/v1/athlete/sports": {
+      "put": {
+        "operationId": "AthleteController_setSports",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChooseSportsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Athlete"
+        ]
+      }
+    },
+    "/api/v1/athlete/slots": {
+      "put": {
+        "operationId": "AthleteController_setSlots",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSlotsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Athlete"
+        ]
+      }
+    },
+    "/api/v1/sessions": {
+      "post": {
+        "operationId": "SessionsController_createSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}": {
+      "patch": {
+        "operationId": "SessionsController_updateSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      },
+      "delete": {
+        "operationId": "SessionsController_deleteSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/log": {
+      "post": {
+        "operationId": "SessionsController_logSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/complete": {
+      "post": {
+        "operationId": "SessionsController_completeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/cancel": {
+      "post": {
+        "operationId": "SessionsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/skip": {
+      "post": {
+        "operationId": "SessionsController_skipSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/reopen": {
+      "post": {
+        "operationId": "SessionsController_reopenSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/restore": {
+      "post": {
+        "operationId": "SessionsController_restoreSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/purge": {
+      "delete": {
+        "operationId": "SessionsController_purgeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Sessions"
+        ]
+      }
+    },
+    "/api/v1/programs": {
+      "post": {
+        "operationId": "ProgramsController_createProgram",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/programs/{id}": {
+      "patch": {
+        "operationId": "ProgramsController_updateProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      },
+      "delete": {
+        "operationId": "ProgramsController_deleteProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/programs/{id}/apply": {
+      "post": {
+        "operationId": "ProgramsController_applyProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyProgramDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/programs/{id}/archive": {
+      "post": {
+        "operationId": "ProgramsController_archiveProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/programs/{id}/activate": {
+      "post": {
+        "operationId": "ProgramsController_activateProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/programs/{id}/restore": {
+      "post": {
+        "operationId": "ProgramsController_restoreProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/programs/{id}/purge": {
+      "delete": {
+        "operationId": "ProgramsController_purgeProgram",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Programs"
+        ]
+      }
+    },
+    "/api/v1/workouts": {
+      "post": {
+        "operationId": "WorkoutsController_createWorkout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Workouts"
+        ]
+      }
+    },
+    "/api/v1/workouts/{id}": {
+      "patch": {
+        "operationId": "WorkoutsController_updateWorkout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Workouts"
+        ]
+      },
+      "delete": {
+        "operationId": "WorkoutsController_deleteWorkout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Workouts"
+        ]
+      }
+    },
+    "/api/v1/workouts/{id}/restore": {
+      "post": {
+        "operationId": "WorkoutsController_restoreWorkout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Workouts"
+        ]
+      }
+    },
+    "/api/v1/workouts/{id}/purge": {
+      "delete": {
+        "operationId": "WorkoutsController_purgeWorkout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Workouts"
+        ]
+      }
+    },
+    "/api/v1/sessions/{id}/apply-workout": {
+      "post": {
+        "operationId": "WorkoutsController_applyWorkout",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyWorkoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Workouts"
+        ]
+      }
+    },
+    "/internal/training/materialise": {
+      "post": {
+        "operationId": "InternalMaterialiseController_run",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "InternalMaterialise"
+        ]
+      }
+    },
     "/api/v1/sync": {
       "post": {
         "operationId": "SyncController_round",
@@ -2542,6 +3383,50 @@
         "properties": {}
       },
       "MoveEventOccurrenceDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ChooseSportsDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SetSlotsDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateSessionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateSessionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "LogSessionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateProgramDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateProgramDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ApplyProgramDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateWorkoutDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateWorkoutDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ApplyWorkoutDto": {
         "type": "object",
         "properties": {}
       },

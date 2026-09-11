@@ -226,7 +226,28 @@ const DATE_WORDS = new RegExp(
  * hour nobody chose, discovered when the member misses something.
  */
 export function mentionsAMoment(text: string): boolean {
-  return CLOCK_WORDS.test(text) || RELATIVE.test(text) || DATE_WORDS.test(text);
+  return mentionsAClock(text) || RELATIVE.test(text) || DATE_WORDS.test(text);
+}
+
+/**
+ * Does the sentence name a *time of day*, as opposed to a day?
+ *
+ * The narrower half of `mentionsAMoment`, and it exists because the wider one is
+ * **defeated by a weekday**. "I do football on Fridays" names a moment — Friday
+ * is a date word — so a clock the model invented alongside it survives the
+ * extractor's guard. For a reminder that is one wrong alarm; for a *training
+ * slot* it is a fortnight of them, materialised ahead, at an hour nobody chose.
+ *
+ * So an intent whose sentence must contain a weekday — `set_slots` — asks this
+ * instead. The same asymmetry of errors decides it as decides the wider guard:
+ * a false negative costs one question, a false positive costs a week of alarms.
+ *
+ * Exported rather than the regex, and not duplicated into the executor, because
+ * two copies of this vocabulary one typo apart is precisely the failure this
+ * codebase has already recorded about its "latest n" reads.
+ */
+export function mentionsAClock(text: string): boolean {
+  return CLOCK_WORDS.test(text);
 }
 
 /**
@@ -234,13 +255,33 @@ export function mentionsAMoment(text: string): boolean {
  *
  * Digits in both scripts carry most of it — a member who names an hour almost
  * always writes a number. The words are the ones that name an hour without one,
- * in both languages; they are deliberately few, because every entry here is a
- * chance to accept an invented time, and the cost of a missing entry is a
- * question rather than a wrong entry.
+ * in both languages.
+ *
+ * ## The spelled-out hour, which the first version of this missed
+ *
+ * "gym Monday and Wednesday **at six**" is P6's own headline example for
+ * setting a training week, and it names an hour with no digit in it. So
+ * `at <number word>` is here, sharing `NUMBER_WORDS` with the relative parser
+ * rather than listing the numbers twice — the guard was too tight without it
+ * and refused the feature's flagship sentence, which is exactly the false
+ * negative this vocabulary exists to avoid. The Arabic half needs no such
+ * pattern: `الساعة` is itself a clock marker ("the hour"), so
+ * "الساعة ستة" matches on the marker.
+ *
+ * Every other entry stays deliberately few, because each one is a chance to
+ * accept a time the model invented — and the cost of a *missing* entry is one
+ * question, where the cost of a wrong entry is an alarm nobody set.
  */
 const CLOCK_WORDS = new RegExp(
   // A digit in either script carries most of the recall on its own.
   String.raw`\d|[٠-٩]` +
+    // "at six", "at half past" — an hour spelled out, which a member setting a
+    // weekly slot very often does. The numbers come from the same table the
+    // relative parser reads, so the two cannot drift apart.
+    String.raw`|(?<![a-z])at\s+(?:${Object.keys(NUMBER_WORDS).join('|')})(?![a-z])` +
+    // `الساعة` is a clock marker in its own right, so the Arabic side needs no
+    // number pattern: "الساعة ستة" matches here.
+    String.raw`|الساعة` +
     // Word boundaries written as lookarounds rather than `\b`, because `am`
     // and `pm` need them — without one, "ram" and "spam" name an hour.
     String.raw`|(?<![a-z])(?:noon|midday|midnight|morning|afternoon|evening|night|` +

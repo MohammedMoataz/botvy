@@ -52,7 +52,21 @@ export type IntentName =
   | 'cancel'
   | 'list'
   | 'record_metric'
-  | 'update_profile';
+  | 'update_profile'
+  /**
+   * P6's two. Both are `coaching`, because a training week is the member's
+   * *body* and not their diary — the prompt's own body-or-schedule test.
+   *
+   * `set_slots` is a weekly rule and never a row: "gym Monday and Wednesday at
+   * six" is a statement about their clock on two weekdays, so its arguments are
+   * a sport, weekdays and one wall-clock time, and the sessions come from the
+   * materialiser rather than from this turn. That is why there is no
+   * `set_session` here: a member saying they train on Mondays has not asked for
+   * one session, and filing it as one would give them a single practice and an
+   * empty week after it.
+   */
+  | 'set_slots'
+  | 'log_session';
 
 /** What a `list` intent is a list of. Matches `chat.card`'s kinds. */
 export type ListKind = 'tasks' | 'reminders' | 'meetings' | 'plan' | 'sessions';
@@ -84,7 +98,15 @@ export interface IntentArgs {
   /** For `list`. */
   listKind?: ListKind;
   /**
-   * For `set_meeting`: how long it runs, in minutes.
+   * For `set_meeting`, and for `set_slots`: how long it runs, in minutes.
+   *
+   * One field for both, because "how long" is the same question and a second
+   * `slotDurationMin` would be a second name the model has to choose between —
+   * which is how a field comes back empty. The *bounds* differ (a slot is
+   * capped at six hours by `MAX_SESSION_MIN`, a meeting at eight) and the
+   * schema below carries the looser pair: each aggregate refuses what it will
+   * not hold, and the executor reports a refusal rather than inventing a
+   * length inside the range.
    *
    * An integer with bounds in the schema rather than a free number, for the
    * same reason `metric` is an enum: the grammar is enforced and the prose is
@@ -121,6 +143,32 @@ export interface IntentArgs {
    */
   metric?: 'weightKg' | 'heightCm';
   value?: number;
+  /**
+   * For `set_slots` and `log_session`: which sport.
+   *
+   * A free string and **not** an enum of `KNOWN_SPORTS`, which is the one place
+   * in this file where the grammar is deliberately left loose. "other" in the
+   * picker is a text field rather than a bucket — `AthleteProfile.chooseSports`
+   * says so at length — so a member whose sport is padel must be able to say
+   * "padel", and an enum of seven would have the model answer `other` and throw
+   * the only useful word away. The cost is the usual one: the executor
+   * normalises whitespace and the aggregate refuses an empty name.
+   */
+  sport?: string;
+  /**
+   * For `set_slots`: which days, as 1 (Monday) to 7 (Sunday).
+   *
+   * Integers and not names, and the schema below bounds them — the same
+   * argument `metric` carries. A model asked for weekday *names* spells them in
+   * two languages, abbreviates half of them and disagrees with itself about
+   * whether the week starts on Sunday; `TrainingSlot.weekday` is ISO 8601 and
+   * the conversion has exactly one home in Training. So the grammar asks for
+   * the number the store holds, and the extractor drops anything outside the
+   * range rather than clamping it: a 0 or an 8 is a model that has picked a
+   * different convention, and pinning it to Monday or Sunday would set the
+   * member's week on a day they never named.
+   */
+  weekdays?: number[];
   /** For `update_profile`: the fields the member stated about themselves. */
   goal?: string;
   foodLikes?: string[];
@@ -164,6 +212,8 @@ const ACTIONS = new Set<IntentName>([
   'list',
   'record_metric',
   'update_profile',
+  'set_slots',
+  'log_session',
 ]);
 
 export function isAction(intent: Intent): boolean {
@@ -198,6 +248,8 @@ export const INTENT_SCHEMA = {
         'list',
         'record_metric',
         'update_profile',
+        'set_slots',
+        'log_session',
       ],
     },
     scope: { type: 'string', enum: ['coaching', 'planning', 'other'] },
@@ -228,6 +280,18 @@ export const INTENT_SCHEMA = {
         onlineLink: { type: 'string' },
         address: { type: 'string' },
         metric: { type: 'string', enum: ['weightKg', 'heightCm'] },
+        sport: { type: 'string' },
+        /*
+         * Bounded here as well as typed, and this is the half that is enforced.
+         * 1 is Monday and 7 is Sunday — `TrainingSlot.weekday`'s convention,
+         * duplicated rather than imported because `domain/` may not reach into
+         * another context (constitution IX). The aggregate remains the
+         * authority; this stops the model offering a day it would refuse.
+         */
+        weekdays: {
+          type: 'array',
+          items: { type: 'integer', minimum: 1, maximum: 7 },
+        },
         value: { type: 'number' },
         goal: { type: 'string' },
         foodLikes: { type: 'array', items: { type: 'string' } },

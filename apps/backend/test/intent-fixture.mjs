@@ -71,6 +71,8 @@ async function loadTimeHelpers() {
 
 let resolveRelativePhrase;
 let preferSoonestDay;
+let mentionsAMoment;
+let mentionsAClock;
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
 
 /**
@@ -220,6 +222,29 @@ async function extract({ prompt, schema, model, numCtx, text, now }) {
     intent.args.when = preferSoonestDay(intent.args.when, text, now, ZONE);
   }
 
+  /*
+   * And the guards, which are the other half of what the pipeline does with a
+   * time — and were missing here, so this file was reporting silent time errors
+   * the product does not have.
+   *
+   * The same lesson as the paragraph above, one layer along. P4 fixed this file
+   * for *resolution*; P5 added `mentionsAMoment` to the extractor and P6 added
+   * `mentionsAClock` for slots, and neither reached the runner. So P5's `M06`
+   * ("I have an appointment with the doctor, put it in my calendar" — no time
+   * given, model invents 08:00) and P6's `S06` scored as silent time errors
+   * against a pipeline that drops both. A fixture must grade the pipeline, not
+   * the prompt, and "the pipeline" includes the parts that *refuse* an answer.
+   *
+   * `set_slots` asks the narrower question, because a weekday satisfies the
+   * wider one — see `mentionsAClock`'s own note for why that distinction is a
+   * fortnight of alarms rather than a nicety.
+   */
+  if (intent.args?.when) {
+    const namesATime =
+      intent.name === 'set_slots' ? mentionsAClock(text) : mentionsAMoment(text);
+    if (!namesATime) delete intent.args.when;
+  }
+
   return { ok: true, ms, intent };
 }
 
@@ -299,7 +324,32 @@ async function main() {
     settings(),
     loadTimeHelpers(),
   ]);
-  ({ resolveRelativePhrase, preferSoonestDay } = helpers);
+  ({
+    resolveRelativePhrase,
+    preferSoonestDay,
+    mentionsAMoment,
+    mentionsAClock,
+  } = helpers);
+  /*
+   * Named rather than trusted, because a missing export from a *compiled*
+   * module is `undefined` at the call site and nothing here would say so —
+   * which is how this file came to be grading a pipeline half it did not
+   * apply. A `dist` built before the guards existed fails here, loudly, rather
+   * than reporting silent time errors the product does not have.
+   */
+  for (const [name, fn] of Object.entries({
+    resolveRelativePhrase,
+    preferSoonestDay,
+    mentionsAMoment,
+    mentionsAClock,
+  })) {
+    if (typeof fn !== 'function') {
+      throw new Error(
+        `the compiled relative-time module has no ${name}; rebuild with ` +
+          '`pnpm --filter @botvy/backend build`',
+      );
+    }
+  }
 
   const now = new Date();
   const times = expectedTimes(now);

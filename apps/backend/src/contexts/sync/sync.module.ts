@@ -32,6 +32,19 @@ import {
 import { CalendarEventSyncAdapter } from '../meetings/infrastructure/calendar-event-sync.adapter.js';
 import { MeetingSyncAdapter } from '../meetings/infrastructure/meeting-sync.adapter.js';
 import { MeetingsModule } from '../meetings/meetings.module.js';
+import {
+  AthleteProfileRepository,
+  ProgramRepository,
+  SessionRepository,
+  WorkoutRepository,
+} from '../training/domain/training.repositories.js';
+import {
+  AthleteProfilePatchAdapter,
+  ProgramSyncAdapter,
+  SessionSyncAdapter,
+  WorkoutSyncAdapter,
+} from '../training/infrastructure/training-sync.adapters.js';
+import { TrainingModule } from '../training/training.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { LabelRepository } from '../planning/domain/label.repository.js';
 import { TaskRepository } from '../planning/domain/task.repository.js';
@@ -100,6 +113,7 @@ import {
     RhythmModule,
     ConversationsModule,
     MeetingsModule,
+    TrainingModule,
     WsModule,
   ],
   providers: [
@@ -153,6 +167,39 @@ import {
         events: CalendarEventRepository,
         member: MemberContextPort,
       ) => new CalendarEventSyncAdapter(uow, events, member),
+    },
+    /*
+     * Training's three row collections. 35, 37, 39 — `contracts/sync.md`'s
+     * order, after the calendar events at 34 and before the rhythm's three at
+     * 40.
+     *
+     * Programs before sessions is the contract's own parents-before-children
+     * clause and **not** a dependency here: no session apply reads a program,
+     * and `programId`/`weekIndex` on a session are opaque values the
+     * materialiser wrote. The adapters say so in their own comments rather than
+     * leaving the numbers to look like a rule, and the gaps at 36 and 38 leave
+     * room for the day P7's accepted suggestion makes it real.
+     */
+    {
+      provide: ProgramSyncAdapter,
+      inject: [UnitOfWork, ProgramRepository],
+      useFactory: (uow: UnitOfWork, programs: ProgramRepository) =>
+        new ProgramSyncAdapter(uow, programs),
+    },
+    {
+      provide: SessionSyncAdapter,
+      inject: [UnitOfWork, SessionRepository, AthleteProfileRepository],
+      useFactory: (
+        uow: UnitOfWork,
+        sessions: SessionRepository,
+        profiles: AthleteProfileRepository,
+      ) => new SessionSyncAdapter(uow, sessions, profiles),
+    },
+    {
+      provide: WorkoutSyncAdapter,
+      inject: [UnitOfWork, WorkoutRepository],
+      useFactory: (uow: UnitOfWork, workouts: WorkoutRepository) =>
+        new WorkoutSyncAdapter(uow, workouts),
     },
     /*
      * The rhythm's two row entities, both **pull-only**.
@@ -233,6 +280,9 @@ import {
         ReminderSyncAdapter,
         MeetingSyncAdapter,
         CalendarEventSyncAdapter,
+        ProgramSyncAdapter,
+        SessionSyncAdapter,
+        WorkoutSyncAdapter,
         DailyPlanSyncAdapter,
         CheckinSyncAdapter,
         ConversationSyncAdapter,
@@ -272,11 +322,30 @@ import {
       useFactory: (states: RhythmStateRepository) =>
         new RhythmStateSyncAdapter(states),
     },
+    /*
+     * `athlete_profile` is the blueprint's own named exception to the row
+     * protocol: one document per member, keyed by their id, no tombstone and
+     * nothing to sweep — so it travels as a **patch** over an allowlist of
+     * `sports` and `slots`, with no conflict check, because the fields a client
+     * writes and the fields the server's jobs write are disjoint sets.
+     *
+     * It patches through the *aggregate* rather than the row, which is what
+     * keeps `SportsChanged` and `SlotsChanged` reaching the materialiser — a
+     * direct write would leave the member's week saved and their fortnight
+     * unbuilt.
+     */
+    {
+      provide: AthleteProfilePatchAdapter,
+      inject: [UnitOfWork, AthleteProfileRepository],
+      useFactory: (uow: UnitOfWork, profiles: AthleteProfileRepository) =>
+        new AthleteProfilePatchAdapter(uow, profiles),
+    },
     {
       provide: SYNCABLE_PATCHES,
       inject: [
         ProfilePatchAdapter,
         PreferencesPatchAdapter,
+        AthleteProfilePatchAdapter,
         RhythmStateSyncAdapter,
       ],
       useFactory: (...adapters: SyncablePatch[]) => adapters,

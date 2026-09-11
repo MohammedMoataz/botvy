@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "training.SessionScheduled",
+  "description": "Payload of training.SessionScheduled. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "plannedAt": {},
+    "durationMin": {
+      "type": "integer"
+    },
+    "sport": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "focus": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {}
+  },
+  "required": [
+    "sessionId",
+    "plannedAt",
+    "durationMin",
+    "sport",
+    "title",
+    "focus",
+    "status"
+  ],
+  "additionalProperties": false
+}

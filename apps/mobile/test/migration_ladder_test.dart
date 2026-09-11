@@ -19,7 +19,7 @@ import 'package:sqlite3/sqlite3.dart';
 ///
 /// "From the previous version" is not enough, and P3 found out why. drift calls
 /// `onUpgrade` **once**, with the pair it actually has: a phone that last ran
-/// version 1 and opens version 6 arrives as `(1, 6)`, and every branch in the
+/// version 1 and opens version 7 arrives as `(1, 7)`, and every branch in the
 /// ladder sees `from == 1`. A branch guarded `from >= 2 && from < 3` therefore
 /// never runs for it — so a v1 install upgrading to v3 came out with the
 /// profile mirrors and **no task tables at all**, and every query against them
@@ -127,13 +127,20 @@ void main() {
     'pending_messages',
   ];
 
+  /// What version 6 shipped: meetings and personal events (P5).
+  const v6Tables = [
+    ...v5Tables,
+    'meetings',
+    'calendar_events',
+  ];
+
   /// Every earlier version, upgraded to the current schema, asserting the
   /// **whole** schema each time.
   ///
   /// The one test in this file that could not have been skipped by an oversight
   /// and is the reason P3's defect existed for two phases. drift calls
   /// `onUpgrade` **once** with the pair it actually has, so a phone at version
-  /// 1 opening version 6 arrives as `(1, 6)` and *every* branch sees
+  /// 1 opening version 7 arrives as `(1, 7)` and *every* branch sees
   /// `from == 1`. A branch guarded `from >= 4 && from < 5` therefore never runs
   /// for it, and that band is the only thing that would create `conversations`,
   /// `messages` and `pending_messages`: the install would come out with the
@@ -150,6 +157,7 @@ void main() {
       3: v3Tables,
       4: v4Tables,
       5: v5Tables,
+      6: v6Tables,
     };
 
     for (final entry in donors.entries) {
@@ -195,6 +203,17 @@ void main() {
             'meetings_pending',
             'calendar_events_start',
             'calendar_events_pending',
+            // P6's, in the same list and for the same reason. `athlete_profile`
+            // declares none: it holds one row per member and is only ever read
+            // by its primary key, so an index over it would be a second copy
+            // of the key.
+            'programs_status',
+            'programs_pending',
+            'workouts_sport',
+            'workouts_pending',
+            'sessions_planned_at',
+            'sessions_status_planned',
+            'sessions_pending',
           ]),
         );
 
@@ -289,6 +308,90 @@ void main() {
         );
         expect((await db.select(db.messages).get()).single.seq, 1);
         expect((await db.select(db.pendingMessages).get()).single.attempts, 0);
+
+        // P6's four tables, written the way the sync applier and the athlete
+        // cubit write them. The JSON columns carry the shapes the whole feature
+        // is derived from — a session's exercises and their sets, a program's
+        // weeks, the member's slots — so a migration that got one of them wrong
+        // would draw an empty week rather than fail.
+        await db.into(db.athleteProfile).insert(
+          AthleteProfileCompanion.insert(
+            userId: 'u-1',
+            sportsJson: const Value('["gym","swimming"]'),
+            slotsJson: const Value(
+              '[{"id":"slot-gym","weekday":1,"start":"18:00",'
+              '"durationMin":60,"sport":"gym","location":null}]',
+            ),
+            fetchedAt: stamp,
+          ),
+        );
+        await db.into(db.programs).insert(
+          ProgramsCompanion.insert(
+            id: 'program-1',
+            title: 'Four weeks of push and pull',
+            sport: 'gym',
+            weeksJson: const Value(
+              '[{"index":0,"sessions":[{"templateId":"t1","weekday":1,'
+              '"title":"Push day","focus":"chest","exercises":[]}]}]',
+            ),
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+        await db.into(db.workouts).insert(
+          WorkoutsCompanion.insert(
+            id: 'workout-1',
+            name: 'Leg day',
+            sport: 'gym',
+            exercisesJson: const Value(
+              '[{"id":"e1","name":"Squat","notes":null,"mediaRefs":[],'
+              '"sets":[{"targetReps":5,"targetWeightKg":100,"done":false}]}]',
+            ),
+            tagsJson: const Value('["legs"]'),
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+        await db.into(db.sessions).insert(
+          SessionsCompanion.insert(
+            id: 'session-1',
+            plannedAt: stamp,
+            durationMin: const Value(75),
+            sport: 'gym',
+            title: 'Push day',
+            focus: const Value('chest'),
+            slotId: const Value('slot-gym'),
+            exercisesJson: const Value(
+              '[{"id":"e1","name":"Squat","notes":null,"mediaRefs":[],'
+              '"sets":[{"targetReps":5,"actualReps":5,"actualWeightKg":100,'
+              '"done":true}]}]',
+            ),
+            createdAt: stamp,
+            updatedAt: stamp,
+          ),
+        );
+
+        final profile = (await db.select(db.athleteProfile).get()).single;
+        expect(profile.slotsJson, contains('18:00'));
+        // The strike count and the pending op a patch table declares, for a
+        // profile nothing has queued.
+        expect(profile.pendingOp, isNull);
+        expect(profile.pushAttempts, 0);
+
+        final session = (await db.select(db.sessions).get()).single;
+        // The defaults the columns declare, for a session nothing has happened
+        // to yet — and the one that matters is the status: a session is born
+        // `planned`, and "missed" is never one of the four (FR-018).
+        expect(session.status, 'planned');
+        expect(session.completedAt, isNull);
+        expect(session.durationMin, 75);
+        expect(session.exercisesJson, contains('actualWeightKg'));
+        expect((await db.select(db.programs).get()).single.status, 'active');
+        expect(
+          (await db.select(db.programs).get()).single.appliedStartDate,
+          isNull,
+        );
+        expect((await db.select(db.workouts).get()).single.tagsJson, '["legs"]');
       });
     }
   });
@@ -356,7 +459,7 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 6);
+    expect(db.schemaVersion, 7);
 
     final rows = await db
         .customSelect(
@@ -372,7 +475,7 @@ void main() {
     expect(await db.getValue('probe'), 'ok');
   });
 
-  /// 1 -> 6, the longest path there is, and the one that was broken.
+  /// 1 -> 7, the longest path there is, and the one that was broken.
   ///
   /// Opened as a v1-shaped file — the one table version 1 actually had, stamped
   /// with `user_version = 1` — so the upgrade path runs for real rather than
@@ -401,7 +504,7 @@ void main() {
       containsAll(declaredTables(db)),
       reason:
           'a v1 install must end up with every table, not only the ones the '
-          '1 -> 2 branch adds: drift calls onUpgrade once with (1, 6), so '
+          '1 -> 2 branch adds: drift calls onUpgrade once with (1, 7), so '
           'every later branch has to be guarded `from < N` rather than '
           '`from >= N-1 && from < N`',
     );
@@ -451,7 +554,7 @@ void main() {
     expect(stored.endOfDayTime, '22:00');
   });
 
-  /// 2 -> 6: the P2 tables, and then everything since.
+  /// 2 -> 7: the P2 tables, and then everything since.
   test('a version 2 file upgrades and gains the P2 tables', () async {
     final db = AppDatabase.forTesting(
       NativeDatabase.opened(await donorAt(2, v2Tables)),
@@ -500,7 +603,8 @@ void main() {
     expect((await db.select(db.tasks).get()).single.status, 'open');
   });
 
-  /// 3 -> 6: the daily rhythm (P3 T350), plus the chat and the calendar on top.
+  /// 3 -> 7: the daily rhythm (P3 T350), plus the chat, the calendar and
+  /// training on top.
   test('a version 3 file upgrades and gains the rhythm tables', () async {
     final raw = await donorAt(3, v3Tables);
     // A task the member already had, so the upgrade is asserted to *keep* what

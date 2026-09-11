@@ -15,6 +15,12 @@ import { RemindersModule } from './contexts/reminders/reminders.module.js';
 import { CalendarEventsController } from './contexts/meetings/features/create-event/calendar-events.controller.js';
 import { MeetingsController } from './contexts/meetings/features/create-meeting/meetings.controller.js';
 import { MeetingsModule } from './contexts/meetings/meetings.module.js';
+import { AthleteController } from './contexts/training/features/choose-sports/athlete.controller.js';
+import { ProgramsController } from './contexts/training/features/create-program/programs.controller.js';
+import { SessionsController } from './contexts/training/features/create-session/sessions.controller.js';
+import { WorkoutsController } from './contexts/training/features/create-workout/workouts.controller.js';
+import { InternalMaterialiseController } from './contexts/training/features/materialise/internal-materialise.controller.js';
+import { TrainingModule } from './contexts/training/training.module.js';
 import { InternalReconcileController } from './contexts/notifications/features/reconcile-meeting-alerts/internal-reconcile.controller.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
 import { RhythmModule } from './contexts/rhythm/rhythm.module.js';
@@ -76,6 +82,7 @@ import { WsModule } from './ws/ws.module.js';
     ConversationsModule,
     RhythmModule,
     MeetingsModule,
+    TrainingModule,
     SyncModule,
     HealthModule,
 
@@ -104,6 +111,11 @@ import { WsModule } from './ws/ws.module.js';
     MeetingsController,
     CalendarEventsController,
     InternalReconcileController,
+    AthleteController,
+    SessionsController,
+    ProgramsController,
+    WorkoutsController,
+    InternalMaterialiseController,
     SyncController,
     InternalAlertsController,
     InternalHeartbeatController,

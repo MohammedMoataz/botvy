@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { localDate, localHhMm, wallClockToUtc } from '../../../shared/time/time.js';
 import {
+  mentionsAClock,
   mentionsAMoment,
   preferSoonestDay,
   resolveRelativePhrase,
@@ -235,6 +236,68 @@ describe('mentionsAMoment', () => {
     ]) {
       expect(mentionsAMoment(text), text).toBe(true);
     }
+  });
+
+  it('accepts a spelled-out hour, which is how a slot is usually said', () => {
+    /*
+     * The regression. `mentionsAClock` shipped without this and refused
+     * **"gym Monday and Wednesday at six"** — P6's own headline example for
+     * setting a training week — so the executor asked for a time the member had
+     * already given. A guard that rejects the feature's flagship sentence is
+     * too tight, and the fix shares `NUMBER_WORDS` with the relative parser so
+     * the two lists cannot drift.
+     */
+    for (const text of [
+      'gym Monday and Wednesday at six',
+      'swimming Sunday at eight',
+      'football on Fridays at half past seven',
+      'الجيم الاثنين والأربعاء الساعة ستة',
+    ]) {
+      expect(mentionsAClock(text), text).toBe(true);
+      expect(mentionsAMoment(text), text).toBe(true);
+    }
+  });
+
+  it('still refuses a weekday with no hour at all', () => {
+    /*
+     * The other half, and the reason `mentionsAClock` exists apart from
+     * `mentionsAMoment`: a weekday satisfies the wider guard, so a slot
+     * sentence naming a day and no time would otherwise keep whatever clock the
+     * model invented — and for a *slot* that is a fortnight of alarms rather
+     * than one.
+     */
+    for (const text of [
+      'gym Monday and Wednesday',
+      'swimming on Sunday',
+      'I train Tuesday and Thursday',
+    ]) {
+      expect(mentionsAClock(text), text).toBe(false);
+      // Still a "moment" by the wider rule — which is precisely the gap
+      // `mentionsAClock` was extracted to close for slots.
+      expect(mentionsAMoment(text), text).toBe(true);
+    }
+  });
+
+  it('does not recognise a plural weekday, and that is worth knowing', () => {
+    /*
+     * Found while writing the case above, and left as a documented gap rather
+     * than widened here.
+     *
+     * `DATE_WORDS` matches `friday` and `on\s+\w+day`, and
+     * "Fridays" satisfies neither — the trailing `s` breaks both boundaries. So
+     * "I do football on Fridays" names no *moment* at all by the wider rule.
+     *
+     * For **this** guard that is the safe direction: a sentence the rule cannot
+     * read keeps no model-supplied clock, so the member is asked. Where it
+     * matters is `preferSoonestDay`, which uses the same vocabulary to decide
+     * whether a bare "at 9pm" means tonight — "on Fridays at 9pm" is read as
+     * naming no day, so the time is pulled to today. That is a pre-existing
+     * reading of P4's vocabulary rather than anything this phase introduced,
+     * and widening the pattern is a change to how *every* time-carrying intent
+     * reads a sentence — too broad to do from inside a guard's spec.
+     */
+    expect(mentionsAMoment('I do football on Fridays')).toBe(false);
+    expect(mentionsAMoment('I do football on Friday')).toBe(true);
   });
 
   it('counts a digit anywhere, which is the cheap majority of real times', () => {

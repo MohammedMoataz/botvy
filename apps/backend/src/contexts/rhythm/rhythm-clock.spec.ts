@@ -56,6 +56,19 @@ import {
 const CAIRO = 'Africa/Cairo';
 const BERLIN = 'Europe/Berlin';
 
+/**
+ * This wall clock, in this zone, on **a named calendar day**.
+ *
+ * The sibling of `at` for the one case that must not take each zone's own
+ * "today": two zones compared against each other. The two-zone test says what
+ * went wrong without it.
+ */
+function onDay(date: string, hhmm: string, zone: string): Date {
+  const instant = wallClockToUtc(`${date}T${hhmm}`, zone);
+  if (!instant) throw new Error(`cannot resolve ${date}T${hhmm} in ${zone}`);
+  return instant;
+}
+
 /** "This wall clock, on that member's own calendar day." */
 function at(hhmm: string, zone: string, dayOffset = 0): Date {
   let date = localDate(new Date(), zone);
@@ -274,18 +287,39 @@ describe('each member’s own local time, and nobody else’s', () => {
     await b.join('cairo', CAIRO);
     await b.join('berlin', BERLIN);
 
-    // 22:00 on the Cairo member's clock.
-    await b.tick.handle(at('22:00', CAIRO));
+    /*
+     * Both instants are built from **one** calendar day, and that is not
+     * tidiness — it is a flake this test had, and P6 found it.
+     *
+     * `at(hhmm, zone)` resolves against *that zone's* own "today", and for a
+     * couple of hours after midnight in the eastern zone the two are on
+     * different dates. Cairo's 22:00 was then a *later* instant than Berlin's,
+     * the second tick went backwards, and the Berlin member's evening never
+     * arrived: `expected [...] to include 'checkin_question'`. A red line that
+     * depends on what hour the suite is run at teaches whoever sees it to
+     * ignore red, which costs more than the thing it was testing.
+     *
+     * So the day is pinned to Cairo's and Berlin's 22:00 is asked for on that
+     * same date. The property under test is untouched — one pulse, two zones,
+     * two different instants for one wall clock — and it now holds at four in
+     * the morning as well as at noon.
+     */
+    const day = localDate(new Date(), CAIRO);
+    const cairoEvening = onDay(day, '22:00', CAIRO);
+    const berlinEvening = onDay(day, '22:00', BERLIN);
+
+    await b.tick.handle(cairoEvening);
 
     expect(b.touchesFor('cairo')).toContain('checkin_question');
     // The Berlin member's evening has not arrived, whatever the instant is.
-    const berlinNow = localHhMm(at('22:00', CAIRO), BERLIN);
-    if (berlinNow < '21:00') {
+    if (localHhMm(cairoEvening, BERLIN) < '21:00') {
       expect(b.touchesFor('berlin')).toEqual([]);
     }
 
-    // And now theirs does.
-    await b.tick.handle(at('22:00', BERLIN));
+    // And now theirs does. Later than Cairo's, because Berlin is behind — which
+    // is the whole claim, so it is asserted rather than assumed.
+    expect(berlinEvening.getTime()).toBeGreaterThan(cairoEvening.getTime());
+    await b.tick.handle(berlinEvening);
     expect(b.touchesFor('berlin')).toContain('checkin_question');
   });
 

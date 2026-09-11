@@ -58,6 +58,13 @@ import { CreateMeetingHandler } from '../meetings/features/create-meeting/create
 import { MeetingQueryHandler } from '../meetings/features/meeting/meeting.query.js';
 import { MeetingOccurrencesQueryHandler } from '../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
 import { MeetingsModule } from '../meetings/meetings.module.js';
+import { AthleteProfileQueryHandler } from '../training/features/athlete-profile/athlete-profile.query.js';
+import { CompleteSessionHandler } from '../training/features/complete-session/complete-session.handler.js';
+import { LogSessionHandler } from '../training/features/log-session/log-session.handler.js';
+import { SessionQueryHandler } from '../training/features/session/session.query.js';
+import { SessionsQueryHandler } from '../training/features/sessions/sessions.query.js';
+import { SetSlotsHandler } from '../training/features/set-slots/set-slots.handler.js';
+import { TrainingModule } from '../training/training.module.js';
 import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { UpdateProfileHandler } from '../profile/features/update-profile/update-profile.handler.js';
 import { CaptureCheckinReplyHandler } from '../rhythm/features/capture-checkin-reply/capture-checkin-reply.handler.js';
@@ -74,6 +81,8 @@ import {
   MemberDayPort,
   MeetingActionsPort,
   MemberFactsPort,
+  TrainingActionsPort,
+  TrainingSummaryPort,
   PlannerActionsPort,
   ProfileWritesPort,
   PromptAssemblerPort,
@@ -101,6 +110,8 @@ import { ChatGateway } from './features/send-message/chat.gateway.js';
 import {
   MeetingsChatActions,
   OperationsUsage,
+  TrainingChatActions,
+  TrainingWeekSummary,
   PlanningReminderActions,
   ProfileChatWrites,
   ProfileMemberFacts,
@@ -156,6 +167,16 @@ import {
     PlanningModule,
     RemindersModule,
     MeetingsModule,
+    /*
+     * Training, from P6, and one-directionally.
+     *
+     * Two things come from it: `set_slots` and `log_session` write through
+     * `TrainingActionsPort`, and the coach prompt's `Training:` line comes
+     * through `TrainingSummaryPort`. Nothing in Training reads Conversations —
+     * its `ProgramApplied` reaches the chat through the outbox — so there is no
+     * cycle and no `forwardRef`, unlike the Rhythm pair below.
+     */
+    TrainingModule,
     /*
      * `forwardRef`, because this edge is genuinely bidirectional.
      *
@@ -269,13 +290,78 @@ import {
         new ProfileMemberFacts(profiles),
     },
     {
+      /*
+       * The day the coach is told about, and from P6 its `trainingLine` is
+       * Training's live week rather than the plan snapshot's one session.
+       *
+       * Worth naming, because it is a *replacement* and not an addition: the
+       * snapshot's `training` field was written the night before, so a session
+       * completed this morning still read as planned in the prompt. The week is
+       * a superset and it is current. The snapshot keeps its field — it is the
+       * record of what the day was going to hold, which is a different question.
+       */
       provide: MemberDayPort,
-      inject: [TodayPlanQueryHandler, StreakQueryHandler, ProfileQueryHandler],
+      inject: [
+        TodayPlanQueryHandler,
+        StreakQueryHandler,
+        ProfileQueryHandler,
+        TrainingSummaryPort,
+      ],
       useFactory: (
         plans: TodayPlanQueryHandler,
         streaks: StreakQueryHandler,
         profiles: ProfileQueryHandler,
-      ) => new RhythmMemberDay(plans, streaks, profiles),
+        training: TrainingSummaryPort,
+      ) => new RhythmMemberDay(plans, streaks, profiles, training),
+    },
+    /*
+     * The coach's `Training:` line (FR-017).
+     *
+     * Its own port rather than a field on `TrainingActionsPort` because it is a
+     * *read* that shapes what the model is told, where that one is a set of
+     * writes the member asked for — and a reviewer reading the DI wiring should
+     * be able to see which of the two a chat turn is doing.
+     */
+    { provide: TrainingSummaryPort, useClass: TrainingWeekSummary },
+    /*
+     * `set_slots` and `log_session`, which until P6 did not exist.
+     *
+     * Seven handlers, and that is the honest cost of a chat that can set a
+     * training week: it needs the profile to merge slots against, the slot
+     * write, two reads to find today's session, and two ways to record one. The
+     * alternative was a Training-side "do what this sentence says" service,
+     * which is a second place that would have to know what a chat sentence may
+     * mean.
+     */
+    {
+      provide: TrainingActionsPort,
+      inject: [
+        AthleteProfileQueryHandler,
+        SetSlotsHandler,
+        SessionsQueryHandler,
+        SessionQueryHandler,
+        LogSessionHandler,
+        CompleteSessionHandler,
+        MemberContextPort,
+      ],
+      useFactory: (
+        profiles: AthleteProfileQueryHandler,
+        slots: SetSlotsHandler,
+        sessions: SessionsQueryHandler,
+        session: SessionQueryHandler,
+        logs: LogSessionHandler,
+        completions: CompleteSessionHandler,
+        member: MemberContextPort,
+      ) =>
+        new TrainingChatActions(
+          profiles,
+          slots,
+          sessions,
+          session,
+          logs,
+          completions,
+          member,
+        ),
     },
     /*
      * `set_meeting`, which until P5 answered "not yet".
@@ -364,12 +450,18 @@ import {
     },
     {
       provide: IntentExecutorPort,
-      inject: [PlannerActionsPort, ProfileWritesPort, MeetingActionsPort],
+      inject: [
+        PlannerActionsPort,
+        ProfileWritesPort,
+        MeetingActionsPort,
+        TrainingActionsPort,
+      ],
       useFactory: (
         planner: PlannerActionsPort,
         profile: ProfileWritesPort,
         meetings: MeetingActionsPort,
-      ) => new IntentExecutor(planner, profile, meetings),
+        training: TrainingActionsPort,
+      ) => new IntentExecutor(planner, profile, meetings, training),
     },
     {
       provide: PromptAssemblerPort,

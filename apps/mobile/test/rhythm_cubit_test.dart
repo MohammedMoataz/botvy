@@ -597,14 +597,28 @@ void main() {
 
     test('an unknown link resolves to nothing rather than to somewhere near',
         () {
-      // A newer gateway can plan an alert for a feature this build has no
-      // screen for. Navigating "somewhere near it" drops the member on an
-      // unrelated page with no way to know why.
-      //
-      // `meetings` was this assertion's example until P5 gave them a screen,
-      // which is exactly the shape of change the case is about: the example
-      // has to be a feature that is still unbuilt, and `training` is P6's.
-      expect(routeForDeepLink('botvy://training/abc'), isNull);
+      /*
+       * A newer gateway can plan an alert for a feature this build has no
+       * screen for. Navigating "somewhere near it" drops the member on an
+       * unrelated page with no way to know why.
+       *
+       * **This example has now rotted twice**, and the fix is to stop choosing
+       * it from the roadmap. `meetings` was the example until P5 gave them a
+       * screen; P5 replaced it with `training` "because it is P6's", and P6
+       * built that, so the case failed the moment the route table grew. Picking
+       * the next unbuilt feature is picking a fixture with an expiry date.
+       *
+       * So the primary assertion is a host that is **reserved for this test**
+       * and will never be a feature. The genuinely-unbuilt ones are asserted
+       * beside it, and they are expected to need replacing — but the case can
+       * no longer become vacuous or fail on the day somebody ships them,
+       * because the first line carries the property on its own.
+       */
+      expect(routeForDeepLink('botvy://not-a-feature/abc'), isNull);
+      // P7's and P8's. When either lands, delete its line — the case above is
+      // what actually holds the property.
+      expect(routeForDeepLink('botvy://links/abc'), isNull);
+      expect(routeForDeepLink('botvy://meals/abc'), isNull);
       expect(routeForDeepLink(''), isNull);
       expect(routeForDeepLink('   '), isNull);
       expect(routeForDeepLink('botvy://'), isNull);

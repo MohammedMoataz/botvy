@@ -21,6 +21,8 @@ import { ConversationsModule } from '../contexts/conversations/conversations.mod
 import { ConversationsResolver } from '../contexts/conversations/features/conversations/conversations.resolver.js';
 import { MeetingsModule } from '../contexts/meetings/meetings.module.js';
 import { CalendarResolver } from '../contexts/meetings/features/agenda/calendar.resolver.js';
+import { TrainingModule } from '../contexts/training/training.module.js';
+import { TrainingResolver } from '../contexts/training/features/sessions/training.resolver.js';
 
 /**
  * The read edge.
@@ -165,6 +167,13 @@ export const RESOLVERS = [
    * which is the proof.
    */
   CalendarResolver,
+  /*
+   * P6's eight reads — the next-practice card, the week, one session, the
+   * athlete profile, the programs, one program, the workouts. Same rule as the
+   * line above: adding a slice means adding it here **and** checking it appears
+   * in the regenerated `packages/contracts/schema.graphql`, which is the proof.
+   */
+  TrainingResolver,
 ] as const;
 
 @Module({
@@ -178,6 +187,7 @@ export const RESOLVERS = [
     RhythmModule,
     ConversationsModule,
     MeetingsModule,
+    TrainingModule,
   ],
   providers: [...RESOLVERS],
 })
