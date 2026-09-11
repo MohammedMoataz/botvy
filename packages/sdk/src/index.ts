@@ -21,7 +21,10 @@ export {
   type TokenStorage,
 } from './tokens.js';
 export {
+  NUDGE_DEBOUNCE_MS,
+  RECONNECT_BACKOFF_MS,
   SocketClient,
+  type SocketLike,
   type SocketOptions,
   type SocketState,
 } from './socket.js';
@@ -72,6 +75,13 @@ export {
   type SyncTable,
   type SyncedRow,
 } from './sync-store.js';
+export {
+  addDays,
+  dayWindow,
+  todayIn,
+  within,
+  type DayWindow,
+} from './day.js';
 export {
   TasksStore,
   localDay,
