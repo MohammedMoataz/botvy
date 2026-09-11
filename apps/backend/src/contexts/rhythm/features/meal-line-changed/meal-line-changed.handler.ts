@@ -6,9 +6,9 @@ import { DailyPlanRepository } from '../../domain/rhythm.repositories.js';
 interface MealPlanPayload {
   /** The member's own local date, `YYYY-MM-DD`. Nutrition resolves it. */
   date?: string;
-  /** Present on `MealPlanReady`. */
+  /** Present on `MealPlanReady`. The names joined; may be null. */
   line?: string | null;
-  /** Present on `MealPlanWithheld`. */
+  /** Present on `MealPlanWithheld`. One of Nutrition's three **codes**. */
   reason?: string | null;
 }
 
@@ -91,7 +91,8 @@ export class MealLineChangedHandler {
     const plan = await this.plans.forDate(userId, date);
     if (!plan) return 'no-plan';
 
-    if (!plan.setMealLine(lineFor(event, payload), event.occurredAt)) {
+    const half = halfFrom(event, payload);
+    if (!plan.setMealLine(half.line, half.reason, event.occurredAt)) {
       return 'unchanged';
     }
 
@@ -101,26 +102,33 @@ export class MealLineChangedHandler {
 }
 
 /**
- * The sentence the member reads, for either event.
+ * The two halves, for either event.
  *
- * A withheld plan **replaces** the line rather than leaving the previous one
- * standing, and that is the whole reason `MealPlanWithheld` is handled here at
- * all. The alternative — ignore it — leaves yesterday's menu on today's card,
- * which is worse than saying nothing: the member would shop for food the system
- * is no longer suggesting. Saying why is what makes it actionable rather than
- * an empty slot that reads as a bug.
+ * ## A code, not a sentence
+ *
+ * P3 stored `"Meals: none planned — <reason>"` into `mealLine` itself, and that
+ * was a rendered **English** sentence written into a row an Arabic-reading
+ * member syncs. The reason travels as one of Nutrition's three codes and each
+ * surface renders it in its own language (FR-014); the phone, the portal and
+ * the coach message all say it differently and two of them say it in two
+ * languages.
+ *
+ * ## A withheld day replaces the line rather than leaving the old one standing
+ *
+ * Which is the whole reason `MealPlanWithheld` is handled here at all. The
+ * alternative — ignore it — leaves yesterday's menu on today's card, and the
+ * member shops for food the system is no longer suggesting.
  *
  * Switched on the event *name* rather than on which field is present, because
- * `MealPlanReady` with a genuinely null line — the model was unavailable and
- * Nutrition sent the plan without one, which the spec's Assumptions allow — has
- * to clear the line rather than be read as a withholding with no reason.
+ * `MealPlanReady` with a genuinely null line has to clear the line **and** the
+ * reason rather than be read as a withholding with no reason.
  */
-function lineFor(event: DomainEvent, payload: MealPlanPayload): string | null {
+function halfFrom(
+  event: DomainEvent,
+  payload: MealPlanPayload,
+): { line: string | null; reason: string | null } {
   if (event.name.endsWith('MealPlanWithheld')) {
-    const reason = payload.reason?.trim();
-    return reason
-      ? `Meals: none planned — ${reason}`
-      : 'Meals: none planned today.';
+    return { line: null, reason: payload.reason?.trim() || null };
   }
-  return payload.line ?? null;
+  return { line: payload.line ?? null, reason: null };
 }

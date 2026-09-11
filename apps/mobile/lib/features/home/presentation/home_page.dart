@@ -76,6 +76,14 @@ class HomePage extends StatelessWidget {
                 tooltip: t.athleteTitle,
                 onPressed: () => context.push(Routes.athlete),
               ),
+              // Beside training rather than beside the profile: the day's line
+              // is "Workout: … | Meals: …", and the two halves are the same
+              // idea about the same day.
+              IconButton(
+                icon: const Icon(Icons.restaurant),
+                tooltip: t.nutritionTitle,
+                onPressed: () => context.push(Routes.nutrition),
+              ),
               IconButton(
                 icon: const Icon(Icons.person_outline),
                 tooltip: t.profileTitle,
@@ -196,14 +204,24 @@ class _TodayCard extends StatelessWidget {
                 ].where((part) => part.isNotEmpty).join(' · '),
               ),
 
-            // The meal line is absent until P8, and absent again whenever the
-            // model could not draft it (FR-012). Both are the same null here,
-            // and neither is worth a placeholder.
+            // The meal half, and the reason when there is none (P8, FR-014).
+            //
+            // A withheld day says **why**, in the member's own language, from a
+            // synced column — so it reads the same with no network. A day
+            // nothing has chosen yet is a different thing and says nothing at
+            // all: an empty slot is not a refusal, and wording it as one would
+            // have members looking for a problem that does not exist.
             if (state.mealLine != null && state.mealLine!.isNotEmpty)
               _Line(
                 icon: Icons.restaurant,
                 label: t.homeMeals,
                 value: state.mealLine!,
+              )
+            else if (state.mealReason != null)
+              _Line(
+                icon: Icons.restaurant,
+                label: t.homeMeals,
+                value: t.nutritionWithheld(state.mealReason),
               ),
           ],
         ),

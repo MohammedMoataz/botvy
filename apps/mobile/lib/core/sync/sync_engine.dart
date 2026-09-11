@@ -109,6 +109,7 @@ class SyncEngine {
     'workouts',
     'sessions',
     'links',
+    'meals',
     'daily_plans',
     'checkins',
     'rhythm_state',
@@ -592,6 +593,7 @@ class SyncEngine {
     'workouts': _WorkoutApplier(),
     'sessions': _SessionApplier(),
     'links': _LinkApplier(),
+    'meals': _MealApplier(),
     'daily_plans': _DailyPlanApplier(),
     'checkins': _CheckinApplier(),
     'rhythm_state': _RhythmStateApplier(),
@@ -2098,6 +2100,122 @@ class _LinkApplier extends _EntityApplier {
   }
 }
 
+/// The member's own meals (P8).
+///
+/// Push **and** pull, unlike [_LinkApplier] two classes up — and the difference
+/// is the whole shape of the two features. Every column of a meal is something
+/// the member typed, so there is nothing here a client could lie about by
+/// pushing it; a link's `status` and `attempts` are the server's record of work
+/// it did, which is why that adapter refuses an edit.
+class _MealApplier extends _EntityApplier {
+  @override
+  Future<List<_PendingRow>> pending(AppDatabase db, int cap) async {
+    final rows = await (db.select(db.meals)..where(
+      (r) => r.pendingOp.isNotNull() & r.pushAttempts.isSmallerThanValue(cap),
+    )).get();
+
+    return [
+      for (final row in rows)
+        _PendingRow(row.id, {
+          'op': row.pendingOp,
+          'id': row.id,
+          'updatedAt': row.updatedAt.toUtc().toIso8601String(),
+          'baseUpdatedAt': row.baseUpdatedAt?.toUtc().toIso8601String(),
+          'data': {
+            'name': row.name,
+            'kind': row.kind,
+            'ingredients': decodeStringList(row.ingredientsJson),
+            'tags': decodeStringList(row.tagsJson),
+          },
+        }),
+    ];
+  }
+
+  @override
+  Future<Set<String>> pendingIds(AppDatabase db) async {
+    final rows =
+        await (db.select(db.meals)..where((r) => r.pendingOp.isNotNull())).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> blockedIds(AppDatabase db) async {
+    final rows = await (db.select(db.meals)..where(
+      (r) =>
+          r.pendingOp.isNotNull() &
+          r.pushAttempts.isBiggerOrEqualValue(SyncEngine.maxPushAttempts),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<Set<String>> purgedAmong(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final rows = await (db.select(db.meals)..where(
+      (r) => r.id.isIn(ids) & r.pendingOp.equals(PendingOps.purge),
+    )).get();
+    return {for (final row in rows) row.id};
+  }
+
+  @override
+  Future<void> clearPending(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.update(db.meals)..where((r) => r.id.isIn(ids))).write(
+      const MealsCompanion(pendingOp: Value(null), pushAttempts: Value(0)),
+    );
+  }
+
+  @override
+  Future<void> block(AppDatabase db, String id, int attempts) async {
+    await (db.update(db.meals)..where((r) => r.id.equals(id)))
+        .write(MealsCompanion(pushAttempts: Value(attempts)));
+  }
+
+  @override
+  Future<void> hardDelete(AppDatabase db, Set<String> ids) async {
+    if (ids.isEmpty) return;
+    await (db.delete(db.meals)..where((r) => r.id.isIn(ids))).go();
+  }
+
+  @override
+  Future<void> writeServerRow(AppDatabase db, Map<String, dynamic> row) async {
+    final updatedAt = _date(row['updatedAt']) ?? DateTime.now().toUtc();
+
+    await db.into(db.meals).insertOnConflictUpdate(
+      MealsCompanion.insert(
+        id: row['id'] as String,
+        name: row['name'] as String? ?? '',
+        kind: Value(row['kind'] as String? ?? 'any'),
+        ingredientsJson: Value(
+          jsonEncode(
+            (row['ingredients'] as List? ?? const [])
+                .map((raw) => '$raw')
+                .toList(),
+          ),
+        ),
+        tagsJson: Value(
+          jsonEncode(
+            (row['tags'] as List? ?? const []).map((raw) => '$raw').toList(),
+          ),
+        ),
+        createdAt: _date(row['createdAt']) ?? updatedAt,
+        updatedAt: updatedAt,
+        baseUpdatedAt: Value(updatedAt),
+        deletedAt: Value(_date(row['deletedAt'])),
+        pendingOp: const Value(null),
+        pushAttempts: const Value(0),
+      ),
+    );
+  }
+
+  @override
+  Future<void> sweep(AppDatabase db, Set<String> seen) async {
+    await (db.delete(db.meals)..where(
+      (r) => r.pendingOp.isNull() & r.id.isNotIn(seen),
+    )).go();
+  }
+}
+
 /// One day's plan, pulled. Written by the tick and by the confirm command, both
 /// on the server; the phone's copy is a mirror it draws Home from.
 class _DailyPlanApplier extends _PullOnlyApplier {
@@ -2126,6 +2244,10 @@ class _DailyPlanApplier extends _PullOnlyApplier {
         ),
         workoutLine: Value(row['workoutLine'] as String?),
         mealLine: Value(row['mealLine'] as String?),
+        // A code, not a sentence — the card renders it in the member's own
+        // language, which is also what makes the reason readable with no
+        // network. Before P8 it needed a GraphQL round trip.
+        mealReason: Value(row['mealReason'] as String?),
         promptedAt: Value(_date(row['promptedAt'])),
         confirmedAt: Value(_date(row['confirmedAt'])),
         summarisedAt: Value(_date(row['summarisedAt'])),

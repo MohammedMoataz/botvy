@@ -56,8 +56,27 @@ export interface DailyPlanState {
   tasks: PlanTask[];
   meetings: PlanMeeting[];
   training: PlanTraining | null;
+  /**
+   * The workout half of the day's line, `"Upper body (gym)"` — no label.
+   *
+   * The label is the surface's: `"Workout: "` is English, and a member reading
+   * Arabic syncs this column. The same decision `mealReason` makes one field
+   * down, and the reason P3's rendered sentence in `mealLine` is corrected in
+   * P8 rather than copied.
+   */
   workoutLine: string | null;
   mealLine: string | null;
+  /**
+   * Why there are no meals, as a **code** — `allergen`, `empty_library`,
+   * `model_unavailable` — or null.
+   *
+   * Nutrition's `WithheldReason`, not imported: a rhythm aggregate typing
+   * another context's union would be the cross-context import
+   * `no-restricted-imports` refuses, and the value crosses as an event payload
+   * field, which is `unknown` at the boundary in any case. What keeps the two
+   * honest is the consumer spec, which asserts the three codes by name.
+   */
+  mealReason: string | null;
   promptedAt: Date | null;
   confirmedAt: Date | null;
   summarisedAt: Date | null;
@@ -95,6 +114,7 @@ export class DailyPlan extends AggregateRoot<string> {
   training: PlanTraining | null;
   workoutLine: string | null;
   mealLine: string | null;
+  mealReason: string | null;
   promptedAt: Date | null;
   confirmedAt: Date | null;
   summarisedAt: Date | null;
@@ -117,6 +137,10 @@ export class DailyPlan extends AggregateRoot<string> {
     this.training = state.training;
     this.workoutLine = state.workoutLine;
     this.mealLine = state.mealLine;
+    // A plan written before P8 has no `mealReason` key at all, so the fallback
+    // is load-bearing rather than defensive — the same call the `meetings`
+    // list above makes for P5.
+    this.mealReason = state.mealReason ?? null;
     this.promptedAt = state.promptedAt;
     this.confirmedAt = state.confirmedAt;
     this.summarisedAt = state.summarisedAt;
@@ -144,6 +168,7 @@ export class DailyPlan extends AggregateRoot<string> {
     training?: PlanTraining | null;
     workoutLine?: string | null;
     mealLine?: string | null;
+    mealReason?: string | null;
     at: Date;
   }): DailyPlan {
     return new DailyPlan({
@@ -156,6 +181,7 @@ export class DailyPlan extends AggregateRoot<string> {
       training: input.training ?? null,
       workoutLine: input.workoutLine ?? null,
       mealLine: input.mealLine ?? null,
+      mealReason: input.mealReason ?? null,
       promptedAt: input.at,
       confirmedAt: null,
       summarisedAt: null,
@@ -185,6 +211,7 @@ export class DailyPlan extends AggregateRoot<string> {
     training?: PlanTraining | null;
     workoutLine?: string | null;
     mealLine?: string | null;
+    mealReason?: string | null;
     at: Date;
   }): boolean {
     if (!this.isUnanswered) return false;
@@ -192,7 +219,11 @@ export class DailyPlan extends AggregateRoot<string> {
     this.meetings = input.meetings ?? [];
     this.training = input.training ?? null;
     this.workoutLine = input.workoutLine ?? null;
+    // The meal half is left alone when the caller says nothing about it, both
+    // halves together: a rebuild running while Nutrition is still choosing must
+    // not blank a line the member already has.
     if (input.mealLine !== undefined) this.mealLine = input.mealLine;
+    if (input.mealReason !== undefined) this.mealReason = input.mealReason;
     this.updatedAt = input.at;
     return true;
   }
@@ -324,11 +355,37 @@ export class DailyPlan extends AggregateRoot<string> {
    * their briefing, and the card on their phone must follow. Returns whether
    * anything moved, so an at-least-once redelivery writes nothing.
    */
-  setMealLine(line: string | null, at: Date): boolean {
-    if (this.mealLine === line) return false;
+  setMealLine(
+    line: string | null,
+    reason: string | null,
+    at: Date,
+  ): boolean {
+    if (this.mealLine === line && this.mealReason === reason) return false;
     this.mealLine = line;
+    this.mealReason = reason;
     this.updatedAt = at;
     return true;
+  }
+
+  /**
+   * The day's line, `"Workout: … | Meals: …"` (FR-008).
+   *
+   * Composed here because both halves are this aggregate's and neither context
+   * that fills them may see the other: Training writes no plan, and Nutrition
+   * announces its half by event. A rest day is **named** rather than left out,
+   * which is FR-008 in as many words — a line that simply omitted the workout
+   * would read as a day whose training nobody knew about.
+   *
+   * English, like every other sentence the server composes (E-012 carries the
+   * argument and what fixing it would take). The stored halves are not: a
+   * client rendering this card in Arabic reads `workoutLine`, `mealLine` and
+   * `mealReason` and builds its own, which is why the three are separate
+   * columns and why the reason is a code.
+   */
+  get dayLine(): string {
+    const workout = this.workoutLine ?? 'rest day';
+    const meals = this.mealLine ?? 'none planned';
+    return `Workout: ${workout} | Meals: ${meals}`;
   }
 
   /** Whether the plan holds nothing to do — the sentence changes when it does. */

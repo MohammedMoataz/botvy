@@ -165,6 +165,7 @@ function toPlanWire(plan: DailyPlan): Record<string, unknown> {
     })),
     training: plan.training,
     workoutLine: plan.workoutLine,
+    mealReason: plan.mealReason,
     mealLine: plan.mealLine,
     promptedAt: plan.promptedAt,
     confirmedAt: plan.confirmedAt,

@@ -16,7 +16,19 @@ export interface Draft {
   tasks: PlanTask[];
   meetings: PlanMeeting[];
   training: PlanTraining | null;
+  /**
+   * The workout half of the day's line — `"Upper body (gym)"`, or null on a
+   * rest day.
+   *
+   * Derived from `training` rather than fetched, because it *is* `training`
+   * said shortly. It is stored on the plan all the same: the day's line is what
+   * the home card shows and the phone reads it from the synced row, and
+   * recomputing it there would put the same derivation in a second language.
+   */
+  workoutLine: string | null;
   mealLine: string | null;
+  /** Why there are no meals, as a code. Null when there are, or when unasked. */
+  mealReason: string | null;
 }
 
 /**
@@ -78,7 +90,7 @@ export class DraftBuilder {
      * both the evening proposal and the morning briefing name the day's
      * meetings (FR-012).
      */
-    const [due, meetings, training, mealLine] = await Promise.all([
+    const [due, meetings, training, meals] = await Promise.all([
       this.tasks.dueOn(userId, date),
       this.meetings.onDate(userId, date),
       this.sessions.forDate(userId, date),
@@ -105,7 +117,9 @@ export class DraftBuilder {
        */
       meetings,
       training,
-      mealLine,
+      workoutLine: workoutHalf(training),
+      mealLine: meals.line,
+      mealReason: meals.reason,
     };
   }
 }
@@ -147,4 +161,17 @@ function dedupeById(tasks: PlanTask[]): PlanTask[] {
     unique.push(task);
   }
   return unique;
+}
+
+/**
+ * The workout half, `"Upper body (gym)"`.
+ *
+ * No time in it, and no `"Workout: "` label. The label is English and belongs
+ * to whichever surface renders the line; the time is already on the `Training:`
+ * line of the touch messages, and the day's line is the *compact* one — FR-008
+ * asks for what, not when.
+ */
+function workoutHalf(training: PlanTraining | null): string | null {
+  if (!training) return null;
+  return `${training.title} (${training.sport})`;
 }

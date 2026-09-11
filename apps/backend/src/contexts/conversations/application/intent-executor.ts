@@ -5,6 +5,7 @@ import {
   MeetingActionsPort,
   PlannerActionsPort,
   ProfileWritesPort,
+  NutritionActionsPort,
   TrainingActionsPort,
   type CancellableItem,
   type ChatTrainingSlot,
@@ -64,6 +65,7 @@ export class IntentExecutor extends IntentExecutorPort {
     private readonly profile: ProfileWritesPort,
     private readonly meetings: MeetingActionsPort,
     private readonly training: TrainingActionsPort,
+    private readonly nutrition: NutritionActionsPort,
   ) {
     super();
   }
@@ -820,6 +822,60 @@ export class IntentExecutor extends IntentExecutorPort {
               `سجّلت "${logged.title}" إنها اتعملت النهاردة.`,
             ) + noted,
           actions: [{ kind: 'session.completed', id: logged.id }],
+          asking: false,
+        };
+      }
+      case 'add_meal': {
+        /*
+         * "Add grilled chicken to my meals" (P8's FR-012).
+         *
+         * ## It goes through the same command the editor uses
+         *
+         * `NutritionActionsPort` is bound to Nutrition's `add-meal` handler
+         * rather than opening a second way into the collection — a second write
+         * path is how one of them comes to skip a rule the other enforces.
+         *
+         * ## No kind, no ingredients, and that is the honest reading
+         *
+         * The sentence names a dish. It does not say whether it is lunch or
+         * dinner, and the command's default — `any`, eligible for every slot —
+         * is the right answer rather than a fallback: a member who says they
+         * eat koshari has not said when. Ingredients are the same: inventing
+         * them would be inventing the input to the **allergen gate**, which is
+         * the one place in this product where a fabricated field can hurt
+         * somebody. The member adds them on the screen that asks.
+         */
+        const name = intent.args.title?.trim();
+        if (!name) {
+          return ask(
+            say(
+              'What should I add to your meals?',
+              'أضيف إيه لقائمة أكلك؟',
+            ),
+          );
+        }
+
+        const added = await this.nutrition.addMeal({ userId, name });
+        if (added.alreadyThere) {
+          // The handler's own replay answer. Saying "added" for a meal that was
+          // already there leaves the member with one row and two facts, one of
+          // which is wrong.
+          return {
+            reply: say(
+              `"${added.name}" is already on your list.`,
+              `"${added.name}" موجودة في قائمتك بالفعل.`,
+            ),
+            actions: [],
+            asking: false,
+          };
+        }
+
+        return {
+          reply: say(
+            `Added "${added.name}" to your meals. It can show up in any part of the day — set it to breakfast or dinner on the Nutrition screen if it belongs to one.`,
+            `ضفت "${added.name}" لقائمة أكلك. ممكن تظهر في أي وقت من اليوم — لو مخصوصة لوجبة معينة اظبطها من شاشة الأكل.`,
+          ),
+          actions: [{ kind: 'meal.added', id: added.id }],
           asking: false,
         };
       }

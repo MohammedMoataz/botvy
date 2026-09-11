@@ -47,6 +47,10 @@ export interface DailyPlanView {
   training: PlanTrainingView | null;
   workoutLine: string | null;
   mealLine: string | null;
+  /** A code the client renders in the member's own language (FR-014). */
+  mealReason: string | null;
+  /** The two halves joined, `"Workout: … | Meals: …"` (FR-008). English. */
+  dayLine: string;
   promptedAt: Date | null;
   confirmedAt: Date | null;
   summarisedAt: Date | null;
@@ -159,6 +163,8 @@ export function planView(plan: DailyPlan): DailyPlanView {
       : null,
     workoutLine: plan.workoutLine,
     mealLine: plan.mealLine,
+    mealReason: plan.mealReason,
+    dayLine: plan.dayLine,
     promptedAt: plan.promptedAt,
     confirmedAt: plan.confirmedAt,
     summarisedAt: plan.summarisedAt,
@@ -185,6 +191,11 @@ export function emptyPlanView(date: string): DailyPlanView {
     training: null,
     workoutLine: null,
     mealLine: null,
+    mealReason: null,
+    // The same sentence a plan with neither half composes, rather than an empty
+    // string: a day nobody has planned is still a rest day with no meals yet,
+    // and a client showing a blank where the line goes would read as a failure.
+    dayLine: 'Workout: rest day | Meals: none planned',
     promptedAt: null,
     confirmedAt: null,
     summarisedAt: null,

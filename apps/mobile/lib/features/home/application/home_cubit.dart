@@ -52,6 +52,7 @@ class HomeState {
     this.planTasks = const [],
     this.training,
     this.mealLine,
+    this.mealReason,
     this.draft,
     this.streakCurrent = 0,
     this.streakBest = 0,
@@ -86,6 +87,12 @@ class HomeState {
   final List<PlanTask> planTasks;
   final TrainingSlot? training;
   final String? mealLine;
+
+  /// Why there are no meals, as one of Nutrition's three **codes** — or null,
+  /// which means either that there are meals or that nothing has chosen the day
+  /// yet. The card renders the code in the member's own language, and it is a
+  /// synced column, so the reason is readable with no network.
+  final String? mealReason;
 
   /// Tomorrow's plan while it is still a draft awaiting an answer, which is
   /// what puts the "plan tomorrow" card on screen. Null once the member has
@@ -189,6 +196,7 @@ class HomeCubit extends Cubit<HomeState> {
         planTasks: await decodePlanTasks(_db, plan),
         training: decodeTraining(plan),
         mealLine: plan?.mealLine,
+        mealReason: plan?.mealReason,
         // Only a draft is offered. A plan the member already confirmed or
         // skipped is settled, and re-offering it would let a second confirm
         // overwrite the first — which is the member's own answer being

@@ -24,6 +24,8 @@ import { CalendarResolver } from '../contexts/meetings/features/agenda/calendar.
 import { TrainingModule } from '../contexts/training/training.module.js';
 import { TrainingResolver } from '../contexts/training/features/sessions/training.resolver.js';
 import { KnowledgeModule } from '../contexts/knowledge/knowledge.module.js';
+import { NutritionResolver } from '../contexts/nutrition/features/meals/nutrition.resolver.js';
+import { NutritionModule } from '../contexts/nutrition/nutrition.module.js';
 import { KnowledgeResolver } from '../contexts/knowledge/features/links/knowledge.resolver.js';
 
 /**
@@ -185,6 +187,7 @@ export const RESOLVERS = [
    * proof.
    */
   KnowledgeResolver,
+  NutritionResolver,
 ] as const;
 
 @Module({
@@ -200,6 +203,7 @@ export const RESOLVERS = [
     MeetingsModule,
     TrainingModule,
     KnowledgeModule,
+    NutritionModule,
   ],
   providers: [...RESOLVERS],
 })

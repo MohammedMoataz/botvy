@@ -143,6 +143,21 @@ export class DailyPlanType {
   @Field(() => String, { nullable: true })
   mealLine!: string | null;
 
+  /**
+   * `allergen` | `empty_library` | `model_unavailable`, or null.
+   *
+   * A `String` rather than Nutrition's enum: this type belongs to Rhythm, and a
+   * resolver importing another context's enum is the cross-context import
+   * `no-restricted-imports` refuses. The enum itself is published on
+   * `TodayMeals`, where the context that owns the vocabulary defines it.
+   */
+  @Field(() => String, { nullable: true })
+  mealReason!: string | null;
+
+  /** The two halves joined (FR-008). English; clients may build their own. */
+  @Field(() => String)
+  dayLine!: string;
+
   @Field(() => DateTimeScalar, { nullable: true })
   promptedAt!: Date | null;
 

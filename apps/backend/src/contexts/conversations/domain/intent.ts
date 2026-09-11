@@ -66,7 +66,17 @@ export type IntentName =
    * empty week after it.
    */
   | 'set_slots'
-  | 'log_session';
+  | 'log_session'
+  /**
+   * P8's one. `coaching`, by the prompt's own body-or-schedule test: a meal a
+   * member keeps is a fact about how they eat, not an appointment.
+   *
+   * Adding only. "Take koshari off my meals" is deliberately not an action —
+   * deleting on a sentence match is the `cancel` branch's two-matches problem
+   * with nothing to show for it, and the errors are not the same size: a wrongly
+   * added meal sits in a list the member can see, a wrongly deleted one is gone.
+   */
+  | 'add_meal';
 
 /** What a `list` intent is a list of. Matches `chat.card`'s kinds. */
 export type ListKind = 'tasks' | 'reminders' | 'meetings' | 'plan' | 'sessions';
@@ -250,6 +260,7 @@ export const INTENT_SCHEMA = {
         'update_profile',
         'set_slots',
         'log_session',
+        'add_meal',
       ],
     },
     scope: { type: 'string', enum: ['coaching', 'planning', 'other'] },

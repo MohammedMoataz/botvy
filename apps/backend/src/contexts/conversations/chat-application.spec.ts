@@ -21,6 +21,7 @@ import { delimitQuoted } from './application/prompt-files.js';
 import {
   MeetingActionsPort,
   MemberDayPort,
+  NutritionActionsPort,
   PlannerActionsPort,
   ProfileWritesPort,
   TrainingActionsPort,
@@ -292,11 +293,36 @@ class FakeTraining extends TrainingActionsPort {
   }
 }
 
+/**
+ * The meal list the chat can write to (P8's FR-012).
+ *
+ * It records what it was asked for, because the assertion worth making is that
+ * the sentence reached **Nutrition's own command** rather than a second write
+ * path — which is the rule the port exists to keep.
+ */
+class FakeNutrition extends NutritionActionsPort {
+  added: string[] = [];
+  alreadyThere = false;
+
+  async addMeal(input: {
+    userId: string;
+    name: string;
+  }): Promise<{ id: string; name: string; alreadyThere: boolean }> {
+    this.added.push(input.name);
+    return { id: 'meal-1', name: input.name, alreadyThere: this.alreadyThere };
+  }
+}
+
 class FakeDay extends MemberDayPort {
   day: MemberDay = {
     tasks: ['Pay the electricity bill'],
     trainingLine: 'Push day, 45 minutes',
-    mealLine: '2,100 kcal, 150 g protein',
+    // Names, not numbers. P8 makes the stored half the meal names alone — no
+    // calories, no macronutrients anywhere in the product (FR-005) — and this
+    // fixture said "2,100 kcal, 150 g protein" while nothing produced a meal
+    // line at all.
+    mealLine: 'ful medames, grilled chicken and rice, lentil soup',
+    mealReason: null,
     streakCurrent: 3,
     streakBest: 9,
     today: localToday(ZONE),
@@ -758,6 +784,7 @@ describe('IntentExecutor', () => {
   let profile: FakeProfile;
   let meetings: FakeMeetings;
   let training: FakeTraining;
+  let nutrition: FakeNutrition;
   let executor: IntentExecutor;
 
   beforeEach(() => {
@@ -765,7 +792,14 @@ describe('IntentExecutor', () => {
     profile = new FakeProfile();
     meetings = new FakeMeetings();
     training = new FakeTraining();
-    executor = new IntentExecutor(planner, profile, meetings, training);
+    nutrition = new FakeNutrition();
+    executor = new IntentExecutor(
+      planner,
+      profile,
+      meetings,
+      training,
+      nutrition,
+    );
   });
 
   it('asks for a missing time and dispatches nothing', async () => {
@@ -1691,6 +1725,62 @@ describe('IntentExecutor', () => {
     expect(result.reply).toContain("couldn't save");
     expect(result.actions).toEqual([]);
     expect(result.asking).toBe(false);
+  });
+
+  it('adds a meal through Nutrition’s own command and says what it did', async () => {
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'add_meal',
+        scope: 'coaching',
+        args: { title: 'koshari' },
+      }),
+      text: 'put koshari on my meal list',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    // Through the port, which is bound to the same `add-meal` handler the
+    // editor uses. A second write path is how one of them comes to skip a rule
+    // the other enforces.
+    expect(nutrition.added).toEqual(['koshari']);
+    expect(result.reply).toContain('koshari');
+    expect(result.actions).toEqual([{ kind: 'meal.added', id: 'meal-1' }]);
+    expect(result.asking).toBe(false);
+  });
+
+  it('says a meal was already there rather than claiming to add it twice', async () => {
+    nutrition.alreadyThere = true;
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'add_meal',
+        scope: 'coaching',
+        args: { title: 'koshari' },
+      }),
+      text: 'put koshari on my meal list',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    // One row and two facts, one of which is wrong, is worse than a plain
+    // "you already have that one".
+    expect(result.reply).toContain('already');
+    expect(result.actions).toEqual([]);
+  });
+
+  it('asks for the dish rather than adding a nameless meal', async () => {
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({ name: 'add_meal', scope: 'coaching', args: {} }),
+      text: 'add that to my meals',
+      now: new Date(),
+      facts: facts(),
+    });
+
+    expect(nutrition.added).toEqual([]);
+    expect(result.asking).toBe(true);
   });
 
   it('logs today’s session as done and keeps the member’s own words as its note', async () => {

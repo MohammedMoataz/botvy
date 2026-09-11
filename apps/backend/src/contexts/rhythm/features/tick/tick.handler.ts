@@ -292,7 +292,9 @@ export class TickHandler {
         tasks: draft.tasks,
         meetings: draft.meetings,
         training: draft.training,
+        workoutLine: draft.workoutLine,
         mealLine: draft.mealLine,
+        mealReason: draft.mealReason,
         at: now,
       });
     if (existing) {
@@ -351,7 +353,9 @@ export class TickHandler {
         tasks: draft.tasks,
         meetings: draft.meetings,
         training: draft.training,
+        workoutLine: draft.workoutLine,
         mealLine: draft.mealLine,
+        mealReason: draft.mealReason,
         at: now,
       });
     }
@@ -426,7 +430,9 @@ export class TickHandler {
           tasks: draft.tasks,
           meetings: draft.meetings,
           training: draft.training,
+          workoutLine: draft.workoutLine,
           mealLine: draft.mealLine,
+          mealReason: draft.mealReason,
           at: now,
         });
       plan.redraft({ ...draft, at: now });

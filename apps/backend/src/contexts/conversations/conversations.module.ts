@@ -64,6 +64,7 @@ import { LogSessionHandler } from '../training/features/log-session/log-session.
 import { SessionQueryHandler } from '../training/features/session/session.query.js';
 import { SessionsQueryHandler } from '../training/features/sessions/sessions.query.js';
 import { SetSlotsHandler } from '../training/features/set-slots/set-slots.handler.js';
+import { NutritionModule } from '../nutrition/nutrition.module.js';
 import { TrainingModule } from '../training/training.module.js';
 import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { UpdateProfileHandler } from '../profile/features/update-profile/update-profile.handler.js';
@@ -81,6 +82,7 @@ import {
   MemberDayPort,
   MeetingActionsPort,
   MemberFactsPort,
+  NutritionActionsPort,
   TrainingActionsPort,
   TrainingSummaryPort,
   PlannerActionsPort,
@@ -110,6 +112,7 @@ import { ChatGateway } from './features/send-message/chat.gateway.js';
 import {
   MeetingsChatActions,
   OperationsUsage,
+  NutritionChatActions,
   TrainingChatActions,
   TrainingWeekSummary,
   PlanningReminderActions,
@@ -177,6 +180,16 @@ import {
      * cycle and no `forwardRef`, unlike the Rhythm pair below.
      */
     TrainingModule,
+    /*
+     * Nutrition, from P8, and one-directionally — one binding.
+     *
+     * `add_meal` writes through `NutritionActionsPort`. The coach's *reading*
+     * of the day's food does not come from here at all: it rides
+     * `daily_plans.mealLine` and `mealReason`, which the rhythm already gives
+     * the prompt, so an answer about meals matches what the member was shown
+     * (FR-012) without a second read of a second collection.
+     */
+    NutritionModule,
     /*
      * `forwardRef`, because this edge is genuinely bidirectional.
      *
@@ -333,6 +346,7 @@ import {
      * which is a second place that would have to know what a chat sentence may
      * mean.
      */
+    { provide: NutritionActionsPort, useClass: NutritionChatActions },
     {
       provide: TrainingActionsPort,
       inject: [
@@ -455,13 +469,16 @@ import {
         ProfileWritesPort,
         MeetingActionsPort,
         TrainingActionsPort,
+        NutritionActionsPort,
       ],
       useFactory: (
         planner: PlannerActionsPort,
         profile: ProfileWritesPort,
         meetings: MeetingActionsPort,
         training: TrainingActionsPort,
-      ) => new IntentExecutor(planner, profile, meetings, training),
+        nutrition: NutritionActionsPort,
+      ) =>
+        new IntentExecutor(planner, profile, meetings, training, nutrition),
     },
     {
       provide: PromptAssemblerPort,

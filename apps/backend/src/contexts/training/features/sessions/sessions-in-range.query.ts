@@ -110,6 +110,36 @@ export class SessionsInRangeQueryHandler {
    * the morning of the day after.
    */
   async onDate(userId: string, date: string): Promise<SessionInRange[]> {
+    return (await this.everythingOnDate(userId, date)).filter(
+      (session) => session.status === 'planned',
+    );
+  }
+
+  /**
+   * The sessions on one of the member's own days, **whatever became of them**.
+   *
+   * P8's caller, and the difference from `onDate` is the whole reason it is a
+   * second method rather than a flag. Nutrition asks *did this member train
+   * today* in order to draft food for the day they actually had — so a session
+   * finished at seven in the morning is exactly the one it must see, and
+   * `onDate`'s `planned` filter hides it. A member who trained at dawn would
+   * have been fed a rest day.
+   *
+   * A boolean on `onDate` would have been shorter and is the shape this codebase
+   * has already been bitten by: two callers one typo apart from asking opposite
+   * questions, with nothing in either call site saying which it meant.
+   * `inConversation`'s ascending-then-limit is the same mistake, and it carried
+   * a member's *first* twenty messages into every prompt for a phase.
+   *
+   * The day's boundaries are computed from the calendar rather than by adding a
+   * day's worth of milliseconds, because a day containing a clock change is not
+   * twenty-four hours long — 24 hours after a spring-forward midnight is one in
+   * the morning of the day after.
+   */
+  async everythingOnDate(
+    userId: string,
+    date: string,
+  ): Promise<Array<SessionInRange & { status: string }>> {
     const { timezone } = await this.member.clock(userId);
     const from = wallClockToUtc(`${date}T00:00`, timezone);
     const to = wallClockToUtc(`${addDays(date, 1)}T00:00`, timezone);
@@ -124,7 +154,6 @@ export class SessionsInRangeQueryHandler {
       new Date(to.getTime() - 1),
     );
     return rows
-      .filter((session) => session.status === 'planned')
       .sort((a, b) => a.plannedAt.getTime() - b.plannedAt.getTime())
       .map((session) => ({
         id: session.id,
@@ -132,6 +161,7 @@ export class SessionsInRangeQueryHandler {
         sport: session.sport,
         startAt: session.plannedAt,
         durationMin: session.durationMin,
+        status: session.status,
       }));
   }
 }

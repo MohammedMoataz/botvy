@@ -6,6 +6,7 @@ import { MeetingOccurrencesQueryHandler } from '../../meetings/features/meeting-
 import { PurgeMeetingHandler } from '../../meetings/features/purge-meeting/purge-meeting.handler.js';
 import { PurgeTrainingTombstonesHandler } from '../../training/features/purge-tombstones/purge-tombstones.handler.js';
 import { PurgeKnowledgeTombstonesHandler } from '../../knowledge/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { PurgeMealTombstonesHandler } from '../../nutrition/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PurgeTaskHandler } from '../../planning/features/purge-task/purge-task.handler.js';
 import { ReminderLifecycleHandler } from '../../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import {
@@ -154,6 +155,25 @@ export class KnowledgeTombstonePurge extends TombstonePurgePort {
 
   async purgeBefore(before: Date): Promise<number> {
     return this.knowledge.purgeTombstones(before);
+  }
+}
+
+/**
+ * Nutrition purging its own, on request.
+ *
+ * The sixth owner, and the smallest: only `meals` has tombstones. A day's
+ * suggestion row is server-written, never synced and never deleted — a day does
+ * not stop having happened, and keeping what it said is the reason the
+ * collection exists (FR-011).
+ */
+@Injectable()
+export class NutritionTombstonePurge extends TombstonePurgePort {
+  constructor(private readonly nutrition: PurgeMealTombstonesHandler) {
+    super();
+  }
+
+  async purgeBefore(before: Date): Promise<number> {
+    return this.nutrition.purgeTombstones(before);
   }
 }
 

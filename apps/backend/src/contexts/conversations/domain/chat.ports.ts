@@ -75,7 +75,22 @@ export interface MemberDay {
    * fills a gap by assuming.
    */
   trainingLine: string | null;
+  /**
+   * What the member is eating today — the names, joined. Null when there are
+   * none, which is not the same as there being no answer.
+   */
   mealLine: string | null;
+  /**
+   * Why there are none, as one of Nutrition's three codes, or null.
+   *
+   * Both halves reach the prompt because "no meals" and "no meals *because I
+   * could not reach the model*" are different things to say to a member who
+   * asks, and a coach handed only the absence will invent the reason — which is
+   * the gap-filling this file's `trainingLine` note already warns about. The
+   * assembler turns the code into the one sentence the coach is allowed to say
+   * (FR-012).
+   */
+  mealReason: string | null;
   streakCurrent: number;
   streakBest: number;
   /** The member's own local date, for the prompt's "today is" line. */
@@ -367,6 +382,27 @@ export interface CardItem {
   status?: string;
   /** What tapping it does. `botvy://tasks/<id>` and friends. */
   deepLink?: string;
+}
+
+/**
+ * Adding a meal to the member's own list from a sentence (P8's FR-012).
+ *
+ * Bound to Nutrition's ordinary `add-meal` command rather than opening a second
+ * way into the collection — a second write path is how one of them comes to
+ * skip a rule the other enforces, and the id rule here is load-bearing: the
+ * *server* mints it for a chat-created meal, because the member did not.
+ *
+ * One method, and deliberately no `remove`. "Take koshari off my meals" is a
+ * deletion the member can see and undo on the screen that lists them, where a
+ * sentence-matched delete would be the `cancel` branch's two-matches problem
+ * with nothing to show for it. Adding is safe to get slightly wrong — a wrong
+ * meal sits in a list — and deleting is not.
+ */
+export abstract class NutritionActionsPort {
+  abstract addMeal(input: {
+    userId: string;
+    name: string;
+  }): Promise<{ id: string; name: string; alreadyThere: boolean }>;
 }
 
 /**

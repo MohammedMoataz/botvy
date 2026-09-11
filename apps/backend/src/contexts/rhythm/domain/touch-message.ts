@@ -86,6 +86,39 @@ function meetingLines(
   ];
 }
 
+/**
+ * The meal half, as a line in a message (FR-008, FR-014).
+ *
+ * The three withholding codes are turned into English here — the one place in
+ * this file's remit that renders a code — because these sentences are the
+ * server's own and already English by design (see the header, and E-012). A
+ * client renders the same three codes from `daily_plans.mealReason` in the
+ * member's own language.
+ *
+ * A day nobody has chosen meals for yet gets **no line at all** rather than
+ * "none planned": the member has not been refused anything, and a plan that
+ * announced an absence every evening would be five words of noise.
+ */
+export function mealLine(plan: DailyPlan): string | null {
+  if (plan.mealLine) return `Meals: ${plan.mealLine}`;
+  if (!plan.mealReason) return null;
+  return `Meals: none planned — ${withheldSentence(plan.mealReason)}`;
+}
+
+/** Nutrition's three codes, in words. An unknown code says only what it knows. */
+function withheldSentence(reason: string): string {
+  switch (reason) {
+    case 'allergen':
+      return 'nothing I could suggest avoided something you are allergic to.';
+    case 'empty_library':
+      return 'your meal list is empty. Add a few and I will use them.';
+    case 'model_unavailable':
+      return 'I could not reach the model.';
+    default:
+      return 'I could not put a list together.';
+  }
+}
+
 function trainingLine(plan: DailyPlan, timezone: string): string | null {
   if (!plan.training) return null;
   const start = localHhMm(plan.training.startAt, timezone);
@@ -101,6 +134,12 @@ export function planPromptMessage(plan: DailyPlan, timezone: string): string {
     // accusation. The member has nothing scheduled; that is a fine way to
     // spend a Tuesday.
     parts.push('', 'Nothing is scheduled yet — nothing due and no training.');
+    // The meal half still goes out. A day with no tasks and no session is
+    // exactly the day whose one piece of news is what the member is eating, and
+    // hiding it here would make FR-009's "the line appears in the evening
+    // proposal" true for busy members only.
+    const quietMeals = mealLine(plan);
+    if (quietMeals) parts.push('', quietMeals);
   } else {
     if (plan.tasks.length > 0) {
       parts.push('', "Here's what I have:");
@@ -110,7 +149,8 @@ export function planPromptMessage(plan: DailyPlan, timezone: string): string {
     if (meetings) parts.push('', ...meetings);
     const training = trainingLine(plan, timezone);
     if (training) parts.push('', training);
-    if (plan.mealLine) parts.push(plan.mealLine);
+    const meals = mealLine(plan);
+    if (meals) parts.push(meals);
   }
 
   parts.push('', 'Confirm, edit it, or ignore this and I will set it at the end of the day.');
@@ -132,6 +172,8 @@ export function endOfDayMessage(
     parts.push('', 'You skipped planning tomorrow.');
   } else if (plan.isEmpty) {
     parts.push('', 'Nothing due and no training.');
+    const quietMeals = mealLine(plan);
+    if (quietMeals) parts.push('', quietMeals);
   } else {
     if (plan.tasks.length > 0) {
       parts.push('', 'Top priorities:');
@@ -149,7 +191,8 @@ export function endOfDayMessage(
     const meetings = meetingLines(plan.meetings, timezone);
     if (meetings) parts.push('', ...meetings);
     parts.push('', trainingLine(plan, timezone) ?? 'No training tomorrow.');
-    if (plan.mealLine) parts.push(plan.mealLine);
+    const meals = mealLine(plan);
+    if (meals) parts.push(meals);
   }
 
   if (plan.autoConfirmed) {
@@ -175,6 +218,8 @@ export function morningBriefingMessage(
 
   if (plan.isEmpty) {
     parts.push('', 'Nothing due and no training. A clear day.');
+    const quietMeals = mealLine(plan);
+    if (quietMeals) parts.push('', quietMeals);
     return parts.join('\n');
   }
 
@@ -187,7 +232,8 @@ export function morningBriefingMessage(
   if (meetings) parts.push('', ...meetings);
   const training = trainingLine(plan, timezone);
   if (training) parts.push('', training);
-  if (plan.mealLine) parts.push(plan.mealLine);
+  const meals = mealLine(plan);
+  if (meals) parts.push(meals);
 
   return parts.join('\n');
 }

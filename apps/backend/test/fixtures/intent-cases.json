@@ -471,5 +471,48 @@
       "scope": "coaching",
       "listKind": "sessions"
     }
+  },
+  {
+    "id": "N01",
+    "text": "add grilled chicken to my meals",
+    "expect": {
+      "name": "add_meal",
+      "scope": "coaching",
+      "title": "grilled chicken"
+    }
+  },
+  {
+    "id": "N02",
+    "text": "ضيف كشري لقائمة أكلي",
+    "expect": {
+      "name": "add_meal",
+      "scope": "coaching",
+      "title": "كشري"
+    }
+  },
+  {
+    "id": "N03",
+    "text": "save lentil soup as one of my dinners",
+    "expect": {
+      "name": "add_meal",
+      "scope": "coaching",
+      "title": "lentil soup"
+    }
+  },
+  {
+    "id": "N04",
+    "text": "what am I eating today?",
+    "expect": {
+      "name": "chat",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "N05",
+    "text": "I don't eat mushrooms any more",
+    "expect": {
+      "name": "update_profile",
+      "scope": "coaching"
+    }
   }
 ]

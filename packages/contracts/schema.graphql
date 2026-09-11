@@ -66,6 +66,12 @@ type Checkin {
   note: String
 }
 
+type ChosenMeal {
+  kind: MealKind!
+  mealId: ID
+  name: String!
+}
+
 type Conversation {
   archived: Boolean!
   clearedUpToSeq: Int!
@@ -90,7 +96,9 @@ type DailyPlan {
   briefedAt: DateTime
   confirmedAt: DateTime
   date: Date!
+  dayLine: String!
   mealLine: String
+  mealReason: String
   promptedAt: DateTime
   status: PlanStatus!
   summarisedAt: DateTime
@@ -202,6 +210,28 @@ enum LinkStatus {
 type Location {
   address: String
   onlineLink: String
+}
+
+type Meal {
+  id: ID!
+  ingredients: [String!]!
+  kind: MealKind!
+  name: String!
+  tags: [String!]!
+  updatedAt: DateTime!
+}
+
+enum MealKind {
+  any
+  breakfast
+  dinner
+  lunch
+  snack
+}
+
+enum MealMode {
+  library
+  llm
 }
 
 type MediaRef {
@@ -408,6 +438,9 @@ type Query {
 
   """The authenticated member."""
   me: User!
+
+  """The member’s own meals, by name."""
+  meals(kind: MealKind): [Meal!]!
   meeting(id: ID!): Meeting
   meetingOccurrences(from: DateTime!, to: DateTime!): [MeetingOccurrence!]!
   meetings(includeCompleted: Boolean): [Meeting!]!
@@ -443,6 +476,11 @@ type Query {
   suggestions(status: SuggestionStatus = pending): [Suggestion!]!
   task(id: ID!): Task
   tasks(cursor: String, labelId: ID, limit: Int, view: TaskViewName!): TaskPage!
+
+  """
+  The meals chosen for one of the member’s days, or null when none have been.
+  """
+  todayMeals(date: Date): TodayMeals
   todayPlan(date: Date): DailyPlan!
   tomorrowDraft: DailyPlan!
 
@@ -668,6 +706,14 @@ type TemplateSet {
   targetWeightKg: Float
 }
 
+type TodayMeals {
+  date: Date!
+  line: String
+  meals: [ChosenMeal!]!
+  mode: MealMode!
+  withheldReason: WithheldReason
+}
+
 type User {
   createdAt: DateTime!
   deviceCount: Int!
@@ -688,6 +734,12 @@ type UserConnection {
 enum UserStatus {
   active
   banned
+}
+
+enum WithheldReason {
+  allergen
+  empty_library
+  model_unavailable
 }
 
 type Workout {

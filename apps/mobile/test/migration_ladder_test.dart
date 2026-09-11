@@ -91,6 +91,25 @@ void main() {
     for (final statement in statements) {
       raw.execute(statement);
     }
+    /*
+     * A donor is built from **today's** DDL, which is what makes this helper
+     * cheap — and it is also why a column added by a later version has to be
+     * taken back out again.
+     *
+     * `daily_plans.meal_reason` arrives at version 9. A v8-shaped donor built
+     * from today's definition would already have it, so the `addColumn` in the
+     * 8 -> 9 branch would fail with "duplicate column" *in this test* and pass
+     * on every real phone — the exact inversion of the defect the band guard
+     * exists to prevent, and a false failure is how a test gets weakened until
+     * it stops catching the real thing.
+     *
+     * SQLite has had `DROP COLUMN` since 3.35, and the bundled `sqlite3_flutter_libs`
+     * is well past it.
+     */
+    if (version < 9 && tables.contains('daily_plans')) {
+      raw.execute('ALTER TABLE daily_plans DROP COLUMN meal_reason');
+    }
+
     raw.execute('PRAGMA user_version = $version');
     return raw;
   }
@@ -143,6 +162,12 @@ void main() {
     'sessions',
   ];
 
+  /// What version 8 shipped: saved links (P7).
+  const v8Tables = [
+    ...v7Tables,
+    'links',
+  ];
+
   /// Every earlier version, upgraded to the current schema, asserting the
   /// **whole** schema each time.
   ///
@@ -168,6 +193,7 @@ void main() {
       5: v5Tables,
       6: v6Tables,
       7: v7Tables,
+      8: v8Tables,
     };
 
     for (final entry in donors.entries) {
@@ -228,6 +254,10 @@ void main() {
             'links_added_at',
             'links_status_added',
             'links_parent',
+            // P8's, in the same list and for the same reason.
+            'meals_name',
+            'meals_kind',
+            'meals_pending',
             'links_pending',
           ]),
         );
@@ -474,7 +504,7 @@ void main() {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
 
-    expect(db.schemaVersion, 8);
+    expect(db.schemaVersion, 9);
 
     final rows = await db
         .customSelect(

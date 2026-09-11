@@ -20,6 +20,7 @@ import {
   NextSessionPort,
   PlannedTasksPort,
   TodayMealsPort,
+  type MealHalf,
   type MemberSchedule,
   type TouchMessageKind,
 } from './domain/rhythm.ports.js';
@@ -157,8 +158,9 @@ class StubSessions extends NextSessionPort {
 
 class StubMeals extends TodayMealsPort {
   line: string | null = null;
-  async lineFor(): Promise<string | null> {
-    return this.line;
+  reason: string | null = null;
+  async lineFor(): Promise<MealHalf> {
+    return { line: this.line, reason: this.reason };
   }
 }
 
@@ -911,22 +913,24 @@ describe('the meal line, replaced after the fact', () => {
       await b.mealLine.handle(
         event(
           'nutrition.MealPlanReady',
-          { date: tomorrow(), line: 'Meals: oats, lentils, fish' },
+          { date: tomorrow(), line: 'oats, lentils, fish' },
           MEMBER,
           regeneratedAt(),
         ),
       ),
     ).toBe('updated');
 
+    // The names, not a sentence: the label is the surface's, and the rhythm
+    // composes `"Workout: … | Meals: …"` from the two halves.
     expect((await b.plans.forDate(MEMBER, tomorrow()))?.mealLine).toBe(
-      'Meals: oats, lentils, fish',
+      'oats, lentils, fish',
     );
   });
 
   it('writes nothing when the relay redelivers the same event', async () => {
     const same = event(
       'nutrition.MealPlanReady',
-      { date: tomorrow(), line: 'Meals: oats, lentils, fish' },
+      { date: tomorrow(), line: 'oats, lentils, fish' },
       MEMBER,
       regeneratedAt(),
     );
@@ -940,23 +944,53 @@ describe('the meal line, replaced after the fact', () => {
     expect((await b.plans.forDate(MEMBER, tomorrow()))?.updatedAt).toEqual(after);
   });
 
-  it('replaces the old line with the reason when a plan is withheld', async () => {
+  it('replaces the old line with the reason code when a plan is withheld', async () => {
     expect(
       await b.mealLine.handle(
         event(
           'nutrition.MealPlanWithheld',
-          { date: tomorrow(), reason: 'the model was unavailable' },
+          { date: tomorrow(), reason: 'model_unavailable' },
           MEMBER,
           regeneratedAt(),
         ),
       ),
     ).toBe('updated');
 
+    const plan = await b.plans.forDate(MEMBER, tomorrow());
     // Not left standing, and not blank: yesterday's menu on today's card would
     // have the member shopping for food nothing is suggesting.
-    expect((await b.plans.forDate(MEMBER, tomorrow()))?.mealLine).toBe(
-      'Meals: none planned — the model was unavailable',
+    expect(plan?.mealLine).toBeNull();
+    // A **code**, never a sentence. P3 stored "Meals: none planned — …" here,
+    // which is English written into a row an Arabic-reading member syncs; the
+    // three codes are rendered by each surface in its own language (FR-014).
+    expect(plan?.mealReason).toBe('model_unavailable');
+  });
+
+  it('clears the reason when meals arrive after a withholding', async () => {
+    await b.mealLine.handle(
+      event(
+        'nutrition.MealPlanWithheld',
+        { date: tomorrow(), reason: 'model_unavailable' },
+        MEMBER,
+        regeneratedAt(),
+      ),
     );
+
+    expect(
+      await b.mealLine.handle(
+        event(
+          'nutrition.MealPlanReady',
+          { date: tomorrow(), line: 'oats, lentils, fish' },
+          MEMBER,
+          at('09:05', CAIRO, 1),
+        ),
+      ),
+    ).toBe('updated');
+
+    const plan = await b.plans.forDate(MEMBER, tomorrow());
+    expect(plan?.mealLine).toBe('oats, lentils, fish');
+    // The reason has to go with it, or the card renders a line *and* an excuse.
+    expect(plan?.mealReason).toBeNull();
   });
 
   it('creates nothing for a date with no plan', async () => {
@@ -964,7 +998,7 @@ describe('the meal line, replaced after the fact', () => {
       await b.mealLine.handle(
         event(
           'nutrition.MealPlanReady',
-          { date: today(), line: 'Meals: anything' },
+          { date: today(), line: 'anything' },
           MEMBER,
           regeneratedAt(),
         ),

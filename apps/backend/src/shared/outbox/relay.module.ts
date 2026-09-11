@@ -23,12 +23,15 @@ import { GenerateSuggestionSaga } from '../../contexts/knowledge/features/genera
 import { RecordSuggestionOutcomeHandler } from '../../contexts/knowledge/features/accept-suggestion/accept-suggestion.handler.js';
 import { KnowledgePurgeOnDeletedHandler } from '../../contexts/knowledge/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { KnowledgeModule } from '../../contexts/knowledge/knowledge.module.js';
+import { NutritionModule } from '../../contexts/nutrition/nutrition.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
 import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { ConversationsModule } from '../../contexts/conversations/conversations.module.js';
 import { RhythmBootstrapHandler } from '../../contexts/rhythm/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { RhythmPreferencesChangedHandler } from '../../contexts/rhythm/features/preferences-changed/preferences-changed.handler.js';
+import { NutritionPurgeOnDeletedHandler } from '../../contexts/nutrition/features/purge-on-deleted/purge-on-deleted.handler.js';
+import { RegenerateOnProfileUpdatedHandler } from '../../contexts/nutrition/features/regenerate-on-profile-updated/regenerate-on-profile-updated.handler.js';
 import { MealLineChangedHandler } from '../../contexts/rhythm/features/meal-line-changed/meal-line-changed.handler.js';
 import { RhythmPurgeOnDeletedHandler } from '../../contexts/rhythm/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RhythmModule } from '../../contexts/rhythm/rhythm.module.js';
@@ -104,6 +107,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
     MeetingsModule,
     TrainingModule,
     KnowledgeModule,
+    NutritionModule,
     SyncModule,
   ],
   providers: [
@@ -168,6 +172,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         GenerateSuggestionSaga,
         RecordSuggestionOutcomeHandler,
         KnowledgePurgeOnDeletedHandler,
+        RegenerateOnProfileUpdatedHandler,
+        NutritionPurgeOnDeletedHandler,
         HeartbeatService,
       ],
       useFactory: (
@@ -202,6 +208,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         suggesting: GenerateSuggestionSaga,
         suggestionOutcomes: RecordSuggestionOutcomeHandler,
         knowledgePurge: KnowledgePurgeOnDeletedHandler,
+        nutritionRegenerate: RegenerateOnProfileUpdatedHandler,
+        nutritionPurge: NutritionPurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
       ) =>
         new OutboxRelay({
@@ -292,6 +300,7 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 await meetingsPurge.handle(event);
                 await trainingPurge.handle(event);
                 await knowledgePurge.handle(event);
+                await nutritionPurge.handle(event);
                 return;
               case 'operations.SettingChanged':
                 settings.invalidate(
@@ -360,9 +369,20 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                * fortnight of sessions on the clock of the city they left. The
                * saga takes both event names and branches on the field.
                */
+              /*
+               * P8 makes it three subscribers.
+               *
+               * Nutrition rebuilds *today's* meals when the changed list names
+               * allergies or foods, and ignores the event otherwise (FR-013) —
+               * a member who declares a nut allergy at noon must not spend the
+               * afternoon looking at almonds. It is last because it is the one
+               * that may talk to a language model, and the two above are
+               * arithmetic on rows the member is waiting for.
+               */
               case 'profile.ProfileUpdated':
                 await profileTimezone(event, alertPlanning);
                 await materialiser.onMemberContextChanged(event);
+                await nutritionRegenerate.handle(event);
                 return;
               case 'profile.PreferencesChanged':
                 await alertPlanning.onPreferencesChanged(event);

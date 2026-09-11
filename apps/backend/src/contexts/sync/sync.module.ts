@@ -48,6 +48,9 @@ import { TrainingModule } from '../training/training.module.js';
 import { LinkRepository } from '../knowledge/domain/knowledge.repositories.js';
 import { LinkSyncAdapter } from '../knowledge/infrastructure/knowledge-sync.adapter.js';
 import { KnowledgeModule } from '../knowledge/knowledge.module.js';
+import { MealRepository } from '../nutrition/domain/nutrition.repositories.js';
+import { MealSyncAdapter } from '../nutrition/infrastructure/nutrition-sync.adapter.js';
+import { NutritionModule } from '../nutrition/nutrition.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { LabelRepository } from '../planning/domain/label.repository.js';
 import { TaskRepository } from '../planning/domain/task.repository.js';
@@ -118,6 +121,7 @@ import {
     MeetingsModule,
     TrainingModule,
     KnowledgeModule,
+    NutritionModule,
     WsModule,
   ],
   providers: [
@@ -227,6 +231,18 @@ import {
       ) => new LinkSyncAdapter(uow, links, member, settings),
     },
     /*
+     * Meals, the plain shape: the whole row is the member's, so every operation
+     * is accepted. Links are the exception on the other side of this line —
+     * their interesting columns are the server's record of work it did, so an
+     * `update` is refused.
+     */
+    {
+      provide: MealSyncAdapter,
+      inject: [UnitOfWork, MealRepository],
+      useFactory: (uow: UnitOfWork, meals: MealRepository) =>
+        new MealSyncAdapter(uow, meals),
+    },
+    /*
      * The rhythm's two row entities, both **pull-only**.
      *
      * They are here so the phone can hold a copy and render Home with the
@@ -309,6 +325,7 @@ import {
         SessionSyncAdapter,
         WorkoutSyncAdapter,
         LinkSyncAdapter,
+        MealSyncAdapter,
         DailyPlanSyncAdapter,
         CheckinSyncAdapter,
         ConversationSyncAdapter,

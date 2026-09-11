@@ -14,6 +14,7 @@ import '../core/sync/sync_engine.dart';
 import '../features/athlete/application/athlete_cubit.dart';
 import '../features/athlete/application/programs_cubit.dart';
 import '../features/knowledge/application/knowledge_cubit.dart';
+import '../features/nutrition/application/nutrition_cubit.dart';
 import '../features/auth/application/auth_cubit.dart';
 import '../features/calendar/application/calendar_cubit.dart';
 import '../features/chat/application/chat_cubit.dart';
@@ -104,6 +105,9 @@ Future<void> configureDependencies({required String baseUrl}) async {
     // program and archiving one are REST commands, because the refusal — the
     // list of sessions an apply would replace — is what the member has to
     // agree to before it happens.
+    ..registerSingleton<NutritionCubit>(
+      NutritionCubit(sl<AppDatabase>(), sl<SyncEngine>(), sl<ApiClient>()),
+    )
     ..registerSingleton<KnowledgeCubit>(
       KnowledgeCubit(sl<AppDatabase>(), sl<SyncEngine>(), sl<ApiClient>()),
     )
@@ -157,6 +161,10 @@ Future<void> configureDependencies({required String baseUrl}) async {
   sl<AthleteCubit>().listenToSync();
   sl<ProgramsCubit>().listenToSync();
   sl<KnowledgeCubit>().listenToSync();
+  // The day's meal half is written by the server — the evening touch, the
+  // morning briefing, a profile change — with nothing on this device doing
+  // anything, so the screen has to hear about a pass to be right.
+  sl<NutritionCubit>().listenToSync();
   sl<ConversationsCubit>().listenToSync();
   sl<ChatCubit>().listen();
 

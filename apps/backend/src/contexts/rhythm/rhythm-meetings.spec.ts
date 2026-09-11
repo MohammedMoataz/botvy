@@ -19,6 +19,7 @@ import {
   NextSessionPort,
   PlannedTasksPort,
   TodayMealsPort,
+  type MealHalf,
   type MemberSchedule,
   type TouchMessageKind,
 } from './domain/rhythm.ports.js';
@@ -149,8 +150,11 @@ class StubSessions extends NextSessionPort {
 }
 
 class NoMeals extends TodayMealsPort {
-  async lineFor(): Promise<string | null> {
-    return null;
+  async lineFor(): Promise<MealHalf> {
+    // No line *and* no reason: nothing has chosen this day's meals, which is a
+    // different day from one whose meals were withheld. The plan renders
+    // correctly with neither.
+    return { line: null, reason: null };
   }
 }
 

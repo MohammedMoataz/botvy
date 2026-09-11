@@ -253,6 +253,94 @@ export const SETTINGS_REGISTRY = {
   }),
 
   // ---- Meals --------------------------------------------------------------
+  /*
+   * What each allergy word covers, beyond itself.
+   *
+   * A key rather than a constant because the words are a *product* decision an
+   * Owner may reasonably disagree with — a household that reads "dairy" as
+   * excluding butter, or one that wants "sesame" as a family of its own — and
+   * because principle XII calls a hard-coded default a bug. Registered in P0
+   * with everything else; P8 is the phase that first reads it.
+   *
+   * The gate expands **both ways**, which is the decision worth stating here
+   * rather than only in the code. A member who declares "nuts" is protected
+   * from "almond", and a member who declares "almond" is *also* held away from
+   * the rest of the family. The second half is over-broad on purpose: the two
+   * errors are not symmetric. Withholding too much costs a member one line of
+   * food suggestions; withholding too little costs them a reaction.
+   */
+  'nutrition.allergenFamilies': define({
+    schema: z.record(z.string(), z.array(z.string())),
+    default: {
+      nuts: [
+        'nut',
+        'nuts',
+        'almond',
+        'walnut',
+        'peanut',
+        'cashew',
+        'pistachio',
+        'hazelnut',
+        'pecan',
+        'macadamia',
+        'praline',
+        'nutella',
+        'marzipan',
+      ],
+      dairy: [
+        'dairy',
+        'milk',
+        'cheese',
+        'yoghurt',
+        'yogurt',
+        'butter',
+        'cream',
+        'ghee',
+        'lactose',
+        'whey',
+        'labneh',
+        'feta',
+        'halloumi',
+      ],
+      gluten: [
+        'gluten',
+        'wheat',
+        'barley',
+        'rye',
+        'bread',
+        'pasta',
+        'couscous',
+        'bulgur',
+        'semolina',
+        'flour',
+        'noodle',
+        'noodles',
+        'cracker',
+        'crackers',
+      ],
+      shellfish: [
+        'shellfish',
+        'shrimp',
+        'prawn',
+        'prawns',
+        'crab',
+        'lobster',
+        'crayfish',
+        'mussel',
+        'mussels',
+        'oyster',
+        'oysters',
+        'clam',
+        'clams',
+        'scallop',
+        'scallops',
+      ],
+      egg: ['egg', 'eggs', 'omelette', 'omelet', 'mayonnaise', 'meringue'],
+      soy: ['soy', 'soya', 'soybean', 'tofu', 'edamame', 'miso', 'tempeh'],
+    },
+    description:
+      'What each allergy word covers. A member who declares a family is held away from every food in it, and a member who declares one food in a family is held away from the family — deliberately over-broad, because withholding too much costs a suggestion and withholding too little costs a reaction. A member’s own words are matched as well, whether or not they appear here.',
+  }),
   'nutrition.mealsPerDay': define({
     schema: z.number().int().min(1).max(8),
     default: 3,

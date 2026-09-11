@@ -16,6 +16,7 @@ import { TasksQueryHandler } from '../../planning/features/tasks-query/tasks.que
 import { ManageReminderHandler } from '../../reminders/features/manage-reminder/manage-reminder.handler.js';
 import { ReminderLifecycleHandler } from '../../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import { RemindersQueryHandler } from '../../reminders/features/reminders-query/reminders.query.js';
+import { AddMealHandler } from '../../nutrition/features/add-meal/add-meal.handler.js';
 import { ProfileQueryHandler } from '../../profile/features/profile-query/profile.query.js';
 import { UpdateProfileHandler } from '../../profile/features/update-profile/update-profile.handler.js';
 import { AthleteProfileQueryHandler } from '../../training/features/athlete-profile/athlete-profile.query.js';
@@ -37,6 +38,7 @@ import {
   MeetingActionsPort,
   MemberDayPort,
   MemberFactsPort,
+  NutritionActionsPort,
   PlannerActionsPort,
   ProfileWritesPort,
   TrainingActionsPort,
@@ -153,6 +155,7 @@ export class RhythmMemberDay extends MemberDayPort {
       }),
       trainingLine,
       mealLine: plan.mealLine ?? null,
+      mealReason: plan.mealReason ?? null,
       streakCurrent: streak.current,
       streakBest: streak.best,
       today,
@@ -835,4 +838,35 @@ export function resolveWallClock(
   timezone: string,
 ): Date | null {
   return wallClockToUtc(wallClock, timezone);
+}
+
+/**
+ * Nutrition adds a meal the member named in a sentence (P8's FR-012).
+ *
+ * Through the ordinary `add-meal` command, not a second write path. The id is
+ * **minted here**, which is the one thing this adapter decides: every other
+ * caller of that handler is a client that minted its own so an offline create
+ * has a reference, and a sentence has no client behind it.
+ *
+ * `alreadyThere` is the handler's own replay answer, passed straight through.
+ * The chat says "you already have that one" rather than claiming to have added
+ * it twice — a member told a meal was added who then finds one row wonders
+ * which of the two facts is wrong.
+ */
+@Injectable()
+export class NutritionChatActions extends NutritionActionsPort {
+  constructor(private readonly meals: AddMealHandler) {
+    super();
+  }
+
+  async addMeal(input: {
+    userId: string;
+    name: string;
+  }): Promise<{ id: string; name: string; alreadyThere: boolean }> {
+    const added = await this.meals.handle(input.userId, {
+      id: newId(),
+      name: input.name,
+    });
+    return { id: added.id, name: input.name, alreadyThere: added.replayed };
+  }
 }

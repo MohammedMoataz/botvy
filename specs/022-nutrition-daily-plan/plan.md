@@ -128,9 +128,13 @@ Without that second path a regenerated line would sit in `meal_suggestions` whil
 briefing, the home card and the coach went on reading the one it replaced — which is
 what FR-010 and FR-013 are for. A withheld half never delays or blocks the plan.
 
-Swapping a single meal is its own command, `POST /nutrition/today/replace { mealId }`,
-beside `POST /nutrition/today/regenerate`: it keeps the rest of the day's meals and
-announces the new half like any other change.
+Swapping a single meal is its own command, `POST /nutrition/today/meals/{index}/replace
+{ mealId }`, beside `POST /nutrition/today/regenerate`: it keeps the rest of the day's
+meals and announces the new half like any other change.
+
+**Built as `/meals/{index}/replace` rather than `/replace { mealId }`**, and the
+difference is the slot: two `any` meals can share a kind, and the member tapped a row
+rather than a category, so the position is what identifies what is being replaced.
 
 ### What the drafter is told about the day
 
@@ -172,12 +176,17 @@ rather than opening a second write path.
 `features/nutrition`: the meal library (add, edit, delete, kind chips), the mode switch
 mirrored from preferences, today's line on home with a regenerate action and a "use one
 of mine" picker. The line is read from drift `daily_plans.mealLine`, which P3 already
-syncs, so it is readable offline and past days keep what they said. When the half is
-null the card needs the reason, which `daily_plans` does not carry: it comes from the
-existing `todayMeals` query while the device is online, and the card falls back to a
-plain "no meals for today" when it is not. Each of the three reasons — an allergen, an
-empty list, nothing could be produced — has its own sentence in English and Arabic, and
-the morning briefing puts the same three in place of the meal half (FR-014).
+syncs, so it is readable offline and past days keep what they said.
+
+**`daily_plans` gained a `mealReason` column, which this section originally said it
+would not.** The plan was for the card to read the reason from the `todayMeals` query
+while online and fall back to a plain "no meals for today" when not — which is a member
+on a plane being told less than a member on wifi, for one string, and it left P3's
+`meal-line-changed.handler.ts` writing a rendered English sentence into `mealLine`
+itself: a row an Arabic-reading member syncs. The line and the **code** are two columns
+now; each of the three reasons — an allergen, an empty list, nothing could be produced —
+has its own sentence in English and Arabic on each surface, and the morning briefing
+puts the same three in place of the meal half (FR-014).
 
 ### Decisions taken here
 

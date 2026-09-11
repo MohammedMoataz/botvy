@@ -3247,6 +3247,220 @@
         ]
       }
     },
+    "/api/v1/meals": {
+      "post": {
+        "operationId": "MealsController_addMeal",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMealDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      }
+    },
+    "/api/v1/meals/{id}": {
+      "patch": {
+        "operationId": "MealsController_updateMeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMealDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      },
+      "delete": {
+        "operationId": "MealsController_deleteMeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      }
+    },
+    "/api/v1/meals/{id}/restore": {
+      "post": {
+        "operationId": "MealsController_restoreMeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      }
+    },
+    "/api/v1/meals/{id}/purge": {
+      "delete": {
+        "operationId": "MealsController_purgeMeal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      }
+    },
+    "/api/v1/nutrition/today/regenerate": {
+      "post": {
+        "operationId": "MealsController_regenerateToday",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      }
+    },
+    "/api/v1/nutrition/today/meals/{index}/replace": {
+      "post": {
+        "operationId": "MealsController_replaceTodayMeal",
+        "parameters": [
+          {
+            "name": "index",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "date",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceTodayMealDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Meals"
+        ]
+      }
+    },
     "/api/v1/suggestions/{id}/accept": {
       "post": {
         "operationId": "SuggestionsController_acceptSuggestion",
@@ -3772,6 +3986,18 @@
         "properties": {}
       },
       "AddLinkDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "AddMealDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateMealDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "ReplaceTodayMealDto": {
         "type": "object",
         "properties": {}
       },

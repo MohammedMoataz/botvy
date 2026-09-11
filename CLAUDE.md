@@ -551,3 +551,47 @@ finds it, with a test, and named in the commit; it does not go there.
   v2 served v1's live database and neither could run beside the other. Keep the
   names distinct, or a `docker compose up` in one tree recreates the other's
   containers on the other's data.
+- **A word matcher that is not a substring search still has to survive English
+  word endings.** The allergen gate matches whole words on purpose — `nut`
+  inside `donut` would withhold a member's breakfast for ever — and word
+  equality plus a crude plural is not enough: **"buttered toast" and "creamy
+  mushroom pasta"** are ordinary ways to write a meal, and a dairy-allergic
+  member would have been handed both. A prefix match with a four-character floor
+  covers `-ed`, `-y` and whatever comes next without a stemmer, and the floor is
+  what keeps `nut` from matching `nutmeg`. Found by a fifty-phrasing corpus on
+  its first run, which is the argument for the corpus: **half of it has to be
+  the cases that must *not* match**, or a gate that matched everything would
+  pass every "is it caught" case and leave the member with a permanently
+  withheld day.
+- **A withholding reason is a code, never a rendered sentence.** P3 stored
+  `"Meals: none planned — the model was unavailable"` into `daily_plans.mealLine`
+  — an English sentence written into a row an Arabic-reading member syncs, by a
+  handler whose own comment said the phone would render it. The line and the
+  reason are separate columns now and every surface renders the three codes
+  itself. The same rule caught a second thing: the plan's "read the reason from
+  `todayMeals` when online, fall back to a plain sentence when not" is a member
+  on a plane being told less than a member on wifi, for one string. A synced
+  column costs nothing and says the same thing everywhere.
+- **A column carried by the aggregate, the view, the resolver and the sync
+  adapter and written by nothing is not a column, it is four places to be
+  wrong.** `daily_plans.workoutLine` sat that way from P3 to P8. The sibling of
+  "an event with consumers and no producer": when a phase adds a field it cannot
+  fill yet, the phase that fills it has to be named in the field's own comment,
+  or nobody ever does.
+- **A gate that registers a member and immediately patches their preferences
+  loses a race no real client loses.** The preferences row is written by the
+  outbox consumer, so the patch answers 404 — correct behaviour — and every
+  check after it silently ran against the installation default instead of the
+  member's choice. Wait for the row. The general form: anything a gate does in
+  the same second as registration is racing the relay, and the symptom is a
+  feature reported broken in a mode nobody selected.
+- **`/rhythm/tick` does nothing at four in the afternoon, and that is the
+  point.** A gate that needs a plan row must use the operator's forced prompt
+  (`POST /internal/rhythm/prompt {userId, kind}`), which ignores the time of day
+  and the claim date — the tick is a clock, and asking it to produce a touch out
+  of hours is asking it to be wrong.
+- **`POST /sync` takes no `full` flag.** A full snapshot is a request with no
+  `since`; an invented field is a 400 for the whole request, because the DTO runs
+  under `forbidNonWhitelisted`. And the response serves rows under `pull`, not
+  under `entities` — `entities` is what the *request* names. Both mistakes read
+  as "this entity does not sync".

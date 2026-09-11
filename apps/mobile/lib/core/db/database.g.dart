@@ -4408,6 +4408,12 @@ class $DailyPlansTable extends DailyPlans
   late final GeneratedColumn<String> mealLine = GeneratedColumn<String>(
       'meal_line', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _mealReasonMeta =
+      const VerificationMeta('mealReason');
+  @override
+  late final GeneratedColumn<String> mealReason = GeneratedColumn<String>(
+      'meal_reason', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _promptedAtMeta =
       const VerificationMeta('promptedAt');
   @override
@@ -4447,6 +4453,7 @@ class $DailyPlansTable extends DailyPlans
         trainingJson,
         workoutLine,
         mealLine,
+        mealReason,
         promptedAt,
         confirmedAt,
         summarisedAt,
@@ -4529,6 +4536,12 @@ class $DailyPlansTable extends DailyPlans
       context.handle(_mealLineMeta,
           mealLine.isAcceptableOrUnknown(data['meal_line']!, _mealLineMeta));
     }
+    if (data.containsKey('meal_reason')) {
+      context.handle(
+          _mealReasonMeta,
+          mealReason.isAcceptableOrUnknown(
+              data['meal_reason']!, _mealReasonMeta));
+    }
     if (data.containsKey('prompted_at')) {
       context.handle(
           _promptedAtMeta,
@@ -4586,6 +4599,8 @@ class $DailyPlansTable extends DailyPlans
           .read(DriftSqlType.string, data['${effectivePrefix}workout_line']),
       mealLine: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}meal_line']),
+      mealReason: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}meal_reason']),
       promptedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}prompted_at']),
       confirmedAt: attachedDatabase.typeMapping
@@ -4650,6 +4665,17 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
   /// could not draft it — FR-012: a missing meal line never stops the plan
   /// being sent, so it must never stop the card drawing either.
   final String? mealLine;
+
+  /// Why there are no meals, as one of Nutrition's three **codes** —
+  /// `allergen`, `empty_library`, `model_unavailable` — or null when there are
+  /// meals, and null again when nothing has chosen the day yet.
+  ///
+  /// A code and never a sentence: the member reads this card in their own
+  /// language, and P3 stored a rendered English sentence in [mealLine] for a
+  /// phone that renders Arabic. The card renders the three itself, which is
+  /// also what makes the reason readable **offline** — it used to require a
+  /// GraphQL round trip that a plane does not have.
+  final String? mealReason;
   final DateTime? promptedAt;
   final DateTime? confirmedAt;
   final DateTime? summarisedAt;
@@ -4668,6 +4694,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
       this.trainingJson,
       this.workoutLine,
       this.mealLine,
+      this.mealReason,
       this.promptedAt,
       this.confirmedAt,
       this.summarisedAt,
@@ -4699,6 +4726,9 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
     }
     if (!nullToAbsent || mealLine != null) {
       map['meal_line'] = Variable<String>(mealLine);
+    }
+    if (!nullToAbsent || mealReason != null) {
+      map['meal_reason'] = Variable<String>(mealReason);
     }
     if (!nullToAbsent || promptedAt != null) {
       map['prompted_at'] = Variable<DateTime>(promptedAt);
@@ -4742,6 +4772,9 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
       mealLine: mealLine == null && nullToAbsent
           ? const Value.absent()
           : Value(mealLine),
+      mealReason: mealReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mealReason),
       promptedAt: promptedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(promptedAt),
@@ -4774,6 +4807,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
       trainingJson: serializer.fromJson<String?>(json['trainingJson']),
       workoutLine: serializer.fromJson<String?>(json['workoutLine']),
       mealLine: serializer.fromJson<String?>(json['mealLine']),
+      mealReason: serializer.fromJson<String?>(json['mealReason']),
       promptedAt: serializer.fromJson<DateTime?>(json['promptedAt']),
       confirmedAt: serializer.fromJson<DateTime?>(json['confirmedAt']),
       summarisedAt: serializer.fromJson<DateTime?>(json['summarisedAt']),
@@ -4797,6 +4831,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
       'trainingJson': serializer.toJson<String?>(trainingJson),
       'workoutLine': serializer.toJson<String?>(workoutLine),
       'mealLine': serializer.toJson<String?>(mealLine),
+      'mealReason': serializer.toJson<String?>(mealReason),
       'promptedAt': serializer.toJson<DateTime?>(promptedAt),
       'confirmedAt': serializer.toJson<DateTime?>(confirmedAt),
       'summarisedAt': serializer.toJson<DateTime?>(summarisedAt),
@@ -4818,6 +4853,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
           Value<String?> trainingJson = const Value.absent(),
           Value<String?> workoutLine = const Value.absent(),
           Value<String?> mealLine = const Value.absent(),
+          Value<String?> mealReason = const Value.absent(),
           Value<DateTime?> promptedAt = const Value.absent(),
           Value<DateTime?> confirmedAt = const Value.absent(),
           Value<DateTime?> summarisedAt = const Value.absent(),
@@ -4838,6 +4874,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
             trainingJson.present ? trainingJson.value : this.trainingJson,
         workoutLine: workoutLine.present ? workoutLine.value : this.workoutLine,
         mealLine: mealLine.present ? mealLine.value : this.mealLine,
+        mealReason: mealReason.present ? mealReason.value : this.mealReason,
         promptedAt: promptedAt.present ? promptedAt.value : this.promptedAt,
         confirmedAt: confirmedAt.present ? confirmedAt.value : this.confirmedAt,
         summarisedAt:
@@ -4868,6 +4905,8 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
       workoutLine:
           data.workoutLine.present ? data.workoutLine.value : this.workoutLine,
       mealLine: data.mealLine.present ? data.mealLine.value : this.mealLine,
+      mealReason:
+          data.mealReason.present ? data.mealReason.value : this.mealReason,
       promptedAt:
           data.promptedAt.present ? data.promptedAt.value : this.promptedAt,
       confirmedAt:
@@ -4895,6 +4934,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
           ..write('trainingJson: $trainingJson, ')
           ..write('workoutLine: $workoutLine, ')
           ..write('mealLine: $mealLine, ')
+          ..write('mealReason: $mealReason, ')
           ..write('promptedAt: $promptedAt, ')
           ..write('confirmedAt: $confirmedAt, ')
           ..write('summarisedAt: $summarisedAt, ')
@@ -4918,6 +4958,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
       trainingJson,
       workoutLine,
       mealLine,
+      mealReason,
       promptedAt,
       confirmedAt,
       summarisedAt,
@@ -4939,6 +4980,7 @@ class LocalDailyPlan extends DataClass implements Insertable<LocalDailyPlan> {
           other.trainingJson == this.trainingJson &&
           other.workoutLine == this.workoutLine &&
           other.mealLine == this.mealLine &&
+          other.mealReason == this.mealReason &&
           other.promptedAt == this.promptedAt &&
           other.confirmedAt == this.confirmedAt &&
           other.summarisedAt == this.summarisedAt &&
@@ -4959,6 +5001,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
   final Value<String?> trainingJson;
   final Value<String?> workoutLine;
   final Value<String?> mealLine;
+  final Value<String?> mealReason;
   final Value<DateTime?> promptedAt;
   final Value<DateTime?> confirmedAt;
   final Value<DateTime?> summarisedAt;
@@ -4978,6 +5021,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
     this.trainingJson = const Value.absent(),
     this.workoutLine = const Value.absent(),
     this.mealLine = const Value.absent(),
+    this.mealReason = const Value.absent(),
     this.promptedAt = const Value.absent(),
     this.confirmedAt = const Value.absent(),
     this.summarisedAt = const Value.absent(),
@@ -4998,6 +5042,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
     this.trainingJson = const Value.absent(),
     this.workoutLine = const Value.absent(),
     this.mealLine = const Value.absent(),
+    this.mealReason = const Value.absent(),
     this.promptedAt = const Value.absent(),
     this.confirmedAt = const Value.absent(),
     this.summarisedAt = const Value.absent(),
@@ -5020,6 +5065,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
     Expression<String>? trainingJson,
     Expression<String>? workoutLine,
     Expression<String>? mealLine,
+    Expression<String>? mealReason,
     Expression<DateTime>? promptedAt,
     Expression<DateTime>? confirmedAt,
     Expression<DateTime>? summarisedAt,
@@ -5040,6 +5086,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
       if (trainingJson != null) 'training_json': trainingJson,
       if (workoutLine != null) 'workout_line': workoutLine,
       if (mealLine != null) 'meal_line': mealLine,
+      if (mealReason != null) 'meal_reason': mealReason,
       if (promptedAt != null) 'prompted_at': promptedAt,
       if (confirmedAt != null) 'confirmed_at': confirmedAt,
       if (summarisedAt != null) 'summarised_at': summarisedAt,
@@ -5062,6 +5109,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
       Value<String?>? trainingJson,
       Value<String?>? workoutLine,
       Value<String?>? mealLine,
+      Value<String?>? mealReason,
       Value<DateTime?>? promptedAt,
       Value<DateTime?>? confirmedAt,
       Value<DateTime?>? summarisedAt,
@@ -5081,6 +5129,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
       trainingJson: trainingJson ?? this.trainingJson,
       workoutLine: workoutLine ?? this.workoutLine,
       mealLine: mealLine ?? this.mealLine,
+      mealReason: mealReason ?? this.mealReason,
       promptedAt: promptedAt ?? this.promptedAt,
       confirmedAt: confirmedAt ?? this.confirmedAt,
       summarisedAt: summarisedAt ?? this.summarisedAt,
@@ -5131,6 +5180,9 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
     if (mealLine.present) {
       map['meal_line'] = Variable<String>(mealLine.value);
     }
+    if (mealReason.present) {
+      map['meal_reason'] = Variable<String>(mealReason.value);
+    }
     if (promptedAt.present) {
       map['prompted_at'] = Variable<DateTime>(promptedAt.value);
     }
@@ -5165,6 +5217,7 @@ class DailyPlansCompanion extends UpdateCompanion<LocalDailyPlan> {
           ..write('trainingJson: $trainingJson, ')
           ..write('workoutLine: $workoutLine, ')
           ..write('mealLine: $mealLine, ')
+          ..write('mealReason: $mealReason, ')
           ..write('promptedAt: $promptedAt, ')
           ..write('confirmedAt: $confirmedAt, ')
           ..write('summarisedAt: $summarisedAt, ')
@@ -13029,6 +13082,587 @@ class LinksCompanion extends UpdateCompanion<LocalLink> {
   }
 }
 
+class $MealsTable extends Meals with TableInfo<$MealsTable, LocalMeal> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MealsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _baseUpdatedAtMeta =
+      const VerificationMeta('baseUpdatedAt');
+  @override
+  late final GeneratedColumn<DateTime> baseUpdatedAt =
+      GeneratedColumn<DateTime>('base_updated_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _pendingOpMeta =
+      const VerificationMeta('pendingOp');
+  @override
+  late final GeneratedColumn<String> pendingOp = GeneratedColumn<String>(
+      'pending_op', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pushAttemptsMeta =
+      const VerificationMeta('pushAttempts');
+  @override
+  late final GeneratedColumn<int> pushAttempts = GeneratedColumn<int>(
+      'push_attempts', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _deletedAtMeta =
+      const VerificationMeta('deletedAt');
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+      'deleted_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+      'kind', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('any'));
+  static const VerificationMeta _ingredientsJsonMeta =
+      const VerificationMeta('ingredientsJson');
+  @override
+  late final GeneratedColumn<String> ingredientsJson = GeneratedColumn<String>(
+      'ingredients_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _tagsJsonMeta =
+      const VerificationMeta('tagsJson');
+  @override
+  late final GeneratedColumn<String> tagsJson = GeneratedColumn<String>(
+      'tags_json', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('[]'));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        updatedAt,
+        baseUpdatedAt,
+        pendingOp,
+        pushAttempts,
+        deletedAt,
+        name,
+        kind,
+        ingredientsJson,
+        tagsJson,
+        createdAt
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'meals';
+  @override
+  VerificationContext validateIntegrity(Insertable<LocalMeal> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    if (data.containsKey('base_updated_at')) {
+      context.handle(
+          _baseUpdatedAtMeta,
+          baseUpdatedAt.isAcceptableOrUnknown(
+              data['base_updated_at']!, _baseUpdatedAtMeta));
+    }
+    if (data.containsKey('pending_op')) {
+      context.handle(_pendingOpMeta,
+          pendingOp.isAcceptableOrUnknown(data['pending_op']!, _pendingOpMeta));
+    }
+    if (data.containsKey('push_attempts')) {
+      context.handle(
+          _pushAttemptsMeta,
+          pushAttempts.isAcceptableOrUnknown(
+              data['push_attempts']!, _pushAttemptsMeta));
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(_deletedAtMeta,
+          deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+          _kindMeta, kind.isAcceptableOrUnknown(data['kind']!, _kindMeta));
+    }
+    if (data.containsKey('ingredients_json')) {
+      context.handle(
+          _ingredientsJsonMeta,
+          ingredientsJson.isAcceptableOrUnknown(
+              data['ingredients_json']!, _ingredientsJsonMeta));
+    }
+    if (data.containsKey('tags_json')) {
+      context.handle(_tagsJsonMeta,
+          tagsJson.isAcceptableOrUnknown(data['tags_json']!, _tagsJsonMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LocalMeal map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalMeal(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      baseUpdatedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}base_updated_at']),
+      pendingOp: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}pending_op']),
+      pushAttempts: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}push_attempts'])!,
+      deletedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}deleted_at']),
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      kind: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}kind'])!,
+      ingredientsJson: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}ingredients_json'])!,
+      tagsJson: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tags_json'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $MealsTable createAlias(String alias) {
+    return $MealsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalMeal extends DataClass implements Insertable<LocalMeal> {
+  /// Client-minted UUIDv7 for anything the phone can create offline, so a
+  /// retried create is a no-op rather than a duplicate.
+  final String id;
+  final DateTime updatedAt;
+
+  /// Null until a pull fills it in: the row has never been reconciled against
+  /// a server timestamp.
+  final DateTime? baseUpdatedAt;
+
+  /// What this device did that the server has not been told about, or null for
+  /// a clean row. See [notPendingOp] before writing a filter over it.
+  final String? pendingOp;
+  final int pushAttempts;
+
+  /// A delete keeps the row and never touches its status: the status is the
+  /// only record of whether the thing was completed, cancelled or never dealt
+  /// with, and the Deleted view exists to show exactly that.
+  final DateTime? deletedAt;
+  final String name;
+
+  /// `breakfast` | `lunch` | `dinner` | `snack` | `any`.
+  ///
+  /// `any` is the default and a real answer rather than an absence: a member
+  /// whose lunch and dinner are the same four dishes should not have to enter
+  /// each of them twice, and the server's rotator treats an `any` meal as
+  /// eligible for every slot.
+  final String kind;
+  final String ingredientsJson;
+  final String tagsJson;
+  final DateTime createdAt;
+  const LocalMeal(
+      {required this.id,
+      required this.updatedAt,
+      this.baseUpdatedAt,
+      this.pendingOp,
+      required this.pushAttempts,
+      this.deletedAt,
+      required this.name,
+      required this.kind,
+      required this.ingredientsJson,
+      required this.tagsJson,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || baseUpdatedAt != null) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt);
+    }
+    if (!nullToAbsent || pendingOp != null) {
+      map['pending_op'] = Variable<String>(pendingOp);
+    }
+    map['push_attempts'] = Variable<int>(pushAttempts);
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    map['name'] = Variable<String>(name);
+    map['kind'] = Variable<String>(kind);
+    map['ingredients_json'] = Variable<String>(ingredientsJson);
+    map['tags_json'] = Variable<String>(tagsJson);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  MealsCompanion toCompanion(bool nullToAbsent) {
+    return MealsCompanion(
+      id: Value(id),
+      updatedAt: Value(updatedAt),
+      baseUpdatedAt: baseUpdatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUpdatedAt),
+      pendingOp: pendingOp == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingOp),
+      pushAttempts: Value(pushAttempts),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+      name: Value(name),
+      kind: Value(kind),
+      ingredientsJson: Value(ingredientsJson),
+      tagsJson: Value(tagsJson),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory LocalMeal.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalMeal(
+      id: serializer.fromJson<String>(json['id']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      baseUpdatedAt: serializer.fromJson<DateTime?>(json['baseUpdatedAt']),
+      pendingOp: serializer.fromJson<String?>(json['pendingOp']),
+      pushAttempts: serializer.fromJson<int>(json['pushAttempts']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      name: serializer.fromJson<String>(json['name']),
+      kind: serializer.fromJson<String>(json['kind']),
+      ingredientsJson: serializer.fromJson<String>(json['ingredientsJson']),
+      tagsJson: serializer.fromJson<String>(json['tagsJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'baseUpdatedAt': serializer.toJson<DateTime?>(baseUpdatedAt),
+      'pendingOp': serializer.toJson<String?>(pendingOp),
+      'pushAttempts': serializer.toJson<int>(pushAttempts),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'name': serializer.toJson<String>(name),
+      'kind': serializer.toJson<String>(kind),
+      'ingredientsJson': serializer.toJson<String>(ingredientsJson),
+      'tagsJson': serializer.toJson<String>(tagsJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  LocalMeal copyWith(
+          {String? id,
+          DateTime? updatedAt,
+          Value<DateTime?> baseUpdatedAt = const Value.absent(),
+          Value<String?> pendingOp = const Value.absent(),
+          int? pushAttempts,
+          Value<DateTime?> deletedAt = const Value.absent(),
+          String? name,
+          String? kind,
+          String? ingredientsJson,
+          String? tagsJson,
+          DateTime? createdAt}) =>
+      LocalMeal(
+        id: id ?? this.id,
+        updatedAt: updatedAt ?? this.updatedAt,
+        baseUpdatedAt:
+            baseUpdatedAt.present ? baseUpdatedAt.value : this.baseUpdatedAt,
+        pendingOp: pendingOp.present ? pendingOp.value : this.pendingOp,
+        pushAttempts: pushAttempts ?? this.pushAttempts,
+        deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+        name: name ?? this.name,
+        kind: kind ?? this.kind,
+        ingredientsJson: ingredientsJson ?? this.ingredientsJson,
+        tagsJson: tagsJson ?? this.tagsJson,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  LocalMeal copyWithCompanion(MealsCompanion data) {
+    return LocalMeal(
+      id: data.id.present ? data.id.value : this.id,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      baseUpdatedAt: data.baseUpdatedAt.present
+          ? data.baseUpdatedAt.value
+          : this.baseUpdatedAt,
+      pendingOp: data.pendingOp.present ? data.pendingOp.value : this.pendingOp,
+      pushAttempts: data.pushAttempts.present
+          ? data.pushAttempts.value
+          : this.pushAttempts,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      name: data.name.present ? data.name.value : this.name,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      ingredientsJson: data.ingredientsJson.present
+          ? data.ingredientsJson.value
+          : this.ingredientsJson,
+      tagsJson: data.tagsJson.present ? data.tagsJson.value : this.tagsJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalMeal(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('name: $name, ')
+          ..write('kind: $kind, ')
+          ..write('ingredientsJson: $ingredientsJson, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      updatedAt,
+      baseUpdatedAt,
+      pendingOp,
+      pushAttempts,
+      deletedAt,
+      name,
+      kind,
+      ingredientsJson,
+      tagsJson,
+      createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalMeal &&
+          other.id == this.id &&
+          other.updatedAt == this.updatedAt &&
+          other.baseUpdatedAt == this.baseUpdatedAt &&
+          other.pendingOp == this.pendingOp &&
+          other.pushAttempts == this.pushAttempts &&
+          other.deletedAt == this.deletedAt &&
+          other.name == this.name &&
+          other.kind == this.kind &&
+          other.ingredientsJson == this.ingredientsJson &&
+          other.tagsJson == this.tagsJson &&
+          other.createdAt == this.createdAt);
+}
+
+class MealsCompanion extends UpdateCompanion<LocalMeal> {
+  final Value<String> id;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> baseUpdatedAt;
+  final Value<String?> pendingOp;
+  final Value<int> pushAttempts;
+  final Value<DateTime?> deletedAt;
+  final Value<String> name;
+  final Value<String> kind;
+  final Value<String> ingredientsJson;
+  final Value<String> tagsJson;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const MealsCompanion({
+    this.id = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.name = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.ingredientsJson = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MealsCompanion.insert({
+    required String id,
+    required DateTime updatedAt,
+    this.baseUpdatedAt = const Value.absent(),
+    this.pendingOp = const Value.absent(),
+    this.pushAttempts = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    required String name,
+    this.kind = const Value.absent(),
+    this.ingredientsJson = const Value.absent(),
+    this.tagsJson = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        updatedAt = Value(updatedAt),
+        name = Value(name),
+        createdAt = Value(createdAt);
+  static Insertable<LocalMeal> custom({
+    Expression<String>? id,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? baseUpdatedAt,
+    Expression<String>? pendingOp,
+    Expression<int>? pushAttempts,
+    Expression<DateTime>? deletedAt,
+    Expression<String>? name,
+    Expression<String>? kind,
+    Expression<String>? ingredientsJson,
+    Expression<String>? tagsJson,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (baseUpdatedAt != null) 'base_updated_at': baseUpdatedAt,
+      if (pendingOp != null) 'pending_op': pendingOp,
+      if (pushAttempts != null) 'push_attempts': pushAttempts,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (name != null) 'name': name,
+      if (kind != null) 'kind': kind,
+      if (ingredientsJson != null) 'ingredients_json': ingredientsJson,
+      if (tagsJson != null) 'tags_json': tagsJson,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MealsCompanion copyWith(
+      {Value<String>? id,
+      Value<DateTime>? updatedAt,
+      Value<DateTime?>? baseUpdatedAt,
+      Value<String?>? pendingOp,
+      Value<int>? pushAttempts,
+      Value<DateTime?>? deletedAt,
+      Value<String>? name,
+      Value<String>? kind,
+      Value<String>? ingredientsJson,
+      Value<String>? tagsJson,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return MealsCompanion(
+      id: id ?? this.id,
+      updatedAt: updatedAt ?? this.updatedAt,
+      baseUpdatedAt: baseUpdatedAt ?? this.baseUpdatedAt,
+      pendingOp: pendingOp ?? this.pendingOp,
+      pushAttempts: pushAttempts ?? this.pushAttempts,
+      deletedAt: deletedAt ?? this.deletedAt,
+      name: name ?? this.name,
+      kind: kind ?? this.kind,
+      ingredientsJson: ingredientsJson ?? this.ingredientsJson,
+      tagsJson: tagsJson ?? this.tagsJson,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (baseUpdatedAt.present) {
+      map['base_updated_at'] = Variable<DateTime>(baseUpdatedAt.value);
+    }
+    if (pendingOp.present) {
+      map['pending_op'] = Variable<String>(pendingOp.value);
+    }
+    if (pushAttempts.present) {
+      map['push_attempts'] = Variable<int>(pushAttempts.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (ingredientsJson.present) {
+      map['ingredients_json'] = Variable<String>(ingredientsJson.value);
+    }
+    if (tagsJson.present) {
+      map['tags_json'] = Variable<String>(tagsJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MealsCompanion(')
+          ..write('id: $id, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('baseUpdatedAt: $baseUpdatedAt, ')
+          ..write('pendingOp: $pendingOp, ')
+          ..write('pushAttempts: $pushAttempts, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('name: $name, ')
+          ..write('kind: $kind, ')
+          ..write('ingredientsJson: $ingredientsJson, ')
+          ..write('tagsJson: $tagsJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -13054,6 +13688,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $WorkoutsTable workouts = $WorkoutsTable(this);
   late final $SessionsTable sessions = $SessionsTable(this);
   late final $LinksTable links = $LinksTable(this);
+  late final $MealsTable meals = $MealsTable(this);
   late final Index labelsSort =
       Index('labels_sort', 'CREATE INDEX labels_sort ON labels (sort_order)');
   late final Index labelsPending = Index(
@@ -13122,6 +13757,12 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'links_parent', 'CREATE INDEX links_parent ON links (parent_link_id)');
   late final Index linksPending = Index(
       'links_pending', 'CREATE INDEX links_pending ON links (pending_op)');
+  late final Index mealsName =
+      Index('meals_name', 'CREATE INDEX meals_name ON meals (name)');
+  late final Index mealsKind =
+      Index('meals_kind', 'CREATE INDEX meals_kind ON meals (kind)');
+  late final Index mealsPending = Index(
+      'meals_pending', 'CREATE INDEX meals_pending ON meals (pending_op)');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -13147,6 +13788,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         workouts,
         sessions,
         links,
+        meals,
         labelsSort,
         labelsPending,
         tasksDue,
@@ -13180,7 +13822,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         linksAddedAt,
         linksStatusAdded,
         linksParent,
-        linksPending
+        linksPending,
+        mealsName,
+        mealsKind,
+        mealsPending
       ];
   @override
   DriftDatabaseOptions get options =>
@@ -15127,6 +15772,7 @@ typedef $$DailyPlansTableCreateCompanionBuilder = DailyPlansCompanion Function({
   Value<String?> trainingJson,
   Value<String?> workoutLine,
   Value<String?> mealLine,
+  Value<String?> mealReason,
   Value<DateTime?> promptedAt,
   Value<DateTime?> confirmedAt,
   Value<DateTime?> summarisedAt,
@@ -15147,6 +15793,7 @@ typedef $$DailyPlansTableUpdateCompanionBuilder = DailyPlansCompanion Function({
   Value<String?> trainingJson,
   Value<String?> workoutLine,
   Value<String?> mealLine,
+  Value<String?> mealReason,
   Value<DateTime?> promptedAt,
   Value<DateTime?> confirmedAt,
   Value<DateTime?> summarisedAt,
@@ -15201,6 +15848,9 @@ class $$DailyPlansTableFilterComposer
 
   ColumnFilters<String> get mealLine => $composableBuilder(
       column: $table.mealLine, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get mealReason => $composableBuilder(
+      column: $table.mealReason, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get promptedAt => $composableBuilder(
       column: $table.promptedAt, builder: (column) => ColumnFilters(column));
@@ -15267,6 +15917,9 @@ class $$DailyPlansTableOrderingComposer
   ColumnOrderings<String> get mealLine => $composableBuilder(
       column: $table.mealLine, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get mealReason => $composableBuilder(
+      column: $table.mealReason, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get promptedAt => $composableBuilder(
       column: $table.promptedAt, builder: (column) => ColumnOrderings(column));
 
@@ -15329,6 +15982,9 @@ class $$DailyPlansTableAnnotationComposer
   GeneratedColumn<String> get mealLine =>
       $composableBuilder(column: $table.mealLine, builder: (column) => column);
 
+  GeneratedColumn<String> get mealReason => $composableBuilder(
+      column: $table.mealReason, builder: (column) => column);
+
   GeneratedColumn<DateTime> get promptedAt => $composableBuilder(
       column: $table.promptedAt, builder: (column) => column);
 
@@ -15381,6 +16037,7 @@ class $$DailyPlansTableTableManager extends RootTableManager<
             Value<String?> trainingJson = const Value.absent(),
             Value<String?> workoutLine = const Value.absent(),
             Value<String?> mealLine = const Value.absent(),
+            Value<String?> mealReason = const Value.absent(),
             Value<DateTime?> promptedAt = const Value.absent(),
             Value<DateTime?> confirmedAt = const Value.absent(),
             Value<DateTime?> summarisedAt = const Value.absent(),
@@ -15401,6 +16058,7 @@ class $$DailyPlansTableTableManager extends RootTableManager<
             trainingJson: trainingJson,
             workoutLine: workoutLine,
             mealLine: mealLine,
+            mealReason: mealReason,
             promptedAt: promptedAt,
             confirmedAt: confirmedAt,
             summarisedAt: summarisedAt,
@@ -15421,6 +16079,7 @@ class $$DailyPlansTableTableManager extends RootTableManager<
             Value<String?> trainingJson = const Value.absent(),
             Value<String?> workoutLine = const Value.absent(),
             Value<String?> mealLine = const Value.absent(),
+            Value<String?> mealReason = const Value.absent(),
             Value<DateTime?> promptedAt = const Value.absent(),
             Value<DateTime?> confirmedAt = const Value.absent(),
             Value<DateTime?> summarisedAt = const Value.absent(),
@@ -15441,6 +16100,7 @@ class $$DailyPlansTableTableManager extends RootTableManager<
             trainingJson: trainingJson,
             workoutLine: workoutLine,
             mealLine: mealLine,
+            mealReason: mealReason,
             promptedAt: promptedAt,
             confirmedAt: confirmedAt,
             summarisedAt: summarisedAt,
@@ -18922,6 +19582,264 @@ typedef $$LinksTableProcessedTableManager = ProcessedTableManager<
     (LocalLink, BaseReferences<_$AppDatabase, $LinksTable, LocalLink>),
     LocalLink,
     PrefetchHooks Function()>;
+typedef $$MealsTableCreateCompanionBuilder = MealsCompanion Function({
+  required String id,
+  required DateTime updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  required String name,
+  Value<String> kind,
+  Value<String> ingredientsJson,
+  Value<String> tagsJson,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$MealsTableUpdateCompanionBuilder = MealsCompanion Function({
+  Value<String> id,
+  Value<DateTime> updatedAt,
+  Value<DateTime?> baseUpdatedAt,
+  Value<String?> pendingOp,
+  Value<int> pushAttempts,
+  Value<DateTime?> deletedAt,
+  Value<String> name,
+  Value<String> kind,
+  Value<String> ingredientsJson,
+  Value<String> tagsJson,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$MealsTableFilterComposer extends Composer<_$AppDatabase, $MealsTable> {
+  $$MealsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get ingredientsJson => $composableBuilder(
+      column: $table.ingredientsJson,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tagsJson => $composableBuilder(
+      column: $table.tagsJson, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$MealsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MealsTable> {
+  $$MealsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingOp => $composableBuilder(
+      column: $table.pendingOp, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+      column: $table.deletedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+      column: $table.kind, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get ingredientsJson => $composableBuilder(
+      column: $table.ingredientsJson,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tagsJson => $composableBuilder(
+      column: $table.tagsJson, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$MealsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MealsTable> {
+  $$MealsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get baseUpdatedAt => $composableBuilder(
+      column: $table.baseUpdatedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingOp =>
+      $composableBuilder(column: $table.pendingOp, builder: (column) => column);
+
+  GeneratedColumn<int> get pushAttempts => $composableBuilder(
+      column: $table.pushAttempts, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get ingredientsJson => $composableBuilder(
+      column: $table.ingredientsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get tagsJson =>
+      $composableBuilder(column: $table.tagsJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$MealsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $MealsTable,
+    LocalMeal,
+    $$MealsTableFilterComposer,
+    $$MealsTableOrderingComposer,
+    $$MealsTableAnnotationComposer,
+    $$MealsTableCreateCompanionBuilder,
+    $$MealsTableUpdateCompanionBuilder,
+    (LocalMeal, BaseReferences<_$AppDatabase, $MealsTable, LocalMeal>),
+    LocalMeal,
+    PrefetchHooks Function()> {
+  $$MealsTableTableManager(_$AppDatabase db, $MealsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MealsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MealsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MealsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> kind = const Value.absent(),
+            Value<String> ingredientsJson = const Value.absent(),
+            Value<String> tagsJson = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MealsCompanion(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            name: name,
+            kind: kind,
+            ingredientsJson: ingredientsJson,
+            tagsJson: tagsJson,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime updatedAt,
+            Value<DateTime?> baseUpdatedAt = const Value.absent(),
+            Value<String?> pendingOp = const Value.absent(),
+            Value<int> pushAttempts = const Value.absent(),
+            Value<DateTime?> deletedAt = const Value.absent(),
+            required String name,
+            Value<String> kind = const Value.absent(),
+            Value<String> ingredientsJson = const Value.absent(),
+            Value<String> tagsJson = const Value.absent(),
+            required DateTime createdAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MealsCompanion.insert(
+            id: id,
+            updatedAt: updatedAt,
+            baseUpdatedAt: baseUpdatedAt,
+            pendingOp: pendingOp,
+            pushAttempts: pushAttempts,
+            deletedAt: deletedAt,
+            name: name,
+            kind: kind,
+            ingredientsJson: ingredientsJson,
+            tagsJson: tagsJson,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$MealsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $MealsTable,
+    LocalMeal,
+    $$MealsTableFilterComposer,
+    $$MealsTableOrderingComposer,
+    $$MealsTableAnnotationComposer,
+    $$MealsTableCreateCompanionBuilder,
+    $$MealsTableUpdateCompanionBuilder,
+    (LocalMeal, BaseReferences<_$AppDatabase, $MealsTable, LocalMeal>),
+    LocalMeal,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -18966,4 +19884,6 @@ class $AppDatabaseManager {
       $$SessionsTableTableManager(_db, _db.sessions);
   $$LinksTableTableManager get links =>
       $$LinksTableTableManager(_db, _db.links);
+  $$MealsTableTableManager get meals =>
+      $$MealsTableTableManager(_db, _db.meals);
 }

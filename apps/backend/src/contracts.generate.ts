@@ -485,6 +485,31 @@ export const eventSchemas = {
     sessionId: z.string().nullable(),
   }),
 
+  // ---- Nutrition ---------------------------------------------------------
+  /*
+   * The two halves of one fact: what the member is eating on a day, or why
+   * nothing.
+   *
+   * `line` is the **names joined** and never a sentence — Daily Rhythm composes
+   * `"Workout: … | Meals: …"` from its own half and this one, and a payload
+   * carrying the label would put half of one line in two contexts.
+   *
+   * `reason` is a **code**, for the same argument one level up: the member's
+   * language is a preference, every surface owns its own strings, and P3 stored
+   * a rendered English sentence into `daily_plans.mealLine` for a phone that
+   * renders Arabic. The three values are the whole vocabulary; a fourth with no
+   * sentence behind it renders as a blank.
+   */
+  'nutrition.MealPlanReady': z.object({
+    /** The member's own local date. Principle XI, which is why it is a string. */
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    line: z.string().nullable(),
+  }),
+  'nutrition.MealPlanWithheld': z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    reason: z.enum(['allergen', 'empty_library', 'model_unavailable']),
+  }),
+
   // ---- Sync -------------------------------------------------------------
   'sync.ChangesApplied': z.object({
     installId: z.string(),

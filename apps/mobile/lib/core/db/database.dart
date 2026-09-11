@@ -352,6 +352,17 @@ class DailyPlans extends Table with SyncColumns {
   /// being sent, so it must never stop the card drawing either.
   TextColumn get mealLine => text().nullable()();
 
+  /// Why there are no meals, as one of Nutrition's three **codes** —
+  /// `allergen`, `empty_library`, `model_unavailable` — or null when there are
+  /// meals, and null again when nothing has chosen the day yet.
+  ///
+  /// A code and never a sentence: the member reads this card in their own
+  /// language, and P3 stored a rendered English sentence in [mealLine] for a
+  /// phone that renders Arabic. The card renders the three itself, which is
+  /// also what makes the reason readable **offline** — it used to require a
+  /// GraphQL round trip that a plane does not have.
+  TextColumn get mealReason => text().nullable()();
+
   DateTimeColumn get promptedAt => dateTime().nullable()();
   DateTimeColumn get confirmedAt => dateTime().nullable()();
   DateTimeColumn get summarisedAt => dateTime().nullable()();
@@ -982,6 +993,46 @@ class Links extends Table with SyncColumns {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@DataClassName('LocalMeal')
+/// A meal the member keeps (P8, FR-001, FR-002).
+///
+/// Unlike [Links], **every column here is the member's own**, so the phone
+/// pushes creates, edits and deletes like any other row — there is nothing on a
+/// meal that is a record of server work, and so nothing a client could lie
+/// about by pushing it.
+///
+/// Nothing nutritional, anywhere: no calories, no portions, no macronutrients.
+/// FR-005 puts all three out of scope, and a column for any of them would be
+/// the first step towards this product making a claim it has no business
+/// making.
+///
+/// [ingredientsJson] is not decoration. The allergen gate on the server reads
+/// the name and the ingredients **together**, so a member whose "mum's stew"
+/// contains peanuts is protected only if they wrote that down — which is why
+/// the editor asks for them rather than leaving a blank box.
+@TableIndex(name: 'meals_name', columns: {#name})
+@TableIndex(name: 'meals_kind', columns: {#kind})
+@TableIndex(name: 'meals_pending', columns: {#pendingOp})
+class Meals extends Table with SyncColumns {
+  TextColumn get name => text()();
+
+  /// `breakfast` | `lunch` | `dinner` | `snack` | `any`.
+  ///
+  /// `any` is the default and a real answer rather than an absence: a member
+  /// whose lunch and dinner are the same four dishes should not have to enter
+  /// each of them twice, and the server's rotator treats an `any` meal as
+  /// eligible for every slot.
+  TextColumn get kind => text().withDefault(const Constant('any'))();
+
+  TextColumn get ingredientsJson => text().withDefault(const Constant('[]'))();
+  TextColumn get tagsJson => text().withDefault(const Constant('[]'))();
+
+  DateTimeColumn get createdAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 /// Thrown when the ladder is asked for a step it has no branch for.
 ///
 /// drift's own default `onUpgrade` throws too, which is the right behaviour and
@@ -1023,6 +1074,7 @@ class MigrationLadderError extends Error {
     Workouts,
     Sessions,
     Links,
+    Meals,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -1032,7 +1084,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -1222,6 +1274,32 @@ class AppDatabase extends _$AppDatabase {
         await m.create(linksStatusAdded);
         await m.create(linksParent);
         await m.create(linksPending);
+      }
+
+      // 8 -> 9: the member's own meals, and the withholding code beside the
+      // meal line (P8, `specs/022-nutrition-daily-plan` T840).
+      //
+      // Two guard shapes in one branch, which is the first time that has
+      // happened and exactly what the note at the top of this method is about.
+      //
+      // `meals` is a `createTable`, so `from < 9`: a phone at any earlier
+      // version needs it built, and its three indexes are listed because
+      // `createTable` builds the table and not its indexes.
+      //
+      // `daily_plans.mealReason` is an `addColumn`, so it is a **band** —
+      // `from >= 4 && from < 9`. The table is created by the `from < 4` branch
+      // above from *today's* definition, which already has the column; an
+      // unconditional `addColumn` would then fail with "duplicate column" on
+      // every upgrade from 1, 2 or 3, and that failure bricks the install.
+      if (from < 9) {
+        await m.createTable(meals);
+
+        await m.create(mealsName);
+        await m.create(mealsKind);
+        await m.create(mealsPending);
+      }
+      if (from >= 4 && from < 9) {
+        await m.addColumn(dailyPlans, dailyPlans.mealReason);
       }
 
       // Anything the ladder above did not cover.

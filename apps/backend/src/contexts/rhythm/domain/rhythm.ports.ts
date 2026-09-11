@@ -94,9 +94,38 @@ export abstract class NextSessionPort {
   abstract forDate(userId: string, date: string): Promise<PlanTraining | null>;
 }
 
-/** Tomorrow's meal line. **Stubbed until P8**, same reasoning as above. */
+/** The meal half of a day's line, and why it is missing when it is. */
+export interface MealHalf {
+  /** The names joined, `"oats, chicken salad"`. Null when there are none. */
+  line: string | null;
+  /**
+   * Why there are none, as a **code** the surface renders — never a sentence.
+   *
+   * Null when the line is present, and *also* null when nothing has chosen the
+   * day yet: "no meals because the model refused" and "no meals because nobody
+   * has asked" are different days, and a plan is not owed a reason for a
+   * question that was never put.
+   */
+  reason: string | null;
+}
+
+/**
+ * The day's meals, from Nutrition (P8).
+ *
+ * The half, not the sentence: the rhythm owns `daily_plans` and composes
+ * `"Workout: … | Meals: …"` from its own workout half and this one. Building
+ * the sentence on the other side would put half of one line in two contexts.
+ *
+ * **A `line` of null is permanent, not a phase gap.** The meal half is the one
+ * part of a plan that comes from the language model, so null is the shape of
+ * "the model was unavailable this evening" as much as it was the shape of
+ * "Nutrition is not built yet" — the rhythm has to tolerate it for ever, and
+ * `DailyPlan.setMealLine(null, reason, at)` exists for exactly that. Asking for
+ * a day the member has never opened *chooses* it, which is a decision that
+ * belongs to Nutrition and is argued in its `RegenerateTodayHandler`.
+ */
 export abstract class TodayMealsPort {
-  abstract lineFor(userId: string, date: string): Promise<string | null>;
+  abstract lineFor(userId: string, date: string): Promise<MealHalf>;
 }
 
 /**

@@ -615,10 +615,11 @@ void main() {
        * because the first line carries the property on its own.
        */
       expect(routeForDeepLink('botvy://not-a-feature/abc'), isNull);
-      // P8's. P7's `links` line was deleted when saved links landed, exactly as
-      // this note said to do — the case above is what actually holds the
-      // property, and these are the ones expected to need replacing.
-      expect(routeForDeepLink('botvy://meals/abc'), isNull);
+      // P7's `links` line was deleted when saved links landed and P8's `meals`
+      // line has now gone the same way, exactly as the note above says to do:
+      // the reserved host is what actually holds the property, and the
+      // roadmap-borrowed ones are expected to need replacing.
+      expect(routeForDeepLink('botvy://meals/abc'), Routes.nutrition);
       expect(routeForDeepLink(''), isNull);
       expect(routeForDeepLink('   '), isNull);
       expect(routeForDeepLink('botvy://'), isNull);

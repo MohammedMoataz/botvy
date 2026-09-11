@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "nutrition.MealPlanWithheld",
+  "description": "Payload of nutrition.MealPlanWithheld. It travels inside the envelope in envelope.schema.json.",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string"
+    },
+    "reason": {}
+  },
+  "required": [
+    "date",
+    "reason"
+  ],
+  "additionalProperties": false
+}

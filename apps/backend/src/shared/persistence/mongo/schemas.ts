@@ -409,6 +409,16 @@ export const DailyPlanSchema = new Schema(
       default: null,
     },
     workoutLine: { type: String, default: null },
+    /**
+     * Why there are no meals — `allergen` | `empty_library` |
+     * `model_unavailable` — as a code, never a rendered sentence.
+     *
+     * P3 stored "Meals: none planned — …" into `mealLine` itself, which is an
+     * English sentence in a row an Arabic-reading member syncs. The line and
+     * the reason are separate columns for that, and each surface renders the
+     * three codes in its own language (FR-014).
+     */
+    mealReason: { type: String, default: null },
     mealLine: { type: String, default: null },
     promptedAt: { type: Date, default: null },
     confirmedAt: { type: Date, default: null },
@@ -1260,6 +1270,103 @@ export const SuggestionSchema = new Schema(
   { collection: 'suggestions', versionKey: false, _id: false },
 );
 
+/**
+ * A meal the member keeps (data-model §2.8, P8).
+ *
+ * A syncable row like every other: the client mints `_id`, `deletedAt` is the
+ * tombstone a delta carries to the phone, `updatedAt` is the cursor.
+ *
+ * `ingredients` earns its place for a reason beyond the member's memory — the
+ * allergen gate reads the name and the ingredients together, so a member whose
+ * "mum's stew" contains peanuts is protected only if they wrote that down.
+ *
+ * Nothing here is nutritional. No calories, no portions, no macronutrients:
+ * FR-005 puts all three out of scope, and a column for any of them would be the
+ * first step towards this product making a claim it has no business making.
+ */
+export const MealSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    name: { type: String, required: true },
+    /** `breakfast` | `lunch` | `dinner` | `snack` | `any`. */
+    kind: { type: String, required: true, default: 'any' },
+    ingredients: { type: [String], default: [] },
+    /** The member's own labels. Nothing in the product interprets them. */
+    tags: { type: [String], default: [] },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    deletedAt: { type: Date, default: null },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'meals', versionKey: false, _id: false },
+);
+
+/**
+ * What was proposed for one of the member's days (data-model §2.8).
+ *
+ * `_id` is `"<userId>:<date>"`, so one day has one answer by construction —
+ * the same shape `daily_plans` uses, and for the same reason: a history of what
+ * was proposed and then regenerated is not something any requirement asks for
+ * or any screen shows.
+ *
+ * Server-only. The **line** reaches the phone inside `daily_plans.mealLine`,
+ * which P3 already syncs, so this collection adds no entity to the offline
+ * contract. What it is for is FR-011: a member who deletes a meal from their
+ * library must still see what Tuesday said, and a rotation recomputed on read
+ * would answer with today's library rather than Tuesday's. The meal's **name**
+ * is stored beside its id for exactly that — the id may point at a row that is
+ * gone.
+ *
+ * There is no `withheld` boolean beside `withheldReason`, though the data model
+ * names one. Two fields for one fact can disagree in a way nothing notices; a
+ * reason present *is* a withholding, and `isWithheld` derives from it — the same
+ * call `Session` makes about a missed session, which is read from the clock
+ * rather than stored.
+ */
+export const MealSuggestionSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    /** The member's own local date, `YYYY-MM-DD`. Principle XI. */
+    date: { type: String, required: true },
+    /** `library` | `llm` — exactly what `user_preferences.mealMode` stores. */
+    mode: { type: String, required: true },
+    meals: {
+      type: [
+        {
+          _id: false,
+          kind: { type: String, required: true },
+          name: { type: String, required: true },
+          /** The member's own meal it came from; null in suggestion mode. */
+          mealId: { type: String, default: null },
+        },
+      ],
+      default: [],
+    },
+    /** The names joined. Null when withheld. */
+    line: { type: String, default: null },
+    /** `allergen` | `empty_library` | `model_unavailable`. A code, never a sentence. */
+    withheldReason: { type: String, default: null },
+    model: { type: String, default: null },
+    /**
+     * The event that produced this version of the day, when one did.
+     *
+     * The idempotency key for every event-driven rebuild: the relay delivers at
+     * least once, and in suggestion mode a second delivery is a second model
+     * call for an answer already given. On the row rather than in a separate
+     * store, for the reason `usage_log` keys on `eventId` at its index — the
+     * check and the write are then the same row. Null for a rebuild a member
+     * asked for by hand, which is deliberately not idempotent.
+     */
+    causeEventId: { type: String, default: null },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  { collection: 'meal_suggestions', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -1290,4 +1397,6 @@ export const MODEL_NAMES = {
   link: 'Link',
   knowledgeDoc: 'KnowledgeDoc',
   suggestion: 'Suggestion',
+  meal: 'Meal',
+  mealSuggestion: 'MealSuggestion',
 } as const;

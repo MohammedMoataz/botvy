@@ -34,7 +34,16 @@ export interface PreferencesView {
   weekStartsOn: string;
   checkinEnabled: boolean;
   meetingDurationMin: number;
-  mealMode: string;
+  /**
+   * `llm` | `library`, the union the aggregate stores.
+   *
+   * Narrowed here rather than left as a `string`, because P8's Nutrition binds
+   * a port to this field and branches on it: a widened published type makes the
+   * consumer either cast or carry an impossible third branch, and a cast at the
+   * boundary is how a value the store cannot hold becomes something the
+   * compiler stops checking.
+   */
+  mealMode: 'llm' | 'library';
   aiSuggestions: boolean;
 }
 
@@ -205,6 +214,43 @@ export class ProfileQueryHandler {
         checkinEnabled: chosen?.checkinEnabled ?? checkinEnabled,
       };
     });
+  }
+
+  /**
+   * What the member eats, as **lists** (P8).
+   *
+   * ## Why this exists beside `summary`
+   *
+   * `summary` assembles the same three fields into prose for a prompt, and
+   * P8's allergen gate must never be given prose. Matching an allergen word
+   * against a sentence is precisely the fragile thing that ends with somebody
+   * being handed an allergen: a summary that ever grew "Allergies: none
+   * recorded" would make every gate match on the word "none", and a member
+   * whose dislikes ran past a line would have the tail of the list silently
+   * dropped by whatever split it.
+   *
+   * So the gate gets arrays and `summary` keeps the sentence. Two reads over
+   * one document is cheaper than one read whose consumers disagree about what
+   * they were given.
+   *
+   * ## Empty rather than null
+   *
+   * A member with no profile row — mid-bootstrap, since the relay is eventual —
+   * has declared no allergies, which is the same answer as a member who has
+   * declared none. Returning null would put a "what now" branch into the one
+   * code path in this product that must never take a wrong branch.
+   */
+  async foodsFor(userId: string): Promise<{
+    allergies: string[];
+    likedFoods: string[];
+    dislikedFoods: string[];
+  }> {
+    const profile = await this.profiles.find(userId);
+    return {
+      allergies: [...(profile?.allergies ?? [])],
+      likedFoods: [...(profile?.foodLikes ?? [])],
+      dislikedFoods: [...(profile?.foodDislikes ?? [])],
+    };
   }
 
   /**

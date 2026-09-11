@@ -12,6 +12,8 @@ import '../features/athlete/presentation/programs_page.dart';
 import '../features/knowledge/application/knowledge_cubit.dart';
 import '../features/knowledge/presentation/knowledge_page.dart';
 import '../features/knowledge/presentation/link_page.dart';
+import '../features/nutrition/application/nutrition_cubit.dart';
+import '../features/nutrition/presentation/nutrition_page.dart';
 import '../features/athlete/presentation/session_page.dart';
 import '../features/auth/application/auth_cubit.dart';
 import '../features/auth/presentation/sign_in_page.dart';
@@ -80,6 +82,7 @@ abstract final class Routes {
   /// deep link, on a cold start, with no screen behind it — and the point of
   /// that notification is that the card is one tap away.
   static const String knowledge = '/knowledge';
+  static const String nutrition = '/nutrition';
 
   static String link(String linkId) => '$knowledge/$linkId';
 
@@ -172,6 +175,10 @@ String? routeForDeepLink(String deepLink) {
     // the wrong thing to open cold.
     ['knowledge', ...] || ['links', ...] || ['suggestions', ...] =>
       Routes.knowledge,
+    // `botvy://nutrition` and `botvy://meals` both land on the one screen: the
+    // day's line and the library are two halves of it, and a deep link that
+    // guessed wrong would leave the member one tap from where they meant.
+    ['nutrition', ...] || ['meals', ...] => Routes.nutrition,
     ['session', ...] || ['sessions', ...] => Routes.athlete,
     ['athlete', ...] || ['training', ...] => Routes.athlete,
     ['programs', ...] => Routes.programs,
@@ -446,6 +453,13 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
       builder: (context, state) => BlocProvider<KnowledgeCubit>.value(
         value: sl<KnowledgeCubit>(),
         child: LinkPage(linkId: state.pathParameters['id'] ?? ''),
+      ),
+    ),
+    GoRoute(
+      path: Routes.nutrition,
+      builder: (context, state) => BlocProvider<NutritionCubit>.value(
+        value: sl<NutritionCubit>(),
+        child: const NutritionPage(),
       ),
     ),
     GoRoute(

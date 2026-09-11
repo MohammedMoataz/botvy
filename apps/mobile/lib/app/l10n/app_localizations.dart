@@ -422,6 +422,73 @@ class AppLocalizations {
   String knowledgeSkipped(int count) =>
       _f('knowledgeSkipped', {'count': '$count'});
 
+  // ── P8: meals and the day's food half ───────────────────────────────────
+  //
+  // The three withholding reasons are **codes** on the wire and sentences here,
+  // which is the whole reason they are codes: the server stores
+  // `allergen` | `empty_library` | `model_unavailable` and each surface says it
+  // in the member's own language. Before P8 the server stored the English
+  // sentence itself, into a column an Arabic-reading member syncs.
+  String get nutritionTitle => _t('nutritionTitle');
+  String get nutritionEmptyTitle => _t('nutritionEmptyTitle');
+  String get nutritionEmptyBody => _t('nutritionEmptyBody');
+  String get nutritionAdd => _t('nutritionAdd');
+  String get nutritionName => _t('nutritionName');
+  String get nutritionIngredients => _t('nutritionIngredients');
+  String get nutritionIngredientsHelp => _t('nutritionIngredientsHelp');
+  String get nutritionTags => _t('nutritionTags');
+  String get nutritionSaveAction => _t('nutritionSaveAction');
+  String get nutritionDelete => _t('nutritionDelete');
+  String get nutritionKindAny => _t('nutritionKindAny');
+  String get nutritionKindBreakfast => _t('nutritionKindBreakfast');
+  String get nutritionKindLunch => _t('nutritionKindLunch');
+  String get nutritionKindDinner => _t('nutritionKindDinner');
+  String get nutritionKindSnack => _t('nutritionKindSnack');
+  String get nutritionModeTitle => _t('nutritionModeTitle');
+  String get nutritionModeLibrary => _t('nutritionModeLibrary');
+  String get nutritionModeLlm => _t('nutritionModeLlm');
+  String get nutritionTodayTitle => _t('nutritionTodayTitle');
+  String get nutritionRegenerate => _t('nutritionRegenerate');
+  String get nutritionUseMine => _t('nutritionUseMine');
+  String get nutritionNoneToday => _t('nutritionNoneToday');
+  String get nutritionWithheldAllergen => _t('nutritionWithheldAllergen');
+  String get nutritionWithheldEmptyLibrary =>
+      _t('nutritionWithheldEmptyLibrary');
+  String get nutritionWithheldModelUnavailable =>
+      _t('nutritionWithheldModelUnavailable');
+
+  /// One of the three codes, as a sentence — or the plain "none today" line for
+  /// a day nothing has chosen yet, which is not a refusal and must not read
+  /// like one.
+  String nutritionWithheld(String? code) {
+    switch (code) {
+      case 'allergen':
+        return nutritionWithheldAllergen;
+      case 'empty_library':
+        return nutritionWithheldEmptyLibrary;
+      case 'model_unavailable':
+        return nutritionWithheldModelUnavailable;
+      default:
+        return nutritionNoneToday;
+    }
+  }
+
+  /// A meal's part of the day, as the member picked it.
+  String nutritionKind(String kind) {
+    switch (kind) {
+      case 'breakfast':
+        return nutritionKindBreakfast;
+      case 'lunch':
+        return nutritionKindLunch;
+      case 'dinner':
+        return nutritionKindDinner;
+      case 'snack':
+        return nutritionKindSnack;
+      default:
+        return nutritionKindAny;
+    }
+  }
+
   String get athleteTitle => _t('athleteTitle');
   String get athleteNextPractice => _t('athleteNextPractice');
   String get athleteToday => _t('athleteToday');
@@ -827,6 +894,36 @@ class AppLocalizations {
       'knowledgeSources': 'From',
       'knowledgeAlreadySaved': 'You already have that one.',
       'knowledgeSkipped': 'and {count} more were left out',
+      'nutritionTitle': 'Meals',
+      'nutritionEmptyTitle': 'No meals yet',
+      'nutritionEmptyBody':
+          'Add the meals you actually eat and Botvy can build your day from them.',
+      'nutritionAdd': 'Add a meal',
+      'nutritionName': 'What is it?',
+      'nutritionIngredients': "What's in it?",
+      'nutritionIngredientsHelp':
+          'Worth filling in: this is what the allergy check reads.',
+      'nutritionTags': 'Tags',
+      'nutritionSaveAction': 'Save',
+      'nutritionDelete': 'Delete',
+      'nutritionKindAny': 'Any time',
+      'nutritionKindBreakfast': 'Breakfast',
+      'nutritionKindLunch': 'Lunch',
+      'nutritionKindDinner': 'Dinner',
+      'nutritionKindSnack': 'Snack',
+      'nutritionModeTitle': 'Where the day comes from',
+      'nutritionModeLibrary': 'My meals',
+      'nutritionModeLlm': 'Suggest for me',
+      'nutritionTodayTitle': 'Today',
+      'nutritionRegenerate': 'Again',
+      'nutritionUseMine': 'Use one of mine',
+      'nutritionNoneToday': 'Nothing planned for today yet.',
+      'nutritionWithheldAllergen':
+          'Nothing could be suggested that avoided something you are allergic to.',
+      'nutritionWithheldEmptyLibrary':
+          'Your meal list is empty. Add a few and Botvy will use them.',
+      'nutritionWithheldModelUnavailable':
+          'Meals could not be produced today. Your plan is unaffected.',
       'athleteTitle': 'Training',
       'athleteNextPractice': 'Next practice',
       'athleteToday': 'Today',
@@ -1205,6 +1302,36 @@ class AppLocalizations {
     'knowledgeSources': 'من',
     'knowledgeAlreadySaved': 'هذا الرابط محفوظ لديك بالفعل.',
     'knowledgeSkipped': 'و{count} أخرى لم تُضَف',
+    'nutritionTitle': 'الوجبات',
+    'nutritionEmptyTitle': 'لا توجد وجبات بعد',
+    'nutritionEmptyBody':
+        'أضف الوجبات التي تأكلها فعلًا ليبني بوتفي يومك منها.',
+    'nutritionAdd': 'أضف وجبة',
+    'nutritionName': 'ما هي؟',
+    'nutritionIngredients': 'ما مكوّناتها؟',
+    'nutritionIngredientsHelp':
+        'يستحق الملء: هذا ما يقرأه فحص الحساسية.',
+    'nutritionTags': 'وسوم',
+    'nutritionSaveAction': 'احفظ',
+    'nutritionDelete': 'احذف',
+    'nutritionKindAny': 'أي وقت',
+    'nutritionKindBreakfast': 'الفطار',
+    'nutritionKindLunch': 'الغداء',
+    'nutritionKindDinner': 'العشاء',
+    'nutritionKindSnack': 'وجبة خفيفة',
+    'nutritionModeTitle': 'مصدر وجبات اليوم',
+    'nutritionModeLibrary': 'وجباتي',
+    'nutritionModeLlm': 'اقترح لي',
+    'nutritionTodayTitle': 'اليوم',
+    'nutritionRegenerate': 'مرة أخرى',
+    'nutritionUseMine': 'استخدم واحدة من وجباتي',
+    'nutritionNoneToday': 'لا توجد وجبات لليوم بعد.',
+    'nutritionWithheldAllergen':
+        'لم يكن هناك اقتراح يخلو مما لديك حساسية منه.',
+    'nutritionWithheldEmptyLibrary':
+        'قائمة وجباتك فارغة. أضف بعضها وسيستخدمها بوتفي.',
+    'nutritionWithheldModelUnavailable':
+        'تعذّر إنتاج وجبات اليوم. خطتك لم تتأثر.',
     'athleteTitle': 'التدريب',
     'athleteNextPractice': 'التدريب القادم',
     'athleteToday': 'اليوم',

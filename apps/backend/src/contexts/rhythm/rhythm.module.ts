@@ -19,6 +19,7 @@ import { PlanningModule } from '../planning/planning.module.js';
 import { MeetingOccurrencesQueryHandler } from '../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
 import { MeetingsModule } from '../meetings/meetings.module.js';
 import { SessionsInRangeQueryHandler } from '../training/features/sessions/sessions-in-range.query.js';
+import { NutritionModule } from '../nutrition/nutrition.module.js';
 import { TrainingModule } from '../training/training.module.js';
 import { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { ProfileModule } from '../profile/profile.module.js';
@@ -63,7 +64,7 @@ import { ProfileMemberSchedule } from './infrastructure/rhythm-member-schedule.a
 import { TrainingNextSession } from './infrastructure/rhythm-next-session.stub.js';
 import { MeetingsOnDate } from './infrastructure/rhythm-meetings.adapter.js';
 import { PlanningPlannedTasks } from './infrastructure/rhythm-planned-tasks.adapter.js';
-import { NoMealsYet } from './infrastructure/rhythm-today-meals.stub.js';
+import { NutritionTodayMeals } from './infrastructure/rhythm-today-meals.adapter.js';
 import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-transcript.adapter.js';
 
 /**
@@ -85,12 +86,15 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
  * one layer allowed to know another context exists, because binding a local
  * port to somebody else's query is its job.
  *
- * `NextSessionPort` and `TodayMealsPort` are bound to stubs that return null,
- * until P6 and P8. The alternative was a branch inside the tick asking whether
- * Training exists yet, and that branch would still be there in P9 — where these
- * two lines are the whole of what those phases have to change. The plan renders
- * correctly without either, which is `spec.md`'s own stated assumption rather
- * than an accident.
+ * `NextSessionPort` and `TodayMealsPort` were bound to stubs that returned
+ * null, until P6 and P8 respectively. Both are real now, and the bet paid:
+ * neither phase changed anything in the rhythm but the one line that binds the
+ * port. The alternative was a branch inside the tick asking whether Training or
+ * Nutrition existed yet, and that branch would still be there in P9.
+ *
+ * A null meal half is still ordinary and always will be — it is the shape of
+ * "the model was unavailable this evening" as much as it was the shape of "P8
+ * has not landed". The plan renders correctly without one.
  *
  * ## `TickHandler` is exported, and two slices depend on it
  *
@@ -123,6 +127,15 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
      * the note in `training.module.ts`.
      */
     TrainingModule,
+    /*
+     * Nutrition, one-directionally: the rhythm asks what the member is eating,
+     * and nothing in Nutrition knows the rhythm exists — it announces
+     * `MealPlanReady` and `MealPlanWithheld` into the outbox and the relay
+     * brings them back here. No `forwardRef`, for the reason the meetings note
+     * above gives: one would be cargo, and it would hide a real cycle if one
+     * were ever introduced.
+     */
+    NutritionModule,
     // The other half of the cycle — see the note in `conversations.module.ts`.
     forwardRef(() => ConversationsModule),
     MongooseModule.forFeature([
@@ -211,7 +224,17 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
       useFactory: (sessions: SessionsInRangeQueryHandler) =>
         new TrainingNextSession(sessions),
     },
-    { provide: TodayMealsPort, useClass: NoMealsYet },
+    /*
+     * **P8 rebound this**, and it was the one line the stub promised.
+     *
+     * `TodayMealsPort` held a null-returning stub from P3 to P8. What changed
+     * in the rhythm is the port's *shape* — a half plus a withholding code
+     * rather than a bare string — because the member reads the reason on their
+     * own screen in their own language, and P3 had been storing an English
+     * sentence into `mealLine` for a phone that renders Arabic. The line and
+     * the code are separate columns now, and each surface renders the three.
+     */
+    { provide: TodayMealsPort, useClass: NutritionTodayMeals },
 
     // ---- the slices ------------------------------------------------------
     DraftBuilder,

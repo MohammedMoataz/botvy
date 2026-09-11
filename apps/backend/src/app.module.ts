@@ -26,6 +26,8 @@ import { SuggestionsController } from './contexts/knowledge/features/accept-sugg
 import { AdminKnowledgeController } from './contexts/knowledge/features/admin-clear-link/admin-knowledge.controller.js';
 import { InternalIngestController } from './contexts/knowledge/features/ingest-link/internal-ingest.controller.js';
 import { KnowledgeModule } from './contexts/knowledge/knowledge.module.js';
+import { MealsController } from './contexts/nutrition/features/add-meal/meals.controller.js';
+import { NutritionModule } from './contexts/nutrition/nutrition.module.js';
 import { InternalReconcileController } from './contexts/notifications/features/reconcile-meeting-alerts/internal-reconcile.controller.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
 import { RhythmModule } from './contexts/rhythm/rhythm.module.js';
@@ -90,6 +92,7 @@ import { WsModule } from './ws/ws.module.js';
     MeetingsModule,
     TrainingModule,
     KnowledgeModule,
+    NutritionModule,
     SyncModule,
     HealthModule,
 
@@ -124,6 +127,7 @@ import { WsModule } from './ws/ws.module.js';
     WorkoutsController,
     InternalMaterialiseController,
     LinksController,
+    MealsController,
     SuggestionsController,
     AdminKnowledgeController,
     InternalIngestController,

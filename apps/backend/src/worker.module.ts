@@ -6,6 +6,7 @@ import { IdentityModule } from './contexts/identity/identity.module.js';
 import { OperationsModule } from './contexts/operations/operations.module.js';
 import { NotificationsModule } from './contexts/notifications/notifications.module.js';
 import { KnowledgeModule } from './contexts/knowledge/knowledge.module.js';
+import { NutritionModule } from './contexts/nutrition/nutrition.module.js';
 import { SyncModule } from './contexts/sync/sync.module.js';
 import { PlanningModule } from './contexts/planning/planning.module.js';
 import { RemindersModule } from './contexts/reminders/reminders.module.js';
@@ -57,6 +58,7 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
      * stay with the backend, because routes are declared there.
      */
     KnowledgeModule,
+    NutritionModule,
     // For `NudgeOnChangesHandler`, which turns `sync.ChangesApplied` into a
     // socket nudge and therefore runs where the relay runs.
     SyncModule,

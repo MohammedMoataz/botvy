@@ -24,6 +24,10 @@ Respond only with the requested JSON. No explanation, no reasoning, no prose.
   not one session — Botvy fills the coming weeks from it.
 - `log_session` — they say they trained. "did my push session this morning",
   "لعبت كورة الصبح". They are telling you it happened, not asking for anything.
+- `add_meal` — they want a dish kept on their own meal list: "put koshari on my
+  meal list", "احفظ فول بالزيت في وجباتي". Put the dish's name, and nothing
+  else, in `args.title`. Only when they are asking for it to be **kept** —
+  saying what they ate or what they feel like eating is not this.
 - `chat` — the default, and the answer whenever you are unsure. Questions,
   advice, small talk, opinions, anything the member is asking rather than
   instructing.
@@ -111,6 +115,10 @@ two weeks of the wrong plan.
 | remind me to go to the gym at six | `set_reminder` | `planning` | being *told*, not a weekly slot |
 | add a run to Monday's list | `set_task` | `planning` | something to *do*, once |
 | should I train legs twice a week? | `chat` | `coaching` | a question about training |
+| put koshari on my meal list | `add_meal` | `coaching` | a dish to *keep* |
+| احفظ فول بالزيت في وجباتي | `add_meal` | `coaching` | the same, in Arabic |
+| I fancy pasta tonight | `chat` | `coaching` | a mood, not a list |
+| I can't eat prawns | `update_profile` | `coaching` | a fact about them, not a dish to keep |
 
 Two rules that catch the rest:
 
@@ -145,6 +153,10 @@ silently.
       with the hour they gave: "at 6 in the evening" is `...T18:00`. If they
       gave no hour, leave `when` out and Botvy asks.
 - `notes` — for `log_session`: what they said they did, in their own words.
+  For `add_meal`, `title` carries the **dish's name alone** — "koshari", not
+  "add koshari to my meals" — and nothing else is filled in: when they eat it
+  and what is in it are theirs to say on the Nutrition screen, and a guessed
+  ingredient is a guessed input to the allergy check.
   "legs", "5 km easy", "رجل". Botvy keeps it on the session as written; do not
   turn it into exercises or sets, and do not invent numbers.
 - `allDay` — true when they named a day but no time ("buy milk tomorrow").

@@ -854,6 +854,35 @@ class ApiClient {
     await _guard(() => dio.post<dynamic>('/suggestions/$id/dismiss'));
   }
 
+  /// "Give me different meals for today" (P8, FR-010).
+  ///
+  /// REST and not a sync push, for the same reason retrying a link is: the
+  /// answer is not this device's to compute. It is a rotation seeded on the
+  /// server, or a call to a language model that lives beside it — a phone that
+  /// wrote its own line would show the member one thing and the next sync pass
+  /// another.
+  ///
+  /// No date in the call. The day is the member's own today, resolved against
+  /// their zone on the server (principle XI); a client that could name a date
+  /// could regenerate a past one, and a past day keeps what it was given
+  /// (FR-011).
+  Future<void> regenerateTodayMeals() async {
+    await _guard(() => dio.post<dynamic>('/nutrition/today/regenerate'));
+  }
+
+  /// "Use one of mine instead" — one slot of today's line, by position.
+  ///
+  /// By position rather than by kind: two `any` meals can share a kind, and the
+  /// member tapped a row rather than a category.
+  Future<void> replaceTodayMeal(int index, String mealId) async {
+    await _guard(
+      () => dio.post<dynamic>(
+        '/nutrition/today/meals/$index/replace',
+        data: {'mealId': mealId},
+      ),
+    );
+  }
+
   // -- reads -----------------------------------------------------------------
 
   /// The selections, named once. A GraphQL query asks for exactly the fields it

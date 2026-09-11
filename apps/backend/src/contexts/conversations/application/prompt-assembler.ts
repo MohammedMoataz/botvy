@@ -247,10 +247,45 @@ function dayBlock(day: MemberDay): string {
   }
 
   if (day.trainingLine) lines.push(`Training: ${day.trainingLine}`);
-  if (day.mealLine) lines.push(`Food: ${day.mealLine}`);
+  /*
+   * The food line, and the one sentence the coach may say about its absence.
+   *
+   * FR-012 is that an answer about meals matches what the member was shown. A
+   * prompt that carried the line and not the reason leaves the coach with an
+   * absence to explain, and a model explains an absence by inventing one — so
+   * the three codes are rendered here, in the one place that decides what the
+   * model is told about food.
+   */
+  if (day.mealLine) {
+    lines.push(`Food: ${day.mealLine}`);
+  } else if (day.mealReason) {
+    lines.push(`Food: none planned today — ${foodReason(day.mealReason)}`);
+  }
   lines.push(
     `Check-in streak: ${day.streakCurrent} day(s) now, best ${day.streakBest}.`,
   );
 
   return lines.join('\n');
+}
+
+/**
+ * Nutrition's three withholding codes, as the one sentence the coach is told.
+ *
+ * A code rather than a sentence travels between the contexts (the member's
+ * language is a preference and every surface owns its strings), and this is the
+ * surface that renders it for the *model* — so the wording is deliberately flat
+ * and factual. An unknown code says only what it knows rather than guessing,
+ * because a coach told "unavailable" will explain why and be wrong.
+ */
+function foodReason(code: string): string {
+  switch (code) {
+    case 'allergen':
+      return 'nothing suggested could avoid something they are allergic to.';
+    case 'empty_library':
+      return 'their meal list is empty.';
+    case 'model_unavailable':
+      return 'the suggestion could not be produced.';
+    default:
+      return 'no list could be put together.';
+  }
 }
