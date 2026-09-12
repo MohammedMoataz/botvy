@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:botvy/app/l10n/app_localizations.dart';
 import 'package:botvy/core/api/api_client.dart';
 import 'package:botvy/core/db/database.dart';
@@ -569,11 +571,39 @@ void main() {
 
     testWidgets('draws a past unlogged session as missed', (tester) async {
       await seedMember();
+
+      /*
+       * Two conditions, and the fixture has to satisfy both at any hour the
+       * suite runs at. It must have **ended** before now, which is what
+       * `isMissed` asks; and it must have **started** on the member's own day,
+       * because the row draws today's sessions and nothing else.
+       *
+       * It was `now - 3h` with a fixed hour of duration, which satisfies the
+       * first and silently breaks the second: three hours before 02:40 in Cairo
+       * is the previous local date, the row correctly draws nothing, and the
+       * test fails every night between midnight and 03:00. A red line that
+       * depends on the hour the suite runs at teaches whoever sees it to ignore
+       * red, which costs more than the case is worth.
+       *
+       * So the end is pinned a minute back from now and the start is clamped to
+       * the member's midnight, with the duration falling out of the two. Early
+       * in the member's day that is a short session rather than no session.
+       */
+      final midnight = memberClock('00:00');
+      final endedAt = DateTime.now().toUtc().subtract(
+        const Duration(minutes: 1),
+      );
+      final startedAt = endedAt.subtract(const Duration(minutes: 60));
+      final plannedAt = startedAt.isAfter(midnight) ? startedAt : midnight;
+
       await cubit.createSession(
-        plannedAt: DateTime.now().toUtc().subtract(const Duration(hours: 3)),
+        plannedAt: plannedAt,
         sport: 'gym',
         title: 'Push day',
-        durationMin: 60,
+        // Never negative: in the first minute of the member's day the clamp
+        // puts the start after `endedAt`, and a zero-length session at midnight
+        // still reads as missed for every instant after it.
+        durationMin: max(0, endedAt.difference(plannedAt).inMinutes),
       );
       await cubit.refresh();
 
