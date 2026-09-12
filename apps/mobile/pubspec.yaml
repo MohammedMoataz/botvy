@@ -4,7 +4,13 @@ publish_to: 'none'
 # versionName+versionCode. Bump the build number on EVERY release build:
 # Android compares versionCode, so two APKs sharing it can silently fail to
 # replace each other and leave an old build installed.
-version: 0.1.0+1
+#
+# The version name matches the release tag, the container images and the
+# extension's manifest, because P11's T1142 asks for one number across all four
+# artefacts: an APK that says 0.1.0 while the tag says v2.0.0 is a release
+# nobody can support — the first question about a bug is "which build", and the
+# phone is the surface least able to answer it.
+version: 2.0.0+2
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
