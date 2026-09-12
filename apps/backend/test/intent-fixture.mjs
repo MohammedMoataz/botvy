@@ -132,7 +132,7 @@ async function loadPrompt() {
   // The same file the backend reads. A copy of the prompt in this directory
   // would be a corpus grading a prompt that is not in production, which is the
   // one thing this file exists to avoid.
-  return readFile(join(HERE, '..', 'prompts', 'intent.md'), 'utf8');
+  return readFile(join(HERE, '..', '..', '..', 'ai', 'prompts', 'intent.md'), 'utf8');
 }
 
 async function loadCases() {

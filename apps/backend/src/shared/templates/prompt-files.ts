@@ -12,8 +12,8 @@ import { fileURLToPath } from 'node:url';
  * reading a bad answer and editing a paragraph, and a paragraph inside a `.ts`
  * template literal is a paragraph nobody edits: it needs escaping, it breaks
  * the diff of every code review it touches, and a backtick in a prompt becomes
- * a syntax error in the build. They live in `apps/backend/prompts/*.md`, where
- * the Owner can read them.
+ * a syntax error in the build. They live in `ai/prompts/*.md`, beside the
+ * model server's own setup, where the Owner can read them.
  *
  * ## Why this is in `shared/` and not in the context that wrote it first
  *
@@ -40,7 +40,11 @@ import { fileURLToPath } from 'node:url';
  * ## How the directory is found, and how that was verified compiled
  *
  * It resolves by walking *up* from this module's own directory until a
- * `prompts` directory appears, rather than by counting `..` segments. Counting
+ * `prompts` or an `ai/prompts` directory appears, rather than by counting `..`
+ * segments. Two candidates because the templates and the code that reads them
+ * no longer live in the same package: from a source tree the walk finds
+ * `<repo>/ai/prompts`, and inside the image it finds `/app/prompts`, which the
+ * Dockerfile puts there. Counting
  * works and is one line shorter, and it is exactly the line that breaks
  * silently: the source sits under `src/` and the compiled output under `dist/`,
  * so the count agrees today only because `tsconfig.build.json` roots the output
@@ -67,15 +71,17 @@ import { fileURLToPath } from 'node:url';
  *       m.renderPrompt('chat.md', { profile: 'PROBE-PROFILE', today: '2026-09-10',
  *                                   now: '14:05', timezone: 'Africa/Cairo' });"
  *
- * — which read `apps/backend/prompts/chat.md`, substituted, left no `{{var}}`
- * behind, and threw the expected "coach.md needs profile, today, now, timezone,
- * day" when called with nothing. In the image `/out` becomes `/app`, so the
- * walk is `/app/dist/shared/templates` → `/app/prompts`.
+ * — which read the templates, substituted, left no `{{var}}` behind, and threw
+ * the expected "coach.md needs profile, today, now, timezone, day" when called
+ * with nothing. In the image `/out` becomes `/app`, so the walk is
+ * `/app/dist/shared/templates` → `/app/prompts`, found at the third hop.
  *
- * **That directory has to be in the image.** `Dockerfile` copies
- * `apps/backend/prompts` into `/out/prompts` beside `dist`, `migrations` and
- * `prisma`; without it every model call in the container would throw on the
- * first template read while every test on a developer's machine passed.
+ * **That directory has to be in the image, and nothing else puts it there.**
+ * `Dockerfile` copies `ai/prompts` into `/out/prompts` beside `dist`,
+ * `migrations` and `prisma`. The templates are outside this package now, so
+ * `pnpm deploy` does not carry them and that one `cp` is the only reason they
+ * ship; without it every model call in the container throws on the first
+ * template read while every test on a developer's machine passes.
  */
 
 /** Read once per process. A prompt file does not change under a running API. */
@@ -87,14 +93,17 @@ function directory(): string {
   if (promptsDir) return promptsDir;
 
   let dir = dirname(fileURLToPath(import.meta.url));
-  // Three hops is the real distance from both `src/` and `dist/` now; eight
-  // leaves room for a directory being added between here and the package root
-  // without this becoming the thing that broke.
+  // Three hops to `/app/prompts` in the image, five to `<repo>/ai/prompts` from
+  // either `src/` or `dist/`; eight leaves room for a directory being added
+  // between here and the repository root without this becoming the thing that
+  // broke. `prompts` is tested before `ai/prompts` at every hop, so the image —
+  // which has the first and not the second — never walks past its own copy.
   for (let hop = 0; hop < 8; hop += 1) {
-    const candidate = join(dir, 'prompts');
-    if (existsSync(candidate)) {
-      promptsDir = candidate;
-      return candidate;
+    for (const candidate of [join(dir, 'prompts'), join(dir, 'ai', 'prompts')]) {
+      if (existsSync(candidate)) {
+        promptsDir = candidate;
+        return candidate;
+      }
     }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -102,8 +111,8 @@ function directory(): string {
   }
 
   throw new Error(
-    `no prompts/ directory above ${dirname(fileURLToPath(import.meta.url))} — ` +
-      'the build did not copy apps/backend/prompts into the image',
+    `no prompts/ or ai/prompts/ directory above ${dirname(fileURLToPath(import.meta.url))} — ` +
+      'the build did not copy ai/prompts into the image',
   );
 }
 
