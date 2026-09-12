@@ -357,7 +357,7 @@ async function main() {
     );
     /*
      * SC-006's measurable half. The faithfulness half needs a person and is in
-     * `apps/backend/test/ingest-fixture.mjs`; what a gate can check is that the
+     * `backend/test/ingest-fixture.mjs`; what a gate can check is that the
      * summary is short enough to read on one screen and that the length of the
      * original is beside it.
      */

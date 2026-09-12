@@ -33,7 +33,7 @@ they are what the portal's MobX bindings and the panel's React render both
 consume.
 
 Making it work means making every store read async, and following that through
-`apps/frontend`'s stores and every component that reads them. That is a
+`frontend`'s stores and every component that reads them. That is a
 refactor, not a fix in passing, which is why the field's comment now states the
 position honestly rather than describing an injection that does not exist.
 

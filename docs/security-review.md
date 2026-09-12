@@ -70,7 +70,7 @@ document, and getting it wrong ships a blank page rather than an error. Recorded
 in `enhancements/` with what it would take.
 
 What holds in the meantime: the public page loads **no third-party resource at
-all**, and that is asserted rather than promised — `apps/frontend/e2e/public.spec.ts`
+all**, and that is asserted rather than promised — `frontend/e2e/public.spec.ts`
 fails if any request leaves the origin.
 
 ## 4. Every credential, and what it alone would let somebody do
@@ -148,7 +148,7 @@ Known limits of the limiter, stated rather than discovered later:
   is sound only because constitution V puts exactly one edge in front of
   everything. Anything else reaching the API directly could spoof it.
 
-Specs: `apps/backend/src/shared/rate-limit/rate-limit.spec.ts` (14), and the
+Specs: `backend/src/shared/rate-limit/rate-limit.spec.ts` (14), and the
 socket's own case in `socket.gateway.spec.ts`.
 
 ## 6. The media proxy and the link fetcher

@@ -11,10 +11,9 @@ READ:  (yes)
 Recorded because the next phase reads those specs, and an uncorrected mistake
 gets inherited. All of these are already corrected in the spec files themselves.
 
-The permanent records are
-[`../014-foundation/spec-corrections.md`](../014-foundation/spec-corrections.md)
-and
-[`../015-identity-profile/spec-corrections.md`](../015-identity-profile/spec-corrections.md).
+The corrections are in the spec files themselves. The two per-phase records that
+listed them, `docs/{014-foundation,015-identity-profile}/spec-corrections.md`,
+went with the rest of the phase paperwork and are in the git history.
 
 ## P0
 

@@ -65,6 +65,26 @@ export type AthleteProfile = {
   sports: Array<Scalars['String']['output']>;
 };
 
+export type AuditConnection = {
+  __typename?: 'AuditConnection';
+  endCursor?: Maybe<Scalars['String']['output']>;
+  hasNextPage: Scalars['Boolean']['output'];
+  nodes: Array<AuditEntry>;
+};
+
+export type AuditEntry = {
+  __typename?: 'AuditEntry';
+  action: Scalars['String']['output'];
+  actorId: Scalars['ID']['output'];
+  actorLabel: Scalars['String']['output'];
+  actorType: Scalars['String']['output'];
+  at: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  meta?: Maybe<Scalars['JSON']['output']>;
+  targetId?: Maybe<Scalars['ID']['output']>;
+  targetType: Scalars['String']['output'];
+};
+
 export type BodyMetric = {
   __typename?: 'BodyMetric';
   bodyFatPct?: Maybe<Scalars['Float']['output']>;
@@ -94,6 +114,13 @@ export type Checkin = {
   note?: Maybe<Scalars['String']['output']>;
 };
 
+export type ChosenMeal = {
+  __typename?: 'ChosenMeal';
+  kind: MealKind;
+  mealId?: Maybe<Scalars['ID']['output']>;
+  name: Scalars['String']['output'];
+};
+
 export type Conversation = {
   __typename?: 'Conversation';
   archived: Scalars['Boolean']['output'];
@@ -120,7 +147,9 @@ export type DailyPlan = {
   briefedAt?: Maybe<Scalars['DateTime']['output']>;
   confirmedAt?: Maybe<Scalars['DateTime']['output']>;
   date: Scalars['Date']['output'];
+  dayLine: Scalars['String']['output'];
   mealLine?: Maybe<Scalars['String']['output']>;
+  mealReason?: Maybe<Scalars['String']['output']>;
   promptedAt?: Maybe<Scalars['DateTime']['output']>;
   status: PlanStatus;
   summarisedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -230,6 +259,29 @@ export type Location = {
   address?: Maybe<Scalars['String']['output']>;
   onlineLink?: Maybe<Scalars['String']['output']>;
 };
+
+export type Meal = {
+  __typename?: 'Meal';
+  id: Scalars['ID']['output'];
+  ingredients: Array<Scalars['String']['output']>;
+  kind: MealKind;
+  name: Scalars['String']['output'];
+  tags: Array<Scalars['String']['output']>;
+  updatedAt: Scalars['DateTime']['output'];
+};
+
+export enum MealKind {
+  Any = 'any',
+  Breakfast = 'breakfast',
+  Dinner = 'dinner',
+  Lunch = 'lunch',
+  Snack = 'snack'
+}
+
+export enum MealMode {
+  Library = 'library',
+  Llm = 'llm'
+}
 
 export type MediaRef = {
   __typename?: 'MediaRef';
@@ -425,6 +477,8 @@ export type Query = {
   __typename?: 'Query';
   agenda: Array<AgendaDay>;
   athleteProfile: AthleteProfile;
+  /** Who did what, and when. Administrators only. */
+  audit: AuditConnection;
   /** The caller's body metric history. */
   bodyMetrics: Array<BodyMetric>;
   checkins: Array<Checkin>;
@@ -441,6 +495,8 @@ export type Query = {
   links: LinkConnection;
   /** The authenticated member. */
   me: User;
+  /** The member’s own meals, by name. */
+  meals: Array<Meal>;
   meeting?: Maybe<Meeting>;
   meetingOccurrences: Array<MeetingOccurrence>;
   meetings: Array<Meeting>;
@@ -470,8 +526,12 @@ export type Query = {
   suggestions: Array<Suggestion>;
   task?: Maybe<Task>;
   tasks: TaskPage;
+  /** The meals chosen for one of the member’s days, or null when none have been. */
+  todayMeals?: Maybe<TodayMeals>;
   todayPlan: DailyPlan;
   tomorrowDraft: DailyPlan;
+  /** Model use by day, kind and model — and by member when asked. Administrators only. */
+  usage: Array<UsageRow>;
   /** Every member. Administrators only. */
   users: UserConnection;
   workouts: Array<Workout>;
@@ -481,6 +541,17 @@ export type Query = {
 export type QueryAgendaArgs = {
   from: Scalars['DateTime']['input'];
   to: Scalars['DateTime']['input'];
+};
+
+
+export type QueryAuditArgs = {
+  action?: InputMaybe<Scalars['String']['input']>;
+  actor?: InputMaybe<Scalars['ID']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: InputMaybe<Scalars['Int']['input']>;
+  from?: InputMaybe<Scalars['DateTime']['input']>;
+  targetType?: InputMaybe<Scalars['String']['input']>;
+  to?: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 
@@ -525,6 +596,11 @@ export type QueryLinksArgs = {
   first?: InputMaybe<Scalars['Int']['input']>;
   kind?: InputMaybe<LinkKind>;
   status?: InputMaybe<LinkStatus>;
+};
+
+
+export type QueryMealsArgs = {
+  kind?: InputMaybe<MealKind>;
 };
 
 
@@ -619,8 +695,21 @@ export type QueryTasksArgs = {
 };
 
 
+export type QueryTodayMealsArgs = {
+  date?: InputMaybe<Scalars['Date']['input']>;
+};
+
+
 export type QueryTodayPlanArgs = {
   date?: InputMaybe<Scalars['Date']['input']>;
+};
+
+
+export type QueryUsageArgs = {
+  byMember?: InputMaybe<Scalars['Boolean']['input']>;
+  from: Scalars['Date']['input'];
+  to: Scalars['Date']['input'];
+  userId?: InputMaybe<Scalars['ID']['input']>;
 };
 
 
@@ -736,6 +825,7 @@ export type SetEntry = {
 
 export type Setting = {
   __typename?: 'Setting';
+  control: Scalars['JSON']['output'];
   defaultValue?: Maybe<Scalars['JSON']['output']>;
   description: Scalars['String']['output'];
   key: Scalars['String']['output'];
@@ -872,6 +962,26 @@ export type TemplateSet = {
   targetWeightKg?: Maybe<Scalars['Float']['output']>;
 };
 
+export type TodayMeals = {
+  __typename?: 'TodayMeals';
+  date: Scalars['Date']['output'];
+  line?: Maybe<Scalars['String']['output']>;
+  meals: Array<ChosenMeal>;
+  mode: MealMode;
+  withheldReason?: Maybe<WithheldReason>;
+};
+
+export type UsageRow = {
+  __typename?: 'UsageRow';
+  calls: Scalars['Int']['output'];
+  completionTokens: Scalars['Int']['output'];
+  day: Scalars['Date']['output'];
+  kind: Scalars['String']['output'];
+  model: Scalars['String']['output'];
+  promptTokens: Scalars['Int']['output'];
+  userId?: Maybe<Scalars['ID']['output']>;
+};
+
 export type User = {
   __typename?: 'User';
   createdAt: Scalars['DateTime']['output'];
@@ -894,6 +1004,12 @@ export type UserConnection = {
 export enum UserStatus {
   Active = 'active',
   Banned = 'banned'
+}
+
+export enum WithheldReason {
+  Allergen = 'allergen',
+  EmptyLibrary = 'empty_library',
+  ModelUnavailable = 'model_unavailable'
 }
 
 export type Workout = {

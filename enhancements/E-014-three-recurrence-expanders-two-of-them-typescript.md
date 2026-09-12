@@ -10,9 +10,9 @@ implementations:
 
 | Where | Language | Rule parsing |
 |---|---|---|
-| `apps/backend/src/contexts/meetings/domain/recurrence-expander.ts` | TypeScript | `rrule` |
+| `backend/src/contexts/meetings/domain/recurrence-expander.ts` | TypeScript | `rrule` |
 | `packages/sdk/src/recurrence.ts` | TypeScript | hand-rolled subset |
-| `apps/mobile/lib/core/recurrence/expander.dart` | Dart | `rrule` (Dart) |
+| `mobile/lib/core/recurrence/expander.dart` | Dart | `rrule` (Dart) |
 
 The Dart one is not the problem: `plan.md`'s complexity table already argues for
 it, the phone must answer with the network off (FR-010), and shipping expanded

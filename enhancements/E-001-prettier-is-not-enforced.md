@@ -5,7 +5,7 @@
 ## What
 
 Prettier is a dev dependency and there is no `format` script, no `format:check`,
-and no CI step. `npx prettier --check "apps/backend/src/**/*.ts"` at the P2
+and no CI step. `npx prettier --check "backend/src/**/*.ts"` at the P2
 starting commit reported **143 files** with style issues.
 
 ## Why it is not a defect

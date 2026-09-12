@@ -11,7 +11,7 @@ OK TO CONTINUE?    (yes / one session only)
 
 A second Claude session was working on `015-identity-profile` alongside me. It
 announced itself mid-run, and rather than collide we split the work: it took
-`apps/backend/src` and `workflows/`, I took `infra/`, `.env`, the image build and
+`backend/src` and `workflows/`, I took `infra/`, `.env`, the image build and
 the gate. Its plan and review notes are in `.harness/`.
 
 That split was the right call given it was already editing files I was about to

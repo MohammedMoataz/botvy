@@ -30,7 +30,7 @@ A cross-site scripting hole in the portal or the public site would have no
 second line of defence. How much that is worth depends on how likely the first
 line is to fail, and here it is fairly sturdy: the public page is static server
 components with no user-supplied content in it at all, the portal renders member
-data through React's escaping, and `apps/frontend/e2e/public.spec.ts` asserts
+data through React's escaping, and `frontend/e2e/public.spec.ts` asserts
 the public page fetches nothing from any other origin — so there is no
 third-party script to be compromised.
 
@@ -49,7 +49,7 @@ Next supports the nonce route: middleware generates one per request, sets it in
 the CSP header and in a request header, and Next threads it onto its own script
 tags. That means:
 
-1. `apps/frontend/middleware.ts` generating a nonce and setting the header;
+1. `frontend/middleware.ts` generating a nonce and setting the header;
 2. checking every PrimeReact component that injects style at runtime, because
    `style-src` is the directive that breaks quietly and looks like a CSS bug;
 3. a report-only rollout first, because a wrong policy on the App Router ships a

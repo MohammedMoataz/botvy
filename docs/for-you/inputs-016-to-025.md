@@ -36,7 +36,7 @@ Nothing here is needed today. The table says when each one turns into a blocker.
 | [I21](#i21--rotate-the-firebase-key-for-real) | Rotate Firebase key | 🔨 | **P11, mandatory** | release |
 | [I22](#i22--the-release-signing-keystore) | Release keystore | 🔨 | P11 | shippable APK, forever |
 | [I23](#i23--backup-destination) | Backup destination | 🔨 | P11 | restore drill |
-| [I24](#i24--delete-legacy) | Approve deleting `legacy/` | ❓ | P11 | v1 decommission |
+| [I24](#i24--delete-legacy) | Approve deleting `legacy/` | ✅ delete | P11 | **done 13 Sep** |
 | [I25](#i25--import-v1-data-or-not) | Import v1 data? | ❓ | P11 | one-shot script |
 | [G](#g--google-sign-in-the-whole-thing) | **Google Sign-In** | 🔨 | whenever you want the button | the Google button on all four surfaces |
 
@@ -94,7 +94,7 @@ server side is already wired (`secrets/firebase-admin.json` exists); the *phone*
 side needs its own config file, and it is not in the repository because it
 carries a live key.
 
-`apps/mobile/android/app/build.gradle.kts` already looks for it and applies the
+`mobile/android/app/build.gradle.kts` already looks for it and applies the
 Google Services plugin **only if it is there**, so `--flavor dev` builds and CI
 keep working without it. `PushService` degrades to "no push" rather than
 crashing. So this is not urgent until you want a nudge on a locked screen.
@@ -107,14 +107,14 @@ crashing. So this is not urgent until you want a nudge on a locked screen.
    by one are rejected by the other).
 2. **Project settings** → **Your apps** → **Add app** → Android.
 3. Android package name: **`org.botvy.botvy`** — exactly. It is `namespace` in
-   `apps/mobile/android/app/build.gradle.kts:40`; a mismatch produces a config
+   `mobile/android/app/build.gradle.kts:40`; a mismatch produces a config
    file the plugin silently ignores.
 4. Nickname `Botvy`. Skip the Debug SHA-1 unless you are also doing
    [G](#g--google-sign-in-the-whole-thing); FCM does not need it.
 5. Download `google-services.json` and put it at:
 
    ```
-   apps/mobile/android/app/src/prod/google-services.json
+   mobile/android/app/src/prod/google-services.json
    ```
 
    Note `src/prod/`, not `app/`. The `prod` flavour is the shipping one; `dev`
@@ -150,7 +150,7 @@ The extension side panel (T206) has no store listing yet, so it loads unpacked.
 
 **👉 Do this when I say the build is ready:** `chrome://extensions` → toggle
 **Developer mode** (top right) → **Load unpacked** → pick
-`apps/extension/.output/chrome-mv3`. It stays loaded across restarts; a rebuild
+`extension/.output/chrome-mv3`. It stays loaded across restarts; a rebuild
 needs the ↻ on its card.
 
 ## I5 — Label palette
@@ -637,7 +637,7 @@ but write the passwords down somewhere you will still have in five years.
 `-validity 10000` is ~27 years — shorter and the app becomes unshippable when it
 expires.
 
-Then create `apps/mobile/android/key.properties` (gitignored):
+Then create `mobile/android/key.properties` (gitignored):
 
 ```properties
 storeFile=C:/Users/dell/botvy-release.jks
@@ -676,22 +676,20 @@ dying or the flat flooding, because the only copy is on the machine that broke.
 - `rclone` to something (Drive, B2, S3) — I add a step to the backup container
   and you provide the remote's credentials at that point.
 
-## I24 — Delete `legacy/`
+## I24 — Delete `legacy/` ✅
 
 ```
-YOUR CALL:  (delete / keep)
+YOUR CALL:  delete  (answered 13 September)
 ```
 
-T1105 removes `legacy/` — the whole of v1, currently read-only in the tree and
-excluded from tsconfig, oxlint, Prettier and `.gitattributes`.
+Done, as T1123. `legacy/` is gone from the tree along with every ignore entry,
+exclude and comment that named it, and `infra/reset.mjs` with it.
 
-It costs nothing to keep except noise, and `git` remembers it either way: every
-v1 commit stays in the history, so `git show` and `git checkout` of an old tag
-work after deletion. There is also a dump of v1's database at
-`backups/pre-v2-identity-20260908T181658Z.dump`.
-
-**My default if blank: delete.** The history is the archive; a read-only copy in
-the working tree is a second thing to explain to anyone who opens the repo.
+You also chose to delete the archives, which the original version of this item
+offered as the safety net: `backups/` and `../botvy-v1-archive` are both empty
+now. **So the git history is the only remaining copy of v1** — every v1 commit
+is still there, and `git show` or `git checkout` of an old tag still works, but
+the *data* is not in git and is not anywhere else either.
 
 ## I25 — Import v1 data, or not?
 
@@ -749,7 +747,7 @@ The code is done — all of it, on both sides:
 1. `GOOGLE_CLIENT_IDS` is empty in `.env`, so the verifier refuses everything.
 2. The OAuth client IDs it wants do not exist yet — that is the console work
    below, and it is the part only you can do.
-3. `google_sign_in` is not in `apps/mobile/pubspec.yaml` and there is no button
+3. `google_sign_in` is not in `mobile/pubspec.yaml` and there is no button
    on the screen. **That part is mine** — one dependency and one widget, once the
    client IDs exist.
 
@@ -830,7 +828,7 @@ you if it becomes necessary.
 
 ### Step 4 — Mine
 
-`google_sign_in: ^7` into `apps/mobile/pubspec.yaml`, the button on the two auth
+`google_sign_in: ^7` into `mobile/pubspec.yaml`, the button on the two auth
 screens, `chrome.identity.launchWebAuthFlow` in the extension. An hour, once the
 ids exist. The v7 API is `initialize()` then `authenticate()` — the old
 `signIn()` is gone, which is why the version pin matters.

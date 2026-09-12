@@ -4,7 +4,7 @@
 
 ## What
 
-`npx tsc --noEmit -p tsconfig.json` in `apps/backend` and `npx nest build` do
+`npx tsc --noEmit -p tsconfig.json` in `backend` and `npx nest build` do
 not report the same errors. During P2 the first was clean while the second found
 four, including two `TS7006 implicitly has an 'any' type` and two `TS2749`.
 
@@ -44,7 +44,7 @@ is the same lesson about a gate that does not test what ships.
 
 ## Resolved in P5
 
-`pnpm typecheck` in `apps/backend` now runs **both** projects:
+`pnpm typecheck` in `backend` now runs **both** projects:
 
 ```
 tsc --noEmit -p tsconfig.build.json && tsc --noEmit -p tsconfig.json

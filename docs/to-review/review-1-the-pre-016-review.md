@@ -1,9 +1,9 @@
 # 📖 R1 — The pre-016 review
 
 A fresh-context review of P0 and P1, before phase 016 begins. Twenty-six
-findings; **thirteen are fixed**. The full record, with every finding's reasoning,
-stays permanently at
-[`../015-identity-profile/review-findings.md`](../015-identity-profile/review-findings.md).
+findings; **thirteen are fixed**. Everything below is the summary; the full
+record with each finding's reasoning was `docs/015-identity-profile/review-findings.md`,
+which went with the phase paperwork and is still in the git history.
 
 ## ☐ Read?
 

@@ -21,7 +21,8 @@ secrets in env, operator knobs in `settings`, member knobs in preferences.
 verification gate, backups **and the restore for both stores**.
 
 The foundation phase has landed, so the layout in the blueprint is the layout on
-disk: `apps/{backend,frontend,extension,mobile}`, `packages/{contracts,sdk,tokens}`,
+disk: `backend/`, `frontend/`, `extension/`, `mobile/`, `ai/`,
+`packages/{contracts,sdk,tokens}`,
 `infra/` and `workflows/`. `infra/verify.mjs` is the phase gate as a command:
 containers healthy, exactly one non-loopback published port, both stores answering,
 and a second `bootstrap.mjs` run that changes nothing.
@@ -269,7 +270,13 @@ finds it, with a test, and named in the commit; it does not go there.
   thrown on the first template read while the whole local suite passed. And
   resolve such a path by **walking up** from `import.meta.url` to the directory
   you want, never by counting `..`: the count agrees between `src/` and `dist/`
-  only by accident of the build layout, and it breaks silently.
+  only by accident of the build layout, and it breaks silently. **The prompts
+  now live in `ai/prompts`, outside the backend package**, which removed the
+  safety net that had been hiding behind that `cp`: `pnpm deploy` copied them
+  when they were committed source *inside* the package, so the Dockerfile line
+  was insurance. It is the only source now. The loader tests `prompts` then
+  `ai/prompts` at each hop, in that order, so the image finds `/app/prompts`
+  before it could ever walk past it.
 - **n8n blocks `$env` inside node expressions by default.** Every execution of
   every cron workflow failed with `access to env vars denied` until
   `N8N_BLOCK_ENV_ACCESS_IN_NODE: 'false'` was set — so no scheduled job had

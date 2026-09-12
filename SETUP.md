@@ -10,7 +10,7 @@ actually working, and get it back after something goes wrong.
 | **Docker** | Compose v2. On Linux or WSL2 for a machine that runs unattended; Docker Desktop is fine for development. |
 | **Node 24** | Only for the developer loop and the two scripts in `infra/`. The containers carry their own. |
 | **pnpm 9.15** | `corepack enable` is enough — the version is pinned in `package.json`. |
-| **Ollama** | Host-native, with the models named in the settings registry pulled. It stays outside Docker so it can reach the GPU. |
+| **Ollama** | Host-native, with the models named in the settings registry pulled. It stays outside Docker so it can reach the GPU — `ai/ollama/SETUP.md` installs it. |
 | **Flutter** | Only to build the phone app. |
 
 A tunnel is optional. Without one the platform is reachable on the LAN; with

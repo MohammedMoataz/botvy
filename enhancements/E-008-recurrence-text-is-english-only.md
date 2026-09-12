@@ -49,7 +49,7 @@ the rule from the structured fields, which are all on the row — so the server'
 English text is a convenience for the admin portal and for chat confirmations
 rather than the thing a member reads.
 
-P5 built that. `apps/mobile/lib/core/recurrence/rule_words.dart` turns a
+P5 built that. `mobile/lib/core/recurrence/rule_words.dart` turns a
 `RepeatSpec` into words in the member's own language, from the structured fields
 and not from `rrule`'s `toText()`, and the repeat picker reads it. The hard part
 was the part this file said it would be: Arabic number agreement is not

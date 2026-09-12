@@ -43,7 +43,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/backend/Dockerfile
+          file: backend/Dockerfile
           push: true
           # Both the tag and `latest`. Compose pins BOTVY_TAG to the exact tag,
           # so `latest` is for a human pulling by hand, never for the deploy.
@@ -57,7 +57,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/frontend/Dockerfile
+          file: frontend/Dockerfile
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ steps.owner.outputs.name }}/botvy-frontend:${{ github.ref_name }}
@@ -101,7 +101,7 @@ jobs:
       - run: pnpm --filter @botvy/extension exec wxt zip
 
       - name: Release APK
-        working-directory: apps/mobile
+        working-directory: mobile
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
@@ -115,8 +115,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            apps/mobile/build/app/outputs/flutter-apk/*.apk
-            apps/extension/.output/*.zip
+            mobile/build/app/outputs/flutter-apk/*.apk
+            extension/.output/*.zip
           fail_on_unmatched_files: false
 
       # Publishing to the Chrome Web Store is optional and off by default.
@@ -128,7 +128,7 @@ jobs:
       # the zip on the release is what most installations use.
       - name: Publish to the Chrome Web Store
         if: vars.CHROME_WEB_STORE_PUBLISH == 'true'
-        working-directory: apps/extension
+        working-directory: extension
         env:
           EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
           CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}

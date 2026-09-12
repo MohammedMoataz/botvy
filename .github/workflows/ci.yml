@@ -106,7 +106,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: extension
-          path: apps/extension/.output/*
+          path: extension/.output/*
           if-no-files-found: warn
 
   frontend-e2e:
@@ -203,7 +203,7 @@ jobs:
         if: failure()
         with:
           name: portal-traces
-          path: apps/frontend/test-results/**
+          path: frontend/test-results/**
           if-no-files-found: ignore
 
   packages:
@@ -232,25 +232,25 @@ jobs:
           channel: stable
           cache: true
       - name: Resolve dependencies
-        working-directory: apps/mobile
+        working-directory: mobile
         run: flutter pub get
       - name: Generate the drift database
-        working-directory: apps/mobile
+        working-directory: mobile
         run: dart run build_runner build --delete-conflicting-outputs
       - name: Analyse
-        working-directory: apps/mobile
+        working-directory: mobile
         run: flutter analyze
       - name: Test
-        working-directory: apps/mobile
+        working-directory: mobile
         # The migration ladder harness lives here. A schema bump without its
         # branch bricks every existing install, so this is the test that has to
         # fail in CI rather than on someone's phone.
         run: flutter test
       - name: Build the debug APK
-        working-directory: apps/mobile
+        working-directory: mobile
         run: flutter build apk --debug --flavor dev
       - uses: actions/upload-artifact@v4
         with:
           name: apk-debug
-          path: apps/mobile/build/app/outputs/flutter-apk/*.apk
+          path: mobile/build/app/outputs/flutter-apk/*.apk
           if-no-files-found: warn

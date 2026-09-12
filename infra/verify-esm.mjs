@@ -43,7 +43,7 @@ import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const DIST = resolve(process.cwd(), 'apps', 'backend', 'dist');
+const DIST = resolve(process.cwd(), 'backend', 'dist');
 
 /**
  * The two roles' entry graphs — and deliberately **not** `main.js`.

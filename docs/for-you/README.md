@@ -22,9 +22,9 @@ Things to *read* rather than answer are in [`../to-review/`](../to-review/).
 ## ✅ Answered — nine of twelve
 
 All six decisions and three of the six actions came back on 9 September and
-their files are gone. What each answer was and what it cost is recorded
-permanently in
-[`../015-identity-profile/decisions-answered.md`](../015-identity-profile/decisions-answered.md).
+their files are gone. What each answer was and what it cost was recorded in
+`docs/015-identity-profile/decisions-answered.md`, which went with the rest of
+the phase paperwork; the git history has it if a reason is ever needed again.
 
 Two of them were work, and both are done: **every read moved to GraphQL** and
 the six REST read routes are gone (A4), and `.env.v2` is folded into `.env`
@@ -47,17 +47,16 @@ D1 and D3 both came back on 10 September and their files are gone.
 
 ---
 
-# 🔴 Now — the reset, the release, and the key
+# 🔴 Now — the release and the key
 
-Five new files, from the P10/P11 sessions on 11–12 September:
+Three files left, from the P10/P11 sessions on 11–12 September. The reset has
+been run and v1 is retired, so those two are gone:
 
 | File | What it is |
 |---|---|
-| [`do-1-the-reset-and-what-it-destroys.md`](do-1-the-reset-and-what-it-destroys.md) | `infra/reset.mjs` — archive v1, retire it, rebuild v2 from nothing. **Read before running**: two of the deletions are irreversible and one of them ends an open task |
 | [`do-2-the-firebase-key-is-still-live.md`](do-2-the-firebase-key-is-still-live.md) | `I21`, pulled out on its own: the new key is in place, the exposed one is **not deleted**, and that is the half that closes the hole. The one mandatory blocker for the release |
 | [`decide-1-what-to-call-this-release.md`](decide-1-what-to-call-this-release.md) | `v2.0.0` or `v1.2.1`. My recommendation is `v2.0.0` and the reasoning is one table |
 | [`decide-2-the-admin-password-before-a-public-release.md`](decide-2-the-admin-password-before-a-public-release.md) | Raised once more, only because publishing changes what is at stake. Settled either way after this |
-| [`decide-3-who-still-uses-v1.md`](decide-3-who-still-uses-v1.md) | `T1121`: who to tell, and what to do about members v1 had banned. Has to happen before the volumes go |
 
 ## Still open — the roadmap register
 

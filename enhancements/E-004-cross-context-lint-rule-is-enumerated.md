@@ -39,7 +39,7 @@ phases: **a lint rule nobody has seen fire is a comment.**
 Either of:
 
 - **Generate the config.** A small script builds the context group from the
-  directory listing of `apps/backend/src/contexts/`, run in CI with a check that
+  directory listing of `backend/src/contexts/`, run in CI with a check that
   the committed file matches. The rule then cannot fall behind the tree.
 - **Split by depth.** Two overrides — one scoped to `contexts/*/domain/**`
   forbidding `../../*`, one scoped to `contexts/*/features/*/**` forbidding

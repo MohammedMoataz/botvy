@@ -608,6 +608,7 @@ type SetEntry {
 }
 
 type Setting {
+  control: JSON!
   defaultValue: JSON
   description: String!
   key: String!

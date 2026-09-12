@@ -17,7 +17,7 @@ if (!hasOpenapi && !hasGraphql) {
   console.log(
     'contracts: nothing to generate — packages/contracts/openapi.json and schema.graphql\n' +
       '           do not exist yet. The backend writes them: run `pnpm gen:contracts`\n' +
-      '           from the repository root once apps/backend ships its generation mode.',
+      '           from the repository root once backend ships its generation mode.',
   );
   process.exit(0);
 }

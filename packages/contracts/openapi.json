@@ -3461,6 +3461,109 @@
         ]
       }
     },
+    "/api/v1/admin/workflows": {
+      "get": {
+        "operationId": "AdminWorkflowsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "AdminWorkflows"
+        ]
+      }
+    },
+    "/api/v1/admin/workflows/{id}/activate": {
+      "post": {
+        "operationId": "AdminWorkflowsController_activate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "AdminWorkflows"
+        ]
+      }
+    },
+    "/api/v1/admin/workflows/{id}/deactivate": {
+      "post": {
+        "operationId": "AdminWorkflowsController_deactivate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "AdminWorkflows"
+        ]
+      }
+    },
+    "/api/v1/admin/workflows/{id}/run": {
+      "post": {
+        "operationId": "AdminWorkflowsController_run",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "AdminWorkflows"
+        ]
+      }
+    },
     "/api/v1/suggestions/{id}/accept": {
       "post": {
         "operationId": "SuggestionsController_acceptSuggestion",
@@ -3716,6 +3819,35 @@
         ],
         "tags": [
           "InternalAlerts"
+        ]
+      }
+    },
+    "/internal/backups/report": {
+      "post": {
+        "operationId": "InternalBackupsController_report",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "service-token": []
+          }
+        ],
+        "tags": [
+          "InternalBackups"
         ]
       }
     },
@@ -4014,6 +4146,10 @@
         "properties": {}
       },
       "InternalAlertDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "BackupReportDto": {
         "type": "object",
         "properties": {}
       },

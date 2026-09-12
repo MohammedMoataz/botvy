@@ -10,10 +10,11 @@ runs on a model on the owner's own machine. Nothing leaves the host.
 
 | Path | What |
 |---|---|
-| `apps/backend` | NestJS. One codebase, two roles: `backend` serves the edge, `worker` relays events and runs jobs. |
-| `apps/frontend` | Next.js. The public site and the admin portal in one app. |
-| `apps/extension` | Chrome side panel for tasks and meetings from a computer. |
-| `apps/mobile` | Flutter. The member's phone, local-first and offline-capable. |
+| `backend` | NestJS. One codebase, two roles: `backend` serves the edge, `worker` relays events and runs jobs. |
+| `frontend` | Next.js. The public site and the admin portal in one app. |
+| `extension` | Chrome side panel for tasks and meetings from a computer. |
+| `mobile` | Flutter. The member's phone, local-first and offline-capable. |
+| `ai` | The prompt templates, and how to install the model server they are sent to. |
 | `packages/contracts` | The API surface, generated once and consumed everywhere. |
 | `packages/sdk` | Typed client, socket client and shared stores for the web surfaces. |
 | `packages/tokens` | One palette and type scale, emitted as CSS variables and a Dart theme. |
