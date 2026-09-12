@@ -44,9 +44,53 @@ const ARCHIVE_ROOT = process.env.BOTVY_ARCHIVE_DIR ?? resolve(root, '..', 'botvy
 
 const V1_COMPOSE = join(root, 'legacy', 'infra', 'docker-compose.yml');
 const V2_COMPOSE = join(root, 'infra', 'docker-compose.yml');
+const ENV_FILE = join(root, '.env');
 
-/** Named, never matched by prefix. A wildcard here is how somebody loses a database. */
+/**
+ * Both stacks read the **root** `.env`, and both need it named.
+ *
+ * Compose looks for `.env` in the directory holding the compose file, which for
+ * v1 is `legacy/infra/` and has none — so every `${VAR:?}` in v1's file failed
+ * interpolation and the whole command aborted before it reached postgres. The
+ * symptom was an empty `pg_dumpall`, which the archive step correctly refused to
+ * treat as evidence rather than writing a zero-byte file and calling it done.
+ */
+const v1 = (...args) => ['compose', '--env-file', ENV_FILE, '-f', V1_COMPOSE, ...args];
+const v2 = (...args) => ['compose', '--env-file', ENV_FILE, '-f', V2_COMPOSE, ...args];
+
+/**
+ * Named, never matched by prefix. A wildcard here is how somebody loses a
+ * database — this machine also carries `odoo-postgres` and `sqlserver`, and a
+ * dozen anonymous volumes belonging to neither stack.
+ *
+ * ## Two groups under one prefix, and they are not the same thing
+ *
+ * v1's own data was created on 29 August. The other four were created on
+ * 7 September at 22:21 — the day v2 first came up **while it still declared
+ * `name: botvy`**, which is the incident `CLAUDE.md` records: the two stacks
+ * were one compose project sharing `pg_data` and `n8n_data`, so v2 served v1's
+ * live database and neither could run beside the other. Renaming the project to
+ * `botvy-v2` fixed it and left these four behind, orphaned.
+ *
+ * They are listed separately because the archive means different things for
+ * each. v1's three are evidence — `docs/parity.md` needs the member list out of
+ * `botvy_pg_data`. The orphans are almost certainly a few hours of throwaway
+ * v2 data from that afternoon, archived anyway because tarring a volume costs
+ * seconds and being wrong about which is which costs the data.
+ *
+ * `botvy_pg_data` in particular may hold **both** eras: v1's tables from August
+ * and whatever v2 wrote into it on 7 September before the rename. The dump
+ * captures whatever is there; do not assume it is only one.
+ */
 const V1_VOLUMES = ['botvy_pg_data', 'botvy_n8n_data', 'botvy_searxng_data'];
+
+/** Left behind on 7 September when v2 was renamed out of the `botvy` project. */
+const ORPHANED_VOLUMES = [
+  'botvy_mongo_data',
+  'botvy_media',
+  'botvy_caddy_data',
+  'botvy_caddy_config',
+];
 const V2_VOLUMES = [
   'botvy-v2_pg_data',
   'botvy-v2_mongo_data',
@@ -140,7 +184,7 @@ function archive() {
    * again, so it is asked now.
    */
   say('  starting v1 postgres on its own, to dump it');
-  docker(['compose', '-f', V1_COMPOSE, 'up', '-d', 'postgres'], { allowFailure: true });
+  docker(v1('up', '-d', 'postgres'), { allowFailure: true });
 
   if (GO || ARCHIVE) {
     // A moment for the container to accept connections. `pg_isready` in a loop
@@ -149,7 +193,7 @@ function archive() {
     for (let attempt = 0; attempt < 30; attempt += 1) {
       const ready = spawnSync(
         'docker',
-        ['compose', '-f', V1_COMPOSE, 'exec', '-T', 'postgres', 'pg_isready'],
+        v1('exec', '-T', 'postgres', 'pg_isready'),
         { stdio: ['ignore', 'pipe', 'pipe'] },
       );
       if (ready.status === 0) break;
@@ -157,10 +201,10 @@ function archive() {
     }
   }
 
-  const sql = docker([
-    'compose', '-f', V1_COMPOSE, 'exec', '-T', 'postgres',
-    'sh', '-c', 'pg_dumpall -U ${POSTGRES_USER:-botvy}',
-  ], { allowFailure: true, capture: true });
+  const sql = docker(
+    v1('exec', '-T', 'postgres', 'sh', '-c', 'pg_dumpall -U ${POSTGRES_USER:-botvy}'),
+    { allowFailure: true, capture: true },
+  );
 
   if (sql && sql.length > 0) {
     // `pg_dumpall` rather than `pg_dump`: v1 keeps n8n's database in the same
@@ -174,11 +218,14 @@ function archive() {
   }
 
   say('  dumping the member list, banned members included');
-  const members = docker([
-    'compose', '-f', V1_COMPOSE, 'exec', '-T', 'postgres',
-    'psql', '-U', 'botvy', '-d', 'botvy', '-A', '-F,', '-t', '-c',
-    'select email, role, status, created_at, last_login_at from users order by status, email',
-  ], { allowFailure: true, capture: true });
+  const members = docker(
+    v1(
+      'exec', '-T', 'postgres',
+      'psql', '-U', 'botvy', '-d', 'botvy', '-A', '-F,', '-t', '-c',
+      'select email, role, status, created_at, last_login_at from users order by status, email',
+    ),
+    { allowFailure: true, capture: true },
+  );
 
   if (members) {
     const target = join(archiveDir, 'v1-members.csv');
@@ -190,10 +237,13 @@ function archive() {
   }
 
   say('  stopping v1 again');
-  docker(['compose', '-f', V1_COMPOSE, 'stop'], { allowFailure: true });
+  docker(v1('stop'), { allowFailure: true });
 
   step('2. Archiving v1 volumes');
   for (const name of V1_VOLUMES) archiveVolume(name, archiveDir);
+
+  step("2b. Archiving the orphans from v2's misnamed first day");
+  for (const name of ORPHANED_VOLUMES) archiveVolume(name, archiveDir);
 
   say(`\nArchive written to ${archiveDir}`);
   say('Record that path in docs/parity.md and specs/025-hardening-release/tasks.md (T1122).');
@@ -201,10 +251,8 @@ function archive() {
 
 function retire() {
   step('3. Removing v1: containers, then its named volumes');
-  docker(['compose', '-f', V1_COMPOSE, 'down', '--remove-orphans', '--volumes'], {
-    allowFailure: true,
-  });
-  for (const name of V1_VOLUMES) {
+  docker(v1('down', '--remove-orphans', '--volumes'), { allowFailure: true });
+  for (const name of [...V1_VOLUMES, ...ORPHANED_VOLUMES]) {
     docker(['volume', 'rm', name], { allowFailure: true });
     say(`  ${name}: removed`);
   }
@@ -214,9 +262,7 @@ function resetV2() {
   step("4. Removing v2's data, so the next start is a first install");
   say('  everything in both stores and the media volume goes. This is the point:');
   say('  a fresh install is what SETUP.md describes and what T1143 rehearses.');
-  docker(['compose', '--env-file', join(root, '.env'), '-f', V2_COMPOSE, 'down', '--volumes'], {
-    allowFailure: true,
-  });
+  docker(v2('down', '--volumes'), { allowFailure: true });
   for (const name of V2_VOLUMES) {
     docker(['volume', 'rm', name], { allowFailure: true });
     say(`  ${name}: removed`);
@@ -236,10 +282,7 @@ function tidy() {
 
 function rebuild() {
   step('6. Building v2 from the current tree and starting it');
-  docker([
-    'compose', '--env-file', join(root, '.env'), '-f', V2_COMPOSE,
-    'up', '-d', '--build', '--force-recreate',
-  ]);
+  docker(v2('up', '-d', '--build', '--force-recreate'));
   say('\n  --force-recreate is not decoration: `up -d --build` rebuilds the image');
   say('  and leaves the previous container running, which looks exactly like a');
   say('  successful deploy and is how four new routes 404d for an afternoon.');
