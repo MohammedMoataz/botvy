@@ -138,6 +138,30 @@ async function migrate() {
   }
 }
 
+/**
+ * Restarts the backend so its seeds run against the schema just applied.
+ *
+ * On a **first** install the backend starts before any migration exists, so
+ * `IdentityBootstrap` finds no `users` table, says so and skips — which is
+ * deliberate: a seed that threw would take the process down and there would be
+ * nothing for `migrate()` above to exec into. The schema exists by the time
+ * this runs, and one restart is what turns that warning into an administrator
+ * who can sign in.
+ *
+ * Not conditional on whether a migration was applied. A restart of a service
+ * whose seeds are all idempotent costs a few seconds and removes a branch that
+ * would otherwise be wrong exactly once — on the install where it matters.
+ */
+async function restartBackend() {
+  const s = step('restarting the backend, so its seeds see the schema');
+  try {
+    await compose('restart', 'backend');
+    s.ok('restarted');
+  } catch (error) {
+    s.fail(error.stderr?.trim() || error.message);
+  }
+}
+
 async function waitForApi() {
   return waitFor('API answering /health', async () => {
     const response = await fetch(`${API}/health`);
@@ -349,6 +373,7 @@ async function reportHealth() {
 console.log('bootstrap');
 if (await waitForStores()) {
   await migrate();
+  await restartBackend();
   if (await waitForApi()) {
     await verifyServiceClient();
     await importWorkflows();
