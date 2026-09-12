@@ -20,7 +20,6 @@ runs on a model on the owner's own machine. Nothing leaves the host.
 | `infra` | Compose stack, the Caddy edge, bootstrap and the verification gate. |
 | `workflows` | n8n workflows, committed as JSON. Git is the source of truth, not the running instance. |
 | `specs` | Every feature, specified before it was built. Start at `specs/013-platform-v2-blueprint`. |
-| `legacy` | Botvy v1, moved here whole and left running until v2 reaches parity. Read-only. |
 
 ## Getting started
 
@@ -42,6 +41,3 @@ context owns its own, migrations only go forward, one public port, times belong 
 the member, and nothing ships without its verification run and recorded output.
 `CLAUDE.md` records what is easy to get wrong here, in the words of the bugs that
 taught it.
-
-v1 lives in `legacy/` and runs from `legacy/infra/docker-compose.yml`. It is a
-reference until it is explicitly decommissioned; nothing in the v2 tree imports it.

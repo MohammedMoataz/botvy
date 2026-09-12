@@ -5,7 +5,7 @@
  * never consulted — reading `process.env.TZ` is what silently shifted every
  * natural-language reminder by the user's UTC offset.
  *
- * Ported unchanged from v1 (`legacy/apps/gateway/src/common/time.ts`) with its
+ * Ported unchanged from v1 with its
  * spec, plus `localHhMm`, which the per-member rhythm tick needs to ask "what
  * does this member's clock read right now".
  */

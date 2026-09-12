@@ -4,7 +4,7 @@
 // `tokens.json`, so that four surfaces share one palette. Until that package
 // is published into this app's dependencies, the values live here — same class
 // name, same members, seeded from exactly the same source the generator is
-// seeded from (`legacy/apps/admin/src/index.css`).
+// seeded from v1's admin stylesheet.
 //
 // TO SWAP IT IN, when packages/tokens ships a pubspec:
 //   1. add `botvy_tokens: { path: ../../packages/tokens }` to pubspec.yaml

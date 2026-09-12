@@ -7,7 +7,7 @@ import { formatInTz, localDate, localHhMm, wallClockToUtc } from './time.js';
  * the instant that names. Getting it wrong puts a reminder hours out, which is
  * the failure this whole area exists to prevent.
  *
- * Ported from v1 (`legacy/apps/gateway/test/time.spec.ts`) unchanged.
+ * Ported from v1 unchanged.
  */
 describe('wallClockToUtc', () => {
   it('reads a wall-clock time as the zone the user is in', () => {

@@ -305,8 +305,7 @@ services:
 
   # A tunnel with no Cloudflare account, for showing somebody the running
   # installation without setting one up. v1 had this beside its named tunnel
-  # (`legacy/infra/docker-compose.yml`, profile `quick`) and the v2 rewrite
-  # dropped it, which left "let me send you a link" needing a domain, a login
+  # and the v2 rewrite dropped it, which left "let me send you a link" needing a domain, a login
   # and a token.
   #
   #   docker compose --env-file .env -f infra/docker-compose.yml --profile quick up -d

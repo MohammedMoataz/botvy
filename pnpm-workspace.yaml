@@ -1,5 +1,3 @@
 packages:
   - "apps/*"
   - "packages/*"
-# legacy/ is deliberately absent: v1 keeps its own workspace file at
-# legacy/pnpm-workspace.yaml and is never installed or built from this root.

@@ -3,9 +3,6 @@
 Everything needed to bring the platform up on one machine, verify it is
 actually working, and get it back after something goes wrong.
 
-v1 is still here, under `legacy/`, and still runs. Its own guide is
-`legacy/SETUP.md`.
-
 ## What you need first
 
 | | |

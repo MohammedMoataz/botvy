@@ -18,14 +18,11 @@ principal kinds; bounded contexts talk through events; commands (REST), queries
 secrets in env, operator knobs in `settings`, member knobs in preferences.
 
 `SETUP.md` is v2's: prerequisites, the environment contract, the run, the
-verification gate, backups **and the restore for both stores**. v1's own guide
-moved with it to `legacy/SETUP.md`.
+verification gate, backups **and the restore for both stores**.
 
 The foundation phase has landed, so the layout in the blueprint is the layout on
 disk: `apps/{backend,frontend,extension,mobile}`, `packages/{contracts,sdk,tokens}`,
-`infra/` and `workflows/`. v1 lives whole under `legacy/` and is read-only — the
-root tsconfig, oxlint, Prettier and `.gitattributes` all exclude it, and nothing
-in the v2 tree imports from it. `infra/verify.mjs` is the phase gate as a command:
+`infra/` and `workflows/`. `infra/verify.mjs` is the phase gate as a command:
 containers healthy, exactly one non-loopback published port, both stores answering,
 and a second `bootstrap.mjs` run that changes nothing.
 
@@ -199,8 +196,8 @@ finds it, with a test, and named in the commit; it does not go there.
   sign-in response is how a client knows to insist.
 - **`npx oxlint` is not this project's lint.** oxlint discovers
   `.oxlintrc.json`; this repo's config is `oxlint.json`, so the bare command
-  silently runs 99 built-in rules over 476 files — `legacy/` included, since it
-  loses the ignore list too — instead of the 102 the config defines, and the
+  silently runs 99 built-in rules over every file it can reach — the ignore list
+  goes with the config — instead of the 102 the config defines, and the
   three `no-restricted-imports` overrides that enforce constitution IX are among
   the missing three. Use `pnpm lint`. A gate that records the bare command has
   recorded a check that did not check what it says.
