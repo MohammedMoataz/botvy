@@ -10,7 +10,7 @@ import {
 import { Public } from '../auth/decorators.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
-import { checkTarget, verifyMediaUrl } from './media.signing.js';
+import { checkResolvedTarget, verifyMediaUrl } from './media.signing.js';
 
 /** Long enough for a slow CDN, short enough that a hung host is not a hang. */
 const TIMEOUT_MS = 15_000;
@@ -96,7 +96,7 @@ export class MediaController {
       throw new BadRequestException('bad signature');
     }
 
-    const verdict = checkTarget(target);
+    const verdict = await checkResolvedTarget(target);
     if (!verdict.allowed) {
       this.logger.warn(`refused a signed media target: ${verdict.reason}`);
       throw new BadRequestException(verdict.reason);
@@ -124,7 +124,7 @@ export class MediaController {
     // redirects inward and the answer is to refuse the body rather than to
     // never have asked.
     const finalUrl = upstream.url || target;
-    const finalVerdict = checkTarget(finalUrl);
+    const finalVerdict = await checkResolvedTarget(finalUrl);
     if (!finalVerdict.allowed) {
       this.logger.warn(`media redirected somewhere refused: ${finalVerdict.reason}`);
       response.status(400).end();

@@ -16,8 +16,11 @@ the only thing blocking both phases.
 
 ## The permanent record
 
-| Folder | What is in it |
+| File or folder | What is in it |
 |---|---|
+| [**security-review.md**](security-review.md) | The review, item by item: one published port, the origin policy, every credential and what it alone would let somebody do, the rate limits, the proxy and fetcher guards, and the two things still deferred |
+| [**parity.md**](parity.md) | Every capability v1 had, named against its equivalent in v2, with the three things deliberately dropped and why |
+| [**restore.md**](restore.md) | How to bring the system back: what you need in front of you, the secrets that are *not* in the archives, restoring onto a different machine, and what a rollback does and does not put back |
 | [014-foundation/](014-foundation/) | P0's paperwork: what was actually built, what was broken and how it was found, what is still owed |
 | [015-identity-profile/](015-identity-profile/) | P1's: the full pre-016 review with every finding's reasoning, and where the spec was wrong |
 | [onboarding/](onboarding/) | The architecture diagram |

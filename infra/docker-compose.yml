@@ -203,10 +203,20 @@ services:
       # part of the platform the API does not run, so it reports over HTTP.
       BOTVY_API_BASE: http://backend:8080
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set it in .env}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      # Only the value used when the API cannot be reached to ask for the real
+      # one. The pruning window is `backup.retentionDays` in the settings
+      # registry, which the report endpoint answers with — a knob an operator
+      # edits from the portal, not a second copy here that they cannot.
+      BACKUP_RETENTION_FALLBACK: ${BACKUP_RETENTION_FALLBACK:-14}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
     volumes:
-      - ../backups:/backups
+      # A host directory, so the archives survive `docker compose down -v` and
+      # can be pointed at another disk. Everything else this project stores
+      # lives in a named volume, which is exactly where a backup must not be.
+      - ${BACKUP_DIR:-../backups}:/backups
+      # Read-only: this container copies the media and must never be able to
+      # change what it is copying.
+      - media:/data/media:ro
     entrypoint: ['/bin/bash', '-c']
     command:
       - |
@@ -218,13 +228,13 @@ services:
         {
           echo 'SHELL=/bin/bash'
           echo 'PATH=/usr/local/bin:/usr/bin:/bin'
-          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_DAYS; do
+          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_FALLBACK; do
             echo "$${name}=$${!name}"
           done
           # Redirected to PID 1's stdout, which is this container's log. cron
           # mails a job's output, there is no mailer here, and without this a
           # failed backup would leave no trace anywhere at all.
-          echo "$${BACKUP_CRON} root { /usr/local/bin/backup-mongo.sh; /usr/local/bin/backup-postgres.sh; } >/proc/1/fd/1 2>&1"
+          echo "$${BACKUP_CRON} root /usr/local/bin/backup.sh >/proc/1/fd/1 2>&1"
         } > /etc/cron.d/botvy-backups
         chmod 0644 /etc/cron.d/botvy-backups
         exec cron -f

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { checkTarget } from '../../../shared/media/media.signing.js';
+import { checkResolvedTarget } from '../../../shared/media/media.signing.js';
 import {
   SourceFetcher,
   SourceRefused,
@@ -120,7 +120,7 @@ export class HttpSourceFetcher extends SourceFetcher {
     let url = startUrl;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      const verdict = checkTarget(url);
+      const verdict = await checkResolvedTarget(url);
       if (!verdict.allowed) {
         throw new SourceRefused(`Botvy will not fetch that address: ${verdict.reason}.`);
       }

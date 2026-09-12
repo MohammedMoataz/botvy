@@ -367,6 +367,56 @@ export const SETTINGS_REGISTRY = {
     default: 48,
     description: 'After this long without a successful backup, health says so.',
   }),
+  // ---- Rate limits, one per entry point (P11, T1114) ----------------------
+  //
+  // Calls a minute, per caller. A member is counted by their id, a machine by
+  // its client id, and a caller with no principal yet — which is the sign-in
+  // form — by their address, because that is the only thing there is to count.
+  //
+  // **Zero means unlimited**, which is how an operator chasing a problem takes
+  // the limiter out of the picture from the portal rather than by redeploying.
+  // Every one of these is deliberately generous: a limit that a legitimate
+  // member can reach is a limit that gets turned off, and a limit that is off
+  // protects nothing.
+  'limits.restPerMinute': define({
+    schema: z.number().int().min(0).max(100_000),
+    default: 300,
+    description:
+      'Commands a signed-in caller may send a minute over REST. Zero means unlimited.',
+  }),
+  'limits.graphqlPerMinute': define({
+    schema: z.number().int().min(0).max(100_000),
+    default: 600,
+    description:
+      'Reads a signed-in caller may make a minute over GraphQL. Higher than the REST limit because a screen is several reads and one act. Zero means unlimited.',
+  }),
+  'limits.anonymousPerMinute': define({
+    schema: z.number().int().min(0).max(100_000),
+    // The one that matters. Sign-in, registration and the refresh exchange are
+    // the routes with no principal behind them, and they are the routes a
+    // credential-stuffing attempt uses. Twenty a minute from one address is
+    // far more than a person typing a password and far less than a machine
+    // working through a word list.
+    default: 20,
+    description:
+      'Calls a minute from one address before anybody has signed in — sign-in, registration and the refresh exchange. This is the credential-stuffing limit; keep it low. Zero means unlimited.',
+  }),
+  'limits.socketPerMinute': define({
+    schema: z.number().int().min(0).max(100_000),
+    default: 600,
+    description:
+      'Messages a minute one socket may send. The extension pings to keep its worker alive and the phone subscribes on every reconnect, so this is counted per socket rather than per member. Zero means unlimited.',
+  }),
+  'limits.internalPerMinute': define({
+    schema: z.number().int().min(0).max(100_000),
+    // Generous, because these are our own scheduled jobs and a limit that
+    // stopped the nightly sweep would be worse than the runaway it prevented.
+    // Present at all because a machine credential that leaks is a machine
+    // credential somebody else can use.
+    default: 1_200,
+    description:
+      'Calls a minute one machine principal may make to /internal/*. Generous: these are the scheduled jobs, and a limit that stops the nightly sweep is worse than what it prevents. Zero means unlimited.',
+  }),
   'ops.staleAfterMinutes': define({
     schema: z.number().int().min(1).max(1440),
     default: 15,
@@ -431,9 +481,11 @@ export const SETTINGS_REGISTRY = {
     schema: z.string().nullable(),
     default: null,
     description:
-      'When the last backup was verified. The backup container reports its outcome to ' +
-      '/internal/ops/heartbeat, which stamps ops_heartbeats; the code that also writes ' +
-      'this key lands with the backup verification in specs/025 (T1104).',
+      'When the last backup was verified. The nightly run reports to ' +
+      '/internal/backups/report, which stamps the `backup` heartbeat and writes this ' +
+      'key — but only on a run that succeeded. The heartbeat answers "did it run"; ' +
+      'this answers "when was the last one that worked", which is the question asked ' +
+      'before deciding whether a restore is affordable.',
     readOnly: true,
   }),
   'ops.adminPasswordIsDefault': define({

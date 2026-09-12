@@ -88,47 +88,63 @@ Both stores are dumped nightly to `backups/`, and each archive is read back
 immediately after it is written. A backup nobody has opened is a hope, not a
 backup.
 
-The `backups` service runs both dump scripts on one schedule. It is a built
-image (`infra/backup/Dockerfile`) rather than `mongo:8` with a command, because
-that image ships neither `cron` nor `pg_dump`.
+The `backups` service runs **one** script, `infra/backup.sh`, on one schedule:
+MongoDB, the Identity database and the media directory into a dated folder under
+`BACKUP_DIR`. It is a built image (`infra/backup/Dockerfile`) rather than
+`mongo:8` with a command, because that image ships neither `cron` nor `pg_dump`.
+
+The three are one backup because they are only useful together. `userId` in
+MongoDB is the PostgreSQL uuid with no join to rebuild it from, and a photo
+referenced by a restored profile that is not in the media copy is a broken image
+for ever — so they succeed or fail together, and report once as the job
+`backup`.
+
+Every archive is read back before the night counts: `mongorestore --dryRun`,
+`pg_restore --list`, and for the media a checksum written beside it plus a file
+count, because a tar of an empty directory is a valid tar. Pruning happens only
+after a verified run, so a run of failures never leaves you with nothing.
 
 The staleness warning is a settings key — `backup.staleHours` — so you can
-retune it from the portal. The schedule is `BACKUP_CRON` in `.env`, because the
-job is a container rather than the API. Retention currently lives in **both**
-places: `backup.retentionDays` in the registry and `BACKUP_RETENTION_DAYS` in
-`.env`, because the sidecar has no way to read the registry from outside the
-API. Change them together until a later phase gives it one.
+retune it from the portal, and so is the retention: `backup.retentionDays` is
+answered by `POST /internal/backups/report`, which is the same call the nightly
+run uses to report its result. `BACKUP_RETENTION_FALLBACK` in `.env` is used
+only when the API could not be reached, which is also a night with nothing to
+prune. The schedule stays `BACKUP_CRON` in `.env`, because the job is a
+container rather than the API.
 
 ### Restoring
 
-Restore **both** stores from the same night. `userId` in MongoDB is the
-PostgreSQL uuid and there is no join to rebuild the link from, so restoring one
-alone leaves accounts whose data is gone, or data whose accounts are.
+The full procedure is **[`docs/restore.md`](docs/restore.md)**, and it is the one
+to follow — including the set of secrets that must accompany the archives and
+are not in them, restoring onto a different machine, and what a rollback does
+and does not put back.
+
+The short version, for the same machine and one night's directory:
 
 ```bash
-# Stop everything that writes, so nothing is half-restored.
 docker compose --env-file .env -f infra/docker-compose.yml stop backend worker
 
-# Identity.
 docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres \
-  pg_restore --clean --if-exists --dbname "$DATABASE_URL" < backups/identity-<STAMP>.dump
+  pg_restore --clean --if-exists --dbname "$DATABASE_URL" < ../backups/<NIGHT>/identity.dump
 
-# Everything else.
 docker compose --env-file .env -f infra/docker-compose.yml exec -T mongo \
-  mongorestore --uri "$MONGO_URL" --archive --gzip --drop < backups/botvy-<STAMP>.archive.gz
+  mongorestore --uri "$MONGO_URL" --archive --gzip --drop < ../backups/<NIGHT>/botvy.archive.gz
+
+docker run --rm -v botvy-v2_media:/data/media -v "$(pwd)/../backups/<NIGHT>:/in:ro" \
+  alpine sh -c 'cd /data/media && tar -xzf /in/media.tar.gz'
 
 docker compose --env-file .env -f infra/docker-compose.yml start backend worker
 node infra/verify.mjs
 ```
 
+Restore **all three from the same night**. `userId` in MongoDB is the PostgreSQL
+uuid and there is no join to rebuild the link from, so restoring one store alone
+leaves accounts whose data is gone, or data whose accounts are — and a photo
+referenced by a restored profile that is not in the media copy is a broken image
+for ever.
+
 Try this before you need it. A restore procedure that has never been run is a
 document, not a capability.
-
-### Restoring onto a different machine
-
-The dumps carry no host names, but several things around them do: the tunnel
-hostname, `CADDY_SITE`, `CORS_ORIGINS`, and the address baked into any phone
-build. Update `.env` first, then restore.
 
 ## Releasing and deploying
 

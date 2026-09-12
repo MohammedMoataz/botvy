@@ -12,6 +12,7 @@ import { EVENT_SCHEMA_VERSION, contextOf } from '../cqrs/domain-event.js';
 import { newId } from '../cqrs/ids.js';
 import { HeartbeatService } from '../health/heartbeat.service.js';
 import { OutboxModule } from '../outbox/outbox.module.js';
+import { RateLimiter } from '../rate-limit/rate-limiter.js';
 import { OutboxWriter } from '../outbox/outbox-writer.js';
 import {
   AuditLogSchema,
@@ -64,6 +65,9 @@ type AnyModel = Model<Record<string, unknown>>;
     ]),
   ],
   providers: [
+    // The one counter every entry point shares, so the four limits are four
+    // buckets in one place rather than four mechanisms.
+    RateLimiter,
     {
       provide: SettingsStore,
       inject: [getModelToken(MODEL_NAMES.setting)],
@@ -112,6 +116,7 @@ type AnyModel = Model<Record<string, unknown>>;
     AuditPort,
     HeartbeatRepository,
     HeartbeatService,
+    RateLimiter,
     MongooseModule,
   ],
 })

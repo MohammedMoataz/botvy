@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PlatformModule } from './shared/platform/platform.module.js';
 import { APP_GUARD } from '@nestjs/core';
+import { RateLimitGuard } from './shared/rate-limit/rate-limit.guard.js';
 import { CqrsModule } from '@nestjs/cqrs';
 import { IdentityModule } from './contexts/identity/identity.module.js';
 import { InternalAlertsController } from './contexts/operations/features/internal-alerts/internal-alerts.controller.js';
+import { InternalBackupsController } from './contexts/operations/features/backup-report/internal-backups.controller.js';
 import { InternalHeartbeatController } from './contexts/operations/features/internal-heartbeat/internal-heartbeat.controller.js';
 import { AdminController } from './contexts/identity/features/admin-members/admin.controller.js';
 import { AuthController } from './contexts/identity/features/sign-in/auth.controller.js';
@@ -148,6 +150,7 @@ import { WsModule } from './ws/ws.module.js';
     MediaController,
     SyncController,
     InternalAlertsController,
+    InternalBackupsController,
     InternalHeartbeatController,
   ],
   providers: [
@@ -155,6 +158,10 @@ import { WsModule } from './ws/ws.module.js';
     { provide: APP_GUARD, useExisting: ServiceTokenGuard },
     { provide: APP_GUARD, useClass: KindGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    // Last, so a refused call has already been identified: the limit a caller
+    // is held to depends on which principal they are, and a limiter that ran
+    // before authentication would count every signed-in member as anonymous.
+    { provide: APP_GUARD, useClass: RateLimitGuard },
   ],
 })
 export class AppModule {}
