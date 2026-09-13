@@ -197,6 +197,43 @@ A few readings worth recognising:
   looks exactly like an idle queue otherwise. Usually the model server, which
   the `ollama` line above will also be saying.
 
+### Docker will not start: `ERROR_SHARING_VIOLATION` on the data disk
+
+On Windows, Docker Desktop can wedge itself like this:
+
+```
+Failed to attach disk '...\docker_data.vhdx' to WSL2: The process cannot access
+the file because it is being used by another process.
+Wsl/Service/AttachDisk/MountVhd/HCS/ERROR_SHARING_VIOLATION
+```
+
+**A reboot does not fix it**, which is the part that wastes an evening: Docker
+Desktop starts at login, its first attach attempt takes a handle on the disk
+image, fails, and never lets go — so every retry, including the one after the
+reboot, finds the file held by the instance that is doing the retrying.
+
+The order that works, and all three steps are needed:
+
+```powershell
+# 1. Every Docker process, not just the dashboard.
+Get-Process | Where-Object { $_.Name -match 'docker' } | Stop-Process -Force
+
+# 2. The mount outlives them, so the file is still held here.
+wsl --shutdown
+
+# 3. Only now, and only once.
+Start-Process "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
+```
+
+Between 2 and 3 the file should be openable; if it is not, something else has
+it and step 3 will fail the same way. `wsl --shutdown` on its own does **not**
+release it while Docker is running, and killing Docker on its own does not
+release it either — it is the pair, in that order.
+
+A related wedge: containers stuck in `Dead` that will not `docker rm -f`
+("removal already in progress"). That is the same daemon in a bad state; the
+three steps above clear it.
+
 ## Reading saved links, and the platform's terms
 
 Botvy reads the links a member saves: articles and pages over ordinary HTTP,
