@@ -89,7 +89,7 @@ gap.
 | # | Item | Kind | Needed by | Status | Blocks |
 |---|------|------|-----------|--------|--------|
 | [I1](#i1--n8n-api-key) | n8n API key | 🔨 | **now** (carried from P0) | 🔴 **open** | P0 gate 5/5, P2 sweep, P3 tick |
-| [I2](#i2--firebase-android-app--google-servicesjson) | `google-services.json` | 🔨 | P2 | 🔴 **in the wrong place** — see the item | push notifications, P2 gate |
+| [I2](#i2--firebase-android-app--google-servicesjson) | `google-services.json` | ✅ | P2 | **done 15 Sep** — moved to the path Gradle reads | push notifications, P2 gate |
 | [I3](#i3--a-real-android-device) | An Android device | 🔨 | P2 | only you can say | airplane-mode alarm gate |
 | [I4](#i4--chrome-with-developer-mode) | Chrome, developer mode | 🔨 | P2 | only you can say | extension side panel |
 | [I5](#i5--label-palette) | Label palette | ❓ | P2 | ❓ default taken — the twelve below | nothing (I have a default) |
@@ -167,29 +167,28 @@ becomes a manual step, and the gate never reaches 5/5.
 ## I2 — Firebase Android app + `google-services.json`
 
 ```
-google-services.json IN PLACE:  downloaded — but at the wrong path (14 September)
+google-services.json IN PLACE:  ✅ yes — mobile/android/app/src/prod/ (15 September)
 PACKAGE NAME USED:              org.botvy.botvy ✅
 ```
 
-**🔴 Read this before anything else in this item.** You did download the file —
-there is a `google-services.json` at the **repository root**, for project
-`bot-vy`, package `org.botvy.botvy`, which is exactly right. Gradle does not
-read it there. It reads `mobile/android/app/src/prod/google-services.json` and
-nowhere else (`mobile/android/app/build.gradle.kts:28`), and applies the Google
-Services plugin only if that exact file exists — so a `prod` build today is
-silently building **without push**, which is the failure mode this item was
-written to avoid.
+**✅ Done.** The file you downloaded had been sitting at the **repository root**,
+where Gradle does not look. It reads
+`mobile/android/app/src/prod/google-services.json` and nowhere else
+(`mobile/android/app/build.gradle.kts:28`) and applies the Google Services
+plugin only if that exact file exists — so every `prod` build until now was
+silently building **without push**, which is the failure this item was written
+to prevent, arriving in the one shape nothing reports: a green build.
 
-Move it:
+It was moved there on 15 September and the root copy deleted, so there is one
+copy and it is in the right place. Verified: byte-identical to the original
+before the root copy was removed, and the file's `package_name`
+(`org.botvy.botvy`) matches the `prod` flavour's `applicationId` exactly — a
+mismatch there fails the build rather than degrading quietly, which is why it is
+the check worth making. Both paths are gitignored (`.gitignore:68`,
+`mobile/android/.gitignore:17`); nothing ever left the machine.
 
-```powershell
-mkdir E:\Work\botvy\mobile\android\app\src\prod
-move E:\Work\botvy\google-services.json E:\Work\botvy\mobile\android\app\src\prod\
-```
-
-Both locations are gitignored (`.gitignore:66-69`) so nothing leaked; the root
-entry exists precisely because a stray copy there is a leak waiting to happen.
-Move it rather than copy it.
+**Not yet proved by a build.** The placement and the name match are verified;
+`flutter build apk --flavor prod` has not been run since the move.
 
 Push is how a reminder reaches a phone that has been closed for two days. The
 server side is already wired (`secrets/firebase-admin.json` exists); the *phone*
