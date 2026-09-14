@@ -7,38 +7,113 @@ items marked ❓ are a decision only you can make, and every one of those has a
 default I will use if you leave it blank. **Silence on a ❓ means "take your
 default".** Silence on a 🔨 blocks that phase's gate.
 
-Nothing here is needed today. The table says when each one turns into a blocker.
+This was written before P2 and is now kept current. As of **14 September** the
+phases P2–P11 have all landed, so most of this register is either done or has
+quietly taken its default. The short list of what is genuinely still waiting on
+you is directly below.
+
+---
+
+# 🔴 Waiting on you — the whole list, four items
+
+Everything else in this file is either finished, or a ❓ whose default was taken
+by silence and can still be changed later without a deploy. These four cannot.
+
+| | What | Where it is written up |
+|---|---|---|
+| **1 — mandatory, blocks the release** | The exposed Firebase service-account key ending **`c3a2a5`** has still not been *deleted* in the Google console. A new key (`…424ead`) is in place and live, but **adding a key does not revoke the old one**. Until that row is gone, a credential that was committed to a public repository still grants full admin over the project | [I21](#i21--rotate-the-firebase-key-for-real) · [`do-2-the-firebase-key-is-still-live.md`](do-2-the-firebase-key-is-still-live.md) |
+| 2 | **The release name** — `v2.0.0` or `v1.2.1`. Unanswered. `mobile/pubspec.yaml` is already `2.0.0+2` and the extension manifest is `2.0.0`, so the artefacts are built on the assumption of `v2.0.0`; say the word and they are renumbered | [`decide-1-what-to-call-this-release.md`](decide-1-what-to-call-this-release.md) |
+| 3 | **The admin password.** `P@ssw0rd` was your explicit choice and I am not re-opening it on taste. It is raised once more only because a public repository and a public tunnel change what is at stake, and then it is settled either way | [`decide-2-the-admin-password-before-a-public-release.md`](decide-2-the-admin-password-before-a-public-release.md) |
+| 4 | **The n8n API key** — still the last failing check in `node infra/verify.mjs` | [I1](#i1--n8n-api-key) |
+
+The rest of the 🔨 items below are things only you can see from where you sit — a
+device in your hand, a console you are signed into. None of them blocks anything
+today; each one is marked in the table.
+
+## What changed on 13–14 September
+
+Five commits on `026-repo-restructure`, four of them pushed — the last one, the
+`SETUP.md` note about Docker, is still local. **Not yet merged into `main` and no
+pull request opened.** Nothing in here needed a decision from you.
+
+- **The four apps moved to the repository root.** `apps/backend` → `backend`,
+  and the same for `frontend`, `extension` and `mobile`. `packages/` did not
+  move. Git recorded all 781 files as renames, so the history follows. Every
+  path in this file was rewritten in the same commit — so a command you copy
+  out of here is still correct.
+- **A new `ai/` directory.** The nine prompt templates moved out of the backend
+  into `ai/prompts/`, and the host-side Ollama setup that was scattered through
+  `SETUP.md` now lives at [`ai/ollama/SETUP.md`](../../ai/ollama/SETUP.md) with
+  a benchmark script beside it. [`ai/README.md`](../../ai/README.md) explains
+  why the model is not in compose. This is the answer to
+  [I7](#i7--ollama-models-pulled).
+- **v1 is fully retired.** `legacy/` is gone, and so are both archives — the
+  `backups/*` dumps in the repository and `E:\Work\botvy-v1-archive` — at your
+  request. `infra/reset.mjs` and `docs/parity.md` went with them. See
+  [I24](#i24--delete-legacy); it also closes [I25](#i25--import-v1-data-or-not),
+  because the archive that script would have read no longer exists.
+- **`docs/` was pruned.** The per-phase paperwork (`docs/014-foundation/`,
+  `docs/015-identity-profile/`) and the index that listed it are gone. What is
+  left is this folder, [`../to-review/`](../to-review/),
+  [`../restore.md`](../restore.md), [`../security-review.md`](../security-review.md)
+  and the architecture diagram.
+- **Two defects fixed.** `pnpm gen:contracts` had never been re-run after P10
+  and P11, so the published contract was missing `/api/v1/admin/workflows` and
+  its activate/deactivate/run routes, `/internal/backups/report`, and the
+  GraphQL field `Setting.control` — everything a client is checked against was
+  a release behind. Regenerated. And a Flutter test failed every night between
+  midnight and 03:00, because its fixture reached across the member's local
+  midnight; it is written relative to the member's day now.
+- **What is verified and what is not.** Green: `pnpm lint` 0/0 over 663 files
+  (and probed — the cross-context rule still fires), 1612 backend tests across
+  95 files, 118 in the SDK, 17 in the extension, both backend typecheck
+  projects, `flutter analyze` clean, `flutter test` 370 passed, and the
+  extension build. **Not yet run:** the two Docker images, `infra/bootstrap.mjs`,
+  `infra/verify.mjs`, and the Playwright end-to-end suites. So the code is
+  proven and the deployment is not — that is the next session's work, not
+  yours.
+- **Docker on this machine, for when it wedges again.** Docker Desktop can
+  deadlock on its own data disk with `ERROR_SHARING_VIOLATION`, and a reboot
+  does **not** clear it. The recipe — kill every Docker process, `wsl
+  --shutdown`, then start Docker once — is written into `SETUP.md` under
+  *Docker will not start*. Also: building the backend and frontend images at
+  the same time crashes buildkit. One at a time.
 
 ## When each item bites
 
-| # | Item | Kind | Needed by | Blocks |
-|---|------|------|-----------|--------|
-| [I1](#i1--n8n-api-key) | n8n API key | 🔨 | **now** (carried from P0) | P0 gate 5/5, P2 sweep, P3 tick |
-| [I2](#i2--firebase-android-app--google-servicesjson) | `google-services.json` | 🔨 | P2 | push notifications, P2 gate |
-| [I3](#i3--a-real-android-device) | An Android device | 🔨 | P2 | airplane-mode alarm gate |
-| [I4](#i4--chrome-with-developer-mode) | Chrome, developer mode | 🔨 | P2 | extension side panel |
-| [I5](#i5--label-palette) | Label palette | ❓ | P2 | nothing (I have a default) |
-| [I6](#i6--the-three-daily-times) | The three daily times | ❓ | P3 | nothing |
-| [I7](#i7--ollama-models-pulled) | Ollama models pulled | 🔨 | P4 | every chat and extraction |
-| [I8](#i8--arabic-intent-sentences-review) | Arabic intent sentences | ❓ | P4 | AR fixture quality |
-| [I9](#i9--chat-token-quota) | Chat token quota | ❓ | P4 | nothing |
-| [I10](#i10--first-day-of-the-week) | First day of the week | ❓ | P5 | calendar correctness for you |
-| [I11](#i11--your-sports-and-weekly-slots) | Your sports + weekly slots | ❓ | P6 | realistic seed, P6 gate |
-| [I12](#i12--test-urls-for-ingestion) | Two test URLs | 🔨 | P7 | P7 gate |
-| [I13](#i13--youtube-terms-acknowledgement) | YouTube ToS call | ❓ | P7 | whether transcripts ship |
-| [I14](#i14--your-allergies-and-dislikes) | Allergies + dislikes | 🔨 | P8 | P8 allergen gate |
-| [I15](#i15--meal-mode-and-a-starter-library) | Meal mode + library | ❓ | P8 | nothing |
-| [I16](#i16--chrome-web-store-publish-or-not) | Web Store: publish? | ❓ | P9 | distribution only |
-| [I17](#i17--domain-name-and-tunnel) | Domain + tunnel token | 🔨 | P10 | public site reachable |
-| [I18](#i18--marketing-copy-and-brand) | Copy, logo, screenshots | 🔨 | P10 | landing page |
-| [I19](#i19--privacy-policy-facts) | Privacy policy facts | 🔨 | P10 | privacy page, Web Store |
-| [I20](#i20--deploy-target-for-cd) | Deploy host for CD | 🔨 | P10 | automatic deploys |
-| [I21](#i21--rotate-the-firebase-key-for-real) | Rotate Firebase key | 🔨 | **P11, mandatory** | release |
-| [I22](#i22--the-release-signing-keystore) | Release keystore | 🔨 | P11 | shippable APK, forever |
-| [I23](#i23--backup-destination) | Backup destination | 🔨 | P11 | restore drill |
-| [I24](#i24--delete-legacy) | Approve deleting `legacy/` | ✅ delete | P11 | **done 13 Sep** |
-| [I25](#i25--import-v1-data-or-not) | Import v1 data? | ❓ | P11 | one-shot script |
-| [G](#g--google-sign-in-the-whole-thing) | **Google Sign-In** | 🔨 | whenever you want the button | the Google button on all four surfaces |
+Status as of **14 September**. `❓ default taken` means you left it blank, the
+phase shipped on my default, and it is a registry key or a preference you can
+still change in the admin portal without a deploy — that is a real answer, not a
+gap.
+
+| # | Item | Kind | Needed by | Status | Blocks |
+|---|------|------|-----------|--------|--------|
+| [I1](#i1--n8n-api-key) | n8n API key | 🔨 | **now** (carried from P0) | 🔴 **open** | P0 gate 5/5, P2 sweep, P3 tick |
+| [I2](#i2--firebase-android-app--google-servicesjson) | `google-services.json` | 🔨 | P2 | 🔴 **in the wrong place** — see the item | push notifications, P2 gate |
+| [I3](#i3--a-real-android-device) | An Android device | 🔨 | P2 | only you can say | airplane-mode alarm gate |
+| [I4](#i4--chrome-with-developer-mode) | Chrome, developer mode | 🔨 | P2 | only you can say | extension side panel |
+| [I5](#i5--label-palette) | Label palette | ❓ | P2 | ❓ default taken — the twelve below | nothing (I have a default) |
+| [I6](#i6--the-three-daily-times) | The three daily times | ❓ | P3 | ❓ defaults taken — 21:00 / 22:00 / 08:00, no quiet hours | nothing |
+| [I7](#i7--ollama-models-pulled) | Ollama models pulled | 🔨 | P4 | only you can say — steps now at [`ai/ollama/SETUP.md`](../../ai/ollama/SETUP.md) | every chat and extraction |
+| [I8](#i8--arabic-intent-sentences-review) | Arabic intent sentences | ❓ | P4 | ❓ no corrections received; the fixture is mine | AR fixture quality |
+| [I9](#i9--chat-token-quota) | Chat token quota | ❓ | P4 | ❓ default taken — 200,000/day | nothing |
+| [I10](#i10--first-day-of-the-week) | First day of the week | ❓ | P5 | ❓ default taken — Saturday | calendar correctness for you |
+| [I11](#i11--your-sports-and-weekly-slots) | Your sports + weekly slots | ❓ | P6 | still yours to give — P6 shipped on seed data | realistic seed, P6 gate |
+| [I12](#i12--test-urls-for-ingestion) | Two test URLs | 🔨 | P7 | still yours to give | P7 gate |
+| [I13](#i13--youtube-terms-acknowledgement) | YouTube ToS call | ❓ | P7 | ❓ default taken — transcripts **on** | whether transcripts ship |
+| [I14](#i14--your-allergies-and-dislikes) | Allergies + dislikes | 🔨 | P8 | still yours to give — the gate ran on a throwaway dairy profile | P8 allergen gate |
+| [I15](#i15--meal-mode-and-a-starter-library) | Meal mode + library | ❓ | P8 | ❓ default taken — `library`, unseeded | nothing |
+| [I16](#i16--chrome-web-store-publish-or-not) | Web Store: publish? | ❓ | P9 | ❓ default taken — self-host | distribution only |
+| [I17](#i17--domain-name-and-tunnel) | Domain + tunnel token | 🔨 | P10 | not set — `TUNNEL_TOKEN` empty, `CADDY_SITE=:80`, so LAN only | public site reachable |
+| [I18](#i18--marketing-copy-and-brand) | Copy, logo, screenshots | 🔨 | P10 | still yours to give | landing page |
+| [I19](#i19--privacy-policy-facts) | Privacy policy facts | 🔨 | P10 | still yours to give | privacy page, Web Store |
+| [I20](#i20--deploy-target-for-cd) | Deploy host for CD | 🔨 | P10 | not set — CD is inert | automatic deploys |
+| [I21](#i21--rotate-the-firebase-key-for-real) | Rotate Firebase key | 🔨 | **P11, mandatory** | 🔴 **half done — the old key is still live** | release |
+| [I22](#i22--the-release-signing-keystore) | Release keystore | 🔨 | P11 | not created — no `mobile/android/key.properties` | shippable APK, forever |
+| [I23](#i23--backup-destination) | Backup destination | 🔨 | P11 | default taken — `../backups` on this host, no offsite copy | restore drill |
+| [I24](#i24--delete-legacy) | Approve deleting `legacy/` | ✅ delete | P11 | ✅ **done 13 Sep**, archives included | — |
+| [I25](#i25--import-v1-data-or-not) | Import v1 data? | ❓ | P11 | ✅ **moot** — the archive it would read is gone | — |
+| [G](#g--google-sign-in-the-whole-thing) | **Google Sign-In** | 🔨 | whenever you want the button | not set — `GOOGLE_CLIENT_IDS` is empty, so the verifier refuses | the Google button on all four surfaces |
 
 ---
 
@@ -73,6 +148,13 @@ is why it is yours and not mine.
 4. Tell me, and I re-run the gate. No restart needed — `bootstrap.mjs` reads
    `.env` itself.
 
+**Where this stands on 14 September.** There is now a key-shaped value in `.env`
+— `N8N_API_KEY` is a 267-character JWT, which is the right shape for one of
+n8n's. But the gate has not been re-run since, and `infra/verify.mjs` has not
+been run at all against the restructured tree, so I cannot say whether the key
+works. This item stays open until the gate reports 5/5. Tell me and I will run
+it.
+
 If you would rather not mint one: `bootstrap.mjs` **skips** rather than fails,
 and you can import `workflows/*.json` by hand from the editor's
 **Import from File**. The cost is that every future phase's workflow import
@@ -85,9 +167,29 @@ becomes a manual step, and the gate never reaches 5/5.
 ## I2 — Firebase Android app + `google-services.json`
 
 ```
-google-services.json IN PLACE:  (yes / no)
-PACKAGE NAME USED:              (default: org.botvy.botvy)
+google-services.json IN PLACE:  downloaded — but at the wrong path (14 September)
+PACKAGE NAME USED:              org.botvy.botvy ✅
 ```
+
+**🔴 Read this before anything else in this item.** You did download the file —
+there is a `google-services.json` at the **repository root**, for project
+`bot-vy`, package `org.botvy.botvy`, which is exactly right. Gradle does not
+read it there. It reads `mobile/android/app/src/prod/google-services.json` and
+nowhere else (`mobile/android/app/build.gradle.kts:28`), and applies the Google
+Services plugin only if that exact file exists — so a `prod` build today is
+silently building **without push**, which is the failure mode this item was
+written to avoid.
+
+Move it:
+
+```powershell
+mkdir E:\Work\botvy\mobile\android\app\src\prod
+move E:\Work\botvy\google-services.json E:\Work\botvy\mobile\android\app\src\prod\
+```
+
+Both locations are gitignored (`.gitignore:66-69`) so nothing leaked; the root
+entry exists precisely because a stray copy there is a leak waiting to happen.
+Move it rather than copy it.
 
 Push is how a reminder reaches a phone that has been closed for two days. The
 server side is already wired (`secrets/firebase-admin.json` exists); the *phone*
@@ -229,6 +331,14 @@ The chat, the intent extraction and the link summaries all go to Ollama running
 natively on the host — nothing in a container, nothing over the internet. The
 models are not in the repository (gigabytes) and not something I can download
 for you.
+
+**Since 13 September this has a proper home.** Everything about the model now
+lives in [`ai/`](../../ai/): [`ai/ollama/SETUP.md`](../../ai/ollama/SETUP.md) is
+the install, the service unit and the binding, with a `benchmark.sh` beside it;
+[`ai/README.md`](../../ai/README.md) says why Ollama is on the host rather than
+in compose, and carries the table of registry keys below. The nine prompt
+templates moved there too, as `ai/prompts/`. If the two disagree with what
+follows, they are newer.
 
 **👉 Do this:**
 
@@ -452,8 +562,9 @@ DOMAIN:        (blank = LAN only)
 TUNNEL TOKEN:  (set / not set)
 ```
 
-Right now the edge is `CADDY_SITE=:80` on `EDGE_PORT=80` — plain HTTP, reachable
-on the LAN. A public landing page needs a hostname and TLS. Two ways:
+Right now the edge is `CADDY_SITE=:80` on `EDGE_PORT=8090` — plain HTTP,
+reachable on the LAN, and `TUNNEL_TOKEN` is empty so the `cloudflared` profile
+is off. A public landing page needs a hostname and TLS. Two ways:
 
 **A. Cloudflare Tunnel (recommended).** No open inbound port, no port
 forwarding, TLS terminated by Cloudflare, works behind a home router and carrier
@@ -571,10 +682,13 @@ choice.
 
 ```
 NEW KEY IN PLACE:   yes — verified, id ends 424ead (10 September)
-OLD KEY DELETED:    (yes / no)  ← the half that matters
+OLD KEY DELETED:    NOT YET, as of 14 September  ← the half that matters
 ```
 
-**Half done, and the remaining half is the one that closes the hole.**
+**Half done, and the remaining half is the one that closes the hole. This is the
+one mandatory blocker for the release.** It is also pulled out into its own file,
+[`do-2-the-firebase-key-is-still-live.md`](do-2-the-firebase-key-is-still-live.md),
+because it is five minutes of work and everything else is waiting behind it.
 
 You replaced the key on 10 September. `secrets/firebase-admin.json` now carries
 `private_key_id` ending **`424ead`**, same project (`bot-vy`), same service
@@ -611,9 +725,12 @@ this item closes for good.
 ## I22 — The release signing keystore
 
 ```
-KEYSTORE CREATED:  (yes / no)
+KEYSTORE CREATED:  no — there is no mobile/android/key.properties (14 September)
 BACKED UP TO:
 ```
+
+Not a blocker for merging, but it *is* a blocker for the release build that
+T1142 publishes: without it the APK is signed with this machine's debug key.
 
 Android identifies an app by its signature. **Lose this keystore and you can
 never ship an update to anyone who installed a build signed with it** — not with
@@ -656,8 +773,8 @@ repository, not in `secrets/` (that is gitignored, not backed up).
 ## I23 — Backup destination
 
 ```
-DESTINATION:  (default: ./backups on this host)
-OFFSITE:      (yes / no)
+DESTINATION:  default taken — ./backups on this host (BACKUP_DIR unset)
+OFFSITE:      (yes / no)  ← still unanswered
 ```
 
 T1101 is nightly `mongodump` + `pg_dump` **and a restore drill executed once** —
@@ -683,36 +800,54 @@ YOUR CALL:  delete  (answered 13 September)
 ```
 
 Done, as T1123. `legacy/` is gone from the tree along with every ignore entry,
-exclude and comment that named it, and `infra/reset.mjs` with it.
+exclude and comment that named it, and `infra/reset.mjs` with it — archiving and
+retiring v1 was that script's whole job. `docs/parity.md` went too, for the same
+reason: its subject was a system that no longer exists, and the one finding it
+produced (the rate-limit regression) is fixed and recorded in
+[`../security-review.md`](../security-review.md).
 
 You also chose to delete the archives, which the original version of this item
-offered as the safety net: `backups/` and `../botvy-v1-archive` are both empty
-now. **So the git history is the only remaining copy of v1** — every v1 commit
-is still there, and `git show` or `git checkout` of an old tag still works, but
-the *data* is not in git and is not anywhere else either.
+offered as the safety net. Both are gone: the repository's `backups/` dumps are
+deleted (the directory is empty), and `E:\Work\botvy-v1-archive` — the 21 MB of
+`v1-all.sql`, `v1-members.csv` and a tar per volume, taken on 11 September — is
+deleted outright.
+
+**So the git history is the only remaining trace of v1.** Every v1 commit is
+still there and `git show` or `git checkout` of an old tag still works, so the
+*code* is recoverable. The **data is gone for good** — it was never in git, and
+there is no copy anywhere else. That was deliberate and it is not reversible.
 
 ## I25 — Import v1 data, or not?
 
 ```
-YOUR CALL:  (skip / import reminders / import reminders + chats)
+YOUR CALL:  no longer a choice — the archive it would read is gone (13 September)
 ```
 
-Accounts and refresh tokens carry over already — same PostgreSQL, same tables.
-What does *not* carry over is everything that moved to MongoDB: v1's reminders,
-conversations and coaching rows. The blueprint recorded "not migrated" as an
-assumption, and T1104 is an optional one-shot script **only if you want it**.
+**This item closed itself, and you should know how.** The import was always a
+one-shot script reading the archived v1 dump. When you chose in
+[I24](#i24--delete-legacy) to delete both archives, the input disappeared, so
+`infra/import-v1.mjs` was struck from the phase (T1130 and T1131 in
+`specs/025-hardening-release/tasks.md` are marked struck, not done). **v2 starts
+clean** — which was my default anyway, so nothing was lost that you had asked
+for.
 
-- **skip** (my default) — v2 starts clean. Simplest, and v1's data stays readable
-  in the dump if you ever want to look.
-- **import reminders** — a day's work, low risk: they map almost one-to-one.
-- **import reminders + chats** — messier, because v1 messages have an
-  autoincrement cursor and v2 uses a per-user `seq`, so the whole history has to
-  be renumbered.
+Two corrections to what this item originally said, because both were wrong by
+the time it mattered:
 
-Worth knowing before you decide: **messages are immutable in v2 and that is
-load-bearing** — they are pulled by `seq > lastSeq` with no `updatedAt` and no
-tombstone. Imported rows must be numbered correctly on the way in, because they
-can never be edited afterwards.
+- It said accounts and refresh tokens carry over, same PostgreSQL, same tables.
+  They did not: the reset on 11 September rebuilt PostgreSQL from nothing, so
+  **no v1 account carried over**. The archived list had 35 rows, four of them
+  real people (you, `admin`, and two example accounts) and thirty-one end-to-end
+  test detritus; all four real ones already use v2, and none of the 35 was
+  banned. That is T1121, and it is why moving members turned out to be no work.
+- It offered "v1's data stays readable in the dump if you ever want to look".
+  There is no dump any more.
+
+Kept for the record, because it is the reason the import is not there: **messages
+are immutable in v2 and that is load-bearing** — they are pulled by
+`seq > lastSeq` with no `updatedAt` and no tombstone. Anything imported would
+have had to be numbered correctly on the way in, because it could never be
+edited afterwards.
 
 ---
 
@@ -720,7 +855,7 @@ can never be edited afterwards.
 
 ```
 WANT IT:            (yes / no / later)
-GOOGLE_CLIENT_IDS:  (set / not set)
+GOOGLE_CLIENT_IDS:  not set — still empty in .env (checked 14 September)
 ```
 
 You said **"skip the google button, do the screens, and mark it in md"** during

@@ -1,5 +1,15 @@
-# syntax=docker/dockerfile:1
 # Built from the repository root: docker build -f frontend/Dockerfile .
+#
+# No `# syntax=docker/dockerfile:1` line, deliberately. That directive makes
+# BuildKit pull an *external* Dockerfile parser image and run it as a gRPC
+# service, and on this host that service dies on startup — `failed to run Build
+# function: frontend grpc server closed unexpectedly`, where "frontend" is
+# BuildKit's parser and has nothing to do with this app. The backend image never
+# carried the line and never hit it.
+#
+# Nothing here needs it: no `RUN --mount`, no `COPY --link`, no heredocs. It was
+# buying a newer parser for a file that uses only the built-in instructions, at
+# the cost of a network pull and one more moving part.
 FROM node:24-alpine AS deps
 RUN corepack enable
 WORKDIR /repo

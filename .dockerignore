@@ -19,3 +19,22 @@ data/
 **/.dart_tool
 **/*.log
 **/*.tsbuildinfo
+
+# Nothing below is read by either Dockerfile, and every byte here is a byte
+# read off the build-context disk. That is not a micro-optimisation on this
+# host: the repository and Docker's own virtual disk sit on the same spinning
+# drive, so context bytes and image-layer writes compete for one head.
+mobile/
+docs/
+gate-logs/
+enhancements/
+.specify/
+.harness/
+.github/
+.claude/
+**/e2e/
+**/test-results/
+**/playwright-report/
+**/coverage/
+*.md
+!ai/prompts/*.md
