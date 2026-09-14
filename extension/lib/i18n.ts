@@ -26,6 +26,8 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'login.failed': 'Sign-in failed. Check that Botvy is reachable.',
     'login.welcome': 'Signed in as {name}.',
     'login.signOut': 'Sign out',
+    'login.gatewayHint':
+      'The address of your Botvy. Set this before signing in.',
     'tasks.today': 'Today',
     'tasks.empty': 'Nothing due today.',
     'tasks.waiting': 'Waiting for your time zone…',
@@ -96,6 +98,8 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'login.failed': 'تعذّر تسجيل الدخول. تأكد من إمكانية الوصول إلى بوتفي.',
     'login.welcome': 'تم تسجيل الدخول بصفة {name}.',
     'login.signOut': 'تسجيل الخروج',
+    'login.gatewayHint':
+      'عنوان بوتفي الخاص بك. اضبطه قبل تسجيل الدخول.',
     'tasks.today': 'اليوم',
     'tasks.empty': 'لا شيء مستحق اليوم.',
     'tasks.waiting': 'في انتظار منطقتك الزمنية…',

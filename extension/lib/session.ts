@@ -62,7 +62,14 @@ export const PROFILE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  */
 export const DEFAULT_GATEWAY =
   (import.meta.env.WXT_GATEWAY_URL as string | undefined) ??
-  'http://localhost:8080';
+  // The **edge**, not the API container. It was `:8080`, which is the port the
+  // backend listens on *inside* its network — nothing publishes it, because
+  // constitution V allows exactly one public port and it belongs to Caddy. So
+  // the built-in default could never have reached a running installation. The
+  // edge is `EDGE_PORT`, documented as 80 in `infra/.env.example`; an install
+  // that moved it sets the address in the panel, which is the field this
+  // constant is only a fallback for.
+  'http://localhost';
 
 export async function readTokens(): Promise<TokenPair | null> {
   const stored = await chrome.storage.local.get(KEYS.tokens);

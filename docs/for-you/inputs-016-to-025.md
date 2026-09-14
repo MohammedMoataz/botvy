@@ -122,7 +122,7 @@ gap.
 ## I1 — n8n API key
 
 ```
-API KEY SET IN .env:  (yes / no)
+API KEY SET IN .env:  yes
 ```
 
 The last failing check in `node infra/verify.mjs`. Everything else in the
@@ -161,7 +161,7 @@ and you can import `workflows/*.json` by hand from the editor's
 becomes a manual step, and the gate never reaches 5/5.
 
 ---
-
+(let claude do it for me)
 # P2 — `016-tasks-labels-reminders`
 
 ## I2 — Firebase Android app + `google-services.json`

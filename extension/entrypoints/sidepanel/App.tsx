@@ -6,6 +6,7 @@ import { PanelStore } from '../../lib/store';
 import { locales, type Locale } from '../../lib/i18n';
 import { AddReminder } from './AddReminder';
 import { Meetings } from './Meetings';
+import { GatewayField } from './GatewayField';
 import { Settings } from './Settings';
 import { Status } from './Status';
 
@@ -220,6 +221,21 @@ export const App = observer(function App() {
       ) : (
         <form onSubmit={onSubmit}>
           <h1 className="h6">{store.t('login.title')}</h1>
+
+          {/*
+            The address comes first, and it is on this form deliberately.
+            `Settings` is inside the signed-in branch, so for every install
+            whose Botvy is not at the build-time default — which is every
+            install that is not a developer's own laptop — the field could not
+            be reached without signing in, and signing in needed the field.
+            Found by loading the built extension against a tunnel.
+          */}
+          <div className="mb-3">
+            <GatewayField store={store} hint={false} />
+            <div className="form-text small">
+              {store.t('login.gatewayHint')}
+            </div>
+          </div>
 
           <div className="mb-2">
             <label className="form-label small" htmlFor="email">

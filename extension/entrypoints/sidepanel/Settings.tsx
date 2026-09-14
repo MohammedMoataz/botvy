@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
 import { observer } from 'mobx-react-lite';
 import type { PanelStore } from '../../lib/store';
+import { GatewayField } from './GatewayField';
 
 /**
  * The address, and the way out (T934).
@@ -15,48 +15,23 @@ import type { PanelStore } from '../../lib/store';
  * where they are spent; a member moving from a LAN address to their tunnel is
  * the same member, and making them sign in again would teach them not to touch
  * the field.
+ *
+ * The field itself lives in `GatewayField`, because the sign-in form needs it
+ * too — this panel is only reachable once signed in, and signing in needs the
+ * address to already be right.
  */
 export const Settings = observer(function Settings({
   store,
 }: {
   store: PanelStore;
 }) {
-  const [gateway, setGateway] = useState(store.gateway);
-  const [saved, setSaved] = useState(false);
-
-  function onSave(event: FormEvent) {
-    event.preventDefault();
-    void store.setGateway(gateway).then(() => {
-      setSaved(true);
-      // The confirmation clears itself: a tick that stays on screen for the rest
-      // of the session stops meaning "just saved".
-      setTimeout(() => setSaved(false), 2_000);
-    });
-  }
-
   return (
     <details className="mt-3">
       <summary className="small text-muted">{store.t('settings.title')}</summary>
 
-      <form className="mt-2" onSubmit={onSave}>
-        <label className="form-label small" htmlFor="gateway">
-          {store.t('settings.gateway')}
-        </label>
-        <div className="input-group input-group-sm">
-          <input
-            id="gateway"
-            className="form-control"
-            inputMode="url"
-            value={gateway}
-            onChange={(e) => setGateway(e.target.value)}
-          />
-          <button className="btn btn-outline-secondary" type="submit">
-            {store.t('settings.save')}
-          </button>
-        </div>
-        <div className="form-text small">{store.t('settings.gatewayHint')}</div>
-        {saved && <div className="text-success small">✓</div>}
-      </form>
+      <div className="mt-2">
+        <GatewayField store={store} />
+      </div>
 
       <button
         className="btn btn-outline-secondary btn-sm mt-3"
