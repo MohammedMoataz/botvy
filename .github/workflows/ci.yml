@@ -219,6 +219,38 @@ jobs:
           done
           echo "the stack never answered"; exit 1
 
+      # Migrations, and then the restart that lets the seeds see them.
+      #
+      # Without this the stack came up against an empty database and every
+      # sign-in answered 500, so thirteen of nineteen cases failed on one line
+      # of a shared helper. It was invisible while the job died earlier, at
+      # "backend is unhealthy" — a first install that could not boot at all
+      # never got far enough to show that it also had no schema.
+      #
+      # `infra/bootstrap.mjs` is the supported path and is deliberately not used
+      # here: it also imports the automation workflows, and this job does not
+      # run n8n — `up -d caddy` brings up only what the edge depends on. It would
+      # fail on a service that is absent on purpose. These are the same two
+      # commands it runs (`infra/bootstrap.mjs:116-126`), and the restart is the
+      # same one, for the same reason: the seeds run at boot, so they need a
+      # boot that happens after the tables exist.
+      - name: Apply the migrations
+        run: |
+          set -euo pipefail
+          compose() { docker compose --env-file .env -f infra/docker-compose.yml "$@"; }
+          compose exec -T backend node_modules/.bin/prisma migrate deploy \
+            --schema prisma/schema.prisma
+          compose exec -T backend node_modules/.bin/migrate-mongo up \
+            -f migrate-mongo-config.cjs
+          compose restart backend
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8088/health > /dev/null; then
+              echo "seeded and answering after ${attempt} attempts"; exit 0
+            fi
+            sleep 5
+          done
+          echo "the API never came back after the restart"; exit 1
+
       - run: pnpm --filter @botvy/frontend exec playwright install --with-deps chromium
 
       # A job that has gone quiet, on purpose. SC-001 is that the overview names
