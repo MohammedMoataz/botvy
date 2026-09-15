@@ -97,6 +97,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @botvy/tokens build
+      # The SDK too, and not only the tokens. `@botvy/sdk` resolves through its
+      # package `exports` to `dist/`, which does not exist in a fresh checkout —
+      # so the extension build failed with "Rolldown failed to resolve import
+      # @botvy/sdk", which reads like a missing dependency rather than an unbuilt
+      # one. It passed locally because `dist/` was already on the developer's
+      # disk, and it took out this job on every release from p7 to v2.0.0: the
+      # images published, the APK and the zip did not, and they were attached by
+      # hand each time. `ci.yml` had the line; this file did not.
+      - run: pnpm --filter @botvy/sdk build
       - run: pnpm --filter @botvy/extension build
       - run: pnpm --filter @botvy/extension exec wxt zip
 
