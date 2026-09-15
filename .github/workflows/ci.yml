@@ -23,15 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
-      # A replica set of one. The outbox needs transactions and change streams,
-      # and both require a set, so a plain mongod would pass tests that then
-      # fail in production.
-      mongo:
-        image: mongo:8
-        ports: ['27017:27017']
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
-          --health-interval 10s --health-timeout 5s --health-retries 10
+      # Mongo is NOT here, deliberately — see "Start MongoDB" below. A `services:`
+      # block can pass flags to `docker create` but cannot replace the image's
+      # command, and this one has to: a replica set needs `mongod --replSet`.
       postgres:
         image: postgres:16-alpine
         env:
@@ -53,10 +47,42 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Initiate the replica set
+      # A replica set of one. The outbox needs transactions and change streams
+      # and both require a set, so a plain mongod passes tests that then fail in
+      # production.
+      #
+      # Started here rather than in `services:` because a service container
+      # takes `docker create` options but not a command, and `--replSet` is a
+      # flag of **mongod**, not of docker. It was declared as a service with a
+      # comment calling it a replica set, and the next step's `rs.initiate`
+      # answered `This node was not started with replication enabled` — so the
+      # backend job has failed on every run since it was written, and the
+      # comment was the only replica set in it.
+      #
+      # `--bind_ip_all` and the command line match `infra/docker-compose.yml`,
+      # so what CI exercises is what runs.
+      - name: Start MongoDB as a replica set
         run: |
-          docker exec $(docker ps -qf ancestor=mongo:8) mongosh --quiet --eval \
+          set -euo pipefail
+          docker run -d --name mongo -p 27017:27017 mongo:8 \
+            mongod --replSet rs0 --bind_ip_all
+          for attempt in $(seq 1 30); do
+            if docker exec mongo mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec mongo mongosh --quiet --eval \
             'try { rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]}) } catch (e) { if (!String(e).includes("already initialized")) throw e }'
+          # Proves the set is actually usable rather than merely initiated: a
+          # write needs a primary, and election takes a moment after initiate.
+          for attempt in $(seq 1 30); do
+            if docker exec mongo mongosh --quiet --eval 'db.adminCommand({hello:1}).isWritablePrimary' | grep -q true; then
+              echo "replica set primary after ${attempt} attempts"; exit 0
+            fi
+            sleep 2
+          done
+          echo "the replica set never elected a primary"; exit 1
       - run: pnpm lint
       - run: pnpm --filter @botvy/backend exec tsc --noEmit -p tsconfig.json
       - run: pnpm --filter @botvy/backend build
@@ -82,6 +108,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @botvy/tokens build
+      # And the SDK. `@botvy/frontend` imports `@botvy/sdk`, which resolves
+      # through its `exports` map to `dist/` — absent in a fresh checkout, so
+      # the build failed with eight copies of "Module not found: Can't resolve
+      # '@botvy/sdk'". It passes locally because `dist/` is already on disk.
+      #
+      # Third place this bit: the `extension` job below has carried the line
+      # since P9, `frontend/Dockerfile` has a comment about it, and neither this
+      # job nor `release.yml` had it. Any job that builds a surface needs it.
+      - run: pnpm --filter @botvy/sdk build
       - run: pnpm --filter @botvy/frontend build
 
   extension:
@@ -156,6 +191,23 @@ jobs:
 
       - name: Start the stack
         run: docker compose --env-file .env -f infra/docker-compose.yml up -d --build caddy
+
+      # Why the stack did not come up, in the run that failed.
+      #
+      # Without this the job reported only `container botvy-v2-backend-1 is
+      # unhealthy` and the reason died with the runner, so the failure could be
+      # seen on every run and diagnosed on none. `/health` always answers 200,
+      # so "unhealthy" means the process was not answering at all — which is
+      # exactly the case whose explanation is in its own log.
+      - name: Why it did not start
+        if: failure()
+        run: |
+          docker compose --env-file .env -f infra/docker-compose.yml ps -a || true
+          for service in backend postgres mongo caddy frontend; do
+            echo "::group::${service}"
+            docker compose --env-file .env -f infra/docker-compose.yml logs --tail 120 "${service}" || true
+            echo "::endgroup::"
+          done
 
       - name: Wait for the edge
         run: |

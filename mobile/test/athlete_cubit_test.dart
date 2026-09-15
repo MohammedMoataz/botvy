@@ -544,8 +544,26 @@ void main() {
     testWidgets('stays present and reads as skipped after a skip',
         (tester) async {
       await seedMember();
+
+      /*
+       * Still to come, on the member's own day — the mirror of the fixture in
+       * the "missed" case below, and the same time bomb pointing the other way.
+       *
+       * It was a flat `memberClock('18:00')`, which reads "Planned" only while
+       * 18:00 in Cairo is still ahead: `isMissed` is `plannedAt + duration <
+       * now`. CI runs in UTC and this ran at 21:46 Cairo, so the row correctly
+       * drew "Missed" and the case failed — every evening, on a suite that is
+       * green every morning. It passed locally only because the run happened
+       * after midnight.
+       *
+       * Two hours out, or the end of the member's day if that comes first, so
+       * the moment is always today and always far enough from `now` that the
+       * default hour of duration cannot carry it into the past.
+       */
+      final endOfDay = memberClock('23:59');
+      final soon = DateTime.now().toUtc().add(const Duration(hours: 2));
       final id = await cubit.createSession(
-        plannedAt: memberClock('18:00'),
+        plannedAt: soon.isBefore(endOfDay) ? soon : endOfDay,
         sport: 'gym',
         title: 'Push day',
       );
