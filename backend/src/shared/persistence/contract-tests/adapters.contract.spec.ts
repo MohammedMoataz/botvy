@@ -34,16 +34,29 @@ describe('repository contract', () => {
   describeRepositoryContract(inMemory);
 });
 
-/**
- * The store-backed halves are declared here and skipped without a database, so
- * the reason they did not run is visible in the report rather than absent from
- * it. T030's compose stack and the CI service containers are what turn them on.
+/*
+ * The store-backed halves are **not written yet**, and `todo` is how that is
+ * said out loud.
+ *
+ * They were declared as `describe.skipIf(!process.env.MONGO_URL)` with an empty
+ * body and a comment describing what would go in it. Locally that reads as two
+ * skipped suites, which is what everyone saw. CI sets `MONGO_URL` and
+ * `DATABASE_URL` on purpose — so that these run here rather than skipping — and
+ * an empty suite that is *not* skipped is a vitest error:
+ *
+ *     Error: No test found in suite repository contract (mongo)
+ *
+ * So the backend job failed on every run since the job was written, for a
+ * placeholder, while all 1612 real tests passed. A skip that turns into a
+ * failure the moment somebody wires up the thing it was waiting for is worse
+ * than either a test or nothing.
+ *
+ * `todo` reports them as outstanding in every run, on a developer's machine and
+ * in CI alike, and fails neither. When the adapters are bound into a test
+ * module, these become `describe(...)` with `describeRepositoryContract` inside,
+ * exactly as the in-memory one above — the suite itself does not change, which
+ * was always the point of writing it as a shared contract.
  */
-describe.skipIf(!process.env.MONGO_URL)('repository contract (mongo)', () => {
-  // Bound in the same shape as the in-memory adapter once the Mongo models are
-  // wired into a test module; the suite itself does not change.
-});
+describe.todo('repository contract (mongo)');
 
-describe.skipIf(!process.env.DATABASE_URL)('repository contract (prisma)', () => {
-  // Likewise for Identity's store.
-});
+describe.todo('repository contract (prisma)');

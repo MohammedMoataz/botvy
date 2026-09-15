@@ -10,6 +10,7 @@ import {
   DEFAULT_ADMIN_PASSWORD,
   type PasswordHasher,
 } from './admin-seed.service.js';
+import { IdentityBootstrap } from './identity.bootstrap.js';
 import {
   N8N_CLIENT_NAME,
   N8N_SCOPES,
@@ -220,5 +221,119 @@ describe('n8n service-client seed', () => {
     const stored = clients.byName.get(N8N_CLIENT_NAME)!;
     expect(stored.tokenHash).toBe(hashToken('an-internal-token'));
     expect(stored.tokenHash).not.toContain('an-internal-token');
+  });
+});
+
+// ------------------------------------------------- booting without a schema
+
+/**
+ * A first install boots before its migrations have run, and must survive it.
+ *
+ * The documented order is `up -d`, then `node infra/bootstrap.mjs` — and
+ * bootstrap applies the migrations by `exec`-ing into the very container these
+ * seeds run in. So a seed that throws takes the process down before there is
+ * anything to exec into, and the install cannot proceed at all.
+ *
+ * This has now shipped broken twice. The first fix guarded the seeds behind
+ * `seededAdminIsStillDefault()`, which returns early — without touching the
+ * database — whenever the operator has changed both `ADMIN_EMAIL` and
+ * `ADMIN_PASSWORD` from the shipped pair, which every real installation does.
+ * The guard therefore read a clean `false` as "the schema is fine" and the seed
+ * died anyway. Nothing caught it because every database it was tried against
+ * already had a schema; CI's fresh one killed the whole e2e job for three days.
+ *
+ * Hence a spec, and one that fails the *original* way too: the repository here
+ * throws what PostgreSQL throws, so a guard that never runs the query cannot
+ * pass it.
+ */
+describe('the identity bootstrap on a database with no schema', () => {
+  class MissingSchemaError extends Error {
+    readonly code = 'P2021';
+    constructor() {
+      super('The table `public.users` does not exist in the current database.');
+    }
+  }
+
+  /** Every read and write answers the way Prisma does before `migrate deploy`. */
+  const noSchema = {
+    async findByLogin(): Promise<never> {
+      throw new MissingSchemaError();
+    },
+    async save(): Promise<never> {
+      throw new MissingSchemaError();
+    },
+  };
+
+  function bootstrapWith(env: Record<string, unknown>) {
+    const unit = new InMemoryUnitOfWork();
+    const admin = new AdminSeedService(
+      unit,
+      noSchema as never,
+      fakeHasher,
+    );
+    const credentials = new AdminCredentialsQueryHandler(
+      noSchema as never,
+      { ADMIN_EMAIL: env.ADMIN_EMAIL, ADMIN_PASSWORD: env.ADMIN_PASSWORD } as never,
+      fakeHasher,
+    );
+    const clients = new ServiceClientSeedService(new InMemoryServiceClientRepository());
+    return new IdentityBootstrap(
+      { BOTVY_ROLE: 'backend', ...env } as never,
+      admin,
+      credentials,
+      clients,
+    );
+  }
+
+  it('starts anyway when the operator has changed both admin credentials', async () => {
+    // The case the first fix missed, and the only case that exists in
+    // production: nobody ships the published address and password.
+    const bootstrap = bootstrapWith({
+      ADMIN_EMAIL: 'owner@example.invalid',
+      ADMIN_PASSWORD: 'not-the-default-one',
+      INTERNAL_SERVICE_TOKEN: 'service-token',
+    });
+
+    await expect(bootstrap.onApplicationBootstrap()).resolves.toBeUndefined();
+  });
+
+  it('starts anyway when the credentials are still the shipped pair', async () => {
+    const bootstrap = bootstrapWith({
+      ADMIN_EMAIL: 'owner@botvy.local',
+      ADMIN_PASSWORD: DEFAULT_ADMIN_PASSWORD,
+      INTERNAL_SERVICE_TOKEN: 'service-token',
+    });
+
+    await expect(bootstrap.onApplicationBootstrap()).resolves.toBeUndefined();
+  });
+
+  it('still fails loudly on anything that is not a missing schema', async () => {
+    // A wrong password or an unreachable database must stop the boot. Starting
+    // half-configured with no administrator is the failure the guard exists to
+    // prevent, and a blanket catch would cause it.
+    const refused = {
+      async findByLogin(): Promise<never> {
+        throw new Error('password authentication failed for user "botvy"');
+      },
+      async save(): Promise<never> {
+        throw new Error('password authentication failed for user "botvy"');
+      },
+    };
+    const unit = new InMemoryUnitOfWork();
+    const bootstrap = new IdentityBootstrap(
+      {
+        BOTVY_ROLE: 'backend',
+        ADMIN_EMAIL: 'owner@example.invalid',
+        ADMIN_PASSWORD: 'whatever',
+        INTERNAL_SERVICE_TOKEN: 'service-token',
+      } as never,
+      new AdminSeedService(unit, refused as never, fakeHasher),
+      new AdminCredentialsQueryHandler(refused as never, {} as never, fakeHasher),
+      new ServiceClientSeedService(new InMemoryServiceClientRepository()),
+    );
+
+    await expect(bootstrap.onApplicationBootstrap()).rejects.toThrow(
+      /password authentication failed/,
+    );
   });
 });
