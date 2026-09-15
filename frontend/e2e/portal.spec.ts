@@ -23,7 +23,10 @@ test.skip(
 
 async function signIn(page: Page): Promise<void> {
   await page.goto(`${BASE}/login`);
-  await page.getByLabel(/email/i).fill(EMAIL as string);
+  // Bilingual, because the Arabic case signs in through this same helper and
+  // the label there is `البريد الإلكتروني` — `/email/i` matched nothing and the
+  // case died in the fixture rather than on what it was written to check.
+  await page.getByLabel(/email|البريد/i).fill(EMAIL as string);
   await page.locator('input[type="password"]').fill(PASSWORD as string);
 
   // Waiting on the response rather than on the screen: a screen that never
@@ -43,10 +46,23 @@ test('signs in and lands on a healthy overview', async ({ page }) => {
   await signIn(page);
 
   await expect(page.getByRole('heading', { name: /overview/i })).toBeVisible();
-  // The jobs, by name. SC-001 is that a stopped one is *named* — a page that
-  // only said "degraded" would leave the Owner opening containers to find out
-  // which.
-  await expect(page.getByText(/rhythm|backup|sweep/i).first()).toBeVisible();
+  /*
+   * The jobs, by name. SC-001 is that a stopped one is *named* — a page that
+   * only said "degraded" would leave the Owner opening containers to find out
+   * which.
+   *
+   * Which names exist depends on what has run. `rhythm`, `backup` and the
+   * sweeps are driven by n8n, and a stack raised for this suite does not run it
+   * — so asserting those three was asserting jobs that could not be there, and
+   * the case failed for a reason that said nothing about the overview. The job
+   * the harness seeds stale is the one every environment has.
+   */
+  const seeded = process.env.BOTVY_E2E_STALE_JOB;
+  await expect(
+    seeded
+      ? page.getByText(seeded).first()
+      : page.getByText(/outbox|rhythm|backup|sweep/i).first(),
+  ).toBeVisible();
 });
 
 test('changes a setting and sees it stick, without a restart', async ({ page }) => {
@@ -66,6 +82,18 @@ test('changes a setting and sees it stick, without a restart', async ({ page }) 
   const next = before === '6' ? '5' : '6';
 
   await input.fill(next);
+  /*
+   * Blur, or Save stays disabled for ever.
+   *
+   * Save is disabled while the draft equals the stored value, and PrimeReact's
+   * `InputNumber` reports through `onValueChange`, which fires on blur rather
+   * than on each keystroke. `fill()` sets the value and dispatches input events
+   * but never blurs, so the draft was never written, the button never enabled,
+   * and Playwright waited the full timeout for an element that could not become
+   * actionable. A person does blur it — clicking Save takes focus off the field
+   * first — which is why this is the test's mistake and not the page's.
+   */
+  await input.blur();
   await panel.getByRole('button', { name: /save/i }).click();
 
   // Re-read from the server, not from the form: the registry may normalise, and
@@ -80,7 +108,7 @@ test('changes a setting and sees it stick, without a restart', async ({ page }) 
 
 test('refuses to demote the last administrator, and says why', async ({ page }) => {
   await signIn(page);
-  await page.getByRole('link', { name: /users|الأعضاء/i }).click();
+  await page.getByRole('link', { name: /members|الأعضاء/i }).click();
 
   const row = page.locator('tr', { hasText: EMAIL as string });
   await expect(row).toBeVisible({ timeout: 15_000 });
@@ -103,7 +131,7 @@ test('refuses to demote the last administrator, and says why', async ({ page }) 
 
 test('promotes a member, and the change sticks', async ({ page }) => {
   await signIn(page);
-  await page.getByRole('link', { name: /users|الأعضاء/i }).click();
+  await page.getByRole('link', { name: /members|الأعضاء/i }).click();
 
   // Somebody other than the administrator running the suite. An installation
   // with only the seeded Owner has nobody to promote, and inventing one here

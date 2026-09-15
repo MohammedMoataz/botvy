@@ -115,8 +115,30 @@ export class AuthStore {
     });
   }
 
+  /**
+   * Signed in, and **reactive** — which it was not.
+   *
+   * It read `this.tokens.signedIn`, and `tokens` is excluded from observability
+   * three lines up (`{ tokens: false }`). `makeAutoObservable` turns every
+   * getter into a computed, and a computed that reads no observable is
+   * evaluated once and cached for the life of the store. So this answered
+   * whatever was true at mount, for ever: `RequireAdmin` is an `observer` whose
+   * effect depends on this value, the value never changed, and **signing out
+   * left the operator on the console**. `e2e/portal.spec.ts` caught it the
+   * first time that suite was ever run against a live stack.
+   *
+   * This is the same mistake P9 found in the extension's panel store, where it
+   * read a deliberately non-observable mirror and the panel went on drawing the
+   * sign-in form after a successful sign-in. Same shape, opposite symptom, two
+   * surfaces apart — which is why the rule in CLAUDE.md is about the *getter*
+   * rather than about either store.
+   *
+   * `status` is the observable that already carries this: set on mount, on a
+   * successful sign-in, on sign-out, and when a refused refresh signs the SDK
+   * store out underneath us.
+   */
   get isAuthenticated(): boolean {
-    return this.tokens.signedIn;
+    return this.status === 'authenticated';
   }
 
   get isAdmin(): boolean {

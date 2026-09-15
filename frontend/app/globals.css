@@ -56,6 +56,20 @@ a {
 /* Logical properties, so the admin bar mirrors itself under dir="rtl". */
 .topbar {
   display: flex;
+  /*
+   * The header row wraps, not only the nav inside it.
+   *
+   * The nav already wraps its own links and says so — but its parent did not,
+   * so brand, nav, the title and the locale switcher stayed on one line and
+   * pushed the page past 360px. `/login` is the screen that showed it, because
+   * it renders inside this layout; FR-014's own check
+   * (`e2e/public.spec.ts`, "fits a 360-pixel phone") measured 360px of viewport
+   * against a wider document and failed there first.
+   *
+   * A child that wraps inside a parent that cannot is the shape of this bug,
+   * and it is invisible on a laptop.
+   */
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
