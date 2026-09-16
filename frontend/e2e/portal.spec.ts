@@ -35,7 +35,11 @@ async function signIn(page: Page): Promise<void> {
   // fixes and look identical from the outside.
   const [answer] = await Promise.all([
     page.waitForResponse((response) => response.url().includes('/auth/login')),
-    page.getByRole('button', { name: /sign in/i }).click(),
+    // Bilingual for the same reason as the label above: the Arabic case comes
+    // through here, and a button that is never found is a click that never
+    // happens — which surfaced as `waitForResponse` timing out, pointing at
+    // the network rather than at the locator.
+    page.getByRole('button', { name: /sign in|تسجيل الدخول/i }).click(),
   ]);
   expect(answer.status()).toBe(200);
 
@@ -222,7 +226,16 @@ test('reaches every act within three steps of the overview (SC-004)', async ({
    * needed a third — a sub-tab, a search before the row appears — would fail
    * here, which is the point of measuring it rather than asserting it in prose.
    */
-  for (const name of [/users/i, /settings/i, /automation/i, /model use/i, /what changed/i]) {
+  // The nav's own words. `Members`, not `users` — the route is `/users` and the
+  // label is not, and matching the route here is how this loop came to look for
+  // a link that does not exist.
+  for (const name of [
+    /members/i,
+    /settings/i,
+    /automation/i,
+    /model use/i,
+    /what changed/i,
+  ]) {
     await page.goto(`${BASE}/overview`);
     await page.getByRole('link', { name }).click();
     await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 10_000 });
