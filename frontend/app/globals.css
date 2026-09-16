@@ -36,10 +36,29 @@ a {
   border: 1px solid var(--botvy-line, #e3e6ea);
   border-radius: 8px;
   padding: 24px;
+  /*
+   * Long unbroken strings wrap instead of pushing the page sideways.
+   *
+   * The settings screen prints each key's default, and a default can be
+   * anything the registry holds — the allergen list is a single 875-pixel JSON
+   * string with no spaces in it. Measured at 360px: the paragraph's box stayed
+   * 270px and its *content* was 875, so every ancestor up to `<html>` inherited
+   * the overflow and the document became 920px wide. Nothing looked too wide,
+   * which is why it took a measurement rather than a reading: no element's
+   * right edge was past the viewport at all.
+   *
+   * `anywhere` rather than `break-word` because the string that needs breaking
+   * has no break opportunity in it, which is the whole problem.
+   */
+  overflow-wrap: anywhere;
 }
 
 .muted {
   color: var(--botvy-muted, #6b7280);
+  /* The class the registry's descriptions and defaults are printed in, and so
+     the class most likely to be handed a string with nothing to break on. See
+     `.panel` above for the measurement. */
+  overflow-wrap: anywhere;
 }
 
 .field {
