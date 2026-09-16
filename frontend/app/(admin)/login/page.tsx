@@ -23,6 +23,7 @@ import { useStores } from '../../../stores/provider';
  */
 function LoginPage() {
   const t = useTranslations('login');
+  const app = useTranslations('app');
   const { auth } = useStores();
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -35,10 +36,16 @@ function LoginPage() {
   }
 
   return (
-    <main className="shell">
-      <form className="panel" onSubmit={(event) => void onSubmit(event)}>
+    // Centred by `.auth-body` in the chrome, which is the branch this path
+    // takes: a sign-in form with the admin rail around it is eight links to
+    // pages that would bounce the reader straight back here.
+    <main className="panel auth-card">
+      <div className="page-head">
         <h1>{t('title')}</h1>
+        <p className="muted">{app('tagline')}</p>
+      </div>
 
+      <form className="stack" onSubmit={(event) => void onSubmit(event)}>
         <div className="field">
           <label htmlFor="email">{t('email')}</label>
           <InputText
@@ -67,6 +74,7 @@ function LoginPage() {
         <Button
           type="submit"
           label={auth.status === 'pending' ? t('pending') : t('submit')}
+          loading={auth.status === 'pending'}
           disabled={auth.status === 'pending'}
         />
 
@@ -77,15 +85,15 @@ function LoginPage() {
           them would confirm which addresses exist.
         */}
         {auth.failure === 'invalid_credentials' && (
-          <Message severity="error" text={t('invalid')} style={{ marginTop: 12 }} />
+          <Message severity="error" text={t('invalid')} />
         )}
         {/* The session was ended on purpose. Saying "wrong password" here would
             send the Owner looking for a typo instead of at their devices. */}
         {auth.failure === 'session_replay' && (
-          <Message severity="warn" text={t('replay')} style={{ marginTop: 12 }} />
+          <Message severity="warn" text={t('replay')} />
         )}
         {auth.failure === 'unknown' && (
-          <Message severity="error" text={t('failed')} style={{ marginTop: 12 }} />
+          <Message severity="error" text={t('failed')} />
         )}
       </form>
     </main>

@@ -105,14 +105,17 @@ function WorkflowsPage() {
 
   return (
     <main className="shell">
-      <h1>{t('title')}</h1>
-      <p className="muted">{t('explain')}</p>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('explain')}</p>
+      </div>
 
       {unconfigured && <Message severity="info" text={t('notConfigured')} />}
       {problem && <Message severity="warn" text={`${t('unreachable')} — ${problem}`} />}
       {note && <Message severity="success" text={note} />}
 
       {rows && (
+        <section className="panel">
         <DataTable value={rows} dataKey="id" emptyMessage={t('none')}>
           <Column field="name" header={t('name')} />
           <Column
@@ -158,13 +161,14 @@ function WorkflowsPage() {
             )}
           />
         </DataTable>
+        </section>
       )}
 
       <Button
         label={t('refresh')}
         severity="secondary"
         size="small"
-        style={{ marginTop: 16 }}
+        style={{ alignSelf: 'flex-start' }}
         onClick={() => void load()}
       />
     </main>

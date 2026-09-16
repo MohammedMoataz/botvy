@@ -28,8 +28,8 @@ export const Meetings = observer(function Meetings({
   showForm?: boolean;
 }) {
   return (
-    <section className="mb-3">
-      <h2 className="h6">{store.t('meetings.next')}</h2>
+    <section>
+      <h2 className="panel-title">{store.t('meetings.next')}</h2>
 
       {/* The list is drawn only once the member's own zone is known. An empty
           list would be a lie while it is not: every occurrence below is a wall

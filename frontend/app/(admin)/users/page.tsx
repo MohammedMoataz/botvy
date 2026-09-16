@@ -122,7 +122,7 @@ function UsersPage() {
     <main className="shell">
       <h1>{t('title')}</h1>
 
-      <div className="row" style={{ gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div className="row">
         <InputText
           value={query}
           placeholder={t('searchPlaceholder')}
@@ -157,9 +157,10 @@ function UsersPage() {
         />
       </div>
 
-      {problem && <Message severity="error" text={problem} style={{ marginBottom: 12 }} />}
-      {note && <Message severity="info" text={note} style={{ marginBottom: 12 }} />}
+      {problem && <Message severity="error" text={problem} />}
+      {note && <Message severity="info" text={note} />}
 
+      <section className="panel">
       <DataTable value={members} loading={busy === 'page'} emptyMessage={t('none')}>
         <Column field="email" header={t('email')} />
         <Column field="displayName" header={t('name')} />
@@ -179,10 +180,11 @@ function UsersPage() {
         <Button
           label={t('loadMore')}
           severity="secondary"
-          style={{ marginTop: 12 }}
+          style={{ alignSelf: 'flex-start' }}
           onClick={() => void run(() => admin.loadMore())}
         />
       )}
+      </section>
     </main>
   );
 }

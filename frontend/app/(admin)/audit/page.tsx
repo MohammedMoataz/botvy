@@ -83,12 +83,15 @@ function AuditPage() {
 
   return (
     <main className="shell">
-      <h1>{t('title')}</h1>
-      <p className="muted">{t('explain')}</p>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('explain')}</p>
+      </div>
 
       {problem && <Message severity="error" text={problem} />}
 
-      <div className="row" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'end' }}>
+      <section className="panel">
+      <div className="row" style={{ alignItems: 'end' }}>
         <label>
           <span className="muted">{t('actor')}</span>
           <InputText value={actor} onChange={(event) => setActor(event.target.value)} />
@@ -111,8 +114,10 @@ function AuditPage() {
         </label>
         <Button label={t('apply')} size="small" onClick={() => void load(true)} />
       </div>
+      </section>
 
-      <DataTable value={rows} dataKey="id" emptyMessage={t('none')} style={{ marginTop: 16 }}>
+      <section className="panel">
+      <DataTable value={rows} dataKey="id" emptyMessage={t('none')}>
         <Column
           header={t('when')}
           body={(row: AuditEntry) => new Date(row.at).toLocaleString()}
@@ -146,10 +151,11 @@ function AuditPage() {
           severity="secondary"
           size="small"
           loading={busy}
-          style={{ marginTop: 12 }}
+          style={{ alignSelf: 'flex-start' }}
           onClick={() => void load(false)}
         />
       )}
+      </section>
     </main>
   );
 }

@@ -1,23 +1,164 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 @import '@botvy/tokens/dist/tokens.css';
 
-/* Bootstrap 5 already uses logical properties, so setting <html dir="rtl">
-   mirrors the panel; only our own additions need care. */
+/*
+ * Bootstrap owns the components; @botvy/tokens owns the colours.
+ *
+ * The bridge is these five variables. Bootstrap 5.3 builds `.form-control`,
+ * `.card`, `.list-group` and the rest out of `--bs-body-bg`,
+ * `--bs-body-color`, `--bs-border-color`, `--bs-secondary-color` and
+ * `--bs-emphasis-color`, so pointing those at the tokens puts the panel on the
+ * same palette as the portal and the phone without restyling a component.
+ *
+ * They are declared after the import, so they win over both Bootstrap's own
+ * `:root` and its `[data-bs-theme="dark"]` block — equal specificity, later in
+ * source order. The tokens underneath them already switch with the reader's
+ * system, which is what makes one declaration cover both themes.
+ *
+ * `main.tsx` still sets `data-bs-theme`, because everything Bootstrap compiles
+ * to a literal — `.alert-warning`, `.text-bg-light`, `.btn-outline-secondary` —
+ * is only reachable through that attribute. Without it the panel drew light
+ * alerts and light badges on a dark ground, which is half of what "text does
+ * not appear in dark mode" turned out to mean.
+ */
+:root {
+  --bs-body-bg: var(--botvy-bg, #f6f7f9);
+  --bs-body-color: var(--botvy-text, #14171a);
+  --bs-border-color: var(--botvy-line, #e3e6ea);
+  --bs-secondary-color: var(--botvy-muted, #4b5563);
+  --bs-emphasis-color: var(--botvy-text, #14171a);
+  --bs-border-radius: 8px;
+  --bs-border-radius-sm: 6px;
+  --bs-link-color: var(--botvy-accent, #2563eb);
+  --bs-link-hover-color: var(--botvy-accent, #2563eb);
+
+  --panel-surface: var(--botvy-surface, #ffffff);
+  --panel-tint: color-mix(in srgb, var(--botvy-accent, #2563eb) 12%, transparent);
+}
+
+/* Bootstrap's own blue, moved onto the product's accent. The button variables
+   are per-component in 5.3, so this is the whole of it — no compiled colour to
+   chase, and the outline variants follow the same two names. */
+.btn-primary {
+  --bs-btn-bg: var(--botvy-accent, #2563eb);
+  --bs-btn-border-color: var(--botvy-accent, #2563eb);
+  --bs-btn-color: var(--botvy-accent-text, #ffffff);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--botvy-accent, #2563eb) 85%, #000);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--botvy-accent, #2563eb) 85%, #000);
+  --bs-btn-active-bg: color-mix(in srgb, var(--botvy-accent, #2563eb) 75%, #000);
+  --bs-btn-disabled-bg: var(--botvy-accent, #2563eb);
+  --bs-btn-disabled-border-color: var(--botvy-accent, #2563eb);
+}
+
+.nav-pills {
+  --bs-nav-pills-link-active-bg: var(--botvy-accent, #2563eb);
+  --bs-nav-pills-link-active-color: var(--botvy-accent-text, #ffffff);
+}
+
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: var(--botvy-accent, #2563eb);
+  box-shadow: 0 0 0 0.2rem var(--panel-tint);
+}
+
+.form-check-input:checked {
+  background-color: var(--botvy-accent, #2563eb);
+  border-color: var(--botvy-accent, #2563eb);
+}
+
 body {
   margin: 0;
   min-width: 320px;
   background: var(--botvy-bg, #f6f7f9);
-  color: var(--botvy-ink, #14171a);
+  color: var(--botvy-text, #14171a);
+  font-size: var(--botvy-font-size-base, 14px);
 }
 
+/* ------------------------------------------------------------- layout --- */
+
 .panel-shell {
-  padding: 16px;
+  padding: 0 12px 16px;
+}
+
+/*
+ * The header stays put while the list scrolls. A side panel is a tall narrow
+ * column, so the brand and the sync state are the first things off the top —
+ * and the sync state is the one thing a member has to be able to check before
+ * trusting anything below it.
+ */
+.panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 10px;
+  margin-block-end: 8px;
+  background: var(--botvy-bg, #f6f7f9);
+  border-block-end: 1px solid var(--botvy-line, #e3e6ea);
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
-  margin-block-end: 2px;
+  letter-spacing: -0.01em;
 }
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 26px;
+  block-size: 26px;
+  border-radius: var(--botvy-radius-md, 6px);
+  background: var(--botvy-accent, #2563eb);
+  color: var(--botvy-accent-text, #ffffff);
+  font-size: 14px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+/* A card, on the token surface rather than Bootstrap's. The panel's ground is
+   the page colour and a section lifts off it, which is the same relationship
+   the portal draws between `.shell` and `.panel`. */
+.panel-card {
+  background: var(--panel-surface);
+  border: 1px solid var(--botvy-line, #e3e6ea);
+  border-radius: var(--botvy-radius-lg, 8px);
+  padding: 12px;
+  margin-block-end: 12px;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: var(--botvy-font-size-xs, 12px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--botvy-muted, #4b5563);
+}
+
+/* The sync strip: information, so it is quiet until one of its two states
+   needs the member. */
+.sync-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  margin-block-end: 12px;
+  border: 1px solid var(--botvy-line, #e3e6ea);
+  border-radius: var(--botvy-radius-md, 6px);
+  background: var(--panel-surface);
+}
+
+/* --------------------------------------------------------------- list --- */
 
 .task-list {
   margin: 0;
@@ -32,8 +173,18 @@ body {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding-block: 6px;
-  border-block-end: 1px solid var(--botvy-line, #e3e6ea);
+  padding: 7px 8px;
+  border-radius: var(--botvy-radius-md, 6px);
+}
+
+.task-row + .task-row {
+  border-block-start: 1px solid var(--botvy-line, #e3e6ea);
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+}
+
+.task-row:hover {
+  background: var(--botvy-bg, #f6f7f9);
 }
 
 .task-title {
@@ -81,4 +232,15 @@ body {
      to compute a contrast ratio for a colour it did not choose. */
   color: #fff;
   text-shadow: 0 0 2px rgb(0 0 0 / 45%);
+}
+
+/* --------------------------------------------------------------- auth --- */
+
+.auth-card {
+  max-inline-size: 360px;
+  margin: 24px auto;
+  padding: 20px;
+  background: var(--panel-surface);
+  border: 1px solid var(--botvy-line, #e3e6ea);
+  border-radius: var(--botvy-radius-lg, 8px);
 }

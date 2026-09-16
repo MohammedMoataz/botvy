@@ -85,11 +85,16 @@ export const App = observer(function App() {
 
   return (
     <div className="panel-shell">
-      <div className="d-flex align-items-start mb-3">
-        <div className="me-auto">
-          <div className="brand">{store.t('app.name')}</div>
-          <div className="text-muted small">{store.t('app.tagline')}</div>
-        </div>
+      {/* Sticky, because a side panel is a tall narrow column and the sync
+          state is the one thing a member has to be able to check before
+          trusting the list under it. */}
+      <header className="panel-head">
+        <span className="brand me-auto">
+          <span className="brand-mark" aria-hidden="true">
+            B
+          </span>
+          {store.t('app.name')}
+        </span>
         <select
           className="form-select form-select-sm w-auto"
           aria-label={store.t('locale.label')}
@@ -102,7 +107,7 @@ export const App = observer(function App() {
             </option>
           ))}
         </select>
-      </div>
+      </header>
 
       {store.isAuthenticated ? (
         <div>
@@ -120,6 +125,7 @@ export const App = observer(function App() {
           {/* Three things a member adds, behind three tabs rather than three
               screens: the panel is a column beside their work, and a form they
               have to navigate to is a form they use on the phone instead. */}
+          <div className="panel-card">
           <ul className="nav nav-pills nav-fill mb-2 small">
             {(['task', 'reminder', 'meeting'] as const).map((kind) => (
               <li className="nav-item" key={kind}>
@@ -149,6 +155,7 @@ export const App = observer(function App() {
           )}
 
           {adding === 'reminder' && <AddReminder store={store} />}
+          </div>
 
           {undoable && (
             <div className="alert alert-secondary py-2 small d-flex align-items-center gap-2">
@@ -162,7 +169,8 @@ export const App = observer(function App() {
             </div>
           )}
 
-          <h1 className="h6">{store.t('tasks.today')}</h1>
+          <section className="panel-card">
+          <h1 className="panel-title">{store.t('tasks.today')}</h1>
 
           {/* Drawn only once the member's own zone is known. An empty list would
               be a lie while it is not: without a zone there is no "today", and
@@ -209,18 +217,22 @@ export const App = observer(function App() {
             </ul>
           )}
 
+          </section>
+
           {/* Today, then the week ahead. The meetings are expanded from their
               rules on every render — the panel holds the rule and not the rows,
               because recurrence is a rule plus exceptions and never expanded
               rows. */}
-          <hr />
-          <Meetings store={store} showForm={adding === 'meeting'} />
+          <div className="panel-card">
+            <Meetings store={store} showForm={adding === 'meeting'} />
+          </div>
 
           <Settings store={store} />
         </div>
       ) : (
-        <form onSubmit={onSubmit}>
-          <h1 className="h6">{store.t('login.title')}</h1>
+        <form className="auth-card" onSubmit={onSubmit}>
+          <h1 className="h5">{store.t('login.title')}</h1>
+          <p className="text-muted small">{store.t('app.tagline')}</p>
 
           {/*
             The address comes first, and it is on this form deliberately.
@@ -268,7 +280,7 @@ export const App = observer(function App() {
           </div>
 
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-primary btn-sm w-100"
             type="submit"
             disabled={store.status === 'pending'}
           >

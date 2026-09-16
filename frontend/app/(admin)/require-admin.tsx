@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -28,10 +28,28 @@ export const RequireAdmin = observer(function RequireAdmin({
   const t = useTranslations('admin');
   const { auth, socket } = useStores();
   const router = useRouter();
+  /*
+   * The session lives in `sessionStorage`, which the server does not have — so
+   * the server rendered `null` here and the browser's first render drew the
+   * whole page, and React answered a mismatch by **regenerating the tree**.
+   *
+   * That was invisible while the portal chrome was server-rendered markup
+   * outside this boundary. It stopped being invisible when the navigation
+   * became a client component, because a regenerated tree replaces its DOM
+   * nodes: `SC-004` clicks a nav link straight after a page load and Playwright
+   * reported the link "detached from the DOM, retrying".
+   *
+   * One flag fixes it for every page: the first client render agrees with the
+   * server, and the effect below is what admits the page. Nothing changes on
+   * screen — the redirect and the null branch already meant nobody saw a frame
+   * of admin chrome before the session was known.
+   */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!auth.isAuthenticated) router.replace('/login');
-  }, [auth.isAuthenticated, router]);
+    if (mounted && !auth.isAuthenticated) router.replace('/login');
+  }, [mounted, auth.isAuthenticated, router]);
 
   /*
    * One socket for the portal, opened here because this is the one component
@@ -60,7 +78,7 @@ export const RequireAdmin = observer(function RequireAdmin({
     socket.connect();
   }, [auth.isAuthenticated, socket]);
 
-  if (!auth.isAuthenticated) {
+  if (!mounted || !auth.isAuthenticated) {
     // Not the children, and not a spinner either: a flash of admin chrome
     // before the redirect looks like the page loaded and then took it away.
     return null;

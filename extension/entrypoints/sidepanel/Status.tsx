@@ -22,7 +22,7 @@ export const Status = observer(function Status({ store }: { store: PanelStore })
           : 'text-bg-success';
 
   return (
-    <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+    <div className="sync-strip">
       <span className={`badge ${tone}`}>{store.t(`sync.state.${state}`)}</span>
 
       <span className="text-muted small">

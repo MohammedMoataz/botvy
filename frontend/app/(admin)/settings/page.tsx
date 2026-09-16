@@ -95,21 +95,31 @@ function SettingsPage() {
 
   return (
     <main className="shell">
-      <h1>{t('title')}</h1>
-      <p className="muted">{t('explain')}</p>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('explain')}</p>
+      </div>
 
       {problems[''] && <Message severity="error" text={problems['']} />}
 
-      <InputText
-        value={filter}
-        onChange={(event) => setFilter(event.target.value)}
-        placeholder={t('filter')}
-        aria-label={t('filter')}
-        style={{ marginBottom: 16, maxWidth: 360, width: '100%' }}
-      />
+      <span className="p-input-icon-left" style={{ maxWidth: 360, width: '100%' }}>
+        <i className="pi pi-search" aria-hidden="true" />
+        <InputText
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          placeholder={t('filter')}
+          aria-label={t('filter')}
+          style={{ width: '100%' }}
+        />
+      </span>
 
       {!entries && <p className="muted">{t('loading')}</p>}
 
+      {/* Two columns on a desk, one on a phone. The registry is around sixty
+          keys and each is three short lines, so a single column was a page you
+          scroll for half a minute to reach `settings.*` — the filter above helps
+          when you know the name and not when you are reading. */}
+      <div className="settings-grid">
       {shown.map((entry) => (
         <section className="panel" key={entry.key}>
           <div className="row" style={{ gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -162,6 +172,7 @@ function SettingsPage() {
           )}
         </section>
       ))}
+      </div>
     </main>
   );
 }

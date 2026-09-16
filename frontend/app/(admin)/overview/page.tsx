@@ -114,30 +114,57 @@ function OverviewPage() {
         answer, and it survives a page load.
       */}
       {report?.defaultAdminPassword && (
-        <Message severity="warn" text={t('defaultPassword')} style={{ marginBottom: 16 }} />
+        <Message severity="warn" text={t('defaultPassword')} />
       )}
 
-      <h1>{t('title')}</h1>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('todayExplain', { zone: zoneLabel })}</p>
+      </div>
 
-      {problem && <Message severity="error" text={problem} style={{ marginBottom: 16 }} />}
-      {health.problem && (
-        <Message severity="warn" text={health.problem} style={{ marginBottom: 16 }} />
-      )}
+      {problem && <Message severity="error" text={problem} />}
+      {health.problem && <Message severity="warn" text={health.problem} />}
+
+      {/* The two numbers an Owner comes to this page for, before the detail.
+          The day is theirs, which is why it is counted in their zone rather
+          than the server's — and why the usage page, which spans every member
+          at once, counts in UTC instead and says so. */}
+      <div className="stats">
+        <section className="panel">
+          <div className="stat-value">{today ? calls : '—'}</div>
+          <div className="stat-label">{t('countCalls')}</div>
+        </section>
+        <section className="panel">
+          <div className="stat-value">
+            {today ? tokens.toLocaleString(locale) : '—'}
+          </div>
+          <div className="stat-label">{t('countTokens')}</div>
+        </section>
+        <section className="panel">
+          <div className="stat-value">
+            {report ? (
+              <Tag
+                severity={report.status === 'ok' ? 'success' : 'warning'}
+                value={t(report.status === 'ok' ? 'statusOk' : 'statusDegraded')}
+              />
+            ) : (
+              '—'
+            )}
+          </div>
+          <div className="stat-label">{t('health')}</div>
+        </section>
+      </div>
 
       <section className="panel">
         <h2>{t('health')}</h2>
         {!report && <p className="muted">{t('loading')}</p>}
         {report && (
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <Tag
-              severity={report.status === 'ok' ? 'success' : 'warning'}
-              value={t(report.status === 'ok' ? 'statusOk' : 'statusDegraded')}
-            />
-            <Tag severity={report.postgres ? 'success' : 'danger'} value={`PostgreSQL`} />
-            <Tag severity={report.mongo ? 'success' : 'danger'} value={`MongoDB`} />
+          <div className="row" style={{ gap: 8 }}>
+            <Tag severity={report.postgres ? 'success' : 'danger'} value="PostgreSQL" />
+            <Tag severity={report.mongo ? 'success' : 'danger'} value="MongoDB" />
             {/* Neither of these degrades the platform on its own, so they are
                 shown as plain information rather than as faults. */}
-            <Tag severity={report.ollama ? 'success' : 'warning'} value={`Ollama`} />
+            <Tag severity={report.ollama ? 'success' : 'warning'} value="Ollama" />
             <Tag
               severity={report.pushConfigured ? 'success' : 'info'}
               value={t(report.pushConfigured ? 'pushOn' : 'pushOff')}
@@ -146,24 +173,18 @@ function OverviewPage() {
         )}
 
         {report && report.jobs.length === 0 && (
-          <p className="muted" style={{ marginTop: 12 }}>
-            {t('noJobsYet')}
-          </p>
+          <p className="muted">{t('noJobsYet')}</p>
         )}
         {report && report.jobs.length > 0 && (
           <>
-            <ul style={{ marginTop: 12 }}>
+            <ul className="plain-list">
               {report.jobs.map((job) => (
-                <li key={job.job}>
-                  <Tag
-                    severity={job.stale ? 'danger' : 'success'}
-                    value={job.job}
-                    style={{ marginInlineEnd: 8 }}
-                  />
+                <li key={job.job} className="row" style={{ gap: 8 }}>
+                  <Tag severity={job.stale ? 'danger' : 'success'} value={job.job} />
                   <span className="muted">
                     {job.lastOkAt ? format.format(new Date(job.lastOkAt)) : t('neverRan')}
                   </span>
-                  {job.lastError && <span className="muted"> — {job.lastError}</span>}
+                  {job.lastError && <span className="muted">{job.lastError}</span>}
                 </li>
               ))}
             </ul>
@@ -172,50 +193,44 @@ function OverviewPage() {
         )}
       </section>
 
-      <section className="panel">
-        <h2>{t('todayTitle')}</h2>
-        {/* The day is the administrator's, which is why it is counted in their
-            zone rather than the server's — and why the usage page, which spans
-            every member at once, counts in UTC instead and says so. */}
-        <p className="muted">{t('todayExplain', { zone: zoneLabel })}</p>
-        <div className="row" style={{ gap: 24, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: '1.6rem' }}>{today ? calls : '—'}</div>
-            <div className="muted">{t('countCalls')}</div>
+      <div className="grid">
+        <section className="panel">
+          <h2>{t('registration')}</h2>
+          <p className="muted">{t('registrationExplain')}</p>
+          <div className="row">
+            <InputSwitch
+              checked={registrationOpen}
+              disabled={saving || !settings}
+              onChange={(event) => void toggleRegistration(event.value === true)}
+            />
+            <span>{t(registrationOpen ? 'registrationOpen' : 'registrationClosed')}</span>
           </div>
-          <div>
-            <div style={{ fontSize: '1.6rem' }}>
-              {today ? tokens.toLocaleString(locale) : '—'}
-            </div>
-            <div className="muted">{t('countTokens')}</div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="panel">
-        <h2>{t('registration')}</h2>
-        <p className="muted">{t('registrationExplain')}</p>
-        <div className="row" style={{ gap: 12, alignItems: 'center' }}>
-          <InputSwitch
-            checked={registrationOpen}
-            disabled={saving || !settings}
-            onChange={(event) => void toggleRegistration(event.value === true)}
+        <section className="panel">
+          <h2>{t('you')}</h2>
+          {/* `member` is only set by a live sign-in — nothing re-reads it after
+              a reload — so on a refreshed page this card held two empty lines
+              and read as broken. The profile is loaded here anyway and carries
+              the name, which is the honest thing to show instead. */}
+          {auth.member ? (
+            <p>
+              {auth.member.email}
+              <br />
+              <span className="muted">{auth.member.role}</span>
+            </p>
+          ) : (
+            <p className="muted">{profile.profile?.displayName ?? '—'}</p>
+          )}
+          <Button
+            label={t('signOut')}
+            severity="secondary"
+            outlined
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => void auth.logout()}
           />
-          <span>{t(registrationOpen ? 'registrationOpen' : 'registrationClosed')}</span>
-        </div>
-      </section>
-
-      <section className="panel">
-        <h2>{t('you')}</h2>
-        <p>
-          {auth.member?.email} — <span className="muted">{auth.member?.role}</span>
-        </p>
-        <Button
-          label={t('signOut')}
-          severity="secondary"
-          onClick={() => void auth.logout()}
-        />
-      </section>
+        </section>
+      </div>
     </main>
   );
 }

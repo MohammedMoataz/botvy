@@ -191,12 +191,14 @@ function IngestionPage() {
   );
 
   return (
-    <main className="stack">
+    <main className="shell">
       <ConfirmDialog />
-      <h1>{t('title')}</h1>
-      <p className="muted">{t('intro')}</p>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('intro')}</p>
+      </div>
 
-      <div className="row" style={{ gap: 12 }}>
+      <div className="row">
         <Dropdown
           value={status}
           options={[
@@ -226,6 +228,7 @@ function IngestionPage() {
         </p>
       ) : null}
 
+      <section className="panel">
       <DataTable value={rows} emptyMessage={t('empty')} stripedRows>
         <Column field="title" header={t('what')} body={(row: QueueRow) => (
           <div className="stack" style={{ gap: 2 }}>
@@ -238,6 +241,7 @@ function IngestionPage() {
         <Column header={t('reason')} body={reasonTemplate} />
         <Column header="" body={actionsTemplate} />
       </DataTable>
+      </section>
     </main>
   );
 }

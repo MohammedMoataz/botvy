@@ -29,9 +29,16 @@ export function LocaleSwitcher() {
   }
 
   return (
-    <label>
-      <span className="muted">{t('label')}: </span>
+    // A native <select> rather than PrimeReact's Dropdown: this control renders
+    // on the marketing page, which must load with nothing third-party and
+    // nothing render-blocking, and a portal-rendered overlay for two options is
+    // a lot of JavaScript for a thing the platform already draws. It borrows
+    // PrimeReact's input skin so it does not look like the one control on the
+    // page nobody styled.
+    <label className="locale">
+      <span className="muted">{t('label')}</span>
       <select
+        className="p-inputtext p-inputtext-sm"
         value={current}
         disabled={pending}
         onChange={(e) => select(e.target.value as Locale)}

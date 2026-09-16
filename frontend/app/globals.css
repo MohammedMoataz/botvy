@@ -1,8 +1,80 @@
-/* Palette comes from @botvy/tokens (seeded from v1's admin CSS). The fallbacks
-   are the same v1 values, so a page still reads correctly if the token build
-   has not run yet. */
+/*
+ * The portal's own stylesheet. Every colour comes from @botvy/tokens, under the
+ * names `packages/tokens/build.mjs` actually emits.
+ *
+ * That sentence is the bug this file was rewritten for: it read `--botvy-ink`
+ * and `--botvy-panel`, and the generator emits `--botvy-text` and
+ * `--botvy-surface`. Every one of those reads therefore fell through to its
+ * fallback — and the fallbacks are the *light* literals, so in dark mode the
+ * page painted near-black text on a near-black ground and most of the portal
+ * was simply not there. A fallback only ever exercised by a typo is a fallback
+ * that hides the typo.
+ */
+
+/*
+ * PrimeReact is light by default and dark when the reader's system is.
+ *
+ * Lara compiles its palette to literal colours — 14 `var()` calls in the whole
+ * sheet — so retheming it means loading the other file, not overriding a set of
+ * variables. The media query rides on the `@import`, so the dark sheet applies
+ * only under `prefers-color-scheme: dark`; it has to be the first rule in this
+ * file, because that is the only place CSS allows an import.
+ *
+ * `layout.tsx` imports the light theme before this file, so the dark one wins
+ * the cascade when its query matches and loses when it does not.
+ */
+@import 'primereact/resources/themes/lara-dark-blue/theme.css' screen and
+  (prefers-color-scheme: dark);
+
 :root {
   color-scheme: light dark;
+
+  /* Spacing, elevation and the shell's measurements. Deliberately *not* in
+     @botvy/tokens: those are shared with the phone, and a Flutter surface has
+     its own idea of what a shadow is. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --shadow-1: 0 1px 2px rgb(15 23 42 / 6%), 0 1px 3px rgb(15 23 42 / 5%);
+  --shadow-2: 0 10px 28px rgb(15 23 42 / 10%), 0 2px 6px rgb(15 23 42 / 5%);
+
+  --side-width: 240px;
+  --bar-height: 56px;
+
+  /* Two accent tints, mixed rather than added to the token set: `color-mix`
+     recomputes them from whichever accent the theme is using, so they stay
+     right in both modes without a second column in tokens.json. */
+  --tint: color-mix(in srgb, var(--botvy-accent, #2563eb) 10%, transparent);
+  --tint-strong: color-mix(in srgb, var(--botvy-accent, #2563eb) 18%, transparent);
+  /*
+   * Accent text *on* the tint, which is not the same colour as accent text on
+   * the page. The raw accent over a 10% wash of itself is 4.2:1 — the axe scan
+   * on the public page failed on exactly that, at the one place it is used in
+   * 12px type. Pulled toward the ink, which is dark in the light theme and
+   * light in the dark one, so both directions gain contrast from one line.
+   */
+  --tint-ink: color-mix(in srgb, var(--botvy-accent, #2563eb) 72%, var(--botvy-text, #14171a));
+}
+
+/* A shadow tuned for a white page is invisible on a dark one. Three states, the
+   same shape tokens.css uses: bare :root is light, the media query covers the
+   system default without overriding an explicit light choice, and the
+   [data-theme] block lets a toggle win in both directions. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 45%);
+    --shadow-2: 0 12px 32px rgb(0 0 0 / 55%);
+  }
+}
+
+:root[data-theme='dark'] {
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 45%);
+  --shadow-2: 0 12px 32px rgb(0 0 0 / 55%);
 }
 
 * {
@@ -12,91 +84,694 @@
 body {
   margin: 0;
   background: var(--botvy-bg, #f6f7f9);
-  color: var(--botvy-ink, #14171a);
-  font:
-    14px/1.6 system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  color: var(--botvy-text, #14171a);
+  /* `--font-family` is Lara's, and Lara ships Inter as a woff2 beside its own
+     stylesheet — a local font on our own origin, which is what the marketing
+     page's "no third-party request at all" case demands. The token stack is the
+     fallback for the moment before it decodes, and for Arabic, which Inter has
+     no glyphs for. */
+  font-family: var(--font-family, var(--botvy-font-family, system-ui, sans-serif));
+  font-size: var(--botvy-font-size-base, 14px);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
   color: var(--botvy-accent, #2563eb);
+  text-decoration-color: color-mix(in srgb, currentcolor 35%, transparent);
+  text-underline-offset: 3px;
 }
 
-.shell {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 48px 20px;
+a:hover {
+  text-decoration-color: currentcolor;
 }
+
+/* One visible focus ring for the whole portal, drawn outside the box so it
+   never changes a layout. PrimeReact draws its own inside its components. */
+:focus-visible {
+  outline: 2px solid var(--botvy-accent, #2563eb);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--tint-strong);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--botvy-line, #e3e6ea) transparent;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.92em;
+  background: var(--botvy-bg, #f6f7f9);
+  border: 1px solid var(--botvy-line, #e3e6ea);
+  border-radius: var(--botvy-radius-sm, 4px);
+  padding: 1px 5px;
+}
+
+/* ------------------------------------------------------------- layout --- */
+
+/*
+ * `.row` and `.stack` were used in sixteen places and defined in none, which is
+ * most of why the portal read as unstyled markup: every toolbar, every tag
+ * strip and every pair of numbers laid itself out as stacked blocks. They are
+ * the two primitives the pages already reach for, so they are the two defined
+ * here rather than a layout system nobody asked for.
+ */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The page body: a column with a gap rather than margins, so a page is a list
+   of sections and the space between them is stated once. */
+.shell {
+  /*
+   * `width: 100%` and not only `max-width`.
+   *
+   * `.app-main` is a flex column, and an item with `margin: 0 auto` opts out of
+   * the cross-axis stretch — so this box sized itself to its *content* instead
+   * of to its column. At 360px the members table made it 600px wide and the
+   * whole document scrolled sideways, which is the one thing FR-014 forbids,
+   * while every other page measured zero because none of them holds a table
+   * that wide. Stated width, then centred inside it.
+   */
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* And a section may not be wider than the page: `min-width: 0` is what lets the
+   card shrink so the table inside it reaches its own `overflow-x: auto`. */
+.shell > * {
+  min-width: 0;
+}
+
+/* Prose rather than a console: the marketing page, and anything else that is
+   read rather than operated. */
+.shell-narrow {
+  max-width: 760px;
+}
+
+.shell > h1,
+.shell > h2,
+.shell > p {
+  margin: 0;
+}
+
+/* A title and its sentence belong together, closer than two sections are. */
+.page-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.page-head > * {
+  margin: 0;
+}
+
+/* A number and its name, not a section with a heading in it. */
+.stats .panel {
+  gap: var(--space-1);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-4);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.stat-label {
+  color: var(--botvy-muted, #4b5563);
+  font-size: var(--botvy-font-size-sm, 13px);
+}
+
+/* --------------------------------------------------------------- card --- */
 
 .panel {
-  background: var(--botvy-panel, #ffffff);
+  background: var(--botvy-surface, #ffffff);
   border: 1px solid var(--botvy-line, #e3e6ea);
-  border-radius: 8px;
-  padding: 24px;
+  border-radius: var(--botvy-radius-lg, 8px);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   /*
-   * Long unbroken strings wrap instead of pushing the page sideways.
-   *
-   * The settings screen prints each key's default, and a default can be
-   * anything the registry holds — the allergen list is a single 875-pixel JSON
-   * string with no spaces in it. Measured at 360px: the paragraph's box stayed
-   * 270px and its *content* was 875, so every ancestor up to `<html>` inherited
-   * the overflow and the document became 920px wide. Nothing looked too wide,
-   * which is why it took a measurement rather than a reading: no element's
-   * right edge was past the viewport at all.
-   *
-   * `anywhere` rather than `break-word` because the string that needs breaking
-   * has no break opportunity in it, which is the whole problem.
+   * Long unbroken strings wrap instead of pushing the page sideways. The
+   * settings screen prints each key's default, and a default can be anything
+   * the registry holds — the allergen list is a single 875-pixel JSON string
+   * with no break opportunity in it. Measured at 360px the box stayed 270px and
+   * its content was 875, so every ancestor up to <html> inherited the overflow.
+   * `anywhere` rather than `break-word`, because the string that needs breaking
+   * has nowhere to break.
    */
   overflow-wrap: anywhere;
 }
 
+/* The gap does the spacing, and `min-width: 0` is what lets a wide table inside
+   a card scroll itself rather than stretch the card. */
+.panel > * {
+  margin: 0;
+  min-width: 0;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.panel-head > :first-child {
+  margin-inline-end: auto;
+}
+
 .muted {
-  color: var(--botvy-muted, #6b7280);
-  /* The class the registry's descriptions and defaults are printed in, and so
-     the class most likely to be handed a string with nothing to break on. See
-     `.panel` above for the measurement. */
+  color: var(--botvy-muted, #4b5563);
+  /* The class the registry's descriptions and defaults print in, and so the
+     class most likely to be handed a string with nothing to break on. */
   overflow-wrap: anywhere;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-.field input {
+.field > label {
+  font-size: var(--botvy-font-size-sm, 13px);
+  font-weight: 600;
+  color: var(--botvy-muted, #4b5563);
+}
+
+.field input,
+.field .p-inputtext,
+.field .p-password {
   width: 100%;
 }
 
-/* Logical properties, so the admin bar mirrors itself under dir="rtl". */
-.topbar {
+/* The filter bars on audit, usage and members: a label stacked over its input,
+   inside a row that wraps. Those pages write `<label><span/><input/></label>`
+   directly, so this styles the shape they already have. */
+.row > label {
   display: flex;
-  /*
-   * The header row wraps, not only the nav inside it.
-   *
-   * The nav already wraps its own links and says so — but its parent did not,
-   * so brand, nav, the title and the locale switcher stayed on one line and
-   * pushed the page past 360px. `/login` is the screen that showed it, because
-   * it renders inside this layout; FR-014's own check
-   * (`e2e/public.spec.ts`, "fits a 360-pixel phone") measured 360px of viewport
-   * against a wider document and failed there first.
-   *
-   * A child that wraps inside a parent that cannot is the shape of this bug,
-   * and it is invisible on a laptop.
-   */
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-  border-block-end: 1px solid var(--botvy-line, #e3e6ea);
-  background: var(--botvy-panel, #ffffff);
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-.topbar .brand {
-  font-weight: 700;
+.row > label > .muted {
+  font-size: var(--botvy-font-size-sm, 13px);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------- shell --- */
+
+.app {
+  display: grid;
+  grid-template-columns: var(--side-width) minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--botvy-bg, #f6f7f9);
+}
+
+/* Logical properties throughout, so the whole chrome mirrors under dir="rtl"
+   with no second rule. */
+.app-side {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  block-size: 100dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4) var(--space-3);
+  background: var(--botvy-surface, #ffffff);
+  border-inline-end: 1px solid var(--botvy-line, #e3e6ea);
+}
+
+.app-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--bar-height);
+  padding: var(--space-2) var(--space-5);
+  background: color-mix(in srgb, var(--botvy-surface, #ffffff) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-block-end: 1px solid var(--botvy-line, #e3e6ea);
+}
+
+.app-bar > :first-child {
   margin-inline-end: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  color: var(--botvy-text, #14171a);
+  text-decoration: none;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--botvy-radius-md, 6px);
+  background: var(--botvy-accent, #2563eb);
+  color: var(--botvy-accent-text, #ffffff);
+  font-size: 15px;
+  flex: 0 0 auto;
+}
+
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-label {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  font-size: var(--botvy-font-size-xs, 12px);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--botvy-muted, #4b5563);
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px var(--space-3);
+  border-radius: var(--botvy-radius-md, 6px);
+  color: var(--botvy-text, #14171a);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.nav-link .pi {
+  font-size: 15px;
+  color: var(--botvy-muted, #4b5563);
+}
+
+.nav-link:hover {
+  background: var(--botvy-bg, #f6f7f9);
+}
+
+/*
+ * The current page, marked with `aria-current` rather than a class — the
+ * attribute is what a screen reader announces, so styling the same thing the
+ * assistive technology reads keeps one source of truth for "you are here".
+ */
+.nav-link[aria-current='page'] {
+  background: var(--tint);
+  /* Same reason as `.eyebrow`: accent over its own wash is under 4.5:1. */
+  color: var(--tint-ink);
+  font-weight: 600;
+}
+
+.nav-link[aria-current='page'] .pi {
+  color: inherit;
+}
+
+.app-side-foot {
+  margin-block-start: auto;
+  padding: var(--space-3);
+  font-size: var(--botvy-font-size-xs, 12px);
+  color: var(--botvy-muted, #4b5563);
+}
+
+/*
+ * Under 980px the rail becomes a scrolling strip above the page.
+ *
+ * `overflow-x: auto` on the strip and not on the document: eight links in a row
+ * is exactly what pushed a phone-width portal into a sideways scroll, and
+ * FR-014 is measured on the document rather than on a container.
+ */
+@media (max-width: 980px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    /* Three auto rows in a box with `min-height: 100dvh` share the slack
+       between them by default, which padded the bar, the nav strip and the page
+       apart with a hundred pixels of nothing. The rows go to the top; the box
+       still covers the viewport, which is all the min-height was for. */
+    align-content: start;
+  }
+
+  /*
+   * `display: contents` lifts the bar and the page out of `.app-main` and into
+   * the grid, which is the only way to get the brand *above* the nav strip in
+   * one column — source order puts the rail first, and on a phone that reads as
+   * a page whose header is underneath its tabs.
+   */
+  .app-main {
+    display: contents;
+  }
+
+  /* `display: contents` makes these children grid items, so the order lives on
+     them and not on the box that used to hold them. */
+  .app-main > * {
+    order: 3;
+  }
+
+  .app-main > .app-bar {
+    order: 1;
+  }
+
+  .app-side {
+    order: 2;
+    position: static;
+    block-size: auto;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: var(--space-2) var(--space-3);
+    border-inline-end: none;
+    border-block-end: 1px solid var(--botvy-line, #e3e6ea);
+  }
+
+
+  .nav-group {
+    flex-direction: row;
+  }
+
+  .nav-label,
+  .app-side-foot {
+    display: none;
+  }
+
+  .app-bar {
+    padding-inline: var(--space-3);
+  }
+
+  .shell {
+    padding: var(--space-5) var(--space-3) var(--space-6);
+  }
+}
+
+/* --------------------------------------------------------------- auth --- */
+
+/*
+ * Sign-in has no navigation, because there is nowhere to navigate to yet. It
+ * shares a route group with the rest of the portal, so the chrome decides by
+ * path rather than by the page being moved.
+ */
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  padding: var(--space-4);
+  gap: var(--space-4);
+  background:
+    radial-gradient(60rem 30rem at 50% -10rem, var(--tint), transparent 70%),
+    var(--botvy-bg, #f6f7f9);
+}
+
+.auth-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.auth-head > :first-child {
+  margin-inline-end: auto;
+}
+
+.auth-body {
+  display: grid;
+  place-items: center;
+  padding-block-end: var(--space-7);
+}
+
+.auth-card {
+  inline-size: 100%;
+  max-inline-size: 400px;
+  box-shadow: var(--shadow-2);
+  gap: var(--space-4);
+}
+
+/* --------------------------------------------------------------- hero --- */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-block: var(--space-6) var(--space-4);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 2.9rem);
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 0;
+  font-size: 1.1rem;
+  max-width: 60ch;
+}
+
+.eyebrow {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: var(--botvy-radius-full, 9999px);
+  background: var(--tint);
+  color: var(--tint-ink);
+  font-size: var(--botvy-font-size-xs, 12px);
+  font-weight: 600;
+}
+
+/* A list of features is a list; it is drawn as cards, without the bullets. */
+.feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--space-3);
+}
+
+.feature-list > li {
+  padding: var(--space-4);
+  border: 1px solid var(--botvy-line, #e3e6ea);
+  border-radius: var(--botvy-radius-lg, 8px);
+  background: var(--botvy-bg, #f6f7f9);
+}
+
+.feature-list > li > strong {
+  display: block;
+  margin-block-end: var(--space-1);
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* --------------------------------------------------- PrimeReact tweaks --- */
+
+/*
+ * A wide table scrolls itself rather than widening the document — the same
+ * FR-014 rule as the nav strip, at the other place eight columns can break it.
+ */
+.p-datatable-wrapper {
+  overflow-x: auto;
+}
+
+/* Lara's own surfaces, pulled onto the token palette so a card, a table header
+   and a dialog are the same colour as everything around them in both themes. */
+.p-datatable .p-datatable-thead > tr > th {
+  background: var(--botvy-bg, #f6f7f9);
+  border-color: var(--botvy-line, #e3e6ea);
+  font-size: var(--botvy-font-size-sm, 13px);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--botvy-muted, #4b5563);
+}
+
+.p-datatable .p-datatable-tbody > tr > td {
+  border-color: var(--botvy-line, #e3e6ea);
+}
+
+.p-message {
+  margin: 0;
+}
+
+.p-tag {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- cta --- */
+
+/*
+ * A link that looks like a button. Not a PrimeReact Button: the marketing page
+ * is a server component with no interactivity in it at all, and a client
+ * component here would be JavaScript shipped so that a link could look filled.
+ */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 18px;
+  border-radius: var(--botvy-radius-md, 6px);
+  background: var(--botvy-accent, #2563eb);
+  color: var(--botvy-accent-text, #ffffff);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-1);
+}
+
+.cta:hover {
+  filter: brightness(1.08);
+}
+
+.cta-quiet {
+  background: var(--botvy-surface, #ffffff);
+  color: var(--botvy-text, #14171a);
+  border: 1px solid var(--botvy-line, #e3e6ea);
+}
+
+/* ------------------------------------------------------------- locale --- */
+
+.locale,
+/* The filter bars stack a label over its input, and this label is not one of
+   those — it is a word beside a control. Written against `.row > label` so it
+   outranks that rule rather than relying on which came last in the file. */
+.row > .locale {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.locale > .muted {
+  font-size: var(--botvy-font-size-sm, 13px);
+}
+
+/*
+ * PrimeReact's Password is an *inline-flex* wrapper around its own input, so
+ * widening the wrapper alone left the field 72px narrower than the email box
+ * above it — `width: 100%` on a flex item is a basis it is still free to shrink
+ * from, and it did. The wrapper becomes a block and the input fills it; the
+ * mask toggle is positioned absolutely by `p-input-icon-right` and does not
+ * need the flex row. Measured: 278px before, 350px after.
+ */
+.field .p-password {
+  display: block;
+}
+
+.field .p-password > .p-inputtext,
+.field .p-password-input {
+  width: 100%;
+}
+
+/* The settings registry: two columns where there is room for two. Its own rule
+   rather than `.grid`, because a key's control can be a JSON textarea and the
+   generic grid's 240px track would put four of those side by side. */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+ * A table narrower than its columns need does not shrink gracefully — it breaks
+ * every cell to one character per line, which is what the members list did at
+ * 360px once the page stopped scrolling sideways. A floor, so the wrapper above
+ * scrolls instead. Below its own width the table is unchanged.
+ */
+.p-datatable .p-datatable-table {
+  min-width: 34rem;
+  /*
+   * And the card's `overflow-wrap: anywhere` must not reach a cell. It is
+   * inherited, so an auto-layout table computed every column's minimum as one
+   * character and drew the members list as a stack of single letters inside a
+   * 544px table — wide *and* unreadable. Cells keep whole words and the wrapper
+   * above scrolls, which is what the floor is for.
+   */
+  overflow-wrap: normal;
 }

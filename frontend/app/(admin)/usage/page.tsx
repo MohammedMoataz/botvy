@@ -89,12 +89,15 @@ function UsagePage() {
 
   return (
     <main className="shell">
-      <h1>{t('title')}</h1>
-      <p className="muted">{t('explain')}</p>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('explain')}</p>
+      </div>
 
       {problem && <Message severity="error" text={problem} />}
 
-      <div className="row" style={{ gap: 12, alignItems: 'end', flexWrap: 'wrap' }}>
+      <section className="panel">
+      <div className="row" style={{ alignItems: 'end' }}>
         <label>
           <span className="muted">{t('from')}</span>
           <InputText
@@ -113,6 +116,7 @@ function UsagePage() {
         </label>
         <Button label={t('apply')} size="small" onClick={() => void load()} />
       </div>
+      </section>
 
       <section className="panel">
         <h2>{t('byDay')}</h2>

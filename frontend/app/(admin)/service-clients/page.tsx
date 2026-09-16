@@ -71,14 +71,16 @@ function ServiceClientsPage() {
 
   return (
     <main className="shell">
-      <h1>{t('title')}</h1>
-      <p className="muted">{t('explain')}</p>
+      <div className="page-head">
+        <h1>{t('title')}</h1>
+        <p className="muted">{t('explain')}</p>
+      </div>
 
       {problem && <Message severity="error" text={problem} style={{ marginBottom: 12 }} />}
 
       <section className="panel">
         <h2>{t('create')}</h2>
-        <div className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div className="row" style={{ alignItems: 'flex-end' }}>
           <div className="field">
             <label htmlFor="client-name">{t('name')}</label>
             <InputText
@@ -104,6 +106,7 @@ function ServiceClientsPage() {
         </div>
       </section>
 
+      <section className="panel">
       <DataTable value={clients} emptyMessage={t('none')}>
         <Column field="name" header={t('name')} />
         <Column
@@ -140,6 +143,7 @@ function ServiceClientsPage() {
           }
         />
       </DataTable>
+      </section>
 
       {/*
         Not dismissible by clicking away, and no close button in the corner. The

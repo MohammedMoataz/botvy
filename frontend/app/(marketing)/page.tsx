@@ -26,33 +26,49 @@ export default async function MarketingPage() {
   const features = ['day', 'coach', 'training', 'food', 'reading'] as const;
 
   return (
-    <main className="shell">
-      <header className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <strong className="brand">{app('name')}</strong>
+    <main className="shell shell-narrow">
+      <header className="row" style={{ justifyContent: 'space-between' }}>
+        <span className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            B
+          </span>
+          {app('name')}
+        </span>
         <LocaleSwitcher />
       </header>
 
-      <h1>{t('headline')}</h1>
-      <p className="muted" style={{ fontSize: '1.1rem', maxWidth: '60ch' }}>
-        {t('body')}
-      </p>
+      <div className="hero">
+        <span className="eyebrow">{app('tagline')}</span>
+        <h1>{t('headline')}</h1>
+        <p className="muted">{t('body')}</p>
+        <div className="row">
+          <Link className="cta" href="/login">
+            {t('signIn')}
+          </Link>
+          <a className="cta cta-quiet" href="#get">
+            {t('downloadTitle')}
+          </a>
+        </div>
+      </div>
 
       <section className="panel">
         <h2>{t('featuresTitle')}</h2>
-        <ul>
+        {/* A list of five things is a list; it is drawn as cards because five
+            one-line paragraphs in a column is a wall, not a summary. */}
+        <ul className="feature-list">
           {features.map((feature) => (
-            <li key={feature} style={{ marginBottom: 8 }}>
+            <li key={feature}>
               <strong>{t(`features.${feature}.title`)}</strong>
-              <div className="muted">{t(`features.${feature}.body`)}</div>
+              <span className="muted">{t(`features.${feature}.body`)}</span>
             </li>
           ))}
         </ul>
       </section>
 
-      <section className="panel">
+      <section className="panel" id="get">
         <h2>{t('downloadTitle')}</h2>
         <p className="muted">{t('downloadBody')}</p>
-        <ul>
+        <ul className="plain-list">
           <li>
             {/*
               The releases page rather than a pinned file: the assets are built
@@ -82,16 +98,12 @@ export default async function MarketingPage() {
       <section className="panel">
         <h2>{t('privacyTitle')}</h2>
         <p>{t('privacyBody')}</p>
-        <ul>
+        <ul className="plain-list">
           <li>{t('privacyPoints.ownMachine')}</li>
           <li>{t('privacyPoints.ownModel')}</li>
           <li>{t('privacyPoints.noAnalytics')}</li>
         </ul>
       </section>
-
-      <p>
-        <Link href="/login">{t('signIn')}</Link>
-      </p>
     </main>
   );
 }
