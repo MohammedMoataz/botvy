@@ -112,9 +112,26 @@ jobs:
       - name: Release APK
         working-directory: mobile
         run: |
+          set -euo pipefail
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
-          flutter build apk --flavor prod --release
+
+          # `String.fromEnvironment` reads **dart-defines**, not the process
+          # environment. This step set `BOTVY_BASE_URL` as an environment
+          # variable and passed no `--dart-define`, so `kDefaultBaseUrl` fell
+          # through to its own default on every release ever cut here: the
+          # Android emulator's loopback, `http://10.0.2.2:8080`, which is
+          # nothing at all on a real phone. The variable read as configuration
+          # and was doing nothing, which is why nobody saw it.
+          #
+          # Passed only when there is something to pass. An explicitly empty
+          # define is worse than none: it overrides the Dart default with `''`,
+          # and the client reads that as `UrlProblem.empty`.
+          if [ -n "${BOTVY_BASE_URL:-}" ]; then
+            flutter build apk --flavor prod --release --dart-define=BOTVY_BASE_URL="$BOTVY_BASE_URL"
+          else
+            flutter build apk --flavor prod --release
+          fi
         env:
           # Baked at build time. The release phase decides whether an installer
           # can point a published build at their own host instead.
