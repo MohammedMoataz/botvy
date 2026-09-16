@@ -106,8 +106,22 @@ jobs:
       # images published, the APK and the zip did not, and they were attached by
       # hand each time. `ci.yml` had the line; this file did not.
       - run: pnpm --filter @botvy/sdk build
+      # `WXT_GATEWAY_URL` is the extension's half of the same setting the APK
+      # bakes, and nothing here was passing it — the shipped zip has always
+      # defaulted to `http://localhost`. Unlike Flutter's `String.fromEnvironment`,
+      # WXT reads a prefixed variable straight from the process environment, so
+      # this is the whole wiring. On **both** steps: `wxt zip` runs its own
+      # build, so setting it on the first alone would package a zip built
+      # without it.
+      #
+      # Unset is the ordinary case and stays correct: the constant's own default
+      # takes over, and the address is a field on the sign-in form regardless.
       - run: pnpm --filter @botvy/extension build
+        env:
+          WXT_GATEWAY_URL: ${{ vars.WXT_GATEWAY_URL }}
       - run: pnpm --filter @botvy/extension exec wxt zip
+        env:
+          WXT_GATEWAY_URL: ${{ vars.WXT_GATEWAY_URL }}
 
       - name: Release APK
         working-directory: mobile
