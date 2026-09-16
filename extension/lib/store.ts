@@ -268,6 +268,20 @@ export class PanelStore {
    */
   #session = 0;
 
+  /**
+   * Set for the length of a deliberate sign-out.
+   *
+   * The SDK's own `logout()` signs its store out as its **first** step, which
+   * raises the subscription below and flips `status` to `idle` — so the panel
+   * drew the sign-in form while `clearAll()` had not yet run. The end-to-end
+   * suite read `chrome.storage` the moment that form appeared and found the
+   * member's cached profile and device id still there, one run in three: not a
+   * write racing the clear, which is what it looked like, but the *screen*
+   * racing it. Everything a reader takes as proof of sign-out — the form, the
+   * status — waits for the clear now.
+   */
+  #signingOut = false;
+
   constructor() {
     let held: TokenPair | null = null;
 
@@ -326,6 +340,10 @@ export class PanelStore {
     this.auth.subscribe((member) => {
       runInAction(() => {
         this.member = member;
+        // A deliberate sign-out sets the status itself, once the cache is gone.
+        // This branch is for the involuntary one — a refused refresh, a replayed
+        // token — where nothing else is going to.
+        if (this.#signingOut) return;
         if (!member && this.status === 'authenticated') {
           this.status = 'idle';
           this.failure =
@@ -672,19 +690,28 @@ export class PanelStore {
     // Anything already in flight belongs to the session being ended, and must
     // not write after the clear.
     this.#session += 1;
+    this.#signingOut = true;
 
-    await signOut({
-      revoke: () => this.auth.logout(),
-      forgetDevice: () =>
-        deviceId ? this.auth.removeDevice(deviceId) : Promise.resolve(),
-    });
+    // `finally`, because a flag left set would swallow the *next* sign-out —
+    // the involuntary one, where a refused refresh is the only thing that would
+    // have moved the status. A stuck true means a revoked session still drawing
+    // as signed in.
+    try {
+      await signOut({
+        revoke: () => this.auth.logout(),
+        forgetDevice: () =>
+          deviceId ? this.auth.removeDevice(deviceId) : Promise.resolve(),
+      });
 
-    // The cursor goes with the database, so the next member to sign in on this
-    // browser gets a full snapshot of their own rows rather than a delta
-    // against somebody else's cursor.
-    this.sync?.reset();
-    this.profile.clear();
-    await this.refresh();
+      // The cursor goes with the database, so the next member to sign in on this
+      // browser gets a full snapshot of their own rows rather than a delta
+      // against somebody else's cursor.
+      this.sync?.reset();
+      this.profile.clear();
+      await this.refresh();
+    } finally {
+      this.#signingOut = false;
+    }
 
     runInAction(() => {
       this.status = 'idle';
