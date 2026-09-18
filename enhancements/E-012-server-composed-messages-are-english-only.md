@@ -1,6 +1,6 @@
 # E-012 — Server-composed coach messages are English only
 
-**Area**: product · **Status**: open · **Found**: P3, writing the three rhythm touches
+**Area**: product · **Status**: done · **Found**: P3, writing the three rhythm touches
 
 ## What
 
@@ -79,3 +79,7 @@ a model being up. Not recommended, recorded because it will be suggested.
 **Recommendation:** the first option, taken in P4, when the message renderer on
 each surface is being built anyway for the coach's own turns. Doing it then costs
 almost nothing extra; doing it later means migrating stored prose.
+
+## How it landed
+
+Option two — composed on the server in the member's locale — which **overrides this file's own recommendation**; the reason is in `docs/decisions/001-the-options-i-chose-on-the-enhancements.md`: option one was priced as cheap only while P4 was building the renderers, and P4 shipped without it.

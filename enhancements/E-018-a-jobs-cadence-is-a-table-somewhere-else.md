@@ -1,6 +1,6 @@
 # E-018 — A job's cadence lives in a table somewhere else
 
-**Area**: build · **Status**: open · **Found**: P6, by `/health` reporting `degraded`
+**Area**: build · **Status**: done · **Found**: P6, by `/health` reporting `degraded`
 
 ## What
 
@@ -90,3 +90,7 @@ is a direction constitution IX would want a hard look at.
 **Recommendation:** do the first, in P11's hardening, where the operator surfaces
 are already being reviewed. Until then the set is correct and its comment says
 what to think about before adding a name to it.
+
+## How it landed
+
+The job declares its cadence when it stamps; `ops_heartbeats` carries it and `NIGHTLY_JOBS` is deleted. A row with no cadence falls back to the minute window, which is why there is no migration. `backup.staleHours` still decides how wide the nightly window is.

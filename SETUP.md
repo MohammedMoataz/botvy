@@ -42,6 +42,20 @@ requiring that nothing changed.
 
 If it exits non-zero, do not go further — each line names what failed.
 
+### What "working" means, and how each part is checked
+
+| What | Command | What a good answer looks like |
+|---|---|---|
+| The stack is up and correct | `node infra/verify.mjs` | exits 0; one published port, and it is the edge |
+| The platform is healthy | `curl -s http://localhost/health` | `status: ok`, both stores up, every job fresh |
+| Scheduled work is arriving | the `jobs` block of the same response | no job older than `ops.staleAfterMinutes`, and `backup` no older than `backup.staleHours` |
+| The built code is loadable | `node infra/verify-esm.mjs` | exits 0 — the compiled output imports under plain Node, which `tsc` and the tests cannot tell you |
+| Nothing secret is in the logs | `node infra/scan-logs.mjs --since 24h --canary "<a planted sentence>"` | `0 hits` |
+| It stays healthy | `node infra/soak-sample.mjs --version 2.1.0`, once a day | a row in `ops/soak-2.1.0.log` reading `HEALTHY` |
+
+The first two are the ones to run today. The rest are the ones that tell you
+months from now that it is still true.
+
 ### Signing in
 
 The seed creates the account named by `ADMIN_EMAIL` on first boot, with
@@ -58,9 +72,15 @@ curl -sX POST "$BOTVY_BASE_URL/api/v1/auth/login"   -H 'content-type: applicatio
 curl -sX POST "$BOTVY_BASE_URL/api/v1/auth/password"   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json'   -d '{"currentPassword":"admin","newPassword":"something longer"}'
 ```
 
-Registration, Google sign-in and refresh-token rotation arrive in P1. The token
-`login` returns is an access token, so it expires on `JWT_ACCESS_TTL` and there
-is nothing yet to renew it with — sign in again.
+**Change it before anything else reaches the system.** It is a published
+default, the portal is public, and the warning in the boot log is the only thing
+standing between it and whoever finds the address. Everything below assumes this
+step has been taken.
+
+`login` answers with an access token and a refresh token: the access token
+expires on `JWT_ACCESS_TTL` and is renewed with the refresh token, which rotates
+on every use. A refresh token replayed after rotation revokes its whole family —
+which is a signal, not a bug, and it means every device signs in again.
 
 Deleting that account brings it back on the next start, because it is a
 *default*. Point `ADMIN_EMAIL` at a different address if that is not what you
@@ -143,6 +163,59 @@ for ever.
 Try this before you need it. A restore procedure that has never been run is a
 document, not a capability.
 
+## Pointing the app and the extension at your own system
+
+Neither has to be rebuilt. Where a member's Botvy lives is a setting they enter,
+because it is different for every installation — so the published APK and the
+published extension zip from any release connect to *your* address once you give
+it to them.
+
+**The phone.** The first screen asks for the server address and stores it. The
+build-time default is only the value that field starts with: the release
+workflow passes it as a dart-define when `BOTVY_BASE_URL` is set for the
+repository, and leaves the constant's own default when it is not. Setting it
+empty is worse than leaving it unset — an empty define overrides the default and
+the client reads it as "no address at all".
+
+**The extension.** The address is a field on the sign-in form, stored per
+browser. Its build-time default is `WXT_GATEWAY_URL`, read straight from the
+environment by both the build and the zip step.
+
+**The extension will ask for permission to reach that address**, once, at
+sign-in. The manifest deliberately requests no host up front — it asks for the
+one origin the member typed, through `permissions.request`. That prompt is
+browser chrome: a human has to accept it, which is why it is the one part of the
+extension an automated test cannot perform for you.
+
+Use `https` wherever the browser can reach it. An extension talking to a plain
+`http` origin works, and everything it carries is on the wire.
+
+### `CSP_ENFORCE`
+
+The web app ships a content security policy as
+`Content-Security-Policy-Report-Only`: the header is there, the browser reports
+violations to its own console, and nothing is blocked. `CSP_ENFORCE=on` in
+`.env`, then `docker compose up -d caddy`, turns it into the enforcing header —
+the edge tells the app which name to send, so the switch needs no rebuild.
+
+Enforce it only after watching a real browser console on `/` and `/login` with
+no violations, and flip `ENFORCED` in `frontend/e2e/csp.spec.ts` in the same
+change so the suite is checking the state you are actually in. A wrong policy
+on the App Router renders a blank page rather than an error, which is the whole
+reason it does not start enforced.
+
+## The tunnel
+
+Optional, and orthogonal to everything above. Without one the platform is on the
+LAN; with one it is reachable from anywhere — still through the single published
+port, because the tunnel terminates at the edge like any other client.
+
+What the tunnel adds to the list of things that carry a machine's name: the
+tunnel hostname and its credential, the allowed browser origin, and the address
+the app and the extension are pointed at. `docs/restore.md` names all of them in
+its **Restoring onto a different machine** section, which is the list to work
+through when the host changes.
+
 ## Releasing and deploying
 
 Push a tag beginning with `v` and CI builds both images, the release APK and
@@ -153,14 +226,14 @@ owning a host.
 The running version is one line in `.env`:
 
 ```
-BOTVY_TAG=v2.0.0
+BOTVY_TAG=v2.1.0
 ```
 
 **Rolling back** is re-pinning the previous tag and pulling — images are
 immutable, so the old one is still in the registry:
 
 ```bash
-sed -i 's/^BOTVY_TAG=.*/BOTVY_TAG=v1.9.0/' .env
+sed -i 's/^BOTVY_TAG=.*/BOTVY_TAG=v2.0.0/' .env
 docker compose --env-file .env -f infra/docker-compose.yml pull
 docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
@@ -276,3 +349,10 @@ Two other things about outbound fetching worth knowing:
 are in `.specify/memory/constitution.md`, and `CLAUDE.md` records the things
 that are easy to get wrong here — each one written in the words of the bug that
 taught it.
+
+The spec-kit slash-commands run on both platforms: each `speckit-*` skill names
+the bash script and the PowerShell one. That is a hand-held local edit over
+spec-kit's generated PowerShell-only output, so a future `specify init` will
+overwrite it — the `LOCAL EDIT (botvy, E-003)` comment in each file says to
+reapply it, and the same note is in the two PowerShell scripts whose text mode
+was fixed the same way.

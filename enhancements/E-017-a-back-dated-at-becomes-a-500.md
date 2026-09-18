@@ -1,6 +1,6 @@
 # E-017 — A back-dated `at` on a status command becomes a 500
 
-**Area**: build · **Status**: open · **Found**: P6, by a fixture that chose its own clock
+**Area**: build · **Status**: done · **Found**: P6, by a fixture that chose its own clock
 
 ## What
 
@@ -100,3 +100,7 @@ session on Tuesday" is a thing a member might well want to say.
 synced reads — P11's hardening is the natural home — and until then leave it,
 because the only reachable path is a field nothing sends. Do **not** fix it in
 one context.
+
+## How it landed
+
+The proper fix, across every aggregate: `at` sets the domain fact and `updatedAt` is always the server's clock. It also found a defect of the same shape one layer up — `refreshLabelSnapshots` is a bulk write with no optimistic filter and stamped the event's `occurredAt`, which could move a task's `updatedAt` backwards behind a cursor a device had already passed. Fixed, with a spec, in the same change.

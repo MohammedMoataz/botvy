@@ -1,6 +1,6 @@
 # E-013 — An aborted or blocked turn's tokens are never metered
 
-**Area**: product · **Status**: open · **Found**: P4, writing the turn's specs
+**Area**: product · **Status**: done · **Found**: P4, writing the turn's specs
 
 ## What
 
@@ -80,3 +80,7 @@ measurable, and it gives up the thing an operator actually wants to cap.
 **Recommendation:** leave it, and re-test on the next Ollama bump. Record the
 gap in P10's usage screen — a footnote saying stopped answers are not counted
 is cheaper than a wrong number presented as exact.
+
+## How it landed
+
+Done as the file recommends, which is to leave the gap and stop presenting the number as exact. The usage screen says the figures are a floor and why; the abort path in the Ollama client and in `TurnRunner.converse` carries the note naming what would close it, so the next Ollama bump has somewhere to land.

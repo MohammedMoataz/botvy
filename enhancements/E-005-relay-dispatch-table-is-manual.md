@@ -1,6 +1,6 @@
 # E-005 — The relay's dispatch table is written by hand
 
-**Area**: architecture · **Status**: open · **Found**: P2 (the risk is P0's, and it has already fired once)
+**Area**: architecture · **Status**: done · **Found**: P2 (the risk is P0's, and it has already fired once)
 
 ## What
 
@@ -47,3 +47,7 @@ Two options, and the second is cheaper than it looks.
 Option 2 preserves what the table is *for* — seeing the entire event topology in
 one place — and removes the only thing wrong with it. It is probably the right
 answer, and it is a small piece of work.
+
+## How it landed
+
+Option 2. Each context declares its subscriptions beside its own module and the app refuses to boot when one has no case in the table. A spec holds the other direction — a case nothing declares fails too — which is the same gap one file over.

@@ -1,6 +1,6 @@
 # E-014 — Three recurrence expanders, and two of them are TypeScript
 
-**Area**: architecture · **Status**: open · **Found**: P5, wiring the extension
+**Area**: architecture · **Status**: done · **Found**: P5, wiring the extension
 
 ## What
 
@@ -99,3 +99,7 @@ actually built out, and take the extraction only if a picker option or an
 external-calendar import lands. Two implementations of a closed specification,
 each with the other's fixture table, is a stable place to be; two
 implementations where one silently guesses is not.
+
+## How it landed
+
+The loud boundary. `canExpandRule` makes the subset a question a caller can ask, the panel names a series it cannot read instead of drawing it as one occurrence, and the degrade path warns once per distinct rule. The parser and its subset are unchanged; the extraction is still the right move only once something writes a rule the subset cannot read.

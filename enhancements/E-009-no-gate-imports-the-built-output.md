@@ -1,6 +1,6 @@
 # E-009 — No gate imports the built output
 
-**Area**: build · **Status**: open · **Found**: P2, by a defect that reached `main`
+**Area**: build · **Status**: done · **Found**: P2, by a defect that reached `main`
 
 ## What
 
@@ -83,3 +83,7 @@ contracts command depend on a Prisma toolchain being installed is a different
 trade that deserves its own look. A cheaper variant: have the generator compare
 the newest `mtime` under `src/` against `dist/main.js` and refuse rather than
 emit.
+
+## How it landed
+
+`gen:contracts` now refuses a `dist/` older than `src/` and names the newest file missing from the build, rather than republishing the previous schema with a success message. `infra/verify-esm.mjs` — which closed the other half — was in `SETUP.md` and in no workflow; it is a CI step now.

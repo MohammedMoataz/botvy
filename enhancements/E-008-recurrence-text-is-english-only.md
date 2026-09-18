@@ -1,6 +1,6 @@
 # E-008 — `recurrenceText` is English only
 
-**Area**: product · **Status**: open · **Found**: P2, building the recurrence wrapper
+**Area**: product · **Status**: done · **Found**: P2, building the recurrence wrapper
 
 ## What
 
@@ -68,3 +68,7 @@ send only the structured rule, leaving every surface to render it the way the
 phone now does. The second is cheaper and is the direction the phone has just
 demonstrated; it is a change to a published read shape, so it belongs in a phase
 that is touching those reads anyway rather than here.
+
+## How it landed
+
+The server renders the words in the member's own locale, from the structured rule, using the rules the phone already implements — the dual, the three-to-ten plural, the eleven-and-up singular. The chat half turned out to be moot: `PlannerActionsPort.createTask` takes no rule, so chat cannot create a repeating task, and the confirmation never rendered one.

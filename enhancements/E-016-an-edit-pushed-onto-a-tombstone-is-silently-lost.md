@@ -1,6 +1,6 @@
 # E-016 — An edit pushed onto a tombstone is accepted and then silently lost
 
-**Area**: architecture · **Status**: open · **Found**: P6, writing Training's sync adapters
+**Area**: architecture · **Status**: done · **Found**: P6, writing Training's sync adapters
 
 ## What
 
@@ -136,3 +136,7 @@ handling is next opened. And whichever lands, land it with a spec asserting the
 does not resurrect it. `training-sync.spec.ts` asserts that much today for
 sessions ("accepts an edit onto a tombstoned session without resurrecting it")
 and it is the only place in the codebase that does, for any entity.
+
+## How it landed
+
+Option 2. An `update` onto a tombstone is refused as `invalid` with the code `deleted_row` and the server's row attached; the phone branches on the code and stops re-sending. The spec asserts the outcome and not only the verdict: the row stays deleted and the edit does not resurrect it.
