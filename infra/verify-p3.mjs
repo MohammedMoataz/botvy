@@ -186,11 +186,64 @@ function nextDate(date) {
   return at.toISOString().slice(0, 10);
 }
 
+/**
+ * A zone in which the member's local clock reads mid-morning right now.
+ *
+ * Not decoration. A member registering after their own evening times have
+ * passed has those touches *suppressed for the day* by the rhythm bootstrap —
+ * correctly, because nobody wants three months of coaching in the first minute
+ * of their account — and this gate then sets `endOfDayTime` to two minutes ago
+ * and waits for a touch that can never fire, because the claim for today is
+ * already made. Run at 23:07 Cairo it failed three checks and the product was
+ * working; run at 11:00 it passed.
+ *
+ * So the gate picks its member's zone from the clock rather than naming one:
+ * somewhere it is mid-morning, the defaults are all still ahead, nothing is
+ * suppressed, and the evening the gate manufactures two minutes ago is the
+ * first one of that member's day. A red line that depends on the hour the gate
+ * runs at teaches whoever sees it to ignore red, which costs more than the case
+ * was worth.
+ */
+function aZoneWhereTheDayHasBarelyStarted() {
+  const candidates = [
+    'Pacific/Kiritimati',
+    'Pacific/Auckland',
+    'Australia/Brisbane',
+    'Asia/Tokyo',
+    'Asia/Shanghai',
+    'Asia/Dhaka',
+    'Asia/Karachi',
+    'Africa/Cairo',
+    'Europe/Berlin',
+    'Atlantic/Reykjavik',
+    'America/Sao_Paulo',
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'Pacific/Honolulu',
+  ];
+  for (const zone of candidates) {
+    const hour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: zone,
+        hour: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+    );
+    // Late enough that the morning briefing's default has passed is fine; what
+    // matters is that the *evening* defaults have not, and that there is room
+    // before midnight for the two-minutes-ago the gate writes.
+    if (hour >= 9 && hour <= 17) return zone;
+  }
+  return 'Africa/Cairo';
+}
+
 async function main() {
   const email = `p3-${randomUUID().slice(0, 8)}@example.test`;
   const password = 'a-long-enough-password';
   const installId = randomUUID();
-  const zone = 'Africa/Cairo';
+  const zone = aZoneWhereTheDayHasBarelyStarted();
 
   // --------------------------------------------------------- 0. a member
   const registered = await rest('POST', '/auth/register', {
