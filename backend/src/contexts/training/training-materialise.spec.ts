@@ -99,7 +99,23 @@ function at(date: string, hhmm: string, zone = CAIRO): Date {
  * depending on the hour it happens to run at.
  */
 function now(): Date {
-  return at(today(), '06:00');
+  /*
+   * Never in the *real* future, which the 06:00 alone was between midnight and
+   * six.
+   *
+   * A row created at 06:00 carries `updatedAt: createdAt`, and since E-017
+   * every later edit stamps the server's own clock — so a suite run at 00:22
+   * wrote rows dated six hours ahead and then had every edit to them refused as
+   * stale, correctly, by both adapters. Eight cases went red at Cairo midnight
+   * with no code between them and green.
+   *
+   * The morning instant is still what the scheduling assertions want for the
+   * rest of the day; before it, the real clock is both earlier than any of
+   * today's slots and, unlike 06:00, actually now.
+   */
+  const morning = at(today(), '06:00');
+  const real = new Date();
+  return morning.getTime() > real.getTime() ? real : morning;
 }
 
 function todayWeekday(): number {
@@ -201,7 +217,20 @@ function event(
     context: contextOf(name),
     aggregate: { type: 'test', id: 'test' },
     userId,
-    occurredAt: now(),
+    /*
+     * The real clock, not the spec's `now()`.
+     *
+     * `now()` is today at 06:00 in the member's zone — a stable wall time, so
+     * the scheduling arithmetic below does not drift while the suite runs. It
+     * is the wrong clock for an *event*, and the difference became visible the
+     * moment `updatedAt` became the server's own `new Date()` rather than the
+     * caller's `at` (E-017): a row written from an event dated 06:00 and then
+     * edited at 00:22 is a row whose stored timestamp is in the future, which
+     * every optimistic check in the codebase correctly refuses. The suite was
+     * green all day and failed after midnight, which is the shape of fixture
+     * this project has already written a rule about.
+     */
+    occurredAt: new Date(),
     payload,
     schemaVersion: EVENT_SCHEMA_VERSION,
   };

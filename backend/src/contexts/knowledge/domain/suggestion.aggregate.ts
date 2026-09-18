@@ -1,4 +1,7 @@
-import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.js';
+import {
+  AggregateRoot,
+  forward,
+} from '../../../shared/persistence/ports/aggregate-root.js';
 
 /**
  * One set of a suggested exercise — **targets only**.
@@ -238,7 +241,7 @@ export class Suggestion extends AggregateRoot<string> {
     // The server's clock: its one caller is an event handler, and an event's
     // `occurredAt` trails the relay, so honouring it would write `updatedAt`
     // backwards on a row a device may already have pulled past.
-    this.updatedAt = new Date();
+    this.updatedAt = forward(this.updatedAt);
     return true;
   }
 

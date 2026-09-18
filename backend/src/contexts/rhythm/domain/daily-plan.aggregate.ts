@@ -1,4 +1,7 @@
-import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.js';
+import {
+  AggregateRoot,
+  forward,
+} from '../../../shared/persistence/ports/aggregate-root.js';
 
 /**
  * A task as the plan recorded it, not as it is now.
@@ -370,7 +373,7 @@ export class DailyPlan extends AggregateRoot<string> {
      * behind a cursor a device has already passed, and the member's meal line
      * would reach the plan and never reach the phone.
      */
-    this.updatedAt = new Date();
+    this.updatedAt = forward(this.updatedAt);
     return true;
   }
 

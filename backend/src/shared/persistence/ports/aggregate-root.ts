@@ -101,3 +101,24 @@ export abstract class AggregateRoot<Id = string> {
     return this.#events;
   }
 }
+
+/**
+ * The server's clock, and never a step backwards.
+ *
+ * `updatedAt` is the optimistic-concurrency column and the sync cursor, so it
+ * is the server's own `new Date()` and not a caller's `at` (E-017). The `max`
+ * is the other half of that rule: a row whose stored timestamp is somehow ahead
+ * of this instant — a clock that has been corrected, a client-minted create
+ * carrying a skewed `createdAt`, a fixture written for a later hour — would
+ * otherwise refuse its own next edit as stale for as long as the difference
+ * lasts, and the member would simply see nothing happen.
+ *
+ * It belongs in the mutating method and never on the base class: `rehydrate`
+ * assigns an `updatedAt` older than this instant by design, and a forward-only
+ * setter there would refuse to load any row that had not been touched this
+ * millisecond.
+ */
+export function forward(current: Date): Date {
+  const now = Date.now();
+  return new Date(Math.max(now, current.getTime() + 1));
+}
