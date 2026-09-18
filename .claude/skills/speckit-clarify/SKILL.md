@@ -62,7 +62,8 @@ Note: This clarification workflow is expected to run (and be completed) BEFORE i
 
 Execution steps:
 
-1. Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
+1. Run `.specify/scripts/bash/check-prerequisites.sh --json --paths-only` on a POSIX shell, or `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly` on Windows, from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
+<!-- LOCAL EDIT (botvy, E-003): spec-kit generates this invocation PowerShell-only, from `"script": "ps"` in `.specify/init-options.json`, and this file's hash is recorded in `.specify/integrations/claude.manifest.json`. Both halves are named here instead, because the bash scripts under `.specify/scripts/bash/` carry an identical `--json` contract (same keys, same order — verified) and Linux is the deployment and CI platform. A future `specify` run will overwrite this line; reapply it rather than wondering. -->
    - `FEATURE_DIR`
    - `FEATURE_SPEC`
    - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)

@@ -21,7 +21,8 @@
     "migrate:pg": "prisma migrate deploy --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
     "migrate:pg:status": "prisma migrate status --schema src/contexts/identity/infrastructure/prisma/schema.prisma",
     "migrate:mongo": "migrate-mongo up -f migrate-mongo-config.cjs",
-    "gen:contracts": "cross-env BOTVY_GEN=1 node dist/main.js"
+    "//gen:contracts": "The guard is not optional decoration. This command is `node dist/main.js`, so it reads nothing under src/ - running it without building first republishes the PREVIOUS schema, silently and with a success message, and schema.graphql is the proof artefact for 'a read a client cannot reach does not exist'. infra/check-dist-fresh.mjs refuses instead. See E-009.",
+    "gen:contracts": "node ../infra/check-dist-fresh.mjs && cross-env BOTVY_GEN=1 node dist/main.js"
   },
   "dependencies": {
     "@apollo/server": "^5.0.0",

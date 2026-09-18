@@ -84,8 +84,21 @@ jobs:
           done
           echo "the replica set never elected a primary"; exit 1
       - run: pnpm lint
+      # The cross-context rule enumerates every context name, so a context added
+      # without its twelve patterns is unpoliced and nothing goes red — which is
+      # exactly what happened to `meetings` for a phase. The list is generated
+      # from the directory listing now; this is the step that notices when the
+      # committed config and the tree have parted company.
+      - run: pnpm lint:contexts
       - run: pnpm --filter @botvy/backend exec tsc --noEmit -p tsconfig.json
       - run: pnpm --filter @botvy/backend build
+      # `tsc` and `vitest` both run against source, and vitest supplies its own
+      # CommonJS interop. Three defects have shipped or nearly shipped because
+      # the artefact the tests exercise is not the artefact that runs — the one
+      # that got furthest was `import { RRule } from 'rrule'`, which type-checked,
+      # passed 608 tests and was `undefined` under plain Node. This imports the
+      # built output the way the container does. Seconds, no Docker.
+      - run: node infra/verify-esm.mjs
       - name: Test
         run: pnpm --filter @botvy/backend test
         env:

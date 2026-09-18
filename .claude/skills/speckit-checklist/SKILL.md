@@ -77,7 +77,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Execution Steps
 
-1. **Setup**: Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list.
+1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json` on a POSIX shell, or `.specify/scripts/powershell/check-prerequisites.ps1 -Json` on Windows, from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list.
+<!-- LOCAL EDIT (botvy, E-003): spec-kit generates this invocation PowerShell-only, from `"script": "ps"` in `.specify/init-options.json`, and this file's hash is recorded in `.specify/integrations/claude.manifest.json`. Both halves are named here instead, because the bash scripts under `.specify/scripts/bash/` carry an identical `--json` contract (same keys, same order — verified) and Linux is the deployment and CI platform. A future `specify` run will overwrite this line; reapply it rather than wondering. -->
    - All file paths must be absolute.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
