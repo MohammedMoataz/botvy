@@ -652,3 +652,36 @@ finds it, with a test, and named in the commit; it does not go there.
   truth, not a bug. The e2e build declares the hosts instead, differing from the
   shipped manifest by exactly one key, and *granting* stays a manual check. Say
   so next to the code rather than hiding it in a script.
+- **`observer()` belongs on the component that reads the store, not on the one
+  that wraps it.** Every admin page was
+  `export default observer(() => <RequireAdmin><XPage /></RequireAdmin>)`, and
+  `XPage` — the one reading `health.report`, the member list, the settings — was
+  plain. MobX subscribes the component whose render touched the observable, so
+  every screen rendered whatever was in the stores at first paint and ignored
+  every update afterwards. The visible symptom was the Owner's health panel
+  reading "Loading…" for ever while `/health` answered 200 every thirty seconds,
+  with nothing in the console and nothing in `problem`. `login/page.tsx` was
+  written the other way round and is the one page that always worked.
+- **A stored `updatedAt` from the future locks its own row.** Since `at` stopped
+  setting `updatedAt`, a mutating method stamps the server's clock — so a row
+  whose stored timestamp is *ahead* of now refuses its own next edit as stale,
+  silently, until real time catches up. A fixture with a wall-clock `now()` puts
+  one there; so does a client with a skewed clock minting a create. `forward()`
+  in `aggregate-root.ts` is the answer where a mutator can meet such a row, and
+  it belongs in the mutator: on the base class it would refuse to load anything,
+  because `rehydrate` assigns an older `updatedAt` by design.
+- **`/health` is public, so the portal's poll spends the credential-stuffing
+  limit.** Every open tab asks every thirty seconds and each ask counts against
+  `limits.anonymousPerMinute`, which is twenty because it is the limit that stops
+  somebody working through a word list. It is why the end-to-end suite met
+  `429`s, and why the CI stack lifts the limits and restarts the API afterwards —
+  the registry is cached at boot, so a row written straight into Mongo does not
+  reach a running API.
+- **MongoDB's slow-query log prints the command document.** On a slow disk an
+  ordinary task write crosses `slowms` and the member's title, their notes and
+  their email address land in the container log. Community cannot redact
+  (`redactClientLogData` is Enterprise), so `mongod` runs `--quiet --slowms
+  30000` and the residual is written down. `infra/scan-logs.mjs --canary` is the
+  pass that found it; it asks compose for the service list, because its first
+  version named the blueprint's `edge` and `api` and silently skipped the two
+  containers compose calls `caddy` and `backend`.
