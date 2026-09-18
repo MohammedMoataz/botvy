@@ -308,6 +308,19 @@ jobs:
               }
             '
 
+      # The API caches the registry, and it cached the defaults at boot — a row
+      # written straight into Mongo does not reach it. Restarting is cheaper
+      # than minting an admin token to PATCH each key through the API, and this
+      # stack exists for ninety seconds.
+      - name: Let the API see the lifted limits
+        run: |
+          docker compose --env-file .env -f infra/docker-compose.yml restart backend worker
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8088/health > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "the API did not come back after the restart"; exit 1
+
       - name: The operator's acts
         run: pnpm --filter @botvy/frontend test:e2e
         env:
