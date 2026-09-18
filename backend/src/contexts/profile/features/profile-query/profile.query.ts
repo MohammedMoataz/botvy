@@ -189,17 +189,25 @@ export class ProfileQueryHandler {
   async schedulesFor(userIds: string[]): Promise<MemberScheduleView[]> {
     if (userIds.length === 0) return [];
 
-    const [profiles, preferences, timezone, locale, planTomorrowTime, endOfDayTime, morningBriefingTime, checkinEnabled] =
-      await Promise.all([
-        this.profiles.findMany(userIds),
-        this.preferences.findMany(userIds),
-        this.settings.get('defaults.timezone'),
-        this.settings.get('defaults.locale'),
-        this.settings.get('defaults.planTomorrowTime'),
-        this.settings.get('defaults.endOfDayTime'),
-        this.settings.get('defaults.morningBriefingTime'),
-        this.settings.get('defaults.checkinEnabled'),
-      ]);
+    const [
+      profiles,
+      preferences,
+      timezone,
+      locale,
+      planTomorrowTime,
+      endOfDayTime,
+      morningBriefingTime,
+      checkinEnabled,
+    ] = await Promise.all([
+      this.profiles.findMany(userIds),
+      this.preferences.findMany(userIds),
+      this.settings.get('defaults.timezone'),
+      this.settings.get('defaults.locale'),
+      this.settings.get('defaults.planTomorrowTime'),
+      this.settings.get('defaults.endOfDayTime'),
+      this.settings.get('defaults.morningBriefingTime'),
+      this.settings.get('defaults.checkinEnabled'),
+    ]);
 
     const profileFor = new Map(profiles.map((row) => [row.userId, row]));
     const preferencesFor = new Map(preferences.map((row) => [row.userId, row]));

@@ -86,11 +86,7 @@ export interface SyncableEntity {
    * wanted both would be an entity whose rows are mutable *and* sequenced, and
    * the sequence is only cheap because the rows are not.
    */
-  pull(
-    userId: string,
-    since: Date | null,
-    lastSeq: number,
-  ): Promise<unknown[]>;
+  pull(userId: string, since: Date | null, lastSeq: number): Promise<unknown[]>;
 
   /** One pushed row. See `contracts/sync.md` for the conflict rule. */
   apply(userId: string, change: SyncChange, now: Date): Promise<ApplyOutcome>;

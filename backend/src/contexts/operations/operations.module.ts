@@ -33,7 +33,10 @@ import { MongoUsageRepository } from './infrastructure/mongo-usage.repository.js
 import { MongoAuditReadRepository } from './infrastructure/mongo-audit-read.repository.js';
 import { IdentityActorLabels } from './infrastructure/operations-audit.adapter.js';
 import { AuditReadRepository } from './domain/audit.repository.js';
-import { ActorLabelPort, AuditQueryHandler } from './features/audit/audit.query.js';
+import {
+  ActorLabelPort,
+  AuditQueryHandler,
+} from './features/audit/audit.query.js';
 import { UsageQueryHandler } from './features/usage/usage.query.js';
 import { WorkflowsPort } from './domain/workflows.port.js';
 import { N8nWorkflowsAdapter } from './infrastructure/n8n-workflows.adapter.js';

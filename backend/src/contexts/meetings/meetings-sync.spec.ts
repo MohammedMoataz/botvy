@@ -388,7 +388,10 @@ describe('a meeting push that is accepted', () => {
         rrule: 'FREQ=DAILY;COUNT=4',
         exdates: [],
         overrides: [
-          { originalStart: third, startAt: new Date(third.getTime() + 3_600_000) },
+          {
+            originalStart: third,
+            startAt: new Date(third.getTime() + 3_600_000),
+          },
         ],
       },
     });

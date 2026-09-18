@@ -168,7 +168,8 @@ export function compareTasksIn(
   left: TaskRow,
   right: TaskRow,
 ): number {
-  if (view === 'completed') return time(right.completedAt) - time(left.completedAt);
+  if (view === 'completed')
+    return time(right.completedAt) - time(left.completedAt);
   if (view === 'deleted') return time(right.deletedAt) - time(left.deletedAt);
   return time(left.dueAt) - time(right.dueAt) || left.priority - right.priority;
 }

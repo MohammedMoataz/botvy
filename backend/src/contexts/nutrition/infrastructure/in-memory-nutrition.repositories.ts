@@ -6,7 +6,11 @@ import {
   suggestionId,
   type MealSuggestionState,
 } from '../domain/meal-suggestion.aggregate.js';
-import { Meal, type MealKind, type MealState } from '../domain/meal.aggregate.js';
+import {
+  Meal,
+  type MealKind,
+  type MealState,
+} from '../domain/meal.aggregate.js';
 import {
   MealRepository,
   MealSuggestionRepository,
@@ -90,7 +94,11 @@ export class InMemoryMealRepository extends MealRepository {
   async purgeTombstonesBefore(before: Date, userId?: string): Promise<number> {
     let removed = 0;
     for (const [id, row] of this.rows) {
-      if (row.deletedAt && row.deletedAt < before && (!userId || row.userId === userId)) {
+      if (
+        row.deletedAt &&
+        row.deletedAt < before &&
+        (!userId || row.userId === userId)
+      ) {
         this.rows.delete(id);
         removed += 1;
       }

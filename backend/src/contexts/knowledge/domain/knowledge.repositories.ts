@@ -22,7 +22,10 @@ export abstract class LinkRepository extends SyncableRepository<Link> {
    * costume: a rule stated once and then applied to a case it was not about.
    * FR-005 is about saving the same link twice, not about ever having saved it.
    */
-  abstract findByUrl(userId: string, normalizedUrl: string): Promise<Link | null>;
+  abstract findByUrl(
+    userId: string,
+    normalizedUrl: string,
+  ): Promise<Link | null>;
 
   /** The member's list, newest first, filtered and paged (`links` query). */
   abstract listFor(
@@ -123,7 +126,10 @@ export abstract class LinkRepository extends SyncableRepository<Link> {
    */
   abstract tombstonesBefore(before: Date, userId?: string): Promise<Link[]>;
 
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }
@@ -155,7 +161,10 @@ export abstract class SuggestionRepository extends Repository<Suggestion> {
    * than deleting it — and because re-proposing over a *pending* one would put
    * two cards in the member's inbox about one evening.
    */
-  abstract forSession(userId: string, sessionId: string): Promise<Suggestion | null>;
+  abstract forSession(
+    userId: string,
+    sessionId: string,
+  ): Promise<Suggestion | null>;
 
   /** The suggestion an accepted session came from, for the outcome (T734). */
   abstract byAcceptedSession(

@@ -235,10 +235,7 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     keys: SortKey[],
     limit: number,
   ): Promise<TaskDoc[]> {
-    const pipeline: PipelineStage[] = [
-      { $match: query },
-      dueSortStage(),
-    ];
+    const pipeline: PipelineStage[] = [{ $match: query }, dueSortStage()];
     if (after) pipeline.push({ $match: after });
     pipeline.push({ $sort: mongoSort(keys) }, { $limit: limit + 1 });
 

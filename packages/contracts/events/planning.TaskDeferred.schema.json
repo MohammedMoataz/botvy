@@ -27,11 +27,6 @@
       "type": "integer"
     }
   },
-  "required": [
-    "taskId",
-    "fromDate",
-    "toDate",
-    "deferCount"
-  ],
+  "required": ["taskId", "fromDate", "toDate", "deferCount"],
   "additionalProperties": false
 }

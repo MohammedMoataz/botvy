@@ -114,7 +114,16 @@ const SYNONYMS: string[][] = [
   ['gluten', 'wheat', 'جلوتين', 'قمح'],
   ['soy', 'soya', 'soybean', 'صويا'],
   ['fish', 'سمك'],
-  ['shellfish', 'shrimp', 'prawn', 'prawns', 'crab', 'جمبري', 'روبيان', 'سرطان البحر'],
+  [
+    'shellfish',
+    'shrimp',
+    'prawn',
+    'prawns',
+    'crab',
+    'جمبري',
+    'روبيان',
+    'سرطان البحر',
+  ],
   ['strawberry', 'strawberries', 'فراولة'],
 ];
 
@@ -198,9 +207,7 @@ export function fold(text: string): string {
     .replace(/ى/g, 'ي')
     .replace(/ة/g, 'ه')
     // Arabic-Indic digits, so a quantity never hides a word behind it.
-    .replace(/[٠-٩]/g, (digit) =>
-      String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)),
-    );
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
 
   return normalised
     .split(/[^\p{L}\p{N}]+/u)

@@ -130,7 +130,9 @@ export function describeRepositoryContract(adapter: AdapterUnderTest): void {
         await repository.save(widget);
       });
 
-      expect((await repository.findById('user-1', 'w-1'))?.label).toBe('second');
+      expect((await repository.findById('user-1', 'w-1'))?.label).toBe(
+        'second',
+      );
     } finally {
       await dispose?.();
     }
@@ -212,7 +214,9 @@ export function describeRepositoryContract(adapter: AdapterUnderTest): void {
         }),
       ).rejects.toBeInstanceOf(StaleWriteError);
 
-      expect((await repository.findById('user-1', 'w-1'))?.label).toBe('winner');
+      expect((await repository.findById('user-1', 'w-1'))?.label).toBe(
+        'winner',
+      );
     } finally {
       await dispose?.();
     }

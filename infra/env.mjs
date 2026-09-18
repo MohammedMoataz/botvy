@@ -21,7 +21,8 @@ const CANDIDATES = ['.env'];
 export const envFiles = () => CANDIDATES.filter((file) => existsSync(file));
 
 /** The `--env-file` arguments for a `docker compose` call. */
-export const envFileArgs = () => envFiles().flatMap((file) => ['--env-file', file]);
+export const envFileArgs = () =>
+  envFiles().flatMap((file) => ['--env-file', file]);
 
 const ASSIGNMENT = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/;
 

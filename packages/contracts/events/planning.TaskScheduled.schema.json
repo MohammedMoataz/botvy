@@ -29,12 +29,6 @@
       "type": "integer"
     }
   },
-  "required": [
-    "taskId",
-    "dueAt",
-    "allDay",
-    "title",
-    "priority"
-  ],
+  "required": ["taskId", "dueAt", "allDay", "title", "priority"],
   "additionalProperties": false
 }

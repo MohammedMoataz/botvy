@@ -49,7 +49,9 @@ export class IdentityOutboxForwarder {
     if (this.#timer) return;
     this.#timer = setInterval(() => {
       void this.forwardOnce().catch((error) => {
-        this.logger.error(`identity outbox forward failed: ${(error as Error).message}`);
+        this.logger.error(
+          `identity outbox forward failed: ${(error as Error).message}`,
+        );
       });
     }, FORWARDER_POLL_MS);
     this.#timer.unref?.();

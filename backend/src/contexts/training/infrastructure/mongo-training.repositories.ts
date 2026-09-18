@@ -70,27 +70,28 @@ export interface WorkoutDoc extends Omit<WorkoutState, 'id'> {
  * here spreads and `.map`s these arrays without asking. `?? []` is where that
  * is settled, once, rather than in each of the four aggregates.
  */
-const athleteProfileMapper: Mapper<AthleteProfile, AthleteProfileDoc> = versioned({
-  toDomain(doc) {
-    return AthleteProfile.rehydrate({
-      // `_id` is the member's id; the aggregate's `id` getter returns `userId`
-      // for exactly this reason. See the class note on `AthleteProfile`.
-      userId: doc._id,
-      sports: doc.sports ?? [],
-      slots: (doc.slots ?? []).map(normaliseSlot),
-      updatedAt: asDate(doc.updatedAt),
-    });
-  },
-  toPersistence(profile) {
-    return {
-      _id: profile.userId,
-      sports: profile.sports,
-      slots: profile.slots,
-      updatedAt: profile.updatedAt,
-      schemaVersion: profile.schemaVersion,
-    };
-  },
-});
+const athleteProfileMapper: Mapper<AthleteProfile, AthleteProfileDoc> =
+  versioned({
+    toDomain(doc) {
+      return AthleteProfile.rehydrate({
+        // `_id` is the member's id; the aggregate's `id` getter returns `userId`
+        // for exactly this reason. See the class note on `AthleteProfile`.
+        userId: doc._id,
+        sports: doc.sports ?? [],
+        slots: (doc.slots ?? []).map(normaliseSlot),
+        updatedAt: asDate(doc.updatedAt),
+      });
+    },
+    toPersistence(profile) {
+      return {
+        _id: profile.userId,
+        sports: profile.sports,
+        slots: profile.slots,
+        updatedAt: profile.updatedAt,
+        schemaVersion: profile.schemaVersion,
+      };
+    },
+  });
 
 const sessionMapper: Mapper<Session, SessionDoc> = versioned({
   toDomain(doc) {

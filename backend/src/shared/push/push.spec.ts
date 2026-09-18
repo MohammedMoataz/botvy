@@ -19,7 +19,10 @@ const okTransport: PushTransport = {
   },
 };
 
-const message: PushMessage = { title: 'Plan tomorrow', body: 'What does tomorrow look like?' };
+const message: PushMessage = {
+  title: 'Plan tomorrow',
+  body: 'What does tomorrow look like?',
+};
 
 /**
  * v1 shipped no spec for push, so this is written here rather than ported. The
@@ -28,7 +31,11 @@ const message: PushMessage = { title: 'Plan tomorrow', body: 'What does tomorrow
  */
 describe('push configuration', () => {
   it('is unconfigured, and harmless, when no credentials file is named', () => {
-    const push = new PushService(undefined, okTransport, reader(() => GOOD));
+    const push = new PushService(
+      undefined,
+      okTransport,
+      reader(() => GOOD),
+    );
 
     expect(() => push.initialise()).not.toThrow();
     expect(push.isConfigured()).toBe(false);
@@ -52,13 +59,21 @@ describe('push configuration', () => {
   });
 
   it('refuses to start when the credentials file is not valid JSON', () => {
-    const push = new PushService('/secrets/firebase.json', okTransport, reader(() => 'not json'));
+    const push = new PushService(
+      '/secrets/firebase.json',
+      okTransport,
+      reader(() => 'not json'),
+    );
 
     expect(() => push.initialise()).toThrow(FirebaseCredentialsUnreadable);
   });
 
   it('is configured when the file reads', () => {
-    const push = new PushService('/secrets/firebase.json', okTransport, reader(() => GOOD));
+    const push = new PushService(
+      '/secrets/firebase.json',
+      okTransport,
+      reader(() => GOOD),
+    );
     push.initialise();
 
     expect(push.isConfigured()).toBe(true);
@@ -90,17 +105,32 @@ describe('push configuration', () => {
 
 describe('push delivery', () => {
   it('delivers to the tokens it was given', async () => {
-    const push = new PushService('/secrets/firebase.json', okTransport, reader(() => GOOD));
+    const push = new PushService(
+      '/secrets/firebase.json',
+      okTransport,
+      reader(() => GOOD),
+    );
     push.initialise();
 
-    expect(await push.send(['t1', 't2'], message)).toMatchObject({ sent: 2, failed: 0 });
+    expect(await push.send(['t1', 't2'], message)).toMatchObject({
+      sent: 2,
+      failed: 0,
+    });
   });
 
   it('sends nothing when push is not configured', async () => {
-    const push = new PushService(undefined, okTransport, reader(() => GOOD));
+    const push = new PushService(
+      undefined,
+      okTransport,
+      reader(() => GOOD),
+    );
     push.initialise();
 
-    expect(await push.send(['t1'], message)).toEqual({ sent: 0, failed: 0, invalidTokens: [] });
+    expect(await push.send(['t1'], message)).toEqual({
+      sent: 0,
+      failed: 0,
+      invalidTokens: [],
+    });
   });
 
   it('sends nothing when there are no tokens, rather than calling the transport', async () => {
@@ -111,7 +141,11 @@ describe('push delivery', () => {
         return { sent: 0, failed: 0, invalidTokens: [] };
       },
     };
-    const push = new PushService('/secrets/firebase.json', transport, reader(() => GOOD));
+    const push = new PushService(
+      '/secrets/firebase.json',
+      transport,
+      reader(() => GOOD),
+    );
     push.initialise();
 
     await push.send([], message);
@@ -125,19 +159,34 @@ describe('push delivery', () => {
         throw new Error('FCM unavailable');
       },
     };
-    const push = new PushService('/secrets/firebase.json', failing, reader(() => GOOD));
+    const push = new PushService(
+      '/secrets/firebase.json',
+      failing,
+      reader(() => GOOD),
+    );
     push.initialise();
 
-    expect(await push.send(['t1'], message)).toMatchObject({ sent: 0, failed: 1 });
+    expect(await push.send(['t1'], message)).toMatchObject({
+      sent: 0,
+      failed: 1,
+    });
   });
 
   it('reports tokens the service rejected, so the caller can reap them', async () => {
     const reaping: PushTransport = {
       async send(tokens) {
-        return { sent: tokens.length - 1, failed: 1, invalidTokens: [tokens[0]!] };
+        return {
+          sent: tokens.length - 1,
+          failed: 1,
+          invalidTokens: [tokens[0]!],
+        };
       },
     };
-    const push = new PushService('/secrets/firebase.json', reaping, reader(() => GOOD));
+    const push = new PushService(
+      '/secrets/firebase.json',
+      reaping,
+      reader(() => GOOD),
+    );
     push.initialise();
 
     expect(await push.send(['dead', 'alive'], message)).toMatchObject({

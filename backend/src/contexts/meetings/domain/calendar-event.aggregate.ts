@@ -151,10 +151,7 @@ export class CalendarEvent extends AggregateRoot<string> {
    * phone through `/sync` like every other row, and the sync facade raises
    * `sync.ChangesApplied` so the member's other devices are nudged.
    */
-  edit(
-    patch: CalendarEventPatch,
-    timezone: string,
-  ): string[] {
+  edit(patch: CalendarEventPatch, timezone: string): string[] {
     const changed: string[] = [];
 
     if (patch.title !== undefined) {
@@ -217,10 +214,7 @@ export class CalendarEvent extends AggregateRoot<string> {
   }
 
   /** One occurrence moved, keyed by the rule's own moment (FR-011). */
-  moveOccurrence(
-    originalStart: Date,
-    startAt: Date,
-  ): void {
+  moveOccurrence(originalStart: Date, startAt: Date): void {
     this.recurrence = moveInRule(
       this.requireRecurrence('This event does not repeat.'),
       originalStart,
@@ -296,7 +290,10 @@ export class CalendarEvent extends AggregateRoot<string> {
 function requireTitle(raw: string): string {
   const title = raw.trim().slice(0, MAX_EVENT_TITLE_LENGTH);
   if (title === '') {
-    throw new CalendarEventRuleError('title_required', 'An event needs a title.');
+    throw new CalendarEventRuleError(
+      'title_required',
+      'An event needs a title.',
+    );
   }
   return title;
 }
@@ -328,7 +325,9 @@ function validatedRecurrence(
     dtstart: recurrence.dtstart,
     rrule: recurrence.rrule,
     exdates: [...(recurrence.exdates ?? [])],
-    overrides: (recurrence.overrides ?? []).map((override) => ({ ...override })),
+    overrides: (recurrence.overrides ?? []).map((override) => ({
+      ...override,
+    })),
   };
   if (!isReadableRule(copy, zone)) {
     throw new CalendarEventRuleError(
@@ -339,7 +338,10 @@ function validatedRecurrence(
   return copy;
 }
 
-function truncate(value: string | null | undefined, max: number): string | null {
+function truncate(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.slice(0, max);
   return trimmed === '' ? null : trimmed;

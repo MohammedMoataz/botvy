@@ -199,7 +199,9 @@ async function up(db) {
       (error.code === 11000 ||
         (Array.isArray(error.writeErrors) &&
           error.writeErrors.length > 0 &&
-          error.writeErrors.every((one) => (one.code ?? one.err?.code) === 11000)));
+          error.writeErrors.every(
+            (one) => (one.code ?? one.err?.code) === 11000,
+          )));
     if (!duplicatesOnly) throw error;
   }
 }

@@ -28,10 +28,6 @@
       ]
     }
   },
-  "required": [
-    "date",
-    "mood",
-    "adhered"
-  ],
+  "required": ["date", "mood", "adhered"],
   "additionalProperties": false
 }

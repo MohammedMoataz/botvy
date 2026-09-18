@@ -296,7 +296,10 @@ export class Meeting extends AggregateRoot<string> {
       }
     }
 
-    if (patch.startAt !== undefined && !sameInstant(patch.startAt, this.startAt)) {
+    if (
+      patch.startAt !== undefined &&
+      !sameInstant(patch.startAt, this.startAt)
+    ) {
       this.startAt = patch.startAt;
       changed.push('startAt');
     }
@@ -449,8 +452,7 @@ export class Meeting extends AggregateRoot<string> {
     );
     this.recurrence = moveInRule(recurrence, originalStart, {
       startAt,
-      durationMin:
-        durationMin === null ? null : requireDuration(durationMin),
+      durationMin: durationMin === null ? null : requireDuration(durationMin),
     });
     this.updatedAt = new Date();
     this.raise(
@@ -707,7 +709,9 @@ function validatedRecurrence(
     dtstart: recurrence.dtstart,
     rrule: recurrence.rrule,
     exdates: [...(recurrence.exdates ?? [])],
-    overrides: (recurrence.overrides ?? []).map((override) => ({ ...override })),
+    overrides: (recurrence.overrides ?? []).map((override) => ({
+      ...override,
+    })),
   };
   if (!isReadableRule(copy, zone)) {
     throw new MeetingRuleError(
@@ -718,7 +722,10 @@ function validatedRecurrence(
   return copy;
 }
 
-function truncate(value: string | null | undefined, max: number): string | null {
+function truncate(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.slice(0, max);
   return trimmed === '' ? null : trimmed;

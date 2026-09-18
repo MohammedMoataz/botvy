@@ -56,7 +56,10 @@ async function up(db) {
     // it and why that is not a reason to shape it differently.
     await db
       .collection(collection)
-      .createIndex({ userId: 1, startAt: 1 }, { name: `${collection}_user_start` });
+      .createIndex(
+        { userId: 1, startAt: 1 },
+        { name: `${collection}_user_start` },
+      );
 
     // ------------------------------------------------------------ `/sync` pull
     //

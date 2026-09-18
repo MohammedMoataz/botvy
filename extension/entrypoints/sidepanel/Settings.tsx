@@ -27,7 +27,9 @@ export const Settings = observer(function Settings({
 }) {
   return (
     <details className="mt-3">
-      <summary className="small text-muted">{store.t('settings.title')}</summary>
+      <summary className="small text-muted">
+        {store.t('settings.title')}
+      </summary>
 
       <div className="mt-2">
         <GatewayField store={store} />

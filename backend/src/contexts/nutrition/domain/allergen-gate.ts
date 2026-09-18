@@ -171,14 +171,16 @@ function covers(word: string, candidate: string): boolean {
 }
 
 function normalise(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    // Arabic diacritics, so a member who wrote a vowelled word and a text that
-    // did not are the same word. Nothing else is transliterated: matching
-    // across scripts is a promise this cannot keep, and the member's own words
-    // are matched literally in whichever script they used them.
-    .replace(/[ً-ْ]/gu, '');
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      // Arabic diacritics, so a member who wrote a vowelled word and a text that
+      // did not are the same word. Nothing else is transliterated: matching
+      // across scripts is a promise this cannot keep, and the member's own words
+      // are matched literally in whichever script they used them.
+      .replace(/[ً-ْ]/gu, '')
+  );
 }
 
 /**

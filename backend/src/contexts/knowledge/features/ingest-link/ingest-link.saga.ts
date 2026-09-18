@@ -229,7 +229,9 @@ export class IngestLinkSaga {
        * put the platform's health check in the business of knowing what a link
        * is.
        */
-      const stuckFor = oldestBefore ? now.getTime() - oldestBefore.getTime() : 0;
+      const stuckFor = oldestBefore
+        ? now.getTime() - oldestBefore.getTime()
+        : 0;
       const threshold =
         (await this.settings.get('knowledge.stuckAfterMinutes')) * 60_000;
 
@@ -345,7 +347,9 @@ export class IngestLinkSaga {
     const limits = await this.limits();
 
     try {
-      const fetcher = this.fetchers.find((candidate) => candidate.handles(link.kind));
+      const fetcher = this.fetchers.find((candidate) =>
+        candidate.handles(link.kind),
+      );
       const extractor = this.extractors.find((candidate) =>
         candidate.handles(link.kind),
       );
@@ -387,7 +391,8 @@ export class IngestLinkSaga {
       const summarised = await this.summariser.summarise({
         title: content.title,
         text: content.text,
-        hadTranscript: link.kind === 'video' ? content.transcript !== null : null,
+        hadTranscript:
+          link.kind === 'video' ? content.transcript !== null : null,
         sourceUrl: link.url,
       });
 

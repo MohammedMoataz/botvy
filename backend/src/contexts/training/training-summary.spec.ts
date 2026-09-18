@@ -50,7 +50,8 @@ function at(hhmm: string, dayOffset: number): Date {
     CAIRO,
   );
   const instant = wallClockToUtc(`${date}T${hhmm}`, CAIRO);
-  if (!instant) throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
+  if (!instant)
+    throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
   return instant;
 }
 

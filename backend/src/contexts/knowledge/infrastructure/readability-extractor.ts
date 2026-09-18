@@ -88,7 +88,9 @@ export class ReadabilityExtractor extends ContentExtractor {
     if (raw.contentType?.toLowerCase().includes('text/plain')) {
       const text = html.trim().slice(0, limits.maxChars);
       if (text.length < MIN_ARTICLE_CHARS) {
-        throw new SourceRefused('There was not enough text on this page to read.');
+        throw new SourceRefused(
+          'There was not enough text on this page to read.',
+        );
       }
       return {
         title: null,
@@ -212,7 +214,10 @@ function imagesIn(document: Document, baseUrl: string): SourceMedia[] {
 
     const caption =
       image.getAttribute('alt')?.trim() ||
-      image.closest('figure')?.querySelector('figcaption')?.textContent?.trim() ||
+      image
+        .closest('figure')
+        ?.querySelector('figcaption')
+        ?.textContent?.trim() ||
       null;
 
     out.push({ type: 'image', url: absolute, caption: caption || null });

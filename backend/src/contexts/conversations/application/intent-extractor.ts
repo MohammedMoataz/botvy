@@ -12,7 +12,11 @@ import {
   type IntentScope,
   type ListKind,
 } from '../domain/intent.js';
-import { mentionsAMoment, preferSoonestDay, resolveRelativePhrase } from '../domain/relative-time.js';
+import {
+  mentionsAMoment,
+  preferSoonestDay,
+  resolveRelativePhrase,
+} from '../domain/relative-time.js';
 import { renderPrompt } from '../../../shared/templates/prompt-files.js';
 
 /**
@@ -156,7 +160,9 @@ export class IntentExtractor extends IntentExtractorPort {
        * is gone — and an operator reading the log needs to see it, even though
        * the member never does.
        */
-      this.logger.warn(`extraction failed, treating as chat: ${(error as Error).message}`);
+      this.logger.warn(
+        `extraction failed, treating as chat: ${(error as Error).message}`,
+      );
       return PLAIN_CHAT;
     }
   }
@@ -326,7 +332,11 @@ export class IntentExtractor extends IntentExtractorPort {
     // A time and an all-day flag contradict each other, and the time is the
     // stronger signal: a member who named an hour did not mean "some point
     // that day". `allDay` survives only when nothing resolved a clock time.
-    if (args.when && /T\d{2}:\d{2}$/.test(args.when) && !isMidnight(args.when)) {
+    if (
+      args.when &&
+      /T\d{2}:\d{2}$/.test(args.when) &&
+      !isMidnight(args.when)
+    ) {
       delete args.allDay;
     }
 
@@ -439,8 +449,24 @@ function asMetric(value: unknown): 'weightKg' | 'heightCm' | undefined {
   if (typeof value !== 'string') return undefined;
   const folded = value.trim().toLowerCase();
 
-  const WEIGHT = ['weightkg', 'weight', 'kg', 'kilos', 'kilograms', '\u0648\u0632\u0646', '\u0627\u0644\u0648\u0632\u0646'];
-  const HEIGHT = ['heightcm', 'height', 'cm', 'centimetres', 'centimeters', '\u0637\u0648\u0644', '\u0627\u0644\u0637\u0648\u0644'];
+  const WEIGHT = [
+    'weightkg',
+    'weight',
+    'kg',
+    'kilos',
+    'kilograms',
+    '\u0648\u0632\u0646',
+    '\u0627\u0644\u0648\u0632\u0646',
+  ];
+  const HEIGHT = [
+    'heightcm',
+    'height',
+    'cm',
+    'centimetres',
+    'centimeters',
+    '\u0637\u0648\u0644',
+    '\u0627\u0644\u0637\u0648\u0644',
+  ];
 
   if (WEIGHT.includes(folded)) return 'weightKg';
   if (HEIGHT.includes(folded)) return 'heightCm';

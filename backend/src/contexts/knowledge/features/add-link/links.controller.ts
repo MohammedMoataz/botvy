@@ -195,7 +195,10 @@ export class LinksController {
         });
       }
       if (error instanceof LinkRuleError) {
-        if (error.code === 'not_deleted' || error.code === 'attempts_exhausted') {
+        if (
+          error.code === 'not_deleted' ||
+          error.code === 'attempts_exhausted'
+        ) {
           throw new ConflictException({
             code: error.code,
             message: error.message,

@@ -3,7 +3,10 @@ import type { Model } from 'mongoose';
 import { AggregateRoot } from '../ports/aggregate-root.js';
 import { StaleWriteError } from '../ports/errors.js';
 import { versioned, type Mapper } from '../ports/mapper.js';
-import { MongoRepositoryBase, type OutboxInsert } from './mongo-repository.base.js';
+import {
+  MongoRepositoryBase,
+  type OutboxInsert,
+} from './mongo-repository.base.js';
 
 /**
  * The filter, asserted directly.

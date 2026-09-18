@@ -49,12 +49,23 @@ class ScriptedRelay implements RelayLoop {
 
 function runtime(relay: ScriptedRelay) {
   const beats: Array<{ ok: boolean; error?: string }> = [];
-  const forwarder = { started: 0, stopped: 0, start() { this.started += 1; }, stop() { this.stopped += 1; } };
+  const forwarder = {
+    started: 0,
+    stopped: 0,
+    start() {
+      this.started += 1;
+    },
+    stop() {
+      this.stopped += 1;
+    },
+  };
   const rt = new RelayRuntime({
     relay,
     forwarder,
     closeStore: async () => {},
-    heartbeat: async (ok, error) => { beats.push(error ? { ok, error } : { ok }); },
+    heartbeat: async (ok, error) => {
+      beats.push(error ? { ok, error } : { ok });
+    },
     sleep: async () => {},
     aliveEveryMs: 60_000,
     retryEveryMs: 60_000,
@@ -95,7 +106,7 @@ describe('RelayRuntime', () => {
     await rt.stop();
   });
 
-  it('reports the later of the relay\'s own delivery and the alive tick', async () => {
+  it("reports the later of the relay's own delivery and the alive tick", async () => {
     const relay = new ScriptedRelay();
     const { rt } = runtime(relay);
     rt.start();

@@ -181,10 +181,7 @@ export abstract class PlannerActionsPort {
     now: Date,
   ): Promise<CancellableItem[]>;
 
-  abstract cancel(
-    userId: string,
-    item: CancellableItem,
-  ): Promise<boolean>;
+  abstract cancel(userId: string, item: CancellableItem): Promise<boolean>;
 
   /** The `list` intent's answer, as structured items for `chat.card`. */
   abstract list(
@@ -566,7 +563,9 @@ export abstract class PromptAssemblerPort {
     floorSeq: number;
     now: Date;
     facts: MemberFacts;
-  }): Promise<Array<{ role: 'system' | 'user' | 'assistant'; content: string }>>;
+  }): Promise<
+    Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  >;
 }
 
 /**

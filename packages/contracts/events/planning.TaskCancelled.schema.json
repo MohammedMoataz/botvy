@@ -13,9 +13,6 @@
       "format": "date-time"
     }
   },
-  "required": [
-    "taskId",
-    "at"
-  ],
+  "required": ["taskId", "at"],
   "additionalProperties": false
 }

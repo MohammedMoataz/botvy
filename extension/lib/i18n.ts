@@ -102,8 +102,7 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'login.failed': 'تعذّر تسجيل الدخول. تأكد من إمكانية الوصول إلى بوتفي.',
     'login.welcome': 'تم تسجيل الدخول بصفة {name}.',
     'login.signOut': 'تسجيل الخروج',
-    'login.gatewayHint':
-      'عنوان بوتفي الخاص بك. اضبطه قبل تسجيل الدخول.',
+    'login.gatewayHint': 'عنوان بوتفي الخاص بك. اضبطه قبل تسجيل الدخول.',
     'tasks.today': 'اليوم',
     'tasks.empty': 'لا شيء مستحق اليوم.',
     'tasks.waiting': 'في انتظار منطقتك الزمنية…',

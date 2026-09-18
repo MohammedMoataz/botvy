@@ -13,14 +13,20 @@ const roles = ['backend', 'worker'] as const;
 
 export const envSchema = z.object({
   BOTVY_ROLE: z.enum(roles).default('backend'),
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'test', 'production'])
+    .default('development'),
   PORT: z.coerce.number().int().positive().default(8080),
   WORKER_PORT: z.coerce.number().int().positive().default(8081),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  LOG_LEVEL: z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
+    .default('info'),
 
   // Stores
   DATABASE_URL: z.string().min(1, 'PostgreSQL connection string (Identity)'),
-  MONGO_URL: z.string().min(1, 'MongoDB connection string (every other context)'),
+  MONGO_URL: z
+    .string()
+    .min(1, 'MongoDB connection string (every other context)'),
 
   // Credentials
   JWT_ACCESS_SECRET: z.string().min(16),
@@ -46,7 +52,10 @@ export const envSchema = z.object({
   // Neighbours
   N8N_URL: z.string().url().default('http://n8n:5678'),
   N8N_API_KEY: z.string().optional(),
-  OLLAMA_BASE_URL: z.string().url().default('http://host.docker.internal:11434'),
+  OLLAMA_BASE_URL: z
+    .string()
+    .url()
+    .default('http://host.docker.internal:11434'),
   FIREBASE_CREDENTIALS_FILE: z.string().optional(),
 
   // Local paths and edges

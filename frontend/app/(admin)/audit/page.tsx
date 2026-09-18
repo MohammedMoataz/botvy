@@ -53,7 +53,9 @@ function AuditPage() {
   const params = useSearchParams();
   const [actor, setActor] = useState('');
   const [action, setAction] = useState(() => params.get('action') ?? '');
-  const [targetType, setTargetType] = useState(() => params.get('targetType') ?? '');
+  const [targetType, setTargetType] = useState(
+    () => params.get('targetType') ?? '',
+  );
 
   useEffect(() => {
     void load(true);
@@ -91,70 +93,79 @@ function AuditPage() {
       {problem && <Message severity="error" text={problem} />}
 
       <section className="panel">
-      <div className="row" style={{ alignItems: 'end' }}>
-        <label>
-          <span className="muted">{t('actor')}</span>
-          <InputText value={actor} onChange={(event) => setActor(event.target.value)} />
-        </label>
-        <label>
-          <span className="muted">{t('action')}</span>
-          <InputText
-            value={action}
-            placeholder="admin.ban"
-            onChange={(event) => setAction(event.target.value)}
+        <div className="row" style={{ alignItems: 'end' }}>
+          <label>
+            <span className="muted">{t('actor')}</span>
+            <InputText
+              value={actor}
+              onChange={(event) => setActor(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="muted">{t('action')}</span>
+            <InputText
+              value={action}
+              placeholder="admin.ban"
+              onChange={(event) => setAction(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="muted">{t('targetType')}</span>
+            <InputText
+              value={targetType}
+              placeholder="user"
+              onChange={(event) => setTargetType(event.target.value)}
+            />
+          </label>
+          <Button
+            label={t('apply')}
+            size="small"
+            onClick={() => void load(true)}
           />
-        </label>
-        <label>
-          <span className="muted">{t('targetType')}</span>
-          <InputText
-            value={targetType}
-            placeholder="user"
-            onChange={(event) => setTargetType(event.target.value)}
-          />
-        </label>
-        <Button label={t('apply')} size="small" onClick={() => void load(true)} />
-      </div>
+        </div>
       </section>
 
       <section className="panel">
-      <DataTable value={rows} dataKey="id" emptyMessage={t('none')}>
-        <Column
-          header={t('when')}
-          body={(row: AuditEntry) => new Date(row.at).toLocaleString()}
-        />
-        <Column
-          header={t('who')}
-          body={(row: AuditEntry) => (
-            <span>
-              {row.actorLabel} <Tag severity="info" value={row.actorType} />
-            </span>
-          )}
-        />
-        <Column field="action" header={t('action')} />
-        <Column
-          header={t('target')}
-          body={(row: AuditEntry) =>
-            row.targetId ? `${row.targetType} · ${row.targetId}` : row.targetType
-          }
-        />
-        <Column
-          header={t('detail')}
-          body={(row: AuditEntry) =>
-            row.meta ? <code>{JSON.stringify(row.meta)}</code> : null
-          }
-        />
-      </DataTable>
+        <DataTable value={rows} dataKey="id" emptyMessage={t('none')}>
+          <Column
+            header={t('when')}
+            body={(row: AuditEntry) => new Date(row.at).toLocaleString()}
+          />
+          <Column
+            header={t('who')}
+            body={(row: AuditEntry) => (
+              <span>
+                {row.actorLabel} <Tag severity="info" value={row.actorType} />
+              </span>
+            )}
+          />
+          <Column field="action" header={t('action')} />
+          <Column
+            header={t('target')}
+            body={(row: AuditEntry) =>
+              row.targetId
+                ? `${row.targetType} · ${row.targetId}`
+                : row.targetType
+            }
+          />
+          <Column
+            header={t('detail')}
+            body={(row: AuditEntry) =>
+              row.meta ? <code>{JSON.stringify(row.meta)}</code> : null
+            }
+          />
+        </DataTable>
 
-      {more && (
-        <Button
-          label={t('loadMore')}
-          severity="secondary"
-          size="small"
-          loading={busy}
-          style={{ alignSelf: 'flex-start' }}
-          onClick={() => void load(false)}
-        />
-      )}
+        {more && (
+          <Button
+            label={t('loadMore')}
+            severity="secondary"
+            size="small"
+            loading={busy}
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => void load(false)}
+          />
+        )}
       </section>
     </main>
   );

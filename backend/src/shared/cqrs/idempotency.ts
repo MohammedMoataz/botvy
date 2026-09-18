@@ -33,7 +33,9 @@ export function idempotencyId(principal: Principal, key: string): string {
   return `${principalId(principal)}:${key}`;
 }
 
-export function readIdempotencyKey(headers: Record<string, unknown> | undefined): string | null {
+export function readIdempotencyKey(
+  headers: Record<string, unknown> | undefined,
+): string | null {
   const raw = headers?.[IDEMPOTENCY_HEADER];
   if (typeof raw !== 'string') return null;
   const trimmed = raw.trim();

@@ -13,7 +13,11 @@ import {
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
-import { localDate, localHhMm, wallClockToUtc } from '../../shared/time/time.js';
+import {
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../shared/time/time.js';
 import { CalendarEventRuleError } from './domain/calendar-event.aggregate.js';
 import { MeetingRuleError } from './domain/meeting.aggregate.js';
 import type { MeetingRecurrence } from './domain/recurrence-expander.js';
@@ -578,7 +582,8 @@ describe('one occurrence of a series', () => {
     );
     expect(occurrences).toHaveLength(6);
     expect(
-      occurrences.find((o) => o.originalStart.getTime() === weekTwo.getTime())
+      occurrences
+        .find((o) => o.originalStart.getTime() === weekTwo.getTime())
         ?.startAt.getTime(),
     ).toBe(moved.getTime());
   });
@@ -592,7 +597,12 @@ describe('one occurrence of a series', () => {
       MeetingRuleError,
     );
     await expect(
-      b.move.handle(MEMBER, body.id, start, new Date(start.getTime() + 3_600_000)),
+      b.move.handle(
+        MEMBER,
+        body.id,
+        start,
+        new Date(start.getTime() + 3_600_000),
+      ),
     ).rejects.toThrow(MeetingRuleError);
   });
 
@@ -755,7 +765,10 @@ describe('a personal event', () => {
     await expect(
       b.createEvent.handle(
         MEMBER,
-        eventBody({ startAt: start, endAt: new Date(start.getTime() - 60_000) }),
+        eventBody({
+          startAt: start,
+          endAt: new Date(start.getTime() - 60_000),
+        }),
       ),
     ).rejects.toThrow(CalendarEventRuleError);
 
@@ -823,7 +836,8 @@ describe('a personal event', () => {
     );
     expect(occurrences).toHaveLength(4);
     expect(
-      occurrences.find((o) => o.originalStart.getTime() === weekTwo.getTime())
+      occurrences
+        .find((o) => o.originalStart.getTime() === weekTwo.getTime())
         ?.startAt.getTime(),
     ).toBe(moved.getTime());
   });

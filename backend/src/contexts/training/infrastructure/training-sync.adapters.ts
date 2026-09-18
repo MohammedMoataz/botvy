@@ -490,13 +490,11 @@ export class ProgramSyncAdapter implements SyncableEntity {
           await this.uow.run(() => this.programs.remove(existing));
           return { applied: true, id: existing.id };
         default:
-          existing.edit(
-            {
-              title: fields.title,
-              sport: fields.sport,
-              weeks: pushedWeeks(fields.weeks),
-            },
-          );
+          existing.edit({
+            title: fields.title,
+            sport: fields.sport,
+            weeks: pushedWeeks(fields.weeks),
+          });
           applyPushedProgramStatus(existing, fields, now);
       }
 
@@ -620,14 +618,12 @@ export class WorkoutSyncAdapter implements SyncableEntity {
           await this.uow.run(() => this.workouts.remove(existing));
           return { applied: true, id: existing.id };
         default:
-          existing.edit(
-            {
-              name: fields.name,
-              sport: fields.sport,
-              exercises: pushedExercises(fields.exercises),
-              tags: fields.tags,
-            },
-          );
+          existing.edit({
+            name: fields.name,
+            sport: fields.sport,
+            exercises: pushedExercises(fields.exercises),
+            tags: fields.tags,
+          });
       }
 
       await this.uow.run(() => this.workouts.save(existing));
@@ -717,7 +713,9 @@ export class AthleteProfilePatchAdapter implements SyncablePatch {
      * make.
      */
     const sports = Array.isArray(patch.sports)
-      ? patch.sports.filter((entry): entry is string => typeof entry === 'string')
+      ? patch.sports.filter(
+          (entry): entry is string => typeof entry === 'string',
+        )
       : undefined;
     const slots = pushedSlots(patch.slots);
 
@@ -833,7 +831,10 @@ function pushedExercises(value: unknown): Exercise[] | undefined {
         ? exercise.mediaRefs.map((ref: MediaRef) => ({ ...ref }))
         : [],
       sets: Array.isArray(exercise.sets)
-        ? exercise.sets.map((set: SetEntry) => ({ ...set, done: set.done === true }))
+        ? exercise.sets.map((set: SetEntry) => ({
+            ...set,
+            done: set.done === true,
+          }))
         : [],
     };
   });

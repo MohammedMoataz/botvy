@@ -24,11 +24,6 @@
       ]
     }
   },
-  "required": [
-    "suggestionId",
-    "forDate",
-    "sport",
-    "sessionId"
-  ],
+  "required": ["suggestionId", "forDate", "sport", "sessionId"],
   "additionalProperties": false
 }

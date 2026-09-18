@@ -21,7 +21,9 @@ function migrationsDir(): string {
       here = dirname(here);
     }
   }
-  throw new Error('could not find migrations/mongo by walking up from this spec');
+  throw new Error(
+    'could not find migrations/mongo by walking up from this spec',
+  );
 }
 
 const DIR = migrationsDir();
@@ -78,7 +80,9 @@ describe('every Mongo migration', () => {
     expect(solitary.test(shipped)).toBe(true);
     // And does not fire on the compound indexes beside it, which are legal.
     expect(
-      solitary.test(`createIndex({ action: 1, _id: -1 }, { name: 'audit_by_action' })`),
+      solitary.test(
+        `createIndex({ action: 1, _id: -1 }, { name: 'audit_by_action' })`,
+      ),
     ).toBe(false);
   });
 
@@ -88,8 +92,12 @@ describe('every Mongo migration', () => {
         default?: { up?: unknown; down?: unknown };
       };
       const shape = loaded.default ?? loaded;
-      expect(typeof (shape as { up?: unknown }).up, `${file} up`).toBe('function');
-      expect(typeof (shape as { down?: unknown }).down, `${file} down`).toBe('function');
+      expect(typeof (shape as { up?: unknown }).up, `${file} up`).toBe(
+        'function',
+      );
+      expect(typeof (shape as { down?: unknown }).down, `${file} down`).toBe(
+        'function',
+      );
     }
   });
 });

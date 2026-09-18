@@ -9,8 +9,6 @@
       "format": "uuid"
     }
   },
-  "required": [
-    "programId"
-  ],
+  "required": ["programId"],
   "additionalProperties": false
 }

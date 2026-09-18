@@ -32,7 +32,9 @@ describe('POST /internal/ops/heartbeat', () => {
 
     expect(answer).toMatchObject({ job: 'backup.mongo', ok: true });
     // An empty error is "no error", not the string "".
-    expect(stamped).toEqual([['backup.mongo', true, undefined, undefined, undefined]]);
+    expect(stamped).toEqual([
+      ['backup.mongo', true, undefined, undefined, undefined],
+    ]);
   });
 
   it('records a failure with its message', async () => {
@@ -77,7 +79,9 @@ describe('POST /internal/ops/heartbeat', () => {
       await asBody({ job: 'ops.retention', ok: true, everyMinutes: 1440 }),
     );
 
-    expect(stamped).toEqual([['ops.retention', true, undefined, undefined, 1440]]);
+    expect(stamped).toEqual([
+      ['ops.retention', true, undefined, undefined, 1440],
+    ]);
   });
 
   it('refuses a body with a field nobody declared', async () => {

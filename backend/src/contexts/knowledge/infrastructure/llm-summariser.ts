@@ -213,7 +213,9 @@ export class LlmSummariser extends SummariserPort {
     tokens += reduced.tokens;
 
     const summary =
-      reduced.text.trim() === '' ? partials.join(' ').slice(0, 1_000) : reduced.text.trim();
+      reduced.text.trim() === ''
+        ? partials.join(' ').slice(0, 1_000)
+        : reduced.text.trim();
 
     return {
       summary,
@@ -237,7 +239,9 @@ export class LlmSummariser extends SummariserPort {
       );
       const points = decoded?.points;
       if (!Array.isArray(points)) {
-        this.logger.debug('key points did not decode; keeping the summary alone');
+        this.logger.debug(
+          'key points did not decode; keeping the summary alone',
+        );
         return [];
       }
       return points

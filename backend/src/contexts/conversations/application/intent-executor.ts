@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { formatInTz, localDate, wallClockToUtc } from '../../../shared/time/time.js';
+import {
+  formatInTz,
+  localDate,
+  wallClockToUtc,
+} from '../../../shared/time/time.js';
 import {
   IntentExecutorPort,
   MeetingActionsPort,
@@ -96,10 +100,7 @@ export class IntentExecutor extends IntentExecutorPort {
         const title = intent.args.title;
         if (!title) {
           return ask(
-            say(
-              'What should I add to your list?',
-              'أضيف إيه لقائمتك؟',
-            ),
+            say('What should I add to your list?', 'أضيف إيه لقائمتك؟'),
           );
         }
 
@@ -117,12 +118,7 @@ export class IntentExecutor extends IntentExecutorPort {
         if (when) {
           dueAt = wallClockToUtc(when, zone);
           if (!dueAt) {
-            return ask(
-              say(
-                'When would you like that for?',
-                'عايزها امتى؟',
-              ),
-            );
+            return ask(say('When would you like that for?', 'عايزها امتى؟'));
           }
           if (!allDay && dueAt.getTime() <= now.getTime()) {
             return ask(this.pastQuestion(say, dueAt, zone));
@@ -149,12 +145,7 @@ export class IntentExecutor extends IntentExecutorPort {
       case 'set_reminder': {
         const title = intent.args.title;
         if (!title) {
-          return ask(
-            say(
-              'What should I remind you about?',
-              'أفكّرك بإيه؟',
-            ),
-          );
+          return ask(say('What should I remind you about?', 'أفكّرك بإيه؟'));
         }
 
         const when = intent.args.when;
@@ -166,19 +157,12 @@ export class IntentExecutor extends IntentExecutorPort {
            * fires at a time they did not choose reads as a bug in the app
            * rather than a misunderstanding. One short question costs a second.
            */
-          return ask(
-            say(
-              'When should I remind you?',
-              'أفكّرك امتى؟',
-            ),
-          );
+          return ask(say('When should I remind you?', 'أفكّرك امتى؟'));
         }
 
         const remindAt = wallClockToUtc(when, zone);
         if (!remindAt) {
-          return ask(
-            say('When should I remind you?', 'أفكّرك امتى؟'),
-          );
+          return ask(say('When should I remind you?', 'أفكّرك امتى؟'));
         }
         if (remindAt.getTime() <= now.getTime()) {
           /*
@@ -231,9 +215,7 @@ export class IntentExecutor extends IntentExecutorPort {
          */
         const title = intent.args.title;
         if (!title) {
-          return ask(
-            say('What is the meeting about?', 'الاجتماع بخصوص إيه؟'),
-          );
+          return ask(say('What is the meeting about?', 'الاجتماع بخصوص إيه؟'));
         }
 
         const when = intent.args.when;
@@ -241,9 +223,7 @@ export class IntentExecutor extends IntentExecutorPort {
           // A meeting is a time in the same way a reminder is. There is no
           // sensible default and an invented hour is one the member finds out
           // about when somebody else is waiting.
-          return ask(
-            say('When is the meeting?', 'الاجتماع امتى؟'),
-          );
+          return ask(say('When is the meeting?', 'الاجتماع امتى؟'));
         }
 
         const startAt = wallClockToUtc(when, zone);
@@ -321,10 +301,7 @@ export class IntentExecutor extends IntentExecutorPort {
         const match = intent.args.match ?? intent.args.title;
         if (!match) {
           return ask(
-            say(
-              'What would you like me to cancel?',
-              'تحب ألغي إيه بالظبط؟',
-            ),
+            say('What would you like me to cancel?', 'تحب ألغي إيه بالظبط؟'),
           );
         }
 
@@ -470,10 +447,7 @@ export class IntentExecutor extends IntentExecutorPort {
         const metric = normaliseMetric(intent.args.metric);
         if (!metric) {
           return ask(
-            say(
-              'Is that your weight or your height?',
-              'ده وزنك ولا طولك؟',
-            ),
+            say('Is that your weight or your height?', 'ده وزنك ولا طولك؟'),
           );
         }
         if (intent.args.value === undefined) {
@@ -509,7 +483,8 @@ export class IntentExecutor extends IntentExecutorPort {
       }
 
       case 'update_profile': {
-        const { goal, foodLikes, foodDislikes, allergies, symptoms } = intent.args;
+        const { goal, foodLikes, foodDislikes, allergies, symptoms } =
+          intent.args;
         if (!goal && !foodLikes && !foodDislikes && !allergies && !symptoms) {
           return ask(
             say(
@@ -541,8 +516,14 @@ export class IntentExecutor extends IntentExecutorPort {
 
         return {
           reply: say(
-            `Noted — I've updated your ${listWords(written.map((field) => fieldName(field, false)), 'and')}.`,
-            `تمام — حدّثت ${listWords(written.map((field) => fieldName(field, true)), 'و')}.`,
+            `Noted — I've updated your ${listWords(
+              written.map((field) => fieldName(field, false)),
+              'and',
+            )}.`,
+            `تمام — حدّثت ${listWords(
+              written.map((field) => fieldName(field, true)),
+              'و',
+            )}.`,
           ),
           actions: [{ kind: 'profile.updated' }],
           asking: false,
@@ -563,18 +544,13 @@ export class IntentExecutor extends IntentExecutorPort {
          */
         const sport = intent.args.sport?.trim();
         if (!sport) {
-          return ask(
-            say('Which sport is that for?', 'ده لأي رياضة؟'),
-          );
+          return ask(say('Which sport is that for?', 'ده لأي رياضة؟'));
         }
 
         const weekdays = intent.args.weekdays ?? [];
         if (weekdays.length === 0) {
           return ask(
-            say(
-              `Which days do you do ${sport}?`,
-              `بتعمل ${sport} أي أيام؟`,
-            ),
+            say(`Which days do you do ${sport}?`, `بتعمل ${sport} أي أيام؟`),
           );
         }
 
@@ -649,7 +625,8 @@ export class IntentExecutor extends IntentExecutorPort {
 
         const merged: ChatTrainingSlot[] = [
           ...week.filter(
-            (slot) => !(sameSport(slot.sport, sport) && named.has(slot.weekday)),
+            (slot) =>
+              !(sameSport(slot.sport, sport) && named.has(slot.weekday)),
           ),
           ...weekdays.map((weekday) => {
             const existing = kept.get(weekday);
@@ -781,7 +758,10 @@ export class IntentExecutor extends IntentExecutorPort {
 
         if (open.length > 1) {
           const listed = open
-            .map((session) => `- ${session.title} (${formatInTz(session.at, zone)})`)
+            .map(
+              (session) =>
+                `- ${session.title} (${formatInTz(session.at, zone)})`,
+            )
             .join('\n');
           return ask(
             say(
@@ -848,10 +828,7 @@ export class IntentExecutor extends IntentExecutorPort {
         const name = intent.args.title?.trim();
         if (!name) {
           return ask(
-            say(
-              'What should I add to your meals?',
-              'أضيف إيه لقائمة أكلك؟',
-            ),
+            say('What should I add to your meals?', 'أضيف إيه لقائمة أكلك؟'),
           );
         }
 
@@ -893,11 +870,7 @@ export class IntentExecutor extends IntentExecutorPort {
   }
 
   /** The question a moment that has already passed gets. */
-  private pastQuestion(
-    say: Phrasebook,
-    at: Date,
-    zone: string,
-  ): string {
+  private pastQuestion(say: Phrasebook, at: Date, zone: string): string {
     return say(
       `That works out to ${formatInTz(at, zone)}, which has already passed — ` +
         'when did you mean?',
@@ -1078,13 +1051,21 @@ function normaliseLocation(
  * becomes a question — a member who said "my body fat is 18%" gets asked rather
  * than having it filed as a weight.
  */
-function normaliseMetric(metric: string | undefined): 'weightKg' | 'heightCm' | null {
+function normaliseMetric(
+  metric: string | undefined,
+): 'weightKg' | 'heightCm' | null {
   if (!metric) return null;
   const folded = fold(metric);
-  if (/(^|\s)(weightkg|weight|kg|kilo|kilogram|mass|وزن|الوزن)(\s|$)/.test(folded)) {
+  if (
+    /(^|\s)(weightkg|weight|kg|kilo|kilogram|mass|وزن|الوزن)(\s|$)/.test(folded)
+  ) {
     return 'weightKg';
   }
-  if (/(^|\s)(heightcm|height|cm|centimetre|centimeter|tall|طول|الطول)(\s|$)/.test(folded)) {
+  if (
+    /(^|\s)(heightcm|height|cm|centimetre|centimeter|tall|طول|الطول)(\s|$)/.test(
+      folded,
+    )
+  ) {
     return 'heightCm';
   }
   return null;

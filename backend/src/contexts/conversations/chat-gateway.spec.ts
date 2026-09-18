@@ -4,8 +4,15 @@ import type { Principal } from '../../shared/auth/principal.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { NudgeService, roomForUser } from '../../ws/nudge.service.js';
-import type { TurnEvents, TurnRequest, TurnRunner } from './application/turn-runner.js';
-import { ChatGateway, type ChatSocket } from './features/send-message/chat.gateway.js';
+import type {
+  TurnEvents,
+  TurnRequest,
+  TurnRunner,
+} from './application/turn-runner.js';
+import {
+  ChatGateway,
+  type ChatSocket,
+} from './features/send-message/chat.gateway.js';
 
 /**
  * `ChatGateway`: the socket's two messages, and the translation between the
@@ -79,7 +86,8 @@ function socket(principal?: Principal): ChatSocket & {
  */
 class FakeRunner {
   readonly runs: Array<{ request: TurnRequest; events: TurnEvents }> = [];
-  behaviour: (request: TurnRequest, events: TurnEvents) => Promise<void> = async () => {};
+  behaviour: (request: TurnRequest, events: TurnEvents) => Promise<void> =
+    async () => {};
 
   async run(request: TurnRequest, events: TurnEvents): Promise<void> {
     this.runs.push({ request, events });
@@ -92,13 +100,15 @@ class FakeRunner {
 
   signalOf(userId: string, requestId: string): AbortSignal | undefined {
     return this.runs.find(
-      (run) => run.request.userId === userId && run.request.requestId === requestId,
+      (run) =>
+        run.request.userId === userId && run.request.requestId === requestId,
     )?.request.signal;
   }
 }
 
 class RecordingSockets {
-  readonly frames: Array<{ room: string; event: string; payload: unknown }> = [];
+  readonly frames: Array<{ room: string; event: string; payload: unknown }> =
+    [];
 
   to(room: string) {
     return {
@@ -121,7 +131,10 @@ function bench(): Bench {
   const rooms = new RecordingSockets();
   const nudges = new NudgeService();
   nudges.attach(rooms);
-  const settings = new SettingsService(new InMemorySettingsStore(), new SilentAudit());
+  const settings = new SettingsService(
+    new InMemorySettingsStore(),
+    new SilentAudit(),
+  );
   return {
     gateway: new ChatGateway(runner.port, nudges, settings),
     runner,
@@ -144,7 +157,9 @@ function settle(): Promise<void> {
 /** A turn that never finishes, so `chat.cancel` has something live to abort. */
 const NEVER = (): Promise<void> => new Promise<void>(() => {});
 
-function body(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function body(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     requestId: 'request-1',
     conversationId: 'conversation-1',
@@ -211,7 +226,9 @@ describe('chat.send: what it refuses', () => {
   ])('refuses %s', async (_name, overrides) => {
     const client = socket(member(MEMBER));
 
-    await expect(harness.gateway.send(body(overrides), client)).resolves.toEqual({
+    await expect(
+      harness.gateway.send(body(overrides), client),
+    ).resolves.toEqual({
       ok: false,
       error: 'bad_request',
     });
@@ -248,7 +265,11 @@ describe('chat.send: the per-minute limit', () => {
     // ack is not something a chat screen renders.
     expect(client.frames.at(-1)).toEqual({
       event: 'chat.error',
-      payload: { requestId: 'request-3', code: 'rate_limited', message: expect.any(String) },
+      payload: {
+        requestId: 'request-3',
+        code: 'rate_limited',
+        message: expect.any(String),
+      },
     });
     expect(harness.runner.runs).toHaveLength(3);
   });
@@ -276,7 +297,10 @@ describe('chat.send: the per-minute limit', () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
 
     for (let index = 0; index < 3; index += 1) {
-      await harness.gateway.send(body({ requestId: `request-${index}` }), client);
+      await harness.gateway.send(
+        body({ requestId: `request-${index}` }),
+        client,
+      );
     }
 
     clock.mockReturnValue(start + 59_999);
@@ -304,11 +328,15 @@ describe('chat.send: the per-minute limit', () => {
     const theirs = socket(member(OTHER));
 
     await harness.gateway.send(body(), mine);
-    await expect(harness.gateway.send(body({ requestId: 'r2' }), mine)).resolves.toEqual({
+    await expect(
+      harness.gateway.send(body({ requestId: 'r2' }), mine),
+    ).resolves.toEqual({
       ok: false,
       error: 'rate_limited',
     });
-    await expect(harness.gateway.send(body(), theirs)).resolves.toEqual({ ok: true });
+    await expect(harness.gateway.send(body(), theirs)).resolves.toEqual({
+      ok: true,
+    });
   });
 });
 
@@ -338,7 +366,9 @@ describe('chat.cancel', () => {
     await harness.gateway.send(body({ requestId: 'shared' }), theirs);
 
     const mine = socket(member(MEMBER));
-    expect(harness.gateway.cancel({ requestId: 'shared' }, mine)).toEqual({ ok: false });
+    expect(harness.gateway.cancel({ requestId: 'shared' }, mine)).toEqual({
+      ok: false,
+    });
 
     expect(harness.runner.signalOf(OTHER, 'shared')?.aborted).toBe(false);
   });
@@ -347,18 +377,24 @@ describe('chat.cancel', () => {
     const client = socket(member(MEMBER));
     await harness.gateway.send(body({ requestId: 'mine' }), client);
 
-    expect(harness.gateway.cancel({ requestId: 'mine' }, client)).toEqual({ ok: true });
+    expect(harness.gateway.cancel({ requestId: 'mine' }, client)).toEqual({
+      ok: true,
+    });
     expect(harness.runner.signalOf(MEMBER, 'mine')?.aborted).toBe(true);
   });
 
   it('answers a requestId it has never seen with ok false', () => {
     const client = socket(member(MEMBER));
 
-    expect(harness.gateway.cancel({ requestId: 'nothing' }, client)).toEqual({ ok: false });
+    expect(harness.gateway.cancel({ requestId: 'nothing' }, client)).toEqual({
+      ok: false,
+    });
   });
 
   it('answers an unauthenticated cancel with ok false', () => {
-    expect(harness.gateway.cancel({ requestId: 'anything' }, socket())).toEqual({ ok: false });
+    expect(harness.gateway.cancel({ requestId: 'anything' }, socket())).toEqual(
+      { ok: false },
+    );
   });
 
   /**
@@ -373,7 +409,9 @@ describe('chat.cancel', () => {
     await harness.gateway.send(body({ requestId: 'done' }), client);
     await settle();
 
-    expect(harness.gateway.cancel({ requestId: 'done' }, client)).toEqual({ ok: false });
+    expect(harness.gateway.cancel({ requestId: 'done' }, client)).toEqual({
+      ok: false,
+    });
   });
 });
 
@@ -407,7 +445,11 @@ describe('the frames on the wire', () => {
         conversationId: 'conversation-1',
         seq: 41,
       });
-      events.intent({ requestId: request.requestId, name: 'set_task', scope: 'planning' });
+      events.intent({
+        requestId: request.requestId,
+        name: 'set_task',
+        scope: 'planning',
+      });
       events.moved({
         requestId: request.requestId,
         from: 'conversation-1',
@@ -424,7 +466,12 @@ describe('the frames on the wire', () => {
         requestId: request.requestId,
         conversationId: 'conversation-2',
         seq: 42,
-        usage: { model: 'qwen', promptTokens: 100, completionTokens: 20, ms: 900 },
+        usage: {
+          model: 'qwen',
+          promptTokens: 100,
+          completionTokens: 20,
+          ms: 900,
+        },
         actions: [{ kind: 'task.created', id: 'task-1' }],
       });
     };
@@ -436,11 +483,19 @@ describe('the frames on the wire', () => {
     expect(client.frames).toEqual([
       {
         event: 'chat.accepted',
-        payload: { requestId: 'request-1', conversationId: 'conversation-1', userSeq: 41 },
+        payload: {
+          requestId: 'request-1',
+          conversationId: 'conversation-1',
+          userSeq: 41,
+        },
       },
       {
         event: 'chat.intent',
-        payload: { requestId: 'request-1', intent: 'set_task', scope: 'planning' },
+        payload: {
+          requestId: 'request-1',
+          intent: 'set_task',
+          scope: 'planning',
+        },
       },
       {
         event: 'chat.moved',
@@ -451,7 +506,10 @@ describe('the frames on the wire', () => {
           title: 'the tallest building in the',
         },
       },
-      { event: 'chat.token', payload: { requestId: 'request-1', text: 'Added ' } },
+      {
+        event: 'chat.token',
+        payload: { requestId: 'request-1', text: 'Added ' },
+      },
       {
         event: 'chat.card',
         payload: {
@@ -465,7 +523,12 @@ describe('the frames on the wire', () => {
         payload: {
           requestId: 'request-1',
           assistantSeq: 42,
-          usage: { model: 'qwen', promptTokens: 100, completionTokens: 20, ms: 900 },
+          usage: {
+            model: 'qwen',
+            promptTokens: 100,
+            completionTokens: 20,
+            ms: 900,
+          },
           actions: [{ type: 'task.created', id: 'task-1' }],
         },
       },
@@ -532,10 +595,17 @@ describe('the frames on the wire', () => {
     const typedAt = new Date(Date.now() - 3 * 60 * 60_000);
 
     await harness.gateway.send(
-      body({ requestId: 'r1', composedAt: typedAt.toISOString(), clientId: 'client-1' }),
+      body({
+        requestId: 'r1',
+        composedAt: typedAt.toISOString(),
+        clientId: 'client-1',
+      }),
       client,
     );
-    await harness.gateway.send(body({ requestId: 'r2', composedAt: 'yesterday' }), client);
+    await harness.gateway.send(
+      body({ requestId: 'r2', composedAt: 'yesterday' }),
+      client,
+    );
 
     expect(harness.runner.runs[0]?.request.composedAt).toEqual(typedAt);
     expect(harness.runner.runs[0]?.request.clientId).toBe('client-1');
@@ -594,7 +664,9 @@ describe('the nudge after a turn', () => {
     await harness.gateway.send(body(), client);
     await settle();
 
-    expect(harness.rooms.frames.map((frame) => frame.event)).toEqual(['sync.nudge']);
+    expect(harness.rooms.frames.map((frame) => frame.event)).toEqual([
+      'sync.nudge',
+    ]);
   });
 
   /**
@@ -610,10 +682,14 @@ describe('the nudge after a turn', () => {
     };
     const client = socket(member(MEMBER));
 
-    await expect(harness.gateway.send(body(), client)).resolves.toEqual({ ok: true });
+    await expect(harness.gateway.send(body(), client)).resolves.toEqual({
+      ok: true,
+    });
     await settle();
 
-    expect(harness.rooms.frames.map((frame) => frame.event)).toEqual(['sync.nudge']);
+    expect(harness.rooms.frames.map((frame) => frame.event)).toEqual([
+      'sync.nudge',
+    ]);
   });
 
   /** A refused turn never ran, so there is nothing to pull and no nudge. */

@@ -14,9 +14,6 @@
       }
     }
   },
-  "required": [
-    "installId",
-    "entities"
-  ],
+  "required": ["installId", "entities"],
   "additionalProperties": false
 }

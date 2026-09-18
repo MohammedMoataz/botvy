@@ -2,10 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { isUuid } from '../../../../shared/cqrs/ids.js';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
-import {
-  Meeting,
-  type MeetingSource,
-} from '../../domain/meeting.aggregate.js';
+import { Meeting, type MeetingSource } from '../../domain/meeting.aggregate.js';
 import type {
   MeetingLocation,
   MeetingRecurrence,

@@ -100,11 +100,7 @@ describe('the evening prompt', () => {
   });
 
   it('names the hour with الساعة rather than "at"', () => {
-    const said = planPromptMessage(
-      planOf({ tasks: [task(0)] }),
-      CAIRO,
-      'ar',
-    );
+    const said = planPromptMessage(planOf({ tasks: [task(0)] }), CAIRO, 'ar');
     expect(said).toContain('هذا ما لديّ:');
     // 18:00Z is 20:00 in Cairo — the member's clock, not the server's.
     expect(said).toContain('الساعة 20:00');
@@ -252,11 +248,7 @@ describe('the meal half', () => {
 
   for (const [code, sentence] of codes) {
     it(`says why in Arabic when the reason is ${code}`, () => {
-      const said = planPromptMessage(
-        planOf({ mealReason: code }),
-        CAIRO,
-        'ar',
-      );
+      const said = planPromptMessage(planOf({ mealReason: code }), CAIRO, 'ar');
       expect(said).toContain('الوجبات: لا شيء —');
       expect(said).toContain(sentence);
     });

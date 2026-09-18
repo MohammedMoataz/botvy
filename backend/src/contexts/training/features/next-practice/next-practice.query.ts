@@ -10,7 +10,6 @@ import { addDays, localToday } from '../../domain/slot-calendar.js';
 import { SessionRepository } from '../../domain/training.repositories.js';
 import { sessionView, type SessionView } from '../sessions/sessions.query.js';
 
-
 /** The card's answer: the session, why it is that one, and whether it is late. */
 export interface NextPracticeView {
   session: SessionView | null;

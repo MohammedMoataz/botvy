@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { newId } from '../../shared/cqrs/ids.js';
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { localDate } from '../../shared/time/time.js';
-import type { CheckinsQueryHandler, CheckinView } from '../rhythm/features/checkins/checkins.query.js';
+import type {
+  CheckinsQueryHandler,
+  CheckinView,
+} from '../rhythm/features/checkins/checkins.query.js';
 import type { ProfileQueryHandler } from '../profile/features/profile-query/profile.query.js';
 import { LatestCheckinPort } from './domain/chat.ports.js';
 import type { QuickQuestion } from './domain/quick-question.repository.js';
@@ -183,8 +186,12 @@ describe('the questions a chat offers, as the screen reads them', () => {
    */
   it('returns the globals and the member’s own, and nobody else’s', async () => {
     await repository.save(question({ text: enAr('global') }));
-    await repository.save(question({ userId: MEMBER, order: 50, text: enAr('mine') }));
-    await repository.save(question({ userId: OTHER, order: 10, text: enAr('theirs') }));
+    await repository.save(
+      question({ userId: MEMBER, order: 50, text: enAr('mine') }),
+    );
+    await repository.save(
+      question({ userId: OTHER, order: 10, text: enAr('theirs') }),
+    );
 
     const offered = await handler.handle(MEMBER, 'coach');
 
@@ -197,23 +204,37 @@ describe('the questions a chat offers, as the screen reads them', () => {
    * FR-010 asks for rather than a filter.
    */
   it('brings a lighter-day question to the top after a low check-in', async () => {
-    await repository.save(question({ mood: 'any', order: 10, text: enAr('my programme') }));
-    await repository.save(question({ mood: 'low', order: 20, text: enAr('something easier') }));
+    await repository.save(
+      question({ mood: 'any', order: 10, text: enAr('my programme') }),
+    );
+    await repository.save(
+      question({ mood: 'low', order: 20, text: enAr('something easier') }),
+    );
     mood.value = 20;
 
     const offered = await handler.handle(MEMBER, 'coach');
 
-    expect(offered.map((row) => row.text)).toEqual(['something easier', 'my programme']);
+    expect(offered.map((row) => row.text)).toEqual([
+      'something easier',
+      'my programme',
+    ]);
   });
 
   it('leaves the order alone for a member who has reported nothing', async () => {
-    await repository.save(question({ mood: 'any', order: 10, text: enAr('my programme') }));
-    await repository.save(question({ mood: 'low', order: 20, text: enAr('something easier') }));
+    await repository.save(
+      question({ mood: 'any', order: 10, text: enAr('my programme') }),
+    );
+    await repository.save(
+      question({ mood: 'low', order: 20, text: enAr('something easier') }),
+    );
     mood.value = null;
 
     const offered = await handler.handle(MEMBER, 'coach');
 
-    expect(offered.map((row) => row.text)).toEqual(['my programme', 'something easier']);
+    expect(offered.map((row) => row.text)).toEqual([
+      'my programme',
+      'something easier',
+    ]);
   });
 
   /**
@@ -229,9 +250,15 @@ describe('the questions a chat offers, as the screen reads them', () => {
       question({ text: { en: 'How am I doing?', ar: 'كيف أدائي؟' } }),
     );
 
-    expect((await handler.handle(MEMBER, 'coach', 'ar'))[0]?.text).toBe('كيف أدائي؟');
-    expect((await handler.handle(MEMBER, 'coach', 'ar-EG'))[0]?.text).toBe('كيف أدائي؟');
-    expect((await handler.handle(MEMBER, 'coach', 'en'))[0]?.text).toBe('How am I doing?');
+    expect((await handler.handle(MEMBER, 'coach', 'ar'))[0]?.text).toBe(
+      'كيف أدائي؟',
+    );
+    expect((await handler.handle(MEMBER, 'coach', 'ar-EG'))[0]?.text).toBe(
+      'كيف أدائي؟',
+    );
+    expect((await handler.handle(MEMBER, 'coach', 'en'))[0]?.text).toBe(
+      'How am I doing?',
+    );
   });
 });
 
@@ -258,7 +285,12 @@ describe('a member’s own quick question', () => {
    */
   it('refuses an id that is not a UUID', async () => {
     await expect(
-      handler.add({ userId: MEMBER, id: 'question-1', scope: 'coach', text: 'How is my sleep?' }),
+      handler.add({
+        userId: MEMBER,
+        id: 'question-1',
+        scope: 'coach',
+        text: 'How is my sleep?',
+      }),
     ).rejects.toBeInstanceOf(InvalidQuickQuestion);
     expect(repository.rows.size).toBe(0);
   });
@@ -268,7 +300,12 @@ describe('a member’s own quick question', () => {
       handler.add({ userId: MEMBER, id: newId(), scope: 'coach', text: '' }),
     ).rejects.toBeInstanceOf(InvalidQuickQuestion);
     await expect(
-      handler.add({ userId: MEMBER, id: newId(), scope: 'coach', text: '   \n ' }),
+      handler.add({
+        userId: MEMBER,
+        id: newId(),
+        scope: 'coach',
+        text: '   \n ',
+      }),
     ).rejects.toBeInstanceOf(InvalidQuickQuestion);
     expect(repository.rows.size).toBe(0);
   });
@@ -328,13 +365,20 @@ describe('a member’s own quick question', () => {
       userId: MEMBER,
       enabled: true,
     });
-    expect(await repository.findOwn(MEMBER, id)).toMatchObject({ userId: MEMBER });
+    expect(await repository.findOwn(MEMBER, id)).toMatchObject({
+      userId: MEMBER,
+    });
   });
 
   /** A retried add is the same row written over itself, not a second chip. */
   it('treats a retried add as a no-op', async () => {
     const id = newId();
-    const input = { userId: MEMBER, id, scope: 'coach' as const, text: 'How is my sleep?' };
+    const input = {
+      userId: MEMBER,
+      id,
+      scope: 'coach' as const,
+      text: 'How is my sleep?',
+    };
 
     await handler.add(input);
     await handler.add(input);
@@ -358,8 +402,12 @@ describe('a member’s own quick question', () => {
     await repository.save(global);
     await repository.save(theirs);
 
-    const onGlobal = await handler.remove(MEMBER, global.id).catch((error: Error) => error);
-    const onTheirs = await handler.remove(MEMBER, theirs.id).catch((error: Error) => error);
+    const onGlobal = await handler
+      .remove(MEMBER, global.id)
+      .catch((error: Error) => error);
+    const onTheirs = await handler
+      .remove(MEMBER, theirs.id)
+      .catch((error: Error) => error);
 
     expect(onGlobal).toBeInstanceOf(QuickQuestionNotYours);
     expect(onTheirs).toBeInstanceOf(QuickQuestionNotYours);
@@ -374,7 +422,12 @@ describe('a member’s own quick question', () => {
 
   it('removes the member’s own', async () => {
     const id = newId();
-    await handler.add({ userId: MEMBER, id, scope: 'coach', text: 'How is my sleep?' });
+    await handler.add({
+      userId: MEMBER,
+      id,
+      scope: 'coach',
+      text: 'How is my sleep?',
+    });
 
     await handler.remove(MEMBER, id);
 
@@ -400,7 +453,11 @@ describe('the mood the questions are ordered by', () => {
   function adapter(rows: CheckinView[], timezone = CAIRO) {
     const asked: Array<{ from: string; to: string }> = [];
     const checkins = {
-      handle: async (_userId: string, from: string, to: string): Promise<CheckinView[]> => {
+      handle: async (
+        _userId: string,
+        from: string,
+        to: string,
+      ): Promise<CheckinView[]> => {
         asked.push({ from, to });
         return rows.filter((row) => row.date >= from && row.date <= to);
       },
@@ -482,7 +539,9 @@ describe('the mood the questions are ordered by', () => {
 
 // ------------------------------------------------------------------- helpers
 
-function checkin(overrides: Partial<CheckinView> & { date: string }): CheckinView {
+function checkin(
+  overrides: Partial<CheckinView> & { date: string },
+): CheckinView {
   return { mood: null, adhered: null, note: null, ...overrides };
 }
 

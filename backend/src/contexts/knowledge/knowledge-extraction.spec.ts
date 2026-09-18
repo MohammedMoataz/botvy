@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { SourceRefused, type FetchLimits, type RawSource } from './domain/knowledge.ports.js';
+import {
+  SourceRefused,
+  type FetchLimits,
+  type RawSource,
+} from './domain/knowledge.ports.js';
 import type { Link } from './domain/link.aggregate.js';
 import { ReadabilityExtractor } from './infrastructure/readability-extractor.js';
 
@@ -172,9 +176,9 @@ describe('extracting an article', () => {
   });
 
   it('refuses an empty body', async () => {
-    await expect(
-      extractor.extract(page(''), link, LIMITS),
-    ).rejects.toThrow(SourceRefused);
+    await expect(extractor.extract(page(''), link, LIMITS)).rejects.toThrow(
+      SourceRefused,
+    );
   });
 
   it('caps the text at the Owner’s limit', async () => {

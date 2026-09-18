@@ -40,127 +40,127 @@
 async function up(db) {
   const now = new Date();
   const seed = [
-  {
-    "_id": "qq-coach-protein",
-    "scope": "coach",
-    "text": {
-      "en": "How much protein should I be eating?",
-      "ar": "أكل قد إيه بروتين في اليوم؟"
+    {
+      _id: 'qq-coach-protein',
+      scope: 'coach',
+      text: {
+        en: 'How much protein should I be eating?',
+        ar: 'أكل قد إيه بروتين في اليوم؟',
+      },
+      mood: 'any',
+      order: 100,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "any",
-    "order": 100,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-coach-after-training",
-    "scope": "coach",
-    "text": {
-      "en": "What should I eat after training?",
-      "ar": "أكل إيه بعد التمرين؟"
+    {
+      _id: 'qq-coach-after-training',
+      scope: 'coach',
+      text: {
+        en: 'What should I eat after training?',
+        ar: 'أكل إيه بعد التمرين؟',
+      },
+      mood: 'any',
+      order: 110,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "any",
-    "order": 110,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-coach-how-doing",
-    "scope": "coach",
-    "text": {
-      "en": "How am I doing this week?",
-      "ar": "إيه أدائي الأسبوع ده؟"
+    {
+      _id: 'qq-coach-how-doing',
+      scope: 'coach',
+      text: {
+        en: 'How am I doing this week?',
+        ar: 'إيه أدائي الأسبوع ده؟',
+      },
+      mood: 'ok',
+      order: 120,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "ok",
-    "order": 120,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-coach-lighter",
-    "scope": "coach",
-    "text": {
-      "en": "Give me a lighter day",
-      "ar": "عايز يوم أخف"
+    {
+      _id: 'qq-coach-lighter',
+      scope: 'coach',
+      text: {
+        en: 'Give me a lighter day',
+        ar: 'عايز يوم أخف',
+      },
+      mood: 'low',
+      order: 90,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "low",
-    "order": 90,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-coach-rest",
-    "scope": "coach",
-    "text": {
-      "en": "Should I rest today?",
-      "ar": "أرتاح النهاردة؟"
+    {
+      _id: 'qq-coach-rest',
+      scope: 'coach',
+      text: {
+        en: 'Should I rest today?',
+        ar: 'أرتاح النهاردة؟',
+      },
+      mood: 'low',
+      order: 95,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "low",
-    "order": 95,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-coach-sleep",
-    "scope": "coach",
-    "text": {
-      "en": "I slept badly — what should I change?",
-      "ar": "منمت وحش امبارح، أعمل إيه؟"
+    {
+      _id: 'qq-coach-sleep',
+      scope: 'coach',
+      text: {
+        en: 'I slept badly — what should I change?',
+        ar: 'منمت وحش امبارح، أعمل إيه؟',
+      },
+      mood: 'low',
+      order: 100,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "low",
-    "order": 100,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-plan-today",
-    "scope": "planner",
-    "text": {
-      "en": "What's on today?",
-      "ar": "إيه المطلوب مني النهاردة؟"
+    {
+      _id: 'qq-plan-today',
+      scope: 'planner',
+      text: {
+        en: "What's on today?",
+        ar: 'إيه المطلوب مني النهاردة؟',
+      },
+      mood: 'any',
+      order: 100,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "any",
-    "order": 100,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-plan-reminders",
-    "scope": "planner",
-    "text": {
-      "en": "Show me my reminders",
-      "ar": "وريني التنبيهات"
+    {
+      _id: 'qq-plan-reminders',
+      scope: 'planner',
+      text: {
+        en: 'Show me my reminders',
+        ar: 'وريني التنبيهات',
+      },
+      mood: 'any',
+      order: 110,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "any",
-    "order": 110,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-plan-overdue",
-    "scope": "planner",
-    "text": {
-      "en": "What have I let slip?",
-      "ar": "إيه اللي فاتني؟"
+    {
+      _id: 'qq-plan-overdue',
+      scope: 'planner',
+      text: {
+        en: 'What have I let slip?',
+        ar: 'إيه اللي فاتني؟',
+      },
+      mood: 'any',
+      order: 120,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "any",
-    "order": 120,
-    "userId": null,
-    "schemaVersion": 1
-  },
-  {
-    "_id": "qq-plan-tomorrow",
-    "scope": "planner",
-    "text": {
-      "en": "What does tomorrow look like?",
-      "ar": "بكرة عامل إيه؟"
+    {
+      _id: 'qq-plan-tomorrow',
+      scope: 'planner',
+      text: {
+        en: 'What does tomorrow look like?',
+        ar: 'بكرة عامل إيه؟',
+      },
+      mood: 'any',
+      order: 130,
+      userId: null,
+      schemaVersion: 1,
     },
-    "mood": "any",
-    "order": 130,
-    "userId": null,
-    "schemaVersion": 1
-  }
-];
+  ];
 
   for (const row of seed) {
     const { _id, ...fields } = row;

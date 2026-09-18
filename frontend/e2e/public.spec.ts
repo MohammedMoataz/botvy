@@ -16,11 +16,14 @@ test.skip(!BASE, 'set BOTVY_E2E_URL to run the public suite');
 /** Every screen that has to survive a narrow phone (FR-014). */
 const SCREENS = ['/', '/login'];
 
-test('carries no third-party request at all (FR-012, SC-005)', async ({ page }) => {
+test('carries no third-party request at all (FR-012, SC-005)', async ({
+  page,
+}) => {
   const foreign: string[] = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (url.origin !== new URL(BASE as string).origin) foreign.push(request.url());
+    if (url.origin !== new URL(BASE as string).origin)
+      foreign.push(request.url());
   });
 
   await page.goto(`${BASE}/`);
@@ -58,7 +61,9 @@ for (const screen of SCREENS) {
     // does not show up in a screenshot taken on a laptop. One pixel of slack
     // for sub-pixel rounding, which browsers do differently.
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -97,7 +102,9 @@ test.describe('in Arabic', () => {
      * pass over the screens.
      */
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(1);
   });

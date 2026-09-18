@@ -37,10 +37,7 @@ export interface TemplateExercise {
   sets: Array<
     Pick<
       SetEntry,
-      | 'targetReps'
-      | 'targetWeightKg'
-      | 'targetDurationSec'
-      | 'targetDistanceM'
+      'targetReps' | 'targetWeightKg' | 'targetDurationSec' | 'targetDistanceM'
     >
   >;
 }
@@ -181,15 +178,21 @@ export class Program extends AggregateRoot<string> {
     program.raise(
       'training.ProgramCreated',
       'program',
-      { programId: program.id, title: program.title, weeks: program.weeks.length },
+      {
+        programId: program.id,
+        title: program.title,
+        weeks: program.weeks.length,
+      },
       state.createdAt,
     );
     return program;
   }
 
-  edit(
-    patch: { title?: string; sport?: string; weeks?: ProgramWeek[] },
-  ): string[] {
+  edit(patch: {
+    title?: string;
+    sport?: string;
+    weeks?: ProgramWeek[];
+  }): string[] {
     const changed: string[] = [];
     if (patch.title !== undefined) {
       const title = requireTitle(patch.title);
@@ -330,7 +333,9 @@ export class Program extends AggregateRoot<string> {
     );
     if (byWeekday) return byWeekday;
 
-    const floating = week.sessions.filter((session) => session.weekday === null);
+    const floating = week.sessions.filter(
+      (session) => session.weekday === null,
+    );
     return floating[slotOrdinal] ?? null;
   }
 
@@ -380,7 +385,10 @@ function requireSport(raw: string): string {
 function validatedWeeks(weeks: ProgramWeek[]): ProgramWeek[] {
   const list = weeks ?? [];
   if (list.length === 0) {
-    throw new ProgramRuleError('no_weeks', 'A program needs at least one week.');
+    throw new ProgramRuleError(
+      'no_weeks',
+      'A program needs at least one week.',
+    );
   }
   if (list.length > MAX_WEEKS) {
     throw new ProgramRuleError(

@@ -197,7 +197,8 @@ export class ConversationSyncAdapter implements SyncableEntity {
         // word instead. Title through the aggregate, which trims and caps it;
         // the two booleans through `applyFlags`, which is where the protected
         // refusals would otherwise land.
-        if (typeof fields.title === 'string') existing.rename(fields.title, now);
+        if (typeof fields.title === 'string')
+          existing.rename(fields.title, now);
         applyFlags(existing, fields);
     }
 

@@ -63,7 +63,9 @@ const ROOTS = ['app.module.js', 'worker.module.js'];
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 
 async function main() {
@@ -102,7 +104,9 @@ await main().catch((error) => {
 });
 
 const failed = results.filter((r) => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+console.log(
+  `\n${results.length - failed.length}/${results.length} checks passed`,
+);
 if (failed.length > 0) {
   console.log(
     '\nA named import that is undefined at runtime is the usual cause: a CommonJS\n' +

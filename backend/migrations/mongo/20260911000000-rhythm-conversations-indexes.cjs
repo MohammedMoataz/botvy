@@ -53,21 +53,33 @@ async function up(db) {
   // read to decide whose midnight it meant.
   await db
     .collection('daily_plans')
-    .createIndex({ userId: 1, date: 1 }, { unique: true, name: 'daily_plans_user_date_unique' });
+    .createIndex(
+      { userId: 1, date: 1 },
+      { unique: true, name: 'daily_plans_user_date_unique' },
+    );
 
   // The sync pull's cursor: "this member's rows changed after a moment".
   await db
     .collection('daily_plans')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'daily_plans_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'daily_plans_user_updated' },
+    );
 
   // ---------------------------------------------------------------- checkins
   await db
     .collection('checkins')
-    .createIndex({ userId: 1, date: 1 }, { unique: true, name: 'checkins_user_date_unique' });
+    .createIndex(
+      { userId: 1, date: 1 },
+      { unique: true, name: 'checkins_user_date_unique' },
+    );
 
   await db
     .collection('checkins')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'checkins_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'checkins_user_updated' },
+    );
 
   // ----------------------------------------------------------- rhythm_states
   //
@@ -78,7 +90,10 @@ async function up(db) {
   // than being the one exception somebody has to remember.
   await db
     .collection('rhythm_states')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'rhythm_states_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'rhythm_states_user_updated' },
+    );
 
   // ----------------------------------------------------------- conversations
   //
@@ -98,7 +113,10 @@ async function up(db) {
   // The sync cursor: "this member's rows changed after a moment".
   await db
     .collection('conversations')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'conversations_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'conversations_user_updated' },
+    );
 
   // The chat list, and a *second* index rather than a reuse of the one above.
   //
@@ -128,14 +146,20 @@ async function up(db) {
   // message the phone stepped over can never be corrected into place.
   await db
     .collection('messages')
-    .createIndex({ userId: 1, seq: 1 }, { unique: true, name: 'messages_user_seq_unique' });
+    .createIndex(
+      { userId: 1, seq: 1 },
+      { unique: true, name: 'messages_user_seq_unique' },
+    );
 
   // One conversation's transcript. `seq` again rather than `createdAt`,
   // because two messages written in the same millisecond have an order and
   // only the sequence knows it.
   await db
     .collection('messages')
-    .createIndex({ conversationId: 1, seq: 1 }, { name: 'messages_conversation_seq' });
+    .createIndex(
+      { conversationId: 1, seq: 1 },
+      { name: 'messages_conversation_seq' },
+    );
 
   // The retry story P4 needs, declared now so the rule exists before the first
   // row that relies on it. Partial on `$exists: true`: every message this

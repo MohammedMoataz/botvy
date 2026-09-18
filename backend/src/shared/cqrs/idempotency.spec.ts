@@ -50,7 +50,12 @@ describe('idempotency keys', () => {
   });
 
   it('separates a machine caller from a member holding the same key', () => {
-    const service: Principal = { kind: 'service', id: 'svc-1', name: 'n8n', scopes: [] };
+    const service: Principal = {
+      kind: 'service',
+      id: 'svc-1',
+      name: 'n8n',
+      scopes: [],
+    };
 
     expect(idempotencyId(alice, 'k')).not.toBe(idempotencyId(service, 'k'));
   });
@@ -60,7 +65,13 @@ describe('idempotency keys', () => {
     const id = idempotencyId(alice, 'k');
     const first = { id: 'ping-1', updatedAt: new Date('2026-09-06T10:00:00Z') };
 
-    await store.remember({ id, route: 'POST /api/v1/ping', status: 200, response: first, createdAt: new Date() });
+    await store.remember({
+      id,
+      route: 'POST /api/v1/ping',
+      status: 200,
+      response: first,
+      createdAt: new Date(),
+    });
 
     expect((await store.find(id))?.response).toEqual(first);
   });

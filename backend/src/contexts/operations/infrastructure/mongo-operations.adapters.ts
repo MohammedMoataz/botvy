@@ -60,7 +60,8 @@ export class MongoHeartbeatRepository extends HeartbeatRepository {
     // Same rule as lastOkAt, for the same reason: a caller that does not
     // declare a cadence — an older backup container, a job that has no opinion
     // — must not erase the claim the job made last time it ran.
-    if (heartbeat.everyMinutes !== null) set.everyMinutes = heartbeat.everyMinutes;
+    if (heartbeat.everyMinutes !== null)
+      set.everyMinutes = heartbeat.everyMinutes;
 
     await this.model.updateOne(
       { _id: heartbeat.job },

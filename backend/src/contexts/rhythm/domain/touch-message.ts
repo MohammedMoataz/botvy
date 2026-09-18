@@ -171,7 +171,8 @@ function meetingLines(
  * announced an absence every evening would be five words of noise.
  */
 export function mealLine(plan: DailyPlan, say: Phrasebook): string | null {
-  if (plan.mealLine) return say(`Meals: ${plan.mealLine}`, `الوجبات: ${plan.mealLine}`);
+  if (plan.mealLine)
+    return say(`Meals: ${plan.mealLine}`, `الوجبات: ${plan.mealLine}`);
   if (!plan.mealReason) return null;
   return say(
     `Meals: none planned — ${withheldSentence(plan.mealReason, say)}`,
@@ -193,12 +194,12 @@ function withheldSentence(reason: string, say: Phrasebook): string {
         'قائمة وجباتك فارغة. أضِف بعضها وسأستخدمها.',
       );
     case 'model_unavailable':
-      return say('I could not reach the model.', 'لم أستطع الوصول إلى النموذج.');
-    default:
       return say(
-        'I could not put a list together.',
-        'لم أستطع تجهيز قائمة.',
+        'I could not reach the model.',
+        'لم أستطع الوصول إلى النموذج.',
       );
+    default:
+      return say('I could not put a list together.', 'لم أستطع تجهيز قائمة.');
   }
 }
 

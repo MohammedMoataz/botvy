@@ -45,6 +45,8 @@ export class CloseOnBannedHandler {
   async handle(event: DomainEvent): Promise<void> {
     if (!event.userId) return;
     this.nudges.disconnect(event.userId, 'banned');
-    this.logger.log(`closed chat connections for banned member ${event.userId}`);
+    this.logger.log(
+      `closed chat connections for banned member ${event.userId}`,
+    );
   }
 }

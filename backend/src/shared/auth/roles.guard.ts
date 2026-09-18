@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { REQUIRED_ROLES } from './decorators.js';
 import { principalFrom } from './principal-from-context.js';
@@ -14,14 +19,15 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const required = this.reflector.getAllAndOverride<Role[] | undefined>(REQUIRED_ROLES, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const required = this.reflector.getAllAndOverride<Role[] | undefined>(
+      REQUIRED_ROLES,
+      [context.getHandler(), context.getClass()],
+    );
     if (!required?.length) return true;
 
     const principal = principalFrom(context);
-    if (!principal) throw new ForbiddenException('no principal on this request');
+    if (!principal)
+      throw new ForbiddenException('no principal on this request');
 
     if (principal.kind !== 'user') {
       throw new ForbiddenException('a machine caller holds no role');

@@ -44,7 +44,9 @@ function looksLikeAClock(pattern: RegExp): boolean {
   // regex would then answer differently on every other call.
   const clock = new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ''));
   return (
-    clock.test('09:30') && clock.test('23:59') && !clock.test('not a time at all')
+    clock.test('09:30') &&
+    clock.test('23:59') &&
+    !clock.test('not a time at all')
   );
 }
 
@@ -73,7 +75,10 @@ export function controlFor(schema: z.ZodTypeAny): SettingControl {
       };
 
     case 'ZodNumber': {
-      const checks = (def.checks ?? []) as Array<{ kind: string; value?: number }>;
+      const checks = (def.checks ?? []) as Array<{
+        kind: string;
+        value?: number;
+      }>;
       const min = checks.find((check) => check.kind === 'min')?.value;
       const max = checks.find((check) => check.kind === 'max')?.value;
       return {
@@ -85,7 +90,10 @@ export function controlFor(schema: z.ZodTypeAny): SettingControl {
     }
 
     case 'ZodString': {
-      const checks = (def.checks ?? []) as Array<{ kind: string; regex?: RegExp }>;
+      const checks = (def.checks ?? []) as Array<{
+        kind: string;
+        regex?: RegExp;
+      }>;
       const pattern = checks.find((check) => check.kind === 'regex')?.regex;
       // A time is a string with a clock-shaped rule, and it is worth telling
       // apart: a member typing "25:00" into a text box finds out when the server
@@ -96,8 +104,9 @@ export function controlFor(schema: z.ZodTypeAny): SettingControl {
     }
 
     case 'ZodArray': {
-      const element = (def.type as { _def?: { typeName?: unknown } } | undefined)
-        ?._def?.typeName;
+      const element = (
+        def.type as { _def?: { typeName?: unknown } } | undefined
+      )?._def?.typeName;
       // A list of strings is chips; a list of anything else is shaped enough
       // that JSON is the honest control.
       return String(element ?? '') === 'ZodString'

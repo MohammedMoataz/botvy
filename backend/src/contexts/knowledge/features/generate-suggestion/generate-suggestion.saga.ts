@@ -131,13 +131,20 @@ export class GenerateSuggestionSaga {
       return { generated: false, reason: 'disabled' };
     }
 
-    const already = await this.suggestions.forSession(userId, payload.sessionId);
+    const already = await this.suggestions.forSession(
+      userId,
+      payload.sessionId,
+    );
     // Whatever became of it. A dismissed suggestion is exactly what FR-010's
     // "not proposed again for the same session" is about, and that is the whole
     // reason a dismissal is a row rather than a delete.
     if (already) return { generated: false, reason: 'already_proposed' };
 
-    const sources = await this.gather(userId, payload.sport, payload.focus ?? null);
+    const sources = await this.gather(
+      userId,
+      payload.sport,
+      payload.focus ?? null,
+    );
     if (sources.length === 0) return { generated: false, reason: 'no_sources' };
 
     const { timezone } = await this.member.clock(userId);
@@ -240,7 +247,9 @@ export class GenerateSuggestionSaga {
       userId,
       links.map((link) => link.id),
     );
-    const byLink = new Map(readings.map((reading) => [reading.linkId, reading]));
+    const byLink = new Map(
+      readings.map((reading) => [reading.linkId, reading]),
+    );
 
     const out: Array<{ title: string; forPrompt: DraftSource }> = [];
     for (const link of links) {

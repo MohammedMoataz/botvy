@@ -105,6 +105,8 @@ export interface DayTraining {
  * about rather than an absence it has to guess at.
  */
 export abstract class DayTrainingPort {
-  abstract trainingOn(userId: string, date: string): Promise<DayTraining | null>;
+  abstract trainingOn(
+    userId: string,
+    date: string,
+  ): Promise<DayTraining | null>;
 }
-

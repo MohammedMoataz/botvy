@@ -46,7 +46,8 @@ import { loadEnvFiles } from './env.mjs';
 loadEnvFiles();
 
 const API =
-  process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 /*
  * `INTERNAL_SERVICE_TOKEN`, which is the name `.env` uses on the host — compose
  * exports the same secret to n8n as `BOTVY_SERVICE_TOKEN` and
@@ -65,7 +66,9 @@ const CAIRO = 'Africa/Cairo';
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 const skip = (name, why) => {
   results.push({ name, ok: true, detail: `skipped: ${why}`, skipped: true });
@@ -299,7 +302,16 @@ async function main() {
   const sync = (body) =>
     rest('POST', '/sync', { token, body: { installId, ...body } });
 
-  const meAnswer = await graphql(`query { me { id } }`, token);
+  const meAnswer = await graphql(
+    `
+      query {
+        me {
+          id
+        }
+      }
+    `,
+    token,
+  );
   const userId = meAnswer.data?.me?.id;
 
   /*
@@ -425,7 +437,13 @@ async function main() {
       });
       if (written.status >= 400) return null;
       const read = await graphql(
-        `query { preferences { nextPracticeCutoff } }`,
+        `
+          query {
+            preferences {
+              nextPracticeCutoff
+            }
+          }
+        `,
         token,
       );
       return read.data?.preferences?.nextPracticeCutoff === value
@@ -614,7 +632,9 @@ async function main() {
     `isMissed=${missedRow?.isMissed} status=${missedRow?.status}`,
   );
 
-  const lateLog = await rest('POST', `/sessions/${missedId}/complete`, { token });
+  const lateLog = await rest('POST', `/sessions/${missedId}/complete`, {
+    token,
+  });
   const afterLate = await sessionRows(
     token,
     new Date(Date.now() - DAY_MS).toISOString(),
@@ -759,10 +779,14 @@ async function main() {
     if (!adminToken) {
       skip('a program outlives the horizon (FR-008)', 'admin sign-in failed');
     } else {
-      const raised = await rest('PATCH', '/admin/settings/training.materialiseDays', {
-        token: adminToken,
-        body: { value: 35 },
-      });
+      const raised = await rest(
+        'PATCH',
+        '/admin/settings/training.materialiseDays',
+        {
+          token: adminToken,
+          body: { value: 35 },
+        },
+      );
       await internal('/training/materialise');
 
       const wide = await sessionRows(
@@ -792,7 +816,9 @@ async function main() {
   /*
    * ---- 7. archiving rewrites nothing (story 4 scenario 4) --------------
    */
-  const archived = await rest('POST', `/programs/${programId}/archive`, { token });
+  const archived = await rest('POST', `/programs/${programId}/archive`, {
+    token,
+  });
   await internal('/training/materialise');
   const afterArchive = await sessionRows(token, from, to);
   const stillFilled = afterArchive.filter((row) =>
@@ -831,7 +857,9 @@ async function main() {
     await rest('POST', `/sessions/${alertFor}/cancel`, { token });
     const cleared = await eventually(async () => {
       const alerts = await sessionAlerts();
-      return alerts.every((alert) => alert.source?.id !== alertFor) ? true : null;
+      return alerts.every((alert) => alert.source?.id !== alertFor)
+        ? true
+        : null;
     });
     record(
       'a session cancelled stops reminding (FR-014)',
@@ -900,13 +928,31 @@ async function main() {
       JSON.stringify({ userId, kind: 'plan' }),
     );
     const named = await eventually(async () => {
-      const answer = await graphql(`query { conversations { id kind } }`, token);
+      const answer = await graphql(
+        `
+          query {
+            conversations {
+              id
+              kind
+            }
+          }
+        `,
+        token,
+      );
       const coach = (answer.data?.conversations ?? []).find(
         (row) => row.kind === 'coach',
       );
       if (!coach) return null;
       const messages = await graphql(
-        `query M($id: ID!) { messages(conversationId: $id, afterSeq: 0, first: 50) { nodes { content } } }`,
+        `
+          query M($id: ID!) {
+            messages(conversationId: $id, afterSeq: 0, first: 50) {
+              nodes {
+                content
+              }
+            }
+          }
+        `,
         token,
         { id: coach.id },
       );

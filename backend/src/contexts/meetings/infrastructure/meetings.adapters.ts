@@ -114,7 +114,11 @@ export class TrainingSessions extends TrainingSessionsPort {
     super();
   }
 
-  async between(userId: string, from: Date, to: Date): Promise<AgendaSession[]> {
+  async between(
+    userId: string,
+    from: Date,
+    to: Date,
+  ): Promise<AgendaSession[]> {
     const rows = await this.sessions.between(userId, from, to);
     return rows.map((session) => ({
       id: session.id,
@@ -125,4 +129,3 @@ export class TrainingSessions extends TrainingSessionsPort {
     }));
   }
 }
-

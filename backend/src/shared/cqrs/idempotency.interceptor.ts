@@ -47,7 +47,13 @@ export class IdempotencyInterceptor implements NestInterceptor {
             // Recorded after the handler succeeded. Remembering first would
             // replay an answer for work that then failed.
             void this.store
-              .remember({ id, route, status: 200, response, createdAt: new Date() })
+              .remember({
+                id,
+                route,
+                status: 200,
+                response,
+                createdAt: new Date(),
+              })
               .catch(() => undefined);
           }),
         );

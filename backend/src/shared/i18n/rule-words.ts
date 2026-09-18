@@ -83,7 +83,11 @@ export function ruleWords(parts: RuleParts, locale: string): string | null {
   // picker writes and a clause neither language has a short form for.
   if (parts.byMonthDay.length > 1) return null;
   const monthDay = parts.byMonthDay[0];
-  if (monthDay !== undefined && monthDay !== -1 && (monthDay < 1 || monthDay > 31))
+  if (
+    monthDay !== undefined &&
+    monthDay !== -1 &&
+    (monthDay < 1 || monthDay > 31)
+  )
     return null;
   if (parts.count !== null && parts.until !== null) return null;
 
@@ -128,31 +132,29 @@ function english(parts: RuleParts, monthDay: number | undefined): string {
  * Arabic text is a foreign mark.
  */
 function arabic(parts: RuleParts, monthDay: number | undefined): string {
-  const every = `كل ${
-    {
-      daily: () =>
-        arabicCounted(parts.interval, {
-          one: 'يوم',
-          two: 'يومين',
-          few: 'أيام',
-          many: 'يومًا',
-        }),
-      weekly: () =>
-        arabicCounted(parts.interval, {
-          one: 'أسبوع',
-          two: 'أسبوعين',
-          few: 'أسابيع',
-          many: 'أسبوعًا',
-        }),
-      monthly: () =>
-        arabicCounted(parts.interval, {
-          one: 'شهر',
-          two: 'شهرين',
-          few: 'أشهر',
-          many: 'شهرًا',
-        }),
-    }[parts.freq]()
-  }`;
+  const every = `كل ${{
+    daily: () =>
+      arabicCounted(parts.interval, {
+        one: 'يوم',
+        two: 'يومين',
+        few: 'أيام',
+        many: 'يومًا',
+      }),
+    weekly: () =>
+      arabicCounted(parts.interval, {
+        one: 'أسبوع',
+        two: 'أسبوعين',
+        few: 'أسابيع',
+        many: 'أسبوعًا',
+      }),
+    monthly: () =>
+      arabicCounted(parts.interval, {
+        one: 'شهر',
+        two: 'شهرين',
+        few: 'أشهر',
+        many: 'شهرًا',
+      }),
+  }[parts.freq]()}`;
 
   let where = '';
   if (parts.freq === 'weekly' && parts.byWeekday.length > 0) {

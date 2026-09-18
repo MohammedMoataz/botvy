@@ -4,7 +4,11 @@ import type {
   TaskListFilter,
   TaskView,
 } from '../domain/task-read.repository.js';
-import type { Priority, TaskState, TaskStatus } from '../domain/task.aggregate.js';
+import type {
+  Priority,
+  TaskState,
+  TaskStatus,
+} from '../domain/task.aggregate.js';
 import {
   InMemoryLabelRepository,
   InMemoryTaskReadRepository,
@@ -44,10 +48,7 @@ const MEMBER = 'member-1';
 const LABEL = 'label-1';
 const CAIRO = 'Africa/Cairo';
 
-function taskRow(
-  id: string,
-  overrides: Partial<TaskState> = {},
-): TaskState {
+function taskRow(id: string, overrides: Partial<TaskState> = {}): TaskState {
   const at = new Date('2026-01-01T00:00:00Z');
   return {
     id,

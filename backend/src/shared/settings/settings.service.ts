@@ -37,7 +37,10 @@ export class UnknownSettingError extends Error {
 
 export class InvalidSettingError extends Error {
   readonly code = 'invalid_setting';
-  constructor(key: string, readonly detail: string) {
+  constructor(
+    key: string,
+    readonly detail: string,
+  ) {
     super(`${key} was refused: ${detail}`);
     this.name = 'InvalidSettingError';
   }
@@ -62,7 +65,9 @@ export class SettingsService {
   constructor(
     private readonly store: SettingsStore,
     private readonly audit: AuditPort,
-    @Optional() @Inject(SETTINGS_EVENT_SINK) private readonly events?: SettingsEventSink,
+    @Optional()
+    @Inject(SETTINGS_EVENT_SINK)
+    private readonly events?: SettingsEventSink,
   ) {}
 
   /** Cache, then store, then the registry default. Never undefined. */
@@ -98,7 +103,9 @@ export class SettingsService {
 
     const parsed = definition.schema.safeParse(value);
     if (!parsed.success) {
-      const detail = parsed.error.issues.map((issue) => issue.message).join('; ');
+      const detail = parsed.error.issues
+        .map((issue) => issue.message)
+        .join('; ');
       await this.recordAttempt(actor, key, value, 'refused_invalid', detail);
       throw new InvalidSettingError(key, detail);
     }
@@ -130,7 +137,10 @@ export class SettingsService {
    * bypassed validation would be the one caller able to put a value in the
    * store that every reader then chokes on.
    */
-  async setSystem<K extends SettingKey>(key: K, value: SettingValue<K>): Promise<void> {
+  async setSystem<K extends SettingKey>(
+    key: K,
+    value: SettingValue<K>,
+  ): Promise<void> {
     const definition = definitionOf(key);
     const parsed = definition.schema.safeParse(value);
     if (!parsed.success) {
@@ -148,7 +158,12 @@ export class SettingsService {
     await this.store.set(key, parsed.data, SYSTEM_ACTOR.id);
     this.#cache.set(key, { value: parsed.data, readAt: Date.now() });
     await this.events?.publish('operations.SettingChanged', { key });
-    await this.recordAttempt(SYSTEM_ACTOR, key, parsed.data, 'applied_by_system');
+    await this.recordAttempt(
+      SYSTEM_ACTOR,
+      key,
+      parsed.data,
+      'applied_by_system',
+    );
   }
 
   /** The read side of the patch: the registry with whatever is currently set. */
@@ -196,7 +211,8 @@ export class SettingsService {
       action: 'settings.patch',
       target: { type: 'setting', id: key },
       at: new Date(),
-      meta: detail === undefined ? { outcome, value } : { outcome, value, detail },
+      meta:
+        detail === undefined ? { outcome, value } : { outcome, value, detail },
     });
   }
 }
@@ -218,9 +234,17 @@ export const SYSTEM_ACTOR = {
 function deepEquals(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((item, index) => deepEquals(item, b[index]));
+    return (
+      a.length === b.length &&
+      a.every((item, index) => deepEquals(item, b[index]))
+    );
   }
-  if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
+  if (
+    typeof a === 'object' &&
+    typeof b === 'object' &&
+    a !== null &&
+    b !== null
+  ) {
     const left = a as Record<string, unknown>;
     const right = b as Record<string, unknown>;
     const keys = Object.keys(left);

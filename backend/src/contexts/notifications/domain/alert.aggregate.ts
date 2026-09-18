@@ -7,12 +7,7 @@ import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.
  * they get it.
  */
 export type AlertSourceKind =
-  | 'reminder'
-  | 'task'
-  | 'meeting'
-  | 'rhythm'
-  | 'session'
-  | 'suggestion';
+  'reminder' | 'task' | 'meeting' | 'rhythm' | 'session' | 'suggestion';
 
 export interface AlertSource {
   kind: AlertSourceKind;

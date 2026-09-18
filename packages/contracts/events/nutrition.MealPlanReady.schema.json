@@ -18,9 +18,6 @@
       ]
     }
   },
-  "required": [
-    "date",
-    "line"
-  ],
+  "required": ["date", "line"],
   "additionalProperties": false
 }

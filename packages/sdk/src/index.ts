@@ -82,13 +82,7 @@ export {
   type SyncTable,
   type SyncedRow,
 } from './sync-store.js';
-export {
-  addDays,
-  dayWindow,
-  todayIn,
-  within,
-  type DayWindow,
-} from './day.js';
+export { addDays, dayWindow, todayIn, within, type DayWindow } from './day.js';
 export {
   compareTasksIn,
   localDay,

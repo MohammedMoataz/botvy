@@ -25,7 +25,11 @@ if (env.NODE_ENV === 'production') {
 
 const ttlSeconds = 60 * 60;
 const token = jwt.sign(
-  { sub: process.argv[2] ?? 'dev-admin', role: 'admin', email: env.ADMIN_EMAIL },
+  {
+    sub: process.argv[2] ?? 'dev-admin',
+    role: 'admin',
+    email: env.ADMIN_EMAIL,
+  },
   env.JWT_ACCESS_SECRET,
   { expiresIn: ttlSeconds },
 );

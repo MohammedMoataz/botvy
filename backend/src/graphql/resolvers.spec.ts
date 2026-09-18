@@ -101,7 +101,9 @@ describe('the me query', () => {
 
   /** A machine caller has no member row, no profile and no devices. */
   it('is member-only', () => {
-    expect(Reflect.getMetadata(REQUIRED_KIND, MeResolver.prototype.me)).toBe('user');
+    expect(Reflect.getMetadata(REQUIRED_KIND, MeResolver.prototype.me)).toBe(
+      'user',
+    );
   });
 });
 
@@ -113,7 +115,9 @@ describe('the devices queries', () => {
     uow = new InMemoryUnitOfWork();
     const users = new InMemoryUserRepository(uow);
     const devices = new InMemoryDeviceRepository(uow);
-    resolver = new MyDevicesResolver(new DevicesQueryHandler(devices, users, env));
+    resolver = new MyDevicesResolver(
+      new DevicesQueryHandler(devices, users, env),
+    );
 
     await uow.run(async () => {
       await users.save(member('user-1'));
@@ -168,10 +172,18 @@ describe('the devices queries', () => {
    * exactly why it carries the role.
    */
   it('guards the by-user variant with the admin role', () => {
-    expect(Reflect.getMetadata(REQUIRED_ROLES, MyDevicesResolver.prototype.devicesOf)).toEqual([
-      'admin',
-    ]);
-    expect(Reflect.getMetadata(REQUIRED_ROLES, MyDevicesResolver.prototype.myDevices)).toBeUndefined();
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_ROLES,
+        MyDevicesResolver.prototype.devicesOf,
+      ),
+    ).toEqual(['admin']);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_ROLES,
+        MyDevicesResolver.prototype.myDevices,
+      ),
+    ).toBeUndefined();
   });
 });
 
@@ -186,7 +198,10 @@ describe('the devices queries', () => {
 describe('graphql error codes', () => {
   const wrap = (status: number, message: string) =>
     new GraphQLError('boom', {
-      originalError: Object.assign(new Error(message), { status, response: { message } }),
+      originalError: Object.assign(new Error(message), {
+        status,
+        response: { message },
+      }),
     });
 
   it('marks an expired token so the client refreshes rather than signing out', () => {
@@ -199,14 +214,19 @@ describe('graphql error codes', () => {
   });
 
   it('tells an invalid token apart from an expired one', () => {
-    expect(formatError({ message: 'boom' }, wrap(401, 'token_invalid')).extensions?.code).toBe(
-      'unauthorized',
-    );
+    expect(
+      formatError({ message: 'boom' }, wrap(401, 'token_invalid')).extensions
+        ?.code,
+    ).toBe('unauthorized');
   });
 
   it('maps a refusal and a miss to their own codes', () => {
-    expect(formatError({ message: 'boom' }, wrap(403, 'nope')).extensions?.code).toBe('forbidden');
-    expect(formatError({ message: 'boom' }, wrap(404, 'gone')).extensions?.code).toBe('not_found');
+    expect(
+      formatError({ message: 'boom' }, wrap(403, 'nope')).extensions?.code,
+    ).toBe('forbidden');
+    expect(
+      formatError({ message: 'boom' }, wrap(404, 'gone')).extensions?.code,
+    ).toBe('not_found');
   });
 
   /**
@@ -214,10 +234,13 @@ describe('graphql error codes', () => {
    * mistake becomes an unexplained 500 in a log nobody reads.
    */
   it('leaves anything else as it found it', () => {
-    const untouched = { message: 'boom', extensions: { code: 'BAD_USER_INPUT' } };
+    const untouched = {
+      message: 'boom',
+      extensions: { code: 'BAD_USER_INPUT' },
+    };
 
-    expect(formatError(untouched, new Error('not a graphql error')).extensions?.code).toBe(
-      'BAD_USER_INPUT',
-    );
+    expect(
+      formatError(untouched, new Error('not a graphql error')).extensions?.code,
+    ).toBe('BAD_USER_INPUT');
   });
 });

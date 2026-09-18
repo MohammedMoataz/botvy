@@ -51,7 +51,9 @@ export class WsAuthGuard {
     } catch (error) {
       // The client reconnects with a fresh token on this rather than keeping a
       // dead socket open.
-      throw new WsUnauthorized(error instanceof TokenExpiredError ? 'token_expired' : 'unauthorized');
+      throw new WsUnauthorized(
+        error instanceof TokenExpiredError ? 'token_expired' : 'unauthorized',
+      );
     }
 
     if (verified.principal.kind !== 'user') {
@@ -66,7 +68,10 @@ function readToken(handshake: HandshakeLike): string | null {
   if (typeof fromAuth === 'string' && fromAuth.length > 0) return fromAuth;
 
   const authorization = handshake.headers?.authorization;
-  if (typeof authorization === 'string' && authorization.startsWith('Bearer ')) {
+  if (
+    typeof authorization === 'string' &&
+    authorization.startsWith('Bearer ')
+  ) {
     const value = authorization.slice('Bearer '.length).trim();
     return value.length > 0 ? value : null;
   }

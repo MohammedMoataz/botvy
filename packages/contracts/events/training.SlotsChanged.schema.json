@@ -47,8 +47,6 @@
       }
     }
   },
-  "required": [
-    "slots"
-  ],
+  "required": ["slots"],
   "additionalProperties": false
 }

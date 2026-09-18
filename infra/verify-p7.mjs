@@ -56,7 +56,8 @@ import { loadEnvFiles } from './env.mjs';
 loadEnvFiles();
 
 const API =
-  process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 /*
  * `INTERNAL_SERVICE_TOKEN`, which is the name `.env` uses on the host — compose
  * exports the same secret to n8n as `BOTVY_SERVICE_TOKEN` and
@@ -107,7 +108,9 @@ const DEAD_URL = 'http://postgres:5432/not-an-article';
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 const skip = (name, why) => {
   results.push({ name, ok: true, detail: `skipped: ${why}`, skipped: true });
@@ -259,7 +262,14 @@ async function setSetting(adminToken, key, value) {
     });
     if (written.status >= 400) return null;
     const read = await graphql(
-      `query { settings { key value } }`,
+      `
+        query {
+          settings {
+            key
+            value
+          }
+        }
+      `,
       adminToken,
     );
     const found = (read.data?.settings ?? []).find((row) => row.key === key);
@@ -268,7 +278,9 @@ async function setSetting(adminToken, key, value) {
       : null;
   });
   if (JSON.stringify(inForce) !== JSON.stringify(value)) {
-    throw new Error(`${key} never took: asked for ${value}, last answer ${inForce}`);
+    throw new Error(
+      `${key} never took: asked for ${value}, last answer ${inForce}`,
+    );
   }
   return inForce;
 }
@@ -374,7 +386,10 @@ async function main() {
         ? `${REAL_ARTICLE} was reached and refused: ${article.failReason}`
         : `${REAL_ARTICLE} never settled — this machine has no route out, or the model is not answering`,
     );
-    skip('the summary answers "is this worth my time" on one screen (SC-006)', 'no article was read');
+    skip(
+      'the summary answers "is this worth my time" on one screen (SC-006)',
+      'no article was read',
+    );
   }
 
   /*
@@ -436,7 +451,10 @@ async function main() {
     );
     await setSetting(adminToken, 'knowledge.maxAttempts', wasMaxAttempts);
   } else {
-    skip('retrying stops at the Owner’s limit rather than for ever (FR-004)', 'no admin token');
+    skip(
+      'retrying stops at the Owner’s limit rather than for ever (FR-004)',
+      'no admin token',
+    );
   }
 
   /*
@@ -489,8 +507,14 @@ async function main() {
     );
     await setSetting(adminToken, 'knowledge.maxLinksPerDay', wasQuota);
   } else {
-    skip('a save past the day’s quota is refused with a reason (FR-015)', 'no admin token');
-    skip('the links already queued are untouched by the refusal (FR-015)', 'no admin token');
+    skip(
+      'a save past the day’s quota is refused with a reason (FR-015)',
+      'no admin token',
+    );
+    skip(
+      'the links already queued are untouched by the refusal (FR-015)',
+      'no admin token',
+    );
   }
 
   /*
@@ -554,8 +578,14 @@ async function main() {
       `status=${signedInward.status}`,
     );
   } else {
-    skip('/media refuses a URL this installation did not sign (FR-008)', 'MEDIA_SIGNING_SECRET unset on the host');
-    skip('/media refuses a signed URL pointing inside the network (FR-008)', 'MEDIA_SIGNING_SECRET unset on the host');
+    skip(
+      '/media refuses a URL this installation did not sign (FR-008)',
+      'MEDIA_SIGNING_SECRET unset on the host',
+    );
+    skip(
+      '/media refuses a signed URL pointing inside the network (FR-008)',
+      'MEDIA_SIGNING_SECRET unset on the host',
+    );
   }
 
   /*
@@ -585,7 +615,13 @@ async function main() {
   });
   const quiet = await eventually(async () => {
     const answer = await graphql(
-      `query { suggestions { id } }`,
+      `
+        query {
+          suggestions {
+            id
+          }
+        }
+      `,
       token,
     );
     return answer.errors ? null : answer.data;
@@ -609,7 +645,20 @@ async function main() {
     },
   });
   const proposed = await eventually(async () => {
-    const answer = await graphql(`query { suggestions { id sport sources { id } } }`, token);
+    const answer = await graphql(
+      `
+        query {
+          suggestions {
+            id
+            sport
+            sources {
+              id
+            }
+          }
+        }
+      `,
+      token,
+    );
     const rows = answer.data?.suggestions ?? [];
     return rows.length > 0 ? rows : null;
   }, 120_000);
@@ -636,7 +685,10 @@ async function main() {
         'or the model declined to draft one. Neither is a broken feature, and ' +
         'a gate that failed on the second would be reporting the model’s mood.',
     );
-    skip('accepting a suggestion fills the session it was about (FR-010)', 'no suggestion was made');
+    skip(
+      'accepting a suggestion fills the session it was about (FR-010)',
+      'no suggestion was made',
+    );
   }
 
   /*
@@ -704,7 +756,7 @@ async function main() {
       'an ordinary member cannot read the queue',
       Boolean(memberQueue.errors),
       memberQueue.errors
-        ? memberQueue.errors[0].extensions?.code ?? 'refused'
+        ? (memberQueue.errors[0].extensions?.code ?? 'refused')
         : 'it answered',
     );
 
@@ -719,9 +771,15 @@ async function main() {
       `status=${cleared.status} documents=${cleared.body?.documents}`,
     );
   } else {
-    skip('the Owner sees the queue across members, with reasons (FR-014)', 'no admin token');
+    skip(
+      'the Owner sees the queue across members, with reasons (FR-014)',
+      'no admin token',
+    );
     skip('an ordinary member cannot read the queue', 'no admin token');
-    skip('the Owner can clear an entry, and it leaves the member’s list (FR-014)', 'no admin token');
+    skip(
+      'the Owner can clear an entry, and it leaves the member’s list (FR-014)',
+      'no admin token',
+    );
   }
 
   /*

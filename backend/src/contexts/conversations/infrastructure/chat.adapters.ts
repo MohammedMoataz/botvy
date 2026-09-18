@@ -147,7 +147,9 @@ export class RhythmMemberDay extends MemberDayPort {
 
     return {
       tasks: plan.tasks.map((task) => {
-        const at = task.dueAt ? localHhMm(new Date(task.dueAt), timezone) : null;
+        const at = task.dueAt
+          ? localHhMm(new Date(task.dueAt), timezone)
+          : null;
         // The time is rendered here, in the member's zone, because this string
         // goes straight into a prompt — and a model handed a UTC timestamp
         // will happily quote it back at them.
@@ -276,10 +278,7 @@ export class PlanningReminderActions extends PlannerActionsPort {
    * matching happens in the executor over these rows — never in the model,
    * which would pick an id that does not exist.
    */
-  async findCancellable(
-    userId: string,
-    now: Date,
-  ): Promise<CancellableItem[]> {
+  async findCancellable(userId: string, now: Date): Promise<CancellableItem[]> {
     const [upcomingTasks, overdueTasks, reminders] = await Promise.all([
       this.taskQueries.page(userId, { view: 'upcoming', limit: 50 }, now),
       this.taskQueries.page(userId, { view: 'overdue', limit: 50 }, now),
@@ -679,9 +678,9 @@ export class ProfileChatWrites extends ProfileWritesPort {
     at: Date;
   }): Promise<{ metric: string; value: number }> {
     // `recordedAt`, which is Profile's own field name for it. Worth stating
-        // because `at` is what every other command in this codebase calls the
-        // same thing, and the mismatch is exactly the kind a `Partial<>` would
-        // have accepted silently.
+    // because `at` is what every other command in this codebase calls the
+    // same thing, and the mismatch is exactly the kind a `Partial<>` would
+    // have accepted silently.
     await this.profiles.recordMetric(input.userId, {
       recordedAt: input.at,
       ...(input.metric === 'weightKg'

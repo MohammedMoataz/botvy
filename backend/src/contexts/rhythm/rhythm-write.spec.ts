@@ -191,11 +191,27 @@ class RecordingTranscript extends CoachTranscriptPort {
   }
 }
 
-function task(id: string, priority = 1, overrides: Partial<PlanTask> = {}): PlanTask {
-  return { id, title: `Task ${id}`, priority, dueAt: null, deferCount: 0, ...overrides };
+function task(
+  id: string,
+  priority = 1,
+  overrides: Partial<PlanTask> = {},
+): PlanTask {
+  return {
+    id,
+    title: `Task ${id}`,
+    priority,
+    dueAt: null,
+    deferCount: 0,
+    ...overrides,
+  };
 }
 
-function event(name: string, payload: unknown, userId: string | null = MEMBER, occurredAt = new Date()): DomainEvent {
+function event(
+  name: string,
+  payload: unknown,
+  userId: string | null = MEMBER,
+  occurredAt = new Date(),
+): DomainEvent {
   return {
     eventId: newId(),
     name,
@@ -315,7 +331,9 @@ describe('the row a member registers with', () => {
      */
     const registered = at('23:00');
     expect(
-      await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, registered)),
+      await b.bootstrap.handle(
+        event('identity.UserRegistered', {}, MEMBER, registered),
+      ),
     ).toBe('created');
 
     const state = await b.states.find(MEMBER);
@@ -383,7 +401,9 @@ describe('the row a member registers with', () => {
   });
 
   it('creates nothing twice when the relay redelivers the registration', async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
 
     // A streak the member has since built, to prove the second delivery does
     // not reset the row rather than merely not adding one.
@@ -414,7 +434,9 @@ describe('a preference change', () => {
      * claim here is the obvious-looking "reschedule" and is exactly how that
      * happens, so the claim is checked to still be in place afterwards.
      */
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     await b.tick.handle(at('22:00'));
 
     const before = await b.states.find(MEMBER);
@@ -451,7 +473,9 @@ describe('a preference change', () => {
 
 describe('the operator’s Run button', () => {
   beforeEach(async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     // Moved behind every instant this block uses, so that a pass at 21:00 sends
     // the evening prompt and nothing else. Without it the 08:00 briefing is
     // also owed at 21:00 and every message count below counts two touches,
@@ -464,8 +488,9 @@ describe('the operator’s Run button', () => {
   it('sends a touch at three in the afternoon, hours before its time', async () => {
     // A conditional Run would report a zero here, which is indistinguishable
     // from a broken gateway — which is the whole reason the flag exists.
-    expect(await b.promptNow.handle({ userId: MEMBER, kind: 'plan' }, at('15:00')))
-      .toEqual({ sent: 1 });
+    expect(
+      await b.promptNow.handle({ userId: MEMBER, kind: 'plan' }, at('15:00')),
+    ).toEqual({ sent: 1 });
     expect(b.transcript.appended).toHaveLength(1);
   });
 
@@ -490,10 +515,9 @@ describe('the operator’s Run button', () => {
     expect(await b.promptNow.handle({ kind: 'morning' }, at('15:00'))).toEqual({
       sent: 2,
     });
-    expect(b.transcript.appended.map((message) => message.userId).sort()).toEqual([
-      MEMBER,
-      'member-2',
-    ]);
+    expect(
+      b.transcript.appended.map((message) => message.userId).sort(),
+    ).toEqual([MEMBER, 'member-2']);
   });
 
   it('reports nothing sent for an id with no rhythm row', async () => {
@@ -507,7 +531,9 @@ describe('the operator’s Run button', () => {
 
 describe('confirming and skipping tomorrow', () => {
   beforeEach(async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     // Behind the 21:00 pass, so the only plan row that exists is tomorrow's
     // draft. With the briefing at 08:00 the same pass also writes *today's*
     // plan, and "confirming a date with no plan is refused" would then be
@@ -637,7 +663,9 @@ describe('confirming and skipping tomorrow', () => {
 
 describe('the check-in and the streak', () => {
   beforeEach(async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
   });
 
   it('increments the streak on a yes, and again the next day', async () => {
@@ -796,7 +824,9 @@ describe('the check-in and the streak', () => {
 
 describe('reading a check-in out of a chat reply', () => {
   beforeEach(async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     // The end-of-day touch is what opens the window.
     await b.tick.handle(at('22:00'));
   });
@@ -807,7 +837,11 @@ describe('reading a check-in out of a chat reply', () => {
       at('22:10'),
     );
 
-    expect(captured).toMatchObject({ captured: true, verdict: 'adhered', mood: 80 });
+    expect(captured).toMatchObject({
+      captured: true,
+      verdict: 'adhered',
+      mood: 80,
+    });
     expect(b.checkins.rows.size).toBe(1);
     expect((await b.states.find(MEMBER))?.awaitingCheckin).toBe(false);
   });
@@ -867,7 +901,11 @@ describe('reading a check-in out of a chat reply', () => {
   it('falls through on an unclear reply and leaves the window open', async () => {
     expect(
       await b.capture.handle(
-        { userId: MEMBER, conversationKind: 'coach', text: 'what was the plan again' },
+        {
+          userId: MEMBER,
+          conversationKind: 'coach',
+          text: 'what was the plan again',
+        },
         at('22:10'),
       ),
     ).toEqual({ captured: false, reason: 'unclear' });
@@ -880,10 +918,18 @@ describe('reading a check-in out of a chat reply', () => {
 
   it('lets negation win inside the coach chat', async () => {
     const captured = await b.capture.handle(
-      { userId: MEMBER, conversationKind: 'coach', text: "yeah, I didn't manage it" },
+      {
+        userId: MEMBER,
+        conversationKind: 'coach',
+        text: "yeah, I didn't manage it",
+      },
       at('22:10'),
     );
-    expect(captured).toMatchObject({ captured: true, verdict: 'missed', streak: 0 });
+    expect(captured).toMatchObject({
+      captured: true,
+      verdict: 'missed',
+      streak: 0,
+    });
   });
 });
 
@@ -891,7 +937,9 @@ describe('reading a check-in out of a chat reply', () => {
 
 describe('the meal line, replaced after the fact', () => {
   beforeEach(async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     // Behind the 21:00 pass, so tomorrow's draft is the only plan on disk and
     // "creates nothing for a date with no plan" is asked of a genuinely empty
     // date.
@@ -943,7 +991,9 @@ describe('the meal line, replaced after the fact', () => {
     expect(await b.mealLine.handle(same)).toBe('unchanged');
     // The same `updatedAt`, which matters beyond tidiness: the phone pulls by
     // `updatedAt`, so a phantom bump re-sends the plan on every duplicate.
-    expect((await b.plans.forDate(MEMBER, tomorrow()))?.updatedAt).toEqual(after);
+    expect((await b.plans.forDate(MEMBER, tomorrow()))?.updatedAt).toEqual(
+      after,
+    );
   });
 
   it('replaces the old line with the reason code when a plan is withheld', async () => {
@@ -1014,7 +1064,9 @@ describe('the meal line, replaced after the fact', () => {
 
 describe('purging a deleted member', () => {
   it('removes their plans, check-ins and rhythm state', async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     // Behind the 22:00 pass, so exactly one plan row exists and the count below
     // is about the purge rather than about how many touches a pass made.
     b.schedules.morningBriefingTime = '23:30';
@@ -1029,7 +1081,9 @@ describe('purging a deleted member', () => {
     expect(b.checkins.rows.size).toBe(1);
     expect(b.states.rows.size).toBe(1);
 
-    expect(await b.purge.handle(event('identity.UserDeleted', {}))).toBe('purged');
+    expect(await b.purge.handle(event('identity.UserDeleted', {}))).toBe(
+      'purged',
+    );
 
     expect(b.plans.rows.size).toBe(0);
     expect(b.checkins.rows.size).toBe(0);
@@ -1039,7 +1093,9 @@ describe('purging a deleted member', () => {
   });
 
   it('reports nothing to do on a redelivery', async () => {
-    await b.bootstrap.handle(event('identity.UserRegistered', {}, MEMBER, at('07:00')));
+    await b.bootstrap.handle(
+      event('identity.UserRegistered', {}, MEMBER, at('07:00')),
+    );
     await b.purge.handle(event('identity.UserDeleted', {}));
 
     expect(await b.purge.handle(event('identity.UserDeleted', {}))).toBe(
@@ -1048,8 +1104,8 @@ describe('purging a deleted member', () => {
   });
 
   it('does nothing for an event with no userId', async () => {
-    expect(
-      await b.purge.handle(event('identity.UserDeleted', {}, null)),
-    ).toBe('nothing-to-do');
+    expect(await b.purge.handle(event('identity.UserDeleted', {}, null))).toBe(
+      'nothing-to-do',
+    );
   });
 });

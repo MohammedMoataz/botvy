@@ -72,4 +72,3 @@ export abstract class TrainingSessionsPort {
     to: Date,
   ): Promise<AgendaSession[]>;
 }
-

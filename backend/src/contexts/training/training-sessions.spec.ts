@@ -95,7 +95,10 @@ class StubMemberContext extends MemberContextPort {
   }
 
   async alertPreferences(): Promise<MemberAlertPreferences> {
-    return { leadTimes: ['1h', '0m'], quietHours: { from: '22:00', to: '07:00' } };
+    return {
+      leadTimes: ['1h', '0m'],
+      quietHours: { from: '22:00', to: '07:00' },
+    };
   }
 }
 
@@ -301,8 +304,20 @@ describe('logging a session (FR-004, story 3 scenario 1)', () => {
         {
           id: 'squat',
           sets: [
-            { targetReps: 5, targetWeightKg: 100, actualReps: 5, actualWeightKg: 100, done: true },
-            { targetReps: 5, targetWeightKg: 100, actualReps: 4, actualWeightKg: 100, done: true },
+            {
+              targetReps: 5,
+              targetWeightKg: 100,
+              actualReps: 5,
+              actualWeightKg: 100,
+              done: true,
+            },
+            {
+              targetReps: 5,
+              targetWeightKg: 100,
+              actualReps: 4,
+              actualWeightKg: 100,
+              done: true,
+            },
           ],
         },
       ],

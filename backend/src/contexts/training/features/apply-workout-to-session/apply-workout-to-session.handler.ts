@@ -70,6 +70,9 @@ export class ApplyWorkoutToSessionHandler {
 
     session.applyWorkout(workout.exercises, newId);
     await this.uow.run(() => this.sessions.save(session));
-    return { updatedAt: session.updatedAt, exercises: session.exercises.length };
+    return {
+      updatedAt: session.updatedAt,
+      exercises: session.exercises.length,
+    };
   }
 }

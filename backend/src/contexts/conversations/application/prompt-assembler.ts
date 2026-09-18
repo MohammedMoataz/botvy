@@ -88,7 +88,9 @@ export class PromptAssembler extends PromptAssemblerPort {
     floorSeq: number;
     now: Date;
     facts: MemberFacts;
-  }): Promise<Array<{ role: 'system' | 'user' | 'assistant'; content: string }>> {
+  }): Promise<
+    Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  > {
     const { userId, kind, text, conversationId, floorSeq, now, facts } = input;
 
     const [day, historyLimit] = await Promise.all([
@@ -160,7 +162,9 @@ export class PromptAssembler extends PromptAssemblerPort {
     floorSeq: number,
     limit: number,
     text: string,
-  ): Promise<Array<{ role: 'system' | 'user' | 'assistant'; content: string }>> {
+  ): Promise<
+    Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  > {
     const rows = await this.messages.inConversation(
       userId,
       conversationId,
@@ -183,7 +187,8 @@ export class PromptAssembler extends PromptAssemblerPort {
         .slice(-limit)
         .map((row) => ({
           role: row.role as 'user' | 'assistant',
-          content: row.role === 'user' ? delimitQuoted(row.content) : row.content,
+          content:
+            row.role === 'user' ? delimitQuoted(row.content) : row.content,
         }))
     );
   }

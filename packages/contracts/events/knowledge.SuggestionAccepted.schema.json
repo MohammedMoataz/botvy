@@ -113,20 +113,12 @@
                 }
               }
             },
-            "required": [
-              "name",
-              "notes",
-              "sets"
-            ],
+            "required": ["name", "notes", "sets"],
             "additionalProperties": false
           }
         }
       },
-      "required": [
-        "title",
-        "focus",
-        "exercises"
-      ],
+      "required": ["title", "focus", "exercises"],
       "additionalProperties": false
     },
     "sourceLinkIds": {

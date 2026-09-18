@@ -112,14 +112,12 @@ export class Meal extends AggregateRoot<string> {
     });
   }
 
-  edit(
-    patch: {
-      name?: string;
-      kind?: MealKind;
-      ingredients?: string[];
-      tags?: string[];
-    },
-  ): string[] {
+  edit(patch: {
+    name?: string;
+    kind?: MealKind;
+    ingredients?: string[];
+    tags?: string[];
+  }): string[] {
     const changed: string[] = [];
     if (patch.name !== undefined) {
       const name = requireName(patch.name);

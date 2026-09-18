@@ -76,10 +76,10 @@ async function compileGraph(module: unknown) {
       .useValue({ ping: async () => true, $connect: async () => undefined })
       .overrideProvider(getConnectionToken())
       // `close` because `enableShutdownHooks` is on and Mongoose's core module
-    // calls it on teardown; without it every run printed a TypeError from a
-    // shutdown hook, which is exactly the sort of noise that trains a reader
-    // to ignore this file's output.
-    .useValue({ db: undefined, close: async () => undefined });
+      // calls it on teardown; without it every run printed a TypeError from a
+      // shutdown hook, which is exactly the sort of noise that trains a reader
+      // to ignore this file's output.
+      .useValue({ db: undefined, close: async () => undefined });
 
     for (const name of Object.values(MODEL_NAMES)) {
       builder.overrideProvider(getModelToken(name)).useValue(fakeModel());

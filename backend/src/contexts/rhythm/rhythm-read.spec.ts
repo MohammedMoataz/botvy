@@ -290,10 +290,7 @@ describe('plans over a range', () => {
   it('is inclusive at both ends', async () => {
     const views = await b.planRange.handle(MEMBER, daysBack(2), daysBack(1));
 
-    expect(views.map((view) => view.date)).toEqual([
-      daysBack(2),
-      daysBack(1),
-    ]);
+    expect(views.map((view) => view.date)).toEqual([daysBack(2), daysBack(1)]);
   });
 
   it('returns a single day when both ends are the same date', async () => {

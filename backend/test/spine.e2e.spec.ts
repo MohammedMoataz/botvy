@@ -22,7 +22,10 @@ const PING_COUNT = 20;
 /** What the success criterion allows for one ping to reach n8n. */
 const REACH_WITHIN_MS = 10_000;
 
-async function ping(clientId: string, idempotencyKey?: string): Promise<Response> {
+async function ping(
+  clientId: string,
+  idempotencyKey?: string,
+): Promise<Response> {
   return fetch(`${API}/api/v1/ping`, {
     method: 'POST',
     headers: {
@@ -35,18 +38,25 @@ async function ping(clientId: string, idempotencyKey?: string): Promise<Response
 }
 
 /** Executions of the echo workflow, newest first. */
-async function echoExecutions(): Promise<Array<{ id: string; startedAt: string }>> {
+async function echoExecutions(): Promise<
+  Array<{ id: string; startedAt: string }>
+> {
   const response = await fetch(`${N8N}/api/v1/executions?limit=250`, {
     headers: { 'X-N8N-API-KEY': N8N_API_KEY },
   });
   if (!response.ok) throw new Error(`n8n executions: HTTP ${response.status}`);
-  const body = (await response.json()) as { data?: Array<Record<string, unknown>> };
+  const body = (await response.json()) as {
+    data?: Array<Record<string, unknown>>;
+  };
   return (body.data ?? [])
     .filter((run) => String(run.workflowName ?? '').includes('Ping Echo'))
     .map((run) => ({ id: String(run.id), startedAt: String(run.startedAt) }));
 }
 
-async function waitForExecutions(atLeast: number, withinMs: number): Promise<number> {
+async function waitForExecutions(
+  atLeast: number,
+  withinMs: number,
+): Promise<number> {
   const deadline = Date.now() + withinMs;
   let seen = 0;
   while (Date.now() < deadline) {
@@ -75,7 +85,10 @@ describe.skipIf(!RUN)('the spine, end to end', () => {
       expect(response.status, `ping ${clientId}`).toBeLessThan(300);
     }
 
-    const after = await waitForExecutions(before + PING_COUNT, REACH_WITHIN_MS * 3);
+    const after = await waitForExecutions(
+      before + PING_COUNT,
+      REACH_WITHIN_MS * 3,
+    );
     expect(after - before).toBe(PING_COUNT);
   });
 
@@ -114,9 +127,13 @@ describe.skipIf(!RUN)('the spine, end to end', () => {
         'content-type': 'application/json',
         'x-botvy-event': 'operations.Pinged',
         // The same id the relay already delivered.
-        'x-botvy-event-id': process.env.BOTVY_REPLAY_EVENT_ID ?? 'replay-of-a-delivered-event',
+        'x-botvy-event-id':
+          process.env.BOTVY_REPLAY_EVENT_ID ?? 'replay-of-a-delivered-event',
       },
-      body: JSON.stringify({ name: 'operations.Pinged', payload: { clientId } }),
+      body: JSON.stringify({
+        name: 'operations.Pinged',
+        payload: { clientId },
+      }),
     });
     expect(replay.status).toBeLessThan(500);
 

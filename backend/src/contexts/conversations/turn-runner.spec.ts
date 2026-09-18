@@ -12,7 +12,11 @@ import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { localDate, wallClockToUtc } from '../../shared/time/time.js';
 import { NudgeService } from '../../ws/nudge.service.js';
-import { TurnRunner, type TurnEvents, type TurnRequest } from './application/turn-runner.js';
+import {
+  TurnRunner,
+  type TurnEvents,
+  type TurnRequest,
+} from './application/turn-runner.js';
 import {
   AllergenGuardPort,
   CheckinPort,
@@ -26,7 +30,10 @@ import {
   type ExecutionResult,
   type MemberFacts,
 } from './domain/chat.ports.js';
-import { Conversation, type ConversationKind } from './domain/conversation.aggregate.js';
+import {
+  Conversation,
+  type ConversationKind,
+} from './domain/conversation.aggregate.js';
 import { PLAIN_CHAT, type Intent, type IntentScope } from './domain/intent.js';
 import { AppendMessageHandler } from './features/append-message/append-message.handler.js';
 import {
@@ -175,7 +182,8 @@ class StubLlm extends OllamaClient {
       this.onChunk?.(index);
       // The consumer has already taken the chunk before this line runs again,
       // which is exactly how a real abort lands: what arrived is kept.
-      if (options.signal?.aborted) throw new Error('The operation was aborted.');
+      if (options.signal?.aborted)
+        throw new Error('The operation was aborted.');
     }
     return this.usage;
   }
@@ -213,7 +221,8 @@ class Facts extends MemberFactsPort {
  */
 class Usage extends UsagePort {
   readonly asked: Array<{ userId: string; from: Date; to: Date }> = [];
-  private readonly ledger: Array<{ userId: string; at: Date; tokens: number }> = [];
+  private readonly ledger: Array<{ userId: string; at: Date; tokens: number }> =
+    [];
 
   spend(userId: string, at: Date, tokens: number): void {
     this.ledger.push({ userId, at, tokens });
@@ -222,15 +231,17 @@ class Usage extends UsagePort {
   async tokensBetween(userId: string, from: Date, to: Date): Promise<number> {
     this.asked.push({ userId, from, to });
     return this.ledger
-      .filter(
-        (row) => row.userId === userId && row.at >= from && row.at < to,
-      )
+      .filter((row) => row.userId === userId && row.at >= from && row.at < to)
       .reduce((total, row) => total + row.tokens, 0);
   }
 }
 
 class Checkins extends CheckinPort {
-  readonly calls: Array<{ userId: string; conversationKind: string; text: string }> = [];
+  readonly calls: Array<{
+    userId: string;
+    conversationKind: string;
+    text: string;
+  }> = [];
   result: CheckinCapture = { captured: false, reason: 'not_awaiting' };
 
   async capture(input: {
@@ -259,7 +270,12 @@ class Extractor extends IntentExtractorPort {
 }
 
 class Executor extends IntentExecutorPort {
-  readonly calls: Array<{ userId: string; intent: Intent; text: string; now: Date }> = [];
+  readonly calls: Array<{
+    userId: string;
+    intent: Intent;
+    text: string;
+    now: Date;
+  }> = [];
   result: ExecutionResult = {
     reply: 'Added “call Dad” for 5pm today.',
     actions: [],
@@ -279,7 +295,11 @@ class Executor extends IntentExecutorPort {
 }
 
 class Prompts extends PromptAssemblerPort {
-  readonly calls: Array<{ kind: string; text: string; conversationId: string }> = [];
+  readonly calls: Array<{
+    kind: string;
+    text: string;
+    conversationId: string;
+  }> = [];
 
   async build(input: {
     userId: string;
@@ -289,7 +309,9 @@ class Prompts extends PromptAssemblerPort {
     floorSeq: number;
     now: Date;
     facts: MemberFacts;
-  }): Promise<Array<{ role: 'system' | 'user' | 'assistant'; content: string }>> {
+  }): Promise<
+    Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  > {
     this.calls.push(input);
     return [
       { role: 'system', content: 'You are Botvy.' },
@@ -365,7 +387,9 @@ function recorder(): {
       error: push('error'),
     } as unknown as TurnEvents,
     of(event) {
-      return frames.filter((frame) => frame.event === event).map((frame) => frame.payload);
+      return frames
+        .filter((frame) => frame.event === event)
+        .map((frame) => frame.payload);
     },
     first(event) {
       return frames.findIndex((frame) => frame.event === event);
@@ -405,14 +429,22 @@ function bench(): Bench {
   // Unattached: nothing here asserts on a socket frame, and the service is a
   // silent no-op with no server, which is the worker's ordinary case too.
   const nudges = new NudgeService();
-  const append = new AppendMessageHandler(uow, conversations, messages, seq, nudges, () =>
-    messages.nextId(),
+  const append = new AppendMessageHandler(
+    uow,
+    conversations,
+    messages,
+    seq,
+    nudges,
+    () => messages.nextId(),
   );
   // The real service over an in-memory store, so every value this spec does not
   // set is the registry's own default. A stub `get` returning numbers would be a
   // spec asserting against hard-coded defaults, which the constitution calls a
   // bug in its own right.
-  const settings = new SettingsService(new InMemorySettingsStore(), new SilentAudit());
+  const settings = new SettingsService(
+    new InMemorySettingsStore(),
+    new SilentAudit(),
+  );
 
   const facts = new Facts();
   facts.set(MEMBER);
@@ -515,10 +547,17 @@ describe('a turn: whose conversation it is', () => {
     const theirs = await seed(harness, 'free', OTHER);
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: theirs.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: theirs.id }),
+      events.events,
+    );
 
     expect(events.of('error')).toEqual([
-      { requestId: 'request-1', code: 'forbidden', message: expect.any(String) },
+      {
+        requestId: 'request-1',
+        code: 'forbidden',
+        message: expect.any(String),
+      },
     ]);
     expect(harness.messages.rows.size).toBe(0);
   });
@@ -526,9 +565,14 @@ describe('a turn: whose conversation it is', () => {
   it('answers a conversation id that exists nowhere the same way', async () => {
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: newId() }), events.events);
+    await harness.runner.run(
+      request({ conversationId: newId() }),
+      events.events,
+    );
 
-    expect(events.of('error').map((payload) => payload.code)).toEqual(['forbidden']);
+    expect(events.of('error').map((payload) => payload.code)).toEqual([
+      'forbidden',
+    ]);
     expect(harness.messages.rows.size).toBe(0);
   });
 
@@ -544,9 +588,14 @@ describe('a turn: whose conversation it is', () => {
     await harness.uow.run(() => harness.conversations.save(conversation));
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: conversation.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: conversation.id }),
+      events.events,
+    );
 
-    expect(events.of('error').map((payload) => payload.code)).toEqual(['forbidden']);
+    expect(events.of('error').map((payload) => payload.code)).toEqual([
+      'forbidden',
+    ]);
     expect(harness.messages.rows.size).toBe(0);
   });
 });
@@ -578,7 +627,10 @@ describe('a turn: the daily allowance', () => {
     harness.usage.spend(MEMBER, new Date(), 1_000);
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: conversation.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: conversation.id }),
+      events.events,
+    );
 
     const [error] = events.of('error');
     expect(error?.code).toBe('quota');
@@ -602,7 +654,10 @@ describe('a turn: the daily allowance', () => {
     harness.usage.spend(MEMBER, new Date(), 999);
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: conversation.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: conversation.id }),
+      events.events,
+    );
 
     expect(events.of('error')).toEqual([]);
     expect(events.of('done')).toHaveLength(1);
@@ -651,7 +706,11 @@ describe('a turn: the daily allowance', () => {
     );
     const berlin = recorder();
     await harness.runner.run(
-      request({ userId: OTHER, requestId: 'request-2', conversationId: berlinChat.id }),
+      request({
+        userId: OTHER,
+        requestId: 'request-2',
+        conversationId: berlinChat.id,
+      }),
       berlin.events,
       now,
     );
@@ -659,7 +718,9 @@ describe('a turn: the daily allowance', () => {
     // Cairo has crossed their midnight: yesterday's spend is not today's.
     expect(cairo.of('error')).toEqual([]);
     // Berlin has not: the same instant is still inside their day.
-    expect(berlin.of('error').map((payload) => payload.code)).toEqual(['quota']);
+    expect(berlin.of('error').map((payload) => payload.code)).toEqual([
+      'quota',
+    ]);
 
     // And the windows the runner asked about are each member's own local day —
     // asserted directly, because a runner that summed the right totals from
@@ -700,12 +761,17 @@ describe('a turn: the evening check-in', () => {
     harness.checkins.result = { captured: true, streak: 3 };
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: conversation.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: conversation.id }),
+      events.events,
+    );
 
     expect(harness.extractor.calls).toEqual([]);
     expect(harness.llm.calls).toEqual([]);
     expect(events.text()).toContain('3 days in a row');
-    expect(stored(harness, 'assistant')[0]?.content).toContain('3 days in a row');
+    expect(stored(harness, 'assistant')[0]?.content).toContain(
+      '3 days in a row',
+    );
   });
 
   /**
@@ -721,7 +787,10 @@ describe('a turn: the evening check-in', () => {
     harness.checkins.result = { captured: false, reason: 'unclear' };
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: conversation.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: conversation.id }),
+      events.events,
+    );
 
     expect(harness.checkins.calls).toHaveLength(1);
     expect(harness.extractor.calls).toHaveLength(1);
@@ -744,7 +813,10 @@ describe('a turn: the evening check-in', () => {
     harness.checkins.result = { captured: true, streak: 9 };
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: conversation.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: conversation.id }),
+      events.events,
+    );
 
     expect(harness.checkins.calls).toEqual([]);
     expect(events.text()).not.toContain('9 days');
@@ -818,7 +890,10 @@ describe('a turn: moving an off-topic message', () => {
     harness.extractor.next = intent({ scope: 'planning' as IntentScope });
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+    );
 
     expect(events.of('moved')).toEqual([]);
     expect(stored(harness, 'assistant')[0]?.conversationId).toBe(coach.id);
@@ -830,7 +905,10 @@ describe('a turn: moving an off-topic message', () => {
     harness.extractor.next = intent({ scope: 'coaching' as IntentScope });
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: planner.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: planner.id }),
+      events.events,
+    );
 
     expect(events.of('moved')).toEqual([]);
     expect(stored(harness, 'assistant')[0]?.conversationId).toBe(planner.id);
@@ -846,7 +924,10 @@ describe('a turn: moving an off-topic message', () => {
     harness.extractor.next = intent({ scope: 'other' as IntentScope });
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: free.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: free.id }),
+      events.events,
+    );
 
     expect(events.of('moved')).toEqual([]);
     expect(harness.conversations.rows.size).toBe(1);
@@ -873,16 +954,25 @@ describe('a turn: an action', () => {
    */
   it('executes and confirms without calling the model', async () => {
     const planner = await seed(harness, 'planner');
-    harness.extractor.next = intent({ name: 'set_reminder', scope: 'planning' });
+    harness.extractor.next = intent({
+      name: 'set_reminder',
+      scope: 'planning',
+    });
     harness.executor.result = {
       reply: 'Reminder set for 5:00 pm today: call Dad.',
-      card: { kind: 'reminders', items: [{ id: 'reminder-1', title: 'call Dad', at: null }] },
+      card: {
+        kind: 'reminders',
+        items: [{ id: 'reminder-1', title: 'call Dad', at: null }],
+      },
       actions: [{ kind: 'reminder.created', id: 'reminder-1' }],
       asking: false,
     };
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: planner.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: planner.id }),
+      events.events,
+    );
 
     expect(harness.llm.calls).toEqual([]);
     expect(harness.executor.calls).toHaveLength(1);
@@ -904,7 +994,10 @@ describe('a turn: an action', () => {
     harness.extractor.next = intent({ name: 'set_task', scope: 'planning' });
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: planner.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: planner.id }),
+      events.events,
+    );
 
     expect(events.of('card')).toEqual([]);
   });
@@ -937,10 +1030,17 @@ describe('a turn: a templated answer still arrives as text', () => {
   it('emits the confirmation of an executed action as a token', async () => {
     const planner = await seed(harness, 'planner');
     harness.extractor.next = intent({ name: 'set_task', scope: 'planning' });
-    harness.executor.result = { reply: 'Added “buy milk” for today.', actions: [], asking: false };
+    harness.executor.result = {
+      reply: 'Added “buy milk” for today.',
+      actions: [],
+      asking: false,
+    };
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: planner.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: planner.id }),
+      events.events,
+    );
 
     expect(events.text()).toBe('Added “buy milk” for today.');
     expect(events.first('token')).toBeLessThan(events.first('done'));
@@ -951,7 +1051,10 @@ describe('a turn: a templated answer still arrives as text', () => {
     harness.checkins.result = { captured: true, streak: 1 };
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+    );
 
     // Singular, too: "1 days in a row" is the kind of thing a member notices.
     expect(events.text()).toBe('Logged. That is 1 day in a row.');
@@ -963,7 +1066,10 @@ describe('a turn: a templated answer still arrives as text', () => {
     harness.allergens.fireOnChunk = 1;
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+    );
 
     expect(events.text()).toContain('could not answer that safely');
   });
@@ -995,15 +1101,25 @@ describe('a turn: the allergen guard', () => {
   it('stops the stream, discards the partial and stores the apology', async () => {
     const coach = await seed(harness, 'coach');
     harness.facts.set(MEMBER, { allergies: ['peanut'] });
-    harness.llm.chunks = ['Try a spoon of ', 'peanut butter with it.', ' Also...'];
+    harness.llm.chunks = [
+      'Try a spoon of ',
+      'peanut butter with it.',
+      ' Also...',
+    ];
     harness.allergens.fireOnChunk = 2;
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+    );
 
     // The stream stopped: the third chunk was never scanned, so it was never
     // pulled from the generator either.
-    expect(harness.allergens.scans[0]).toEqual(['Try a spoon of ', 'peanut butter with it.']);
+    expect(harness.allergens.scans[0]).toEqual([
+      'Try a spoon of ',
+      'peanut butter with it.',
+    ]);
 
     // The stored assistant message is the apology, not the partial. This is the
     // assertion the defect would fail: `answer` still held "Try a spoon of ".
@@ -1079,9 +1195,14 @@ describe('a turn: a cancel and a broken model', () => {
     harness.llm.failWith = new Error('connect ECONNREFUSED 127.0.0.1:11434');
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+    );
 
-    expect(events.of('error').map((payload) => payload.code)).toEqual(['model_unavailable']);
+    expect(events.of('error').map((payload) => payload.code)).toEqual([
+      'model_unavailable',
+    ]);
     expect(stored(harness, 'assistant')).toEqual([]);
     // Their own message is kept, which is what the error message promises.
     expect(stored(harness, 'user')).toHaveLength(1);
@@ -1094,9 +1215,14 @@ describe('a turn: a cancel and a broken model', () => {
     harness.llm.chunks = [];
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+    );
 
-    expect(events.of('error').map((payload) => payload.code)).toEqual(['model_unavailable']);
+    expect(events.of('error').map((payload) => payload.code)).toEqual([
+      'model_unavailable',
+    ]);
     expect(stored(harness, 'assistant')).toEqual([]);
   });
 });
@@ -1141,7 +1267,10 @@ describe('a turn: when it is understood as of', () => {
 
   it('hands the executor composedAt too', async () => {
     const planner = await seed(harness, 'planner');
-    harness.extractor.next = intent({ name: 'set_reminder', scope: 'planning' });
+    harness.extractor.next = intent({
+      name: 'set_reminder',
+      scope: 'planning',
+    });
     const arrivedAt = new Date();
     const typedAt = new Date(arrivedAt.getTime() - 6 * 60 * 60_000);
     const events = recorder();
@@ -1182,7 +1311,11 @@ describe('a turn: when it is understood as of', () => {
     const now = new Date();
     const events = recorder();
 
-    await harness.runner.run(request({ conversationId: coach.id }), events.events, now);
+    await harness.runner.run(
+      request({ conversationId: coach.id }),
+      events.events,
+      now,
+    );
 
     expect(harness.extractor.calls[0]?.now).toEqual(now);
   });

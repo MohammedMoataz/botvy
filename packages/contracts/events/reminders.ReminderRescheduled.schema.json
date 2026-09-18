@@ -19,10 +19,6 @@
       }
     }
   },
-  "required": [
-    "reminderId",
-    "remindAt",
-    "leadTimes"
-  ],
+  "required": ["reminderId", "remindAt", "leadTimes"],
   "additionalProperties": false
 }

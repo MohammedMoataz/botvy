@@ -133,10 +133,7 @@ export class MongoLinkRepository extends LinkRepository {
     await this.#inner.remove(link);
   }
 
-  async findByUrl(
-    userId: string,
-    normalizedUrl: string,
-  ): Promise<Link | null> {
+  async findByUrl(userId: string, normalizedUrl: string): Promise<Link | null> {
     const doc = await this.model
       .findOne({ userId, normalizedUrl, deletedAt: null })
       .session(MongoUnitOfWork.currentSession())

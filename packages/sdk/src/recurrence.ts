@@ -429,13 +429,22 @@ interface ParsedRule {
  */
 function parseRule(rrule: string): ParsedRule | null {
   const parts = new Map<string, string>();
-  for (const chunk of rrule.replace(/^RRULE:/i, '').trim().split(';')) {
+  for (const chunk of rrule
+    .replace(/^RRULE:/i, '')
+    .trim()
+    .split(';')) {
     if (!chunk) continue;
     const eq = chunk.indexOf('=');
     if (eq <= 0) return null;
     const name = chunk.slice(0, eq).trim().toUpperCase();
     if (!KNOWN_PARTS.has(name)) return null;
-    parts.set(name, chunk.slice(eq + 1).trim().toUpperCase());
+    parts.set(
+      name,
+      chunk
+        .slice(eq + 1)
+        .trim()
+        .toUpperCase(),
+    );
   }
 
   const freq = parts.get('FREQ');
@@ -559,7 +568,8 @@ function generate(
     if (rule.until !== null && candidate > rule.until) return false;
     if (rule.count !== null && emitted >= rule.count) return false;
     emitted += 1;
-    if (candidate >= fromMs && candidate <= toMs) found.push(new Date(candidate));
+    if (candidate >= fromMs && candidate <= toMs)
+      found.push(new Date(candidate));
     return true;
   };
 
@@ -675,7 +685,10 @@ function overridesByKey(
   overrides: OccurrenceOverride[],
 ): Map<number, OccurrenceOverride> {
   return new Map(
-    overrides.map((override) => [key(new Date(override.originalStart)), override]),
+    overrides.map((override) => [
+      key(new Date(override.originalStart)),
+      override,
+    ]),
   );
 }
 
@@ -727,7 +740,13 @@ function toFloating(instant: Date, timeZone: string): Date {
     Number(parts.find((part) => part.type === type)?.value ?? '0');
   // `hour12: false` still formats midnight as 24 in some ICU versions.
   return new Date(
-    Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute')),
+    Date.UTC(
+      get('year'),
+      get('month') - 1,
+      get('day'),
+      get('hour') % 24,
+      get('minute'),
+    ),
   );
 }
 

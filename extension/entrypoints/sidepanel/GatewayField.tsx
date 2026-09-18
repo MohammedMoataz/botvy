@@ -65,7 +65,9 @@ export const GatewayField = observer(function GatewayField({
           {store.t('settings.save')}
         </button>
       </div>
-      {hint && <div className="form-text small">{store.t('settings.gatewayHint')}</div>}
+      {hint && (
+        <div className="form-text small">{store.t('settings.gatewayHint')}</div>
+      )}
       {saved && <div className="text-success small">✓</div>}
     </div>
   );

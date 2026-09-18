@@ -39,7 +39,9 @@ function UsagePage() {
   const [problem, setProblem] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 6 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   const [from, setFrom] = useState(weekAgo);
   const [to, setTo] = useState(today);
 
@@ -108,25 +110,25 @@ function UsagePage() {
       {problem && <Message severity="error" text={problem} />}
 
       <section className="panel">
-      <div className="row" style={{ alignItems: 'end' }}>
-        <label>
-          <span className="muted">{t('from')}</span>
-          <InputText
-            type="date"
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-          />
-        </label>
-        <label>
-          <span className="muted">{t('to')}</span>
-          <InputText
-            type="date"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-          />
-        </label>
-        <Button label={t('apply')} size="small" onClick={() => void load()} />
-      </div>
+        <div className="row" style={{ alignItems: 'end' }}>
+          <label>
+            <span className="muted">{t('from')}</span>
+            <InputText
+              type="date"
+              value={from}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="muted">{t('to')}</span>
+            <InputText
+              type="date"
+              value={to}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </label>
+          <Button label={t('apply')} size="small" onClick={() => void load()} />
+        </div>
       </section>
 
       <section className="panel">

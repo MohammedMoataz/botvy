@@ -44,8 +44,13 @@ export class WebhookFanout {
     private readonly post: HttpPost,
   ) {}
 
-  matching(subscriptions: WebhookSubscription[], eventName: string): WebhookSubscription[] {
-    return subscriptions.filter((sub) => sub.enabled && sub.event === eventName);
+  matching(
+    subscriptions: WebhookSubscription[],
+    eventName: string,
+  ): WebhookSubscription[] {
+    return subscriptions.filter(
+      (sub) => sub.enabled && sub.event === eventName,
+    );
   }
 
   async deliver(
@@ -69,10 +74,19 @@ export class WebhookFanout {
         outcomes.push(
           response.ok
             ? { url: target.url, ok: true, status: response.status }
-            : { url: target.url, ok: false, status: response.status, error: `HTTP ${response.status}` },
+            : {
+                url: target.url,
+                ok: false,
+                status: response.status,
+                error: `HTTP ${response.status}`,
+              },
         );
       } catch (error) {
-        outcomes.push({ url: target.url, ok: false, error: (error as Error).message });
+        outcomes.push({
+          url: target.url,
+          ok: false,
+          error: (error as Error).message,
+        });
       }
     }
 

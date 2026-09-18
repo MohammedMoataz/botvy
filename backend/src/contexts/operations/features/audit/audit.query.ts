@@ -85,7 +85,9 @@ export class AuditQueryHandler {
   async list(filter: AuditFilter): Promise<AuditConnectionView> {
     const page = await this.audit.list(filter);
 
-    const ids = [...new Set(page.rows.map((row) => row.actorId).filter(Boolean))];
+    const ids = [
+      ...new Set(page.rows.map((row) => row.actorId).filter(Boolean)),
+    ];
     const labels = ids.length ? await this.labels.labelsFor(ids) : {};
 
     return {

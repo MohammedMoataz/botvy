@@ -637,7 +637,9 @@ describe('a rhythm touch is one alert the member asked for', () => {
     await b.saga.onRhythmTouch(touch);
     await b.saga.onRhythmTouch(touch);
 
-    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(1);
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(
+      1,
+    );
   });
 
   it('keeps the three touches apart, and apart from other days', async () => {
@@ -656,7 +658,9 @@ describe('a rhythm touch is one alert the member asked for', () => {
       event('rhythm.MorningBriefingSent', { date: '2026-09-13', taskIds: [] }),
     );
 
-    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(4);
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(
+      4,
+    );
   });
 
   it('ignores an event with no date rather than planning a nameless alert', async () => {
@@ -685,15 +689,17 @@ describe('a rhythm touch is one alert the member asked for', () => {
         checkinAsked: false,
       }),
     );
-    const before = (await b.alerts.pendingForMember(MEMBER, new Date(0)))[0]!
-      .notifyAt.getTime();
+    const before = (
+      await b.alerts.pendingForMember(MEMBER, new Date(0))
+    )[0]!.notifyAt.getTime();
 
     await b.saga.onProfileUpdated(
       event('profile.ProfileUpdated', { changed: ['timezone'] }),
     );
 
-    const after = (await b.alerts.pendingForMember(MEMBER, new Date(0)))[0]!
-      .notifyAt.getTime();
+    const after = (
+      await b.alerts.pendingForMember(MEMBER, new Date(0))
+    )[0]!.notifyAt.getTime();
     expect(after).toBe(before);
   });
 });

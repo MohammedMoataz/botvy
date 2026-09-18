@@ -49,7 +49,9 @@ describe('environment contract', () => {
   });
 
   it('rejects an unknown role rather than defaulting to one', () => {
-    expect(() => loadEnv({ ...complete, BOTVY_ROLE: 'scheduler' })).toThrow(/BOTVY_ROLE/);
+    expect(() => loadEnv({ ...complete, BOTVY_ROLE: 'scheduler' })).toThrow(
+      /BOTVY_ROLE/,
+    );
   });
 
   it('rejects a secret too short to be one', () => {
@@ -65,18 +67,25 @@ describe('environment contract', () => {
    * this stack failed.
    */
   it('accepts a bare login as the administrator, not only an email', () => {
-    expect(loadEnv({ ...complete, ADMIN_EMAIL: 'admin' }).ADMIN_EMAIL).toBe('admin');
-    expect(loadEnv({ ...complete, ADMIN_EMAIL: 'owner@example.test' }).ADMIN_EMAIL).toBe(
-      'owner@example.test',
+    expect(loadEnv({ ...complete, ADMIN_EMAIL: 'admin' }).ADMIN_EMAIL).toBe(
+      'admin',
     );
+    expect(
+      loadEnv({ ...complete, ADMIN_EMAIL: 'owner@example.test' }).ADMIN_EMAIL,
+    ).toBe('owner@example.test');
   });
 
   it('still refuses an empty administrator login', () => {
-    expect(() => loadEnv({ ...complete, ADMIN_EMAIL: '' })).toThrow(/ADMIN_EMAIL/);
+    expect(() => loadEnv({ ...complete, ADMIN_EMAIL: '' })).toThrow(
+      /ADMIN_EMAIL/,
+    );
   });
 
   it('reads CORS origins as a list, tolerating spacing', () => {
-    const env = loadEnv({ ...complete, CORS_ORIGINS: 'https://a.test, https://b.test ' });
+    const env = loadEnv({
+      ...complete,
+      CORS_ORIGINS: 'https://a.test, https://b.test ',
+    });
 
     expect(corsOrigins(env)).toEqual(['https://a.test', 'https://b.test']);
   });

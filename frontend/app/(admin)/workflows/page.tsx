@@ -111,56 +111,60 @@ function WorkflowsPage() {
       </div>
 
       {unconfigured && <Message severity="info" text={t('notConfigured')} />}
-      {problem && <Message severity="warn" text={`${t('unreachable')} — ${problem}`} />}
+      {problem && (
+        <Message severity="warn" text={`${t('unreachable')} — ${problem}`} />
+      )}
       {note && <Message severity="success" text={note} />}
 
       {rows && (
         <section className="panel">
-        <DataTable value={rows} dataKey="id" emptyMessage={t('none')}>
-          <Column field="name" header={t('name')} />
-          <Column
-            header={t('active')}
-            body={(row: WorkflowSummary) => (
-              <InputSwitch
-                checked={row.active}
-                disabled={busy !== null}
-                aria-label={`${t('active')}: ${row.name}`}
-                onChange={(event) => void toggle(row, event.value === true)}
-              />
-            )}
-          />
-          <Column
-            header={t('lastRun')}
-            body={(row: WorkflowSummary) =>
-              row.lastRunAt ? (
-                <span>
-                  {new Date(row.lastRunAt).toLocaleString()}{' '}
-                  {row.lastStatus && (
-                    <Tag
-                      severity={row.lastStatus === 'success' ? 'success' : 'warning'}
-                      value={row.lastStatus}
-                    />
-                  )}
-                </span>
-              ) : (
-                <span className="muted">{t('neverRan')}</span>
-              )
-            }
-          />
-          <Column
-            header={t('actions')}
-            body={(row: WorkflowSummary) => (
-              <Button
-                label={t('run')}
-                size="small"
-                severity="secondary"
-                loading={busy === row.id}
-                disabled={busy !== null}
-                onClick={() => void run(row)}
-              />
-            )}
-          />
-        </DataTable>
+          <DataTable value={rows} dataKey="id" emptyMessage={t('none')}>
+            <Column field="name" header={t('name')} />
+            <Column
+              header={t('active')}
+              body={(row: WorkflowSummary) => (
+                <InputSwitch
+                  checked={row.active}
+                  disabled={busy !== null}
+                  aria-label={`${t('active')}: ${row.name}`}
+                  onChange={(event) => void toggle(row, event.value === true)}
+                />
+              )}
+            />
+            <Column
+              header={t('lastRun')}
+              body={(row: WorkflowSummary) =>
+                row.lastRunAt ? (
+                  <span>
+                    {new Date(row.lastRunAt).toLocaleString()}{' '}
+                    {row.lastStatus && (
+                      <Tag
+                        severity={
+                          row.lastStatus === 'success' ? 'success' : 'warning'
+                        }
+                        value={row.lastStatus}
+                      />
+                    )}
+                  </span>
+                ) : (
+                  <span className="muted">{t('neverRan')}</span>
+                )
+              }
+            />
+            <Column
+              header={t('actions')}
+              body={(row: WorkflowSummary) => (
+                <Button
+                  label={t('run')}
+                  size="small"
+                  severity="secondary"
+                  loading={busy === row.id}
+                  disabled={busy !== null}
+                  onClick={() => void run(row)}
+                />
+              )}
+            />
+          </DataTable>
         </section>
       )}
 

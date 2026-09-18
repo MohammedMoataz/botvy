@@ -26,7 +26,9 @@ const run = promisify(execFile);
 // that still has it installed. Defaulting to port 80 here sent both scripts
 // at whatever already answers there - v1's own edge, on this machine - and a
 // /health that answers is indistinguishable from the right /health answering.
-const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+const API =
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 // n8n's editor is published on a loopback address that `.env` sets, and this
 // script talks to it from the host. Hard-coding 5679 meant that a host which
 // moved the bind - as one running v1's n8n alongside must - had this script
@@ -50,7 +52,8 @@ let failed = false;
 let changes = 0;
 
 const step = (name) => ({
-  ok: (detail = '') => console.log(`  ok    ${name}${detail ? ` — ${detail}` : ''}`),
+  ok: (detail = '') =>
+    console.log(`  ok    ${name}${detail ? ` — ${detail}` : ''}`),
   skip: (why) => console.log(`  skip  ${name} — ${why}`),
   fail: (why) => {
     failed = true;
@@ -76,9 +79,13 @@ async function waitFor(name, probe, { attempts = 60, everyMs = 2000 } = {}) {
 }
 
 async function compose(...args) {
-  return run('docker', ['compose', ...envFileArgs(), '-f', 'infra/docker-compose.yml', ...args], {
-    maxBuffer: 32 * 1024 * 1024,
-  });
+  return run(
+    'docker',
+    ['compose', ...envFileArgs(), '-f', 'infra/docker-compose.yml', ...args],
+    {
+      maxBuffer: 32 * 1024 * 1024,
+    },
+  );
 }
 
 // ---------------------------------------------------------------- steps
@@ -117,12 +124,29 @@ async function migrate() {
   for (const [name, args, didApply] of [
     [
       'PostgreSQL migrations',
-      ['exec', '-T', 'backend', 'node_modules/.bin/prisma', 'migrate', 'deploy', '--schema', 'prisma/schema.prisma'],
+      [
+        'exec',
+        '-T',
+        'backend',
+        'node_modules/.bin/prisma',
+        'migrate',
+        'deploy',
+        '--schema',
+        'prisma/schema.prisma',
+      ],
       (out) => /Applying migration|migration.* applied/i.test(out),
     ],
     [
       'Mongo migrations',
-      ['exec', '-T', 'backend', 'node_modules/.bin/migrate-mongo', 'up', '-f', 'migrate-mongo-config.cjs'],
+      [
+        'exec',
+        '-T',
+        'backend',
+        'node_modules/.bin/migrate-mongo',
+        'up',
+        '-f',
+        'migrate-mongo-config.cjs',
+      ],
       (out) => /MIGRATED UP/i.test(out),
     ],
   ]) {
@@ -197,7 +221,8 @@ const SERVICE_PROBE = `
 
 async function verifyServiceClient() {
   const s = step('n8n service client answers');
-  if (!INTERNAL_TOKEN) return s.skip('INTERNAL_SERVICE_TOKEN not set in .env or this shell');
+  if (!INTERNAL_TOKEN)
+    return s.skip('INTERNAL_SERVICE_TOKEN not set in .env or this shell');
 
   let answer;
   try {
@@ -249,9 +274,12 @@ async function workflowsByName() {
   const byName = new Map();
   let cursor;
   do {
-    const query = cursor ? `?limit=100&cursor=${encodeURIComponent(cursor)}` : '?limit=100';
+    const query = cursor
+      ? `?limit=100&cursor=${encodeURIComponent(cursor)}`
+      : '?limit=100';
     const response = await n8n(`/workflows${query}`);
-    if (!response.ok) throw new Error(`listing workflows: HTTP ${response.status}`);
+    if (!response.ok)
+      throw new Error(`listing workflows: HTTP ${response.status}`);
     const page = await response.json();
     for (const workflow of page.data ?? []) byName.set(workflow.name, workflow);
     cursor = page.nextCursor ?? undefined;
@@ -277,7 +305,8 @@ async function workflowsByName() {
  */
 async function importWorkflows() {
   const s = step('n8n workflows imported');
-  if (!process.env.N8N_API_KEY) return s.skip('N8N_API_KEY not set; import by hand from the editor');
+  if (!process.env.N8N_API_KEY)
+    return s.skip('N8N_API_KEY not set; import by hand from the editor');
 
   let files;
   try {
@@ -285,7 +314,13 @@ async function importWorkflows() {
     const all = await readdir(WORKFLOW_DIR);
     files = all
       .filter((file) => file.endsWith('.json'))
-      .sort((a, b) => (a.startsWith('error_handler') ? -1 : b.startsWith('error_handler') ? 1 : a.localeCompare(b)));
+      .sort((a, b) =>
+        a.startsWith('error_handler')
+          ? -1
+          : b.startsWith('error_handler')
+            ? 1
+            : a.localeCompare(b),
+      );
   } catch {
     return s.skip(`no ${WORKFLOW_DIR}/ directory`);
   }
@@ -321,11 +356,19 @@ async function importWorkflows() {
 
     const match = existing.get(body.name);
     const response = match
-      ? await n8n(`/workflows/${match.id}`, { method: 'PUT', body: JSON.stringify(payload) })
-      : await n8n('/workflows', { method: 'POST', body: JSON.stringify(payload) });
+      ? await n8n(`/workflows/${match.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        })
+      : await n8n('/workflows', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
 
     if (!response.ok) {
-      return s.fail(`${file}: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`);
+      return s.fail(
+        `${file}: HTTP ${response.status} ${(await response.text()).slice(0, 200)}`,
+      );
     }
 
     const saved = await response.json();
@@ -340,9 +383,14 @@ async function importWorkflows() {
     // A workflow with a trigger node is meant to be listening. The error
     // handler is called by n8n itself and needs no activation.
     const wantsActivation =
-      !isErrorHandler && (body.nodes ?? []).some((node) => /webhook|Trigger/i.test(node.type ?? ''));
+      !isErrorHandler &&
+      (body.nodes ?? []).some((node) =>
+        /webhook|Trigger/i.test(node.type ?? ''),
+      );
     if (wantsActivation && !saved.active) {
-      const activation = await n8n(`/workflows/${saved.id}/activate`, { method: 'POST' });
+      const activation = await n8n(`/workflows/${saved.id}/activate`, {
+        method: 'POST',
+      });
       if (!activation.ok) {
         return s.fail(`${file}: activate returned HTTP ${activation.status}`);
       }
@@ -351,14 +399,18 @@ async function importWorkflows() {
     }
   }
 
-  s.ok(`${files.length} file${files.length === 1 ? '' : 's'}: ${created} created, ${updated} updated, ${activated} activated`);
+  s.ok(
+    `${files.length} file${files.length === 1 ? '' : 's'}: ${created} created, ${updated} updated, ${activated} activated`,
+  );
 }
 
 async function reportHealth() {
   const s = step('health summary');
   try {
     const report = await (await fetch(`${API}/health`)).json();
-    const stale = (report.jobs ?? []).filter((job) => job.stale).map((job) => job.job);
+    const stale = (report.jobs ?? [])
+      .filter((job) => job.stale)
+      .map((job) => job.job);
     s.ok(
       `status=${report.status} postgres=${report.postgres} mongo=${report.mongo} ollama=${report.ollama}` +
         (stale.length > 0 ? ` stale=[${stale.join(', ')}]` : ''),
@@ -381,5 +433,7 @@ if (await waitForStores()) {
   }
 }
 
-console.log(`${failed ? 'bootstrap finished with failures' : 'bootstrap complete'} — changes=${changes}`);
+console.log(
+  `${failed ? 'bootstrap finished with failures' : 'bootstrap complete'} — changes=${changes}`,
+);
 process.exit(failed ? 1 : 0);

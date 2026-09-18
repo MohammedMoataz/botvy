@@ -63,7 +63,8 @@ function at(hhmm: string, dayOffset = 0): Date {
   let date = localDate(new Date(), CAIRO);
   for (let index = 0; index < dayOffset; index += 1) date = nextDate(date);
   const instant = wallClockToUtc(`${date}T${hhmm}`, CAIRO);
-  if (!instant) throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
+  if (!instant)
+    throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
   return instant;
 }
 

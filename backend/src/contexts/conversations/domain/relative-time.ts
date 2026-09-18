@@ -120,7 +120,8 @@ function toWallClock(instant: Date, timeZone: string): string {
     minute: '2-digit',
     hour12: false,
   }).formatToParts(instant);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? '00';
   return `${get('year')}-${get('month')}-${get('day')}T${pad(Number(get('hour')) % 24)}:${get('minute')}`;
 }
 
@@ -157,7 +158,10 @@ export function resolveRelativePhrase(
     اسبوعين: 20160,
   };
   const minutes =
-    dual[unit] ?? (digits ? toNumber(digits) * (UNIT_MINUTES[unit] ?? 0) : UNIT_MINUTES[unit] ?? 0);
+    dual[unit] ??
+    (digits
+      ? toNumber(digits) * (UNIT_MINUTES[unit] ?? 0)
+      : (UNIT_MINUTES[unit] ?? 0));
   if (!Number.isFinite(minutes) || minutes <= 0) return null;
 
   return toWallClock(new Date(now.getTime() + minutes * 60_000), timeZone);

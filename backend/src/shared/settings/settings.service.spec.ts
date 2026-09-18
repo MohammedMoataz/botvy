@@ -23,7 +23,9 @@ const owner: Principal = { kind: 'user', id: 'owner-1', role: 'admin' };
 describe('SettingsService', () => {
   let store: InMemorySettingsStore;
   let audit: RecordingAudit;
-  let events: SettingsEventSink & { published: Array<{ name: string; payload: unknown }> };
+  let events: SettingsEventSink & {
+    published: Array<{ name: string; payload: unknown }>;
+  };
   let settings: SettingsService;
 
   beforeEach(() => {
@@ -50,23 +52,26 @@ describe('SettingsService', () => {
 
     expect(await settings.get('rhythm.draftTopN')).toBe(3);
     expect(events.published).toEqual([
-      { name: 'operations.SettingChanged', payload: { key: 'rhythm.draftTopN' } },
+      {
+        name: 'operations.SettingChanged',
+        payload: { key: 'rhythm.draftTopN' },
+      },
     ]);
   });
 
   it('refuses a value the key’s own schema rejects, and stores nothing', async () => {
-    await expect(settings.set('rhythm.draftTopN', 0, owner)).rejects.toBeInstanceOf(
-      InvalidSettingError,
-    );
+    await expect(
+      settings.set('rhythm.draftTopN', 0, owner),
+    ).rejects.toBeInstanceOf(InvalidSettingError);
 
     expect(store.rows.size).toBe(0);
     expect(await settings.get('rhythm.draftTopN')).toBe(5);
   });
 
   it('refuses a key nobody registered rather than storing a stray value', async () => {
-    await expect(settings.set('defaults.invented', 'x', owner)).rejects.toBeInstanceOf(
-      UnknownSettingError,
-    );
+    await expect(
+      settings.set('defaults.invented', 'x', owner),
+    ).rejects.toBeInstanceOf(UnknownSettingError);
   });
 
   /**
@@ -75,13 +80,15 @@ describe('SettingsService', () => {
    * retunes when a job legitimately runs long.
    */
   it('refuses a read-only key by its flag', async () => {
-    await expect(settings.set('ops.lastBackupAt', '2026-09-06T03:00:00Z', owner)).rejects.toBeInstanceOf(
-      SettingReadOnlyError,
-    );
+    await expect(
+      settings.set('ops.lastBackupAt', '2026-09-06T03:00:00Z', owner),
+    ).rejects.toBeInstanceOf(SettingReadOnlyError);
   });
 
   it('accepts a key that shares the ops prefix but not the flag', async () => {
-    await expect(settings.set('ops.staleAfterMinutes', 30, owner)).resolves.toBe(30);
+    await expect(
+      settings.set('ops.staleAfterMinutes', 30, owner),
+    ).resolves.toBe(30);
     expect(await settings.get('ops.staleAfterMinutes')).toBe(30);
   });
 

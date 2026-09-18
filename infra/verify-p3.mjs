@@ -58,7 +58,9 @@ import { loadEnvFiles } from './env.mjs';
 
 loadEnvFiles();
 
-const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+const API =
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 const SERVICE_TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? '';
 
 /** The relay is a change stream, so eventual. Generous on purpose. */
@@ -67,7 +69,9 @@ const RELAY_TIMEOUT_MS = 45_000;
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 
 async function rest(method, path, { token, body } = {}) {
@@ -92,7 +96,10 @@ async function rest(method, path, { token, body } = {}) {
 async function graphql(query, token, variables) {
   const response = await fetch(`${API}/graphql`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ query, variables }),
   });
   return response.json();
@@ -234,7 +241,11 @@ async function main() {
 
   // ---- 1. the two pinned chats exist, from registration alone -------------
   const chats = await eventually(async () => {
-    const pulled = await sync({ installId, since: null, entities: ['conversations'] });
+    const pulled = await sync({
+      installId,
+      since: null,
+      entities: ['conversations'],
+    });
     const rows = pulled.body?.pull?.conversations ?? [];
     return rows.length >= 2 ? rows : null;
   });
@@ -254,13 +265,22 @@ async function main() {
   const firstTick = await internal('/rhythm/tick');
   record(
     'the tick reaches every member, including one who has never had a touch',
-    firstTick.ok && typeof firstTick.body?.users === 'number' && firstTick.body.users >= 1,
+    firstTick.ok &&
+      typeof firstTick.body?.users === 'number' &&
+      firstTick.body.users >= 1,
     firstTick.ok ? `users=${firstTick.body?.users}` : firstTick.error,
   );
 
   // ---- 4. the contracted response shape ---------------------------------
   const shape = firstTick.body ?? {};
-  const wanted = ['users', 'planPrompts', 'endOfDay', 'morning', 'checkins', 'ms'];
+  const wanted = [
+    'users',
+    'planPrompts',
+    'endOfDay',
+    'morning',
+    'checkins',
+    'ms',
+  ];
   const actual = Object.keys(shape).sort();
   record(
     'the tick answers with exactly the shape contracts/internal.md names',
@@ -280,7 +300,11 @@ async function main() {
   // through the *bootstrap being idempotent*: the relay delivers at least once,
   // so `identity.UserRegistered` may already have been replayed. Two coach
   // chats after any number of deliveries is the index and the handler agreeing.
-  const stillTwo = await sync({ installId, since: null, entities: ['conversations'] });
+  const stillTwo = await sync({
+    installId,
+    since: null,
+    entities: ['conversations'],
+  });
   const coachChats = (stillTwo.body?.pull?.conversations ?? []).filter(
     (row) => row.kind === 'coach',
   );
@@ -406,7 +430,11 @@ async function main() {
    * hands the phone. Its absence there, combined with the sweep having claimed
    * it above, is what says it stayed where the member put it.
    */
-  const pulled = await sync({ installId, since: null, entities: ['daily_plans'] });
+  const pulled = await sync({
+    installId,
+    since: null,
+    entities: ['daily_plans'],
+  });
   const futureRhythm = (pulled.body?.pendingAlerts ?? []).filter(
     (entry) => entry.source?.kind === 'rhythm',
   );
@@ -447,7 +475,11 @@ async function main() {
    * chat — so this is the strongest thing available, and it is enough.
    */
   const chatted = await eventually(async () => {
-    const pulled = await sync({ installId, since: null, entities: ['conversations'] });
+    const pulled = await sync({
+      installId,
+      since: null,
+      entities: ['conversations'],
+    });
     const coach = (pulled.body?.pull?.conversations ?? []).find(
       (row) => row.kind === 'coach',
     );
@@ -504,11 +536,15 @@ async function main() {
   // job name. The first version of this check indexed it as a map, got
   // `undefined`, and would have reported a missing heartbeat for a job that was
   // stamping perfectly well — a gate wrong about the thing it is gating.
-  const beat = (health?.jobs ?? []).find((entry) => entry.job === 'rhythm.tick');
+  const beat = (health?.jobs ?? []).find(
+    (entry) => entry.job === 'rhythm.tick',
+  );
   record(
     '/health reports the tick’s heartbeat',
     Boolean(beat) && beat.stale === false,
-    beat ? `lastOkAt=${beat.lastOkAt} stale=${beat.stale}` : 'no rhythm.tick job',
+    beat
+      ? `lastOkAt=${beat.lastOkAt} stale=${beat.stale}`
+      : 'no rhythm.tick job',
   );
 
   // ---- the streak, over the member's own REST command -------------------
@@ -552,9 +588,12 @@ await main().catch((error) => {
 });
 
 const failed = results.filter((r) => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed against ${API}`);
+console.log(
+  `\n${results.length - failed.length}/${results.length} checks passed against ${API}`,
+);
 if (failed.length > 0) {
   console.log('\nfailed:');
-  for (const f of failed) console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+  for (const f of failed)
+    console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
 }
 process.exit(failed.length === 0 ? 0 : 1);

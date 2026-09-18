@@ -344,7 +344,10 @@ describe('the client’s fetch', () => {
       if (this !== globalThis) throw new TypeError('Illegal invocation');
       calls.push(url);
       return Promise.resolve(
-        new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }),
+        new Response('{}', {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
       );
     };
 

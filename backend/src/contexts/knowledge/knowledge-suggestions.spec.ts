@@ -292,9 +292,7 @@ describe('proposing a session', () => {
   it('leaves a session the member has no time to change alone', async () => {
     // FR-009: at least a day away. A card about this evening's session is an
     // interruption rather than a help — they have already packed their bag.
-    const outcome = await h.saga.onSessionScheduled(
-      sessionScheduled({}, 0),
-    );
+    const outcome = await h.saga.onSessionScheduled(sessionScheduled({}, 0));
     expect(outcome.reason).toBe('too_soon');
     // Cheaper than the preference read, and checked first for that reason.
     expect(h.preference.reads).toBe(0);
@@ -516,7 +514,11 @@ describe('accepting and dismissing', () => {
   it('shows the member what it was drawn from', async () => {
     const [view] = await h.query.list(MEMBER, 'pending');
     expect(view!.sources).toEqual([
-      { id: LINK_A, url: `https://example.com/${LINK_A}`, title: `Piece ${LINK_A}` },
+      {
+        id: LINK_A,
+        url: `https://example.com/${LINK_A}`,
+        title: `Piece ${LINK_A}`,
+      },
     ]);
     expect(view!.rationale).toBe('From the split you saved.');
   });

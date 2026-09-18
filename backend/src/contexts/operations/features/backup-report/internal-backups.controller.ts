@@ -156,7 +156,8 @@ export class InternalBackupsController {
     // Treated as a failure here rather than trusted, because the alternative is
     // a green heartbeat standing in for an empty directory.
     const ok = body.ok && archives.length > 0;
-    const error = body.ok && !ok ? 'reported success with no archives' : body.error;
+    const error =
+      body.ok && !ok ? 'reported success with no archives' : body.error;
 
     await this.heartbeats.stamp(
       BACKUP_JOB,

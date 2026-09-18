@@ -1,7 +1,11 @@
 import { describe } from 'vitest';
 import { InMemoryRepositoryBase } from '../memory/in-memory-repository.base.js';
 import { InMemoryUnitOfWork } from '../memory/in-memory-unit-of-work.js';
-import { describeRepositoryContract, Widget, type AdapterUnderTest } from './repository.contract.js';
+import {
+  describeRepositoryContract,
+  Widget,
+  type AdapterUnderTest,
+} from './repository.contract.js';
 
 /**
  * The same suite, run against every adapter set.
@@ -24,7 +28,10 @@ const inMemory: AdapterUnderTest = {
       repository,
       uow,
       async capturedEvents() {
-        return uow.events.map((event) => ({ name: event.name, eventId: event.eventId }));
+        return uow.events.map((event) => ({
+          name: event.name,
+          eventId: event.eventId,
+        }));
       },
     };
   },

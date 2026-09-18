@@ -26,11 +26,6 @@
       "type": "string"
     }
   },
-  "required": [
-    "taskId",
-    "dueAt",
-    "allDay",
-    "title"
-  ],
+  "required": ["taskId", "dueAt", "allDay", "title"],
   "additionalProperties": false
 }

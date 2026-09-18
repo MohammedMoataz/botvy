@@ -230,9 +230,7 @@ describe('the apply order', () => {
      * reads like the contract rather than a correctness guarantee.
      */
     expect(h.programSync.applyOrder).toBeGreaterThan(34);
-    expect(h.sessionSync.applyOrder).toBeGreaterThan(
-      h.programSync.applyOrder,
-    );
+    expect(h.sessionSync.applyOrder).toBeGreaterThan(h.programSync.applyOrder);
     expect(h.workoutSync.applyOrder).toBeGreaterThan(h.sessionSync.applyOrder);
     expect(h.workoutSync.applyOrder).toBeLessThan(40);
     // The patch list is its own sequence: profile (1), preferences (2), then
@@ -414,9 +412,11 @@ describe('a push against the conflict rule', () => {
       if (outcome.applied) continue;
       expect(outcome.rejection.reason).toBe('not_deleted');
     }
-    expect(outcomes.map((outcome) =>
-      outcome.applied ? null : outcome.rejection.entity,
-    )).toEqual(['sessions', 'programs', 'workouts']);
+    expect(
+      outcomes.map((outcome) =>
+        outcome.applied ? null : outcome.rejection.entity,
+      ),
+    ).toEqual(['sessions', 'programs', 'workouts']);
 
     // Erasing a live row is data loss dressed as housekeeping: all three stay.
     expect(h.sessions.rows.has(SESSION_ID)).toBe(true);
@@ -890,9 +890,9 @@ describe('the athlete profile patch', () => {
      */
     expect(outcome.rejection.reason).not.toBe('stale');
     // The stored timetable is the one it was.
-    expect(h.profiles.rows.get(USER)?.slots.map((entry) => entry.start)).toEqual(
-      ['18:00'],
-    );
+    expect(
+      h.profiles.rows.get(USER)?.slots.map((entry) => entry.start),
+    ).toEqual(['18:00']);
   });
 
   it('accepts a stale patch outright, because there is no version to lose', async () => {

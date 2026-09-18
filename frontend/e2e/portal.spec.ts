@@ -69,7 +69,9 @@ test('signs in and lands on a healthy overview', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('changes a setting and sees it stick, without a restart', async ({ page }) => {
+test('changes a setting and sees it stick, without a restart', async ({
+  page,
+}) => {
   await signIn(page);
   await page.getByRole('link', { name: /settings|الإعدادات/i }).click();
   await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible();
@@ -106,11 +108,15 @@ test('changes a setting and sees it stick, without a restart', async ({ page }) 
   await page.reload();
   await page.getByPlaceholder(/filter/i).fill('draftTopN');
   await expect(
-    page.locator('section.panel', { hasText: 'rhythm.draftTopN' }).locator('input'),
+    page
+      .locator('section.panel', { hasText: 'rhythm.draftTopN' })
+      .locator('input'),
   ).toHaveValue(next);
 });
 
-test('refuses to demote the last administrator, and says why', async ({ page }) => {
+test('refuses to demote the last administrator, and says why', async ({
+  page,
+}) => {
   await signIn(page);
   await page.getByRole('link', { name: /members|الأعضاء/i }).click();
 
@@ -127,7 +133,9 @@ test('refuses to demote the last administrator, and says why', async ({ page }) 
   const demote = row.getByRole('button', { name: /member|demote|عضو/i });
   if (await demote.count()) {
     await demote.first().click();
-    await expect(page.getByText(/last administrator|only administrator|self/i)).toBeVisible({
+    await expect(
+      page.getByText(/last administrator|only administrator|self/i),
+    ).toBeVisible({
       timeout: 10_000,
     });
   }
@@ -140,9 +148,14 @@ test('promotes a member, and the change sticks', async ({ page }) => {
   // Somebody other than the administrator running the suite. An installation
   // with only the seeded Owner has nobody to promote, and inventing one here
   // would leave an administrator behind on every run.
-  const others = page.locator('tr', { hasNot: page.getByText(EMAIL as string) });
+  const others = page.locator('tr', {
+    hasNot: page.getByText(EMAIL as string),
+  });
   const dropdown = others.locator('.p-dropdown').first();
-  test.skip((await dropdown.count()) === 0, 'no second member on this installation');
+  test.skip(
+    (await dropdown.count()) === 0,
+    'no second member on this installation',
+  );
 
   await dropdown.click();
   await page.getByRole('option', { name: /administrator|مسؤول/i }).click();
@@ -158,14 +171,19 @@ test('runs a workflow when there is one to run', async ({ page }) => {
   await page.getByRole('link', { name: /automation|الأتمتة/i }).click();
 
   const run = page.getByRole('button', { name: /run now|شغّله الآن/i }).first();
-  test.skip((await run.count()) === 0, 'automation is not configured on this installation');
+  test.skip(
+    (await run.count()) === 0,
+    'automation is not configured on this installation',
+  );
 
   await run.click();
 
   // Either it ran or the tool refused, and both are answers. What must not
   // happen is a button that reports nothing at all, which is how an Owner ends
   // up pressing it four times.
-  await expect(page.getByText(/was run|تم تشغيل|not answering|لا تستجيب/i)).toBeVisible({
+  await expect(
+    page.getByText(/was run|تم تشغيل|not answering|لا تستجيب/i),
+  ).toBeVisible({
     timeout: 20_000,
   });
 });
@@ -174,15 +192,22 @@ test('retries a failed link from the queue', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: /reading|ingestion|القراءة/i }).click();
 
-  const retry = page.getByRole('button', { name: /retry|أعد المحاولة/i }).first();
-  test.skip((await retry.count()) === 0, 'nothing in the queue on this installation');
+  const retry = page
+    .getByRole('button', { name: /retry|أعد المحاولة/i })
+    .first();
+  test.skip(
+    (await retry.count()) === 0,
+    'nothing in the queue on this installation',
+  );
 
   await retry.click();
 
   // The act writes an audit row, and the page says where — which is FR-005
   // reaching the screen rather than only the database.
   await expect(
-    page.getByRole('link', { name: /see what was recorded|اطّلع على ما تم تسجيله/i }),
+    page.getByRole('link', {
+      name: /see what was recorded|اطّلع على ما تم تسجيله/i,
+    }),
   ).toBeVisible({ timeout: 20_000 });
 });
 
@@ -205,7 +230,9 @@ test('shows every act on the audit page, newest first', async ({ page }) => {
   await signIn(page);
   await page.getByRole('link', { name: /what changed|ما الذي تغيّر/i }).click();
 
-  await expect(page.getByRole('heading', { name: /what changed/i })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /what changed/i }),
+  ).toBeVisible();
 
   // The settings change made earlier in this file is an administrative act, so
   // the trail has to carry it — SC-002 is *100%* of acts produce a record, and
@@ -238,7 +265,9 @@ test('reaches every act within three steps of the overview (SC-004)', async ({
   ]) {
     await page.goto(`${BASE}/overview`);
     await page.getByRole('link', { name }).click();
-    await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('heading').first()).toBeVisible({
+      timeout: 10_000,
+    });
   }
 });
 
@@ -246,7 +275,10 @@ test('names a job that has gone quiet, and reads degraded (SC-001)', async ({
   page,
 }) => {
   const job = process.env.BOTVY_E2E_STALE_JOB;
-  test.skip(!job, 'set BOTVY_E2E_STALE_JOB to a job seeded stale in ops_heartbeats');
+  test.skip(
+    !job,
+    'set BOTVY_E2E_STALE_JOB to a job seeded stale in ops_heartbeats',
+  );
 
   await signIn(page);
 
@@ -283,14 +315,18 @@ test('the public page loads with no API at all', async ({ page, context }) => {
   await page.goto(`${BASE}/`);
 
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByText(/your own (machine|hardware)/i).first()).toBeVisible();
+  await expect(
+    page.getByText(/your own (machine|hardware)/i).first(),
+  ).toBeVisible();
 });
 
 test.describe('in Arabic, on a phone', () => {
   test.use({ locale: 'ar' });
 
   test.beforeEach(async ({ context }) => {
-    await context.addCookies([{ name: 'botvy_locale', value: 'ar', url: BASE as string }]);
+    await context.addCookies([
+      { name: 'botvy_locale', value: 'ar', url: BASE as string },
+    ]);
   });
 
   test('every portal screen reads right to left and fits (T1042, FR-014)', async ({
@@ -319,12 +355,19 @@ test.describe('in Arabic, on a phone', () => {
       '/service-clients',
     ]) {
       await page.goto(`${BASE}${screen}`);
-      await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading').first()).toBeVisible({
+        timeout: 15_000,
+      });
 
       const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
       );
-      expect(overflow, `${screen} scrolls sideways at 360px`).toBeLessThanOrEqual(1);
+      expect(
+        overflow,
+        `${screen} scrolls sideways at 360px`,
+      ).toBeLessThanOrEqual(1);
     }
   });
 });

@@ -339,18 +339,23 @@ export class KnowledgeResolver {
   @Query(() => LinkType, {
     name: 'link',
     nullable: true,
-    description: 'One saved link with its summary and, for a playlist, its videos.',
+    description:
+      'One saved link with its summary and, for a playlist, its videos.',
   })
   async one(
     @CurrentPrincipal() principal: Principal,
     @Args('id', { type: () => ID }) id: string,
   ): Promise<LinkType | null> {
-    return (await this.links.one(principal.id, id)) as unknown as LinkType | null;
+    return (await this.links.one(
+      principal.id,
+      id,
+    )) as unknown as LinkType | null;
   }
 
   @Query(() => [SuggestionType], {
     name: 'suggestions',
-    description: 'Session suggestions drawn from the member’s own saved sources.',
+    description:
+      'Session suggestions drawn from the member’s own saved sources.',
   })
   async inbox(
     @CurrentPrincipal() principal: Principal,

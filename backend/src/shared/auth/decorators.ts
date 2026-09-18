@@ -1,4 +1,8 @@
-import { SetMetadata, createParamDecorator, type ExecutionContext } from '@nestjs/common';
+import {
+  SetMetadata,
+  createParamDecorator,
+  type ExecutionContext,
+} from '@nestjs/common';
 import type { Role, Principal } from './principal.js';
 
 export const IS_PUBLIC = 'botvy:isPublic';
@@ -21,7 +25,8 @@ export const UsersOnly = () => SetMetadata(REQUIRED_KIND, 'user');
 export const ServiceOnly = () => SetMetadata(REQUIRED_KIND, 'service');
 
 /** Narrows a service route to clients holding a scope. */
-export const Scopes = (...scopes: string[]) => SetMetadata(REQUIRED_SCOPES, scopes);
+export const Scopes = (...scopes: string[]) =>
+  SetMetadata(REQUIRED_SCOPES, scopes);
 
 /**
  * The principal for the current request, whatever the transport. Handlers take

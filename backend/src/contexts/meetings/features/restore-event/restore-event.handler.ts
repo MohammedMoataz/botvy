@@ -11,10 +11,7 @@ export class RestoreCalendarEventHandler {
     private readonly events: CalendarEventRepository,
   ) {}
 
-  async handle(
-    userId: string,
-    id: string,
-  ): Promise<{ updatedAt: Date }> {
+  async handle(userId: string, id: string): Promise<{ updatedAt: Date }> {
     const event = await this.events.findById(userId, id);
     if (!event) throw new CalendarEventNotFound(id);
     if (!event.isDeleted) return { updatedAt: event.updatedAt };

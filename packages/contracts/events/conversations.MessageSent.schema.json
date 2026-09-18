@@ -13,10 +13,6 @@
     },
     "role": {}
   },
-  "required": [
-    "conversationId",
-    "seq",
-    "role"
-  ],
+  "required": ["conversationId", "seq", "role"],
   "additionalProperties": false
 }

@@ -79,7 +79,8 @@ export function nextPractice(
   const stillToCome = todays.some(
     (session) =>
       session.status === 'planned' &&
-      session.plannedAt.getTime() + session.durationMin * 60_000 >= now.getTime(),
+      session.plannedAt.getTime() + session.durationMin * 60_000 >=
+        now.getTime(),
   );
 
   const beforeCutoff = localHhMm(now, timezone) < cutoff;

@@ -393,7 +393,10 @@ describe('choose-sports and set-slots', () => {
     const result = await b.sports.handle(MEMBER, ['gym', 'swimming'], now());
 
     expect(result.changed).toBe(true);
-    expect((await b.profiles.find(MEMBER))?.sports).toEqual(['gym', 'swimming']);
+    expect((await b.profiles.find(MEMBER))?.sports).toEqual([
+      'gym',
+      'swimming',
+    ]);
     expect(b.names()).toEqual(['training.SportsChanged']);
   });
 
@@ -755,9 +758,8 @@ describe('the materialiser: filling from the active program', () => {
     // 'Task due'" in a different context.
     expect(b.names()).toContain('training.SessionRescheduled');
     expect(
-      b.uow.events.find(
-        (entry) => entry.name === 'training.SessionRescheduled',
-      )?.payload,
+      b.uow.events.find((entry) => entry.name === 'training.SessionRescheduled')
+        ?.payload,
     ).toMatchObject({ title: 'Week 1' });
   });
 

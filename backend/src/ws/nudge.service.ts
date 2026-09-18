@@ -93,7 +93,9 @@ export class NudgeService {
     try {
       this.#server.to(room).emit(event, payload);
     } catch (error) {
-      this.logger.debug(`nudge to ${room} did not reach anyone: ${(error as Error).message}`);
+      this.logger.debug(
+        `nudge to ${room} did not reach anyone: ${(error as Error).message}`,
+      );
     }
   }
 

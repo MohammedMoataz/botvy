@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
 import { wallClockToUtc } from '../../../../shared/time/time.js';
-import {
-  AgendaQueryHandler,
-  type AgendaKind,
-} from '../agenda/agenda.query.js';
+import { AgendaQueryHandler, type AgendaKind } from '../agenda/agenda.query.js';
 
 /** How many of each kind a day holds. Every key present, zeroes included. */
 export interface AgendaKindCounts {
@@ -85,7 +82,8 @@ export class MonthOverviewQueryHandler {
      * either drops the last hour of the 31st or reaches into the 1st.
      */
     const first = `${pad4(year)}-${pad2(month)}-01`;
-    const nextMonth = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+    const nextMonth =
+      month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
     const from = wallClockToUtc(`${first}T00:00`, timezone);
     const to = wallClockToUtc(
       `${pad4(nextMonth.year)}-${pad2(nextMonth.month)}-01T00:00`,

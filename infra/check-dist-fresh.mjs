@@ -85,4 +85,6 @@ if (latest.mtimeMs > built) {
   process.exit(1);
 }
 
-console.log('check-dist-fresh: backend/dist/ is newer than backend/src/ — generating.');
+console.log(
+  'check-dist-fresh: backend/dist/ is newer than backend/src/ — generating.',
+);

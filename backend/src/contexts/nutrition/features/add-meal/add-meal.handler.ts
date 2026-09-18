@@ -146,7 +146,11 @@ export class DeleteMealHandler {
     private readonly meals: MealRepository,
   ) {}
 
-  async handle(userId: string, id: string, at: Date = new Date()): Promise<void> {
+  async handle(
+    userId: string,
+    id: string,
+    at: Date = new Date(),
+  ): Promise<void> {
     const meal = await this.meals.findById(userId, id);
     if (!meal) throw new MealNotFound(id);
     if (meal.isDeleted) return;

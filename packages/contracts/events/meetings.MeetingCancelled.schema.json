@@ -10,9 +10,6 @@
     },
     "at": {}
   },
-  "required": [
-    "meetingId",
-    "at"
-  ],
+  "required": ["meetingId", "at"],
   "additionalProperties": false
 }

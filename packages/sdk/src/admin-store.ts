@@ -178,9 +178,13 @@ export class AdminStore {
 
   async setRole(userId: string, role: Role): Promise<void> {
     await this.#against(userId, () =>
-      this.client.rest('PATCH', `/admin/users/${encodeURIComponent(userId)}/role`, {
-        role,
-      }),
+      this.client.rest(
+        'PATCH',
+        `/admin/users/${encodeURIComponent(userId)}/role`,
+        {
+          role,
+        },
+      ),
     );
     this.#patchMember(userId, { role });
   }
@@ -202,7 +206,10 @@ export class AdminStore {
 
   async unban(userId: string): Promise<void> {
     await this.#against(userId, () =>
-      this.client.rest('POST', `/admin/users/${encodeURIComponent(userId)}/unban`),
+      this.client.rest(
+        'POST',
+        `/admin/users/${encodeURIComponent(userId)}/unban`,
+      ),
     );
     this.#patchMember(userId, { status: 'active' });
   }
@@ -284,9 +291,17 @@ export class AdminStore {
       first?: number;
       after?: string;
     } = {},
-  ): Promise<{ nodes: AuditEntry[]; endCursor: string | null; hasNextPage: boolean }> {
+  ): Promise<{
+    nodes: AuditEntry[];
+    endCursor: string | null;
+    hasNextPage: boolean;
+  }> {
     const { audit } = await this.client.query<{
-      audit: { nodes: AuditEntry[]; endCursor: string | null; hasNextPage: boolean };
+      audit: {
+        nodes: AuditEntry[];
+        endCursor: string | null;
+        hasNextPage: boolean;
+      };
     }>(
       `query Audit($actor: ID, $action: String, $targetType: String, $from: DateTime, $to: DateTime, $first: Int, $after: String) {
         audit(actor: $actor, action: $action, targetType: $targetType, from: $from, to: $to, first: $first, after: $after) {
@@ -335,10 +350,9 @@ export class AdminStore {
    * something real is the wrong shape for "n8n is not answering".
    */
   async workflows(): Promise<WorkflowSummary[]> {
-    const { workflows } = await this.client.rest<{ workflows: WorkflowSummary[] }>(
-      'GET',
-      '/admin/workflows',
-    );
+    const { workflows } = await this.client.rest<{
+      workflows: WorkflowSummary[];
+    }>('GET', '/admin/workflows');
     return workflows;
   }
 

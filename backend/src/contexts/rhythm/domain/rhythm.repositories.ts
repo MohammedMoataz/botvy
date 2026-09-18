@@ -29,7 +29,10 @@ export abstract class DailyPlanRepository extends Repository<DailyPlan> {
   ): Promise<DailyPlan[]>;
 
   /** Everything changed since a cursor, for the phone's pull. */
-  abstract changedSince(userId: string, since: Date | null): Promise<DailyPlan[]>;
+  abstract changedSince(
+    userId: string,
+    since: Date | null,
+  ): Promise<DailyPlan[]>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }
@@ -60,10 +63,7 @@ export abstract class RhythmStateRepository extends Repository<RhythmState> {
    * writes in a way an offset is not — a row updated mid-pass would shift an
    * offset window and skip somebody's evening.
    */
-  abstract page(
-    after: string | null,
-    limit: number,
-  ): Promise<RhythmState[]>;
+  abstract page(after: string | null, limit: number): Promise<RhythmState[]>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }

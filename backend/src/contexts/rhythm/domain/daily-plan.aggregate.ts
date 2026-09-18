@@ -276,7 +276,11 @@ export class DailyPlan extends AggregateRoot<string> {
     this.raise(
       'rhythm.PlanSkipped',
       'daily_plan',
-      { date: this.date, taskIds: this.tasks.map((task) => task.id), autoConfirmed: false },
+      {
+        date: this.date,
+        taskIds: this.tasks.map((task) => task.id),
+        autoConfirmed: false,
+      },
       at,
     );
   }

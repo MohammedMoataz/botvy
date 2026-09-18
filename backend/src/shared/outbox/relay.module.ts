@@ -10,41 +10,77 @@ import { PlanAlertsSaga } from '../../contexts/notifications/features/plan-alert
 import { NotificationsPurgeOnDeletedHandler } from '../../contexts/notifications/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PlanningPurgeOnDeletedHandler } from '../../contexts/planning/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RemindersPurgeOnDeletedHandler } from '../../contexts/reminders/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { REMINDERS_SUBSCRIPTIONS, RemindersModule } from '../../contexts/reminders/reminders.module.js';
+import {
+  REMINDERS_SUBSCRIPTIONS,
+  RemindersModule,
+} from '../../contexts/reminders/reminders.module.js';
 import { MeetingsPurgeOnDeletedHandler } from '../../contexts/meetings/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { MEETINGS_SUBSCRIPTIONS, MeetingsModule } from '../../contexts/meetings/meetings.module.js';
+import {
+  MEETINGS_SUBSCRIPTIONS,
+  MeetingsModule,
+} from '../../contexts/meetings/meetings.module.js';
 import { BootstrapAthleteProfileHandler } from '../../contexts/training/features/bootstrap-athlete-profile/bootstrap-athlete-profile.handler.js';
 import { SessionMaterialiserSaga } from '../../contexts/training/features/materialise/materialise.saga.js';
 import { TrainingPurgeOnDeletedHandler } from '../../contexts/training/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { TRAINING_SUBSCRIPTIONS, TrainingModule } from '../../contexts/training/training.module.js';
+import {
+  TRAINING_SUBSCRIPTIONS,
+  TrainingModule,
+} from '../../contexts/training/training.module.js';
 import { ApplySuggestionHandler } from '../../contexts/training/features/apply-suggestion/apply-suggestion.handler.js';
 import { IngestLinkSaga } from '../../contexts/knowledge/features/ingest-link/ingest-link.saga.js';
 import { GenerateSuggestionSaga } from '../../contexts/knowledge/features/generate-suggestion/generate-suggestion.saga.js';
 import { RecordSuggestionOutcomeHandler } from '../../contexts/knowledge/features/accept-suggestion/accept-suggestion.handler.js';
 import { KnowledgePurgeOnDeletedHandler } from '../../contexts/knowledge/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { KNOWLEDGE_SUBSCRIPTIONS, KnowledgeModule } from '../../contexts/knowledge/knowledge.module.js';
-import { NUTRITION_SUBSCRIPTIONS, NutritionModule } from '../../contexts/nutrition/nutrition.module.js';
+import {
+  KNOWLEDGE_SUBSCRIPTIONS,
+  KnowledgeModule,
+} from '../../contexts/knowledge/knowledge.module.js';
+import {
+  NUTRITION_SUBSCRIPTIONS,
+  NutritionModule,
+} from '../../contexts/nutrition/nutrition.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
 import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { CONVERSATIONS_SUBSCRIPTIONS, ConversationsModule } from '../../contexts/conversations/conversations.module.js';
+import {
+  CONVERSATIONS_SUBSCRIPTIONS,
+  ConversationsModule,
+} from '../../contexts/conversations/conversations.module.js';
 import { RhythmBootstrapHandler } from '../../contexts/rhythm/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { RhythmPreferencesChangedHandler } from '../../contexts/rhythm/features/preferences-changed/preferences-changed.handler.js';
 import { NutritionPurgeOnDeletedHandler } from '../../contexts/nutrition/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RegenerateOnProfileUpdatedHandler } from '../../contexts/nutrition/features/regenerate-on-profile-updated/regenerate-on-profile-updated.handler.js';
 import { MealLineChangedHandler } from '../../contexts/rhythm/features/meal-line-changed/meal-line-changed.handler.js';
 import { RhythmPurgeOnDeletedHandler } from '../../contexts/rhythm/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { RHYTHM_SUBSCRIPTIONS, RhythmModule } from '../../contexts/rhythm/rhythm.module.js';
+import {
+  RHYTHM_SUBSCRIPTIONS,
+  RhythmModule,
+} from '../../contexts/rhythm/rhythm.module.js';
 import { RolloverOnEndOfDaySaga } from '../../contexts/planning/features/rollover/rollover-on-end-of-day.saga.js';
 import { CloseOnBannedHandler } from '../../contexts/conversations/features/close-on-banned/close-on-banned.handler.js';
 import { RecordUsageHandler } from '../../contexts/operations/features/record-usage/record-usage.handler.js';
 import { OperationsPurgeOnDeletedHandler } from '../../contexts/operations/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { SYNC_SUBSCRIPTIONS, SyncModule } from '../../contexts/sync/sync.module.js';
-import { NOTIFICATIONS_SUBSCRIPTIONS, NotificationsModule } from '../../contexts/notifications/notifications.module.js';
+import {
+  SYNC_SUBSCRIPTIONS,
+  SyncModule,
+} from '../../contexts/sync/sync.module.js';
+import {
+  NOTIFICATIONS_SUBSCRIPTIONS,
+  NotificationsModule,
+} from '../../contexts/notifications/notifications.module.js';
 import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
-import { PLANNING_SUBSCRIPTIONS, PlanningModule } from '../../contexts/planning/planning.module.js';
-import { OPERATIONS_SUBSCRIPTIONS, OperationsModule } from '../../contexts/operations/operations.module.js';
-import { PROFILE_SUBSCRIPTIONS, ProfileModule } from '../../contexts/profile/profile.module.js';
+import {
+  PLANNING_SUBSCRIPTIONS,
+  PlanningModule,
+} from '../../contexts/planning/planning.module.js';
+import {
+  OPERATIONS_SUBSCRIPTIONS,
+  OperationsModule,
+} from '../../contexts/operations/operations.module.js';
+import {
+  PROFILE_SUBSCRIPTIONS,
+  ProfileModule,
+} from '../../contexts/profile/profile.module.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
 import type { DomainEvent } from '../cqrs/domain-event.js';
@@ -703,7 +739,13 @@ const DECLARED_SUBSCRIPTIONS = {
             }
           },
           heartbeat: (ok, error) =>
-            heartbeats.stamp(RELAY_JOB, ok, error, undefined, RELAY_EVERY_MINUTES),
+            heartbeats.stamp(
+              RELAY_JOB,
+              ok,
+              error,
+              undefined,
+              RELAY_EVERY_MINUTES,
+            ),
         });
       },
     },
@@ -732,7 +774,13 @@ const DECLARED_SUBSCRIPTIONS = {
           forwarder,
           closeStore: () => store.close(),
           heartbeat: (ok, error) =>
-            heartbeats.stamp(RELAY_JOB, ok, error, undefined, RELAY_EVERY_MINUTES),
+            heartbeats.stamp(
+              RELAY_JOB,
+              ok,
+              error,
+              undefined,
+              RELAY_EVERY_MINUTES,
+            ),
         }),
     },
     { provide: RELAY_LIVENESS, useExisting: RelayRuntime },

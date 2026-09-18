@@ -110,7 +110,9 @@ class ScriptedSummariser extends SummariserPort {
     tokens: 12,
   };
 
-  async summarise(input: { hadTranscript: boolean | null }): Promise<Summarised> {
+  async summarise(input: {
+    hadTranscript: boolean | null;
+  }): Promise<Summarised> {
     this.seen.push({ hadTranscript: input.hadTranscript });
     if (this.answer instanceof Error) throw this.answer;
     return this.answer;
@@ -223,12 +225,7 @@ describe('reading a link', () => {
     const states = h.uow.events
       .filter((event) => event.name === 'knowledge.LinkStateChanged')
       .map((event) => (event.payload as { status: LinkStatus }).status);
-    expect(states).toEqual([
-      'fetching',
-      'extracting',
-      'summarising',
-      'done',
-    ]);
+    expect(states).toEqual(['fetching', 'extracting', 'summarising', 'done']);
 
     const ingested = h.uow.events.find(
       (event) => event.name === 'knowledge.LinkIngested',
@@ -526,7 +523,10 @@ describe('sizing a model call', () => {
   });
 
   it('never exceeds the budget, whatever llm.numCtx is set to', () => {
-    const text = Array.from({ length: 200 }, (_x, i) => `Paragraph ${i}. ${'word '.repeat(40)}`).join('\n\n');
+    const text = Array.from(
+      { length: 200 },
+      (_x, i) => `Paragraph ${i}. ${'word '.repeat(40)}`,
+    ).join('\n\n');
     for (const numCtx of [512, 2048, 8192, 32_768]) {
       const budget = chunkBudget(numCtx);
       for (const piece of chunk(text, budget)) {
@@ -543,7 +543,8 @@ describe('sizing a model call', () => {
     const wall = 'x'.repeat(budget * 3);
     const pieces = chunk(wall, budget);
     expect(pieces.length).toBeGreaterThan(1);
-    for (const piece of pieces) expect(piece.length).toBeLessThanOrEqual(budget);
+    for (const piece of pieces)
+      expect(piece.length).toBeLessThanOrEqual(budget);
   });
 
   it('answers nothing for nothing', () => {
@@ -655,7 +656,13 @@ describe('the event that starts it', () => {
     // would have the pipeline calling itself once per step.
     const h = harness();
     const drain = vi.spyOn(h.saga, 'drain');
-    for (const status of ['fetching', 'extracting', 'summarising', 'done', 'failed']) {
+    for (const status of [
+      'fetching',
+      'extracting',
+      'summarising',
+      'done',
+      'failed',
+    ]) {
       await h.saga.onLinkStateChanged({
         eventId: `evt-${status}`,
         name: 'knowledge.LinkStateChanged',

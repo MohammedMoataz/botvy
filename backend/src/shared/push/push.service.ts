@@ -56,7 +56,8 @@ export class PushService {
   constructor(
     private readonly credentialsFile: string | undefined,
     private readonly transport?: PushTransport,
-    private readonly readFile: (path: string) => string = (path) => readFileSync(path, 'utf8'),
+    private readonly readFile: (path: string) => string = (path) =>
+      readFileSync(path, 'utf8'),
   ) {}
 
   /** Called at boot. Throws when a declared credentials file cannot be read. */
@@ -73,7 +74,10 @@ export class PushService {
       this.#configured = true;
       this.logger.log('Push is configured.');
     } catch (error) {
-      throw new FirebaseCredentialsUnreadable(this.credentialsFile, (error as Error).message);
+      throw new FirebaseCredentialsUnreadable(
+        this.credentialsFile,
+        (error as Error).message,
+      );
     }
   }
 

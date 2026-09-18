@@ -24,10 +24,7 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "id"
-      ],
+      "required": ["type", "id"],
       "additionalProperties": false
     },
     "userId": {

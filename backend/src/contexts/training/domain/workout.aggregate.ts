@@ -88,9 +88,7 @@ export class Workout extends AggregateRoot<string> {
     return new Workout(state);
   }
 
-  static create(
-    state: Omit<WorkoutState, 'updatedAt' | 'deletedAt'>,
-  ): Workout {
+  static create(state: Omit<WorkoutState, 'updatedAt' | 'deletedAt'>): Workout {
     return new Workout({
       ...state,
       name: requireName(state.name),
@@ -102,14 +100,12 @@ export class Workout extends AggregateRoot<string> {
     });
   }
 
-  edit(
-    patch: {
-      name?: string;
-      sport?: string;
-      exercises?: Exercise[];
-      tags?: string[];
-    },
-  ): string[] {
+  edit(patch: {
+    name?: string;
+    sport?: string;
+    exercises?: Exercise[];
+    tags?: string[];
+  }): string[] {
     const changed: string[] = [];
     if (patch.name !== undefined) {
       const name = requireName(patch.name);

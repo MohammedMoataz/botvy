@@ -128,19 +128,17 @@ export class ApplySuggestionHandler {
       name: exercise.name ?? 'Exercise',
       notes: exercise.notes ?? null,
       mediaRefs: [],
-      sets: (exercise.sets ?? []).map(
-        (set): SetEntry => ({
-          targetReps: asNumber(set.targetReps),
-          targetWeightKg: asNumber(set.targetWeightKg),
-          targetDurationSec: asNumber(set.targetDurationSec),
-          targetDistanceM: asNumber(set.targetDistanceM),
-          actualReps: null,
-          actualWeightKg: null,
-          actualDurationSec: null,
-          actualDistanceM: null,
-          done: false,
-        }),
-      ),
+      sets: (exercise.sets ?? []).map((set): SetEntry => ({
+        targetReps: asNumber(set.targetReps),
+        targetWeightKg: asNumber(set.targetWeightKg),
+        targetDurationSec: asNumber(set.targetDurationSec),
+        targetDistanceM: asNumber(set.targetDistanceM),
+        actualReps: null,
+        actualWeightKg: null,
+        actualDurationSec: null,
+        actualDistanceM: null,
+        done: false,
+      })),
     };
   }
 }

@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useTranslations } from 'next-intl';
-import { AdminStore, MemberGone, type MemberSummary, type Role } from '@botvy/sdk';
+import {
+  AdminStore,
+  MemberGone,
+  type MemberSummary,
+  type Role,
+} from '@botvy/sdk';
 import { Button } from 'primereact/button';
 import { Column } from 'primereact/column';
 import { DataTable } from 'primereact/datatable';
@@ -29,10 +34,14 @@ function UsersPage() {
   // One subscription, so a row action updates the table without a re-read.
   // Re-reading would reshuffle the list under the Owner's cursor, and with a
   // cursor-paged list, page two of a changed list is not the same page two.
-  useEffect(() => admin.subscribe(() => {
-    setMembers([...admin.members]);
-    setHasMore(admin.hasMore);
-  }), [admin]);
+  useEffect(
+    () =>
+      admin.subscribe(() => {
+        setMembers([...admin.members]);
+        setHasMore(admin.hasMore);
+      }),
+    [admin],
+  );
 
   useEffect(() => {
     void run(() => admin.search({}));
@@ -74,7 +83,9 @@ function UsersPage() {
         { label: t('roleAdmin'), value: 'admin' },
       ]}
       disabled={busy === member.id}
-      onChange={(event) => void run(() => admin.setRole(member.id, event.value as Role), member.id)}
+      onChange={(event) =>
+        void run(() => admin.setRole(member.id, event.value as Role), member.id)
+      }
     />
   );
 
@@ -129,7 +140,12 @@ function UsersPage() {
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
-              void run(() => admin.search({ ...(query ? { query } : {}), ...(status ? { status } : {}) }));
+              void run(() =>
+                admin.search({
+                  ...(query ? { query } : {}),
+                  ...(status ? { status } : {}),
+                }),
+              );
             }
           }}
         />
@@ -144,14 +160,22 @@ function UsersPage() {
           onChange={(event) => {
             const next = (event.value as 'active' | 'banned' | null) ?? null;
             setStatus(next);
-            void run(() => admin.search({ ...(query ? { query } : {}), ...(next ? { status: next } : {}) }));
+            void run(() =>
+              admin.search({
+                ...(query ? { query } : {}),
+                ...(next ? { status: next } : {}),
+              }),
+            );
           }}
         />
         <Button
           label={t('search')}
           onClick={() =>
             void run(() =>
-              admin.search({ ...(query ? { query } : {}), ...(status ? { status } : {}) }),
+              admin.search({
+                ...(query ? { query } : {}),
+                ...(status ? { status } : {}),
+              }),
             )
           }
         />
@@ -161,29 +185,35 @@ function UsersPage() {
       {note && <Message severity="info" text={note} />}
 
       <section className="panel">
-      <DataTable value={members} loading={busy === 'page'} emptyMessage={t('none')}>
-        <Column field="email" header={t('email')} />
-        <Column field="displayName" header={t('name')} />
-        <Column header={t('role')} body={roleTemplate} />
-        <Column header={t('status')} body={statusTemplate} />
-        <Column field="deviceCount" header={t('devices')} />
-        <Column
-          header={t('lastSeen')}
-          body={(member: MemberSummary) =>
-            member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString() : t('never')
-          }
-        />
-        <Column header={t('actions')} body={actionsTemplate} />
-      </DataTable>
+        <DataTable
+          value={members}
+          loading={busy === 'page'}
+          emptyMessage={t('none')}
+        >
+          <Column field="email" header={t('email')} />
+          <Column field="displayName" header={t('name')} />
+          <Column header={t('role')} body={roleTemplate} />
+          <Column header={t('status')} body={statusTemplate} />
+          <Column field="deviceCount" header={t('devices')} />
+          <Column
+            header={t('lastSeen')}
+            body={(member: MemberSummary) =>
+              member.lastLoginAt
+                ? new Date(member.lastLoginAt).toLocaleString()
+                : t('never')
+            }
+          />
+          <Column header={t('actions')} body={actionsTemplate} />
+        </DataTable>
 
-      {hasMore && (
-        <Button
-          label={t('loadMore')}
-          severity="secondary"
-          style={{ alignSelf: 'flex-start' }}
-          onClick={() => void run(() => admin.loadMore())}
-        />
-      )}
+        {hasMore && (
+          <Button
+            label={t('loadMore')}
+            severity="secondary"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => void run(() => admin.loadMore())}
+          />
+        )}
       </section>
     </main>
   );

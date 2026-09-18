@@ -60,10 +60,14 @@ async function up(db) {
 
   // The sync pull's cursor. Every syncable collection is read as "this member's
   // rows changed after a moment", and that is this index in both directions.
-  await db.collection('labels').createIndex({ userId: 1, updatedAt: 1 }, { name: 'labels_user_updated' });
+  await db
+    .collection('labels')
+    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'labels_user_updated' });
 
   // ------------------------------------------------------------------- tasks
-  await db.collection('tasks').createIndex({ userId: 1, dueAt: 1 }, { name: 'tasks_user_due' });
+  await db
+    .collection('tasks')
+    .createIndex({ userId: 1, dueAt: 1 }, { name: 'tasks_user_due' });
 
   // Today, Upcoming and Overdue are all "this member's open tasks in a date
   // window", so the compound order is userId → status → dueAt: equality fields
@@ -71,18 +75,28 @@ async function up(db) {
   // serve all three with.
   await db
     .collection('tasks')
-    .createIndex({ userId: 1, status: 1, dueAt: 1 }, { name: 'tasks_user_status_due' });
+    .createIndex(
+      { userId: 1, status: 1, dueAt: 1 },
+      { name: 'tasks_user_status_due' },
+    );
 
-  await db.collection('tasks').createIndex({ userId: 1, labelId: 1 }, { name: 'tasks_user_label' });
+  await db
+    .collection('tasks')
+    .createIndex({ userId: 1, labelId: 1 }, { name: 'tasks_user_label' });
 
-  await db.collection('tasks').createIndex({ userId: 1, updatedAt: 1 }, { name: 'tasks_user_updated' });
+  await db
+    .collection('tasks')
+    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'tasks_user_updated' });
 
   // The Deleted view, and the tombstone purge the sweep dispatches. Partial, so
   // the index holds only tombstones: it is read by two rare paths and would
   // otherwise carry a null entry for every live task a member has.
   await db.collection('tasks').createIndex(
     { userId: 1, deletedAt: 1 },
-    { partialFilterExpression: { deletedAt: { $type: 'date' } }, name: 'tasks_user_deleted' },
+    {
+      partialFilterExpression: { deletedAt: { $type: 'date' } },
+      name: 'tasks_user_deleted',
+    },
   );
 
   // --------------------------------------------------------------- reminders
@@ -92,11 +106,17 @@ async function up(db) {
 
   await db
     .collection('reminders')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'reminders_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'reminders_user_updated' },
+    );
 
   await db.collection('reminders').createIndex(
     { userId: 1, deletedAt: 1 },
-    { partialFilterExpression: { deletedAt: { $type: 'date' } }, name: 'reminders_user_deleted' },
+    {
+      partialFilterExpression: { deletedAt: { $type: 'date' } },
+      name: 'reminders_user_deleted',
+    },
   );
 
   // ------------------------------------------------------------------ alerts
@@ -111,7 +131,13 @@ async function up(db) {
   // its existence for the reason in the header — otherwise the second one-off
   // reminder a member ever creates collides with the first.
   await db.collection('alerts').createIndex(
-    { userId: 1, 'source.kind': 1, 'source.id': 1, 'source.occurrenceAt': 1, label: 1 },
+    {
+      userId: 1,
+      'source.kind': 1,
+      'source.id': 1,
+      'source.occurrenceAt': 1,
+      label: 1,
+    },
     {
       unique: true,
       partialFilterExpression: { 'source.occurrenceAt': { $exists: true } },
@@ -125,19 +151,27 @@ async function up(db) {
   // interest to nobody.
   await db.collection('alerts').createIndex(
     { notifyAt: 1 },
-    { partialFilterExpression: { sentAt: null }, name: 'alerts_pending_notify' },
+    {
+      partialFilterExpression: { sentAt: null },
+      name: 'alerts_pending_notify',
+    },
   );
 
   // The re-plan paths. A time-zone change, a preferences change, a ban and a
   // device coming or going all mean "find this member's future alerts", and
   // that is a lookup by member and moment with no notion of `sentAt`.
-  await db.collection('alerts').createIndex({ userId: 1, notifyAt: 1 }, { name: 'alerts_user_notify' });
+  await db
+    .collection('alerts')
+    .createIndex({ userId: 1, notifyAt: 1 }, { name: 'alerts_user_notify' });
 
   // `pendingAlerts` hands the phone the next seven days so it can schedule its
   // own alarms, and the purge on `identity.UserDeleted` deletes by source.
   await db
     .collection('alerts')
-    .createIndex({ userId: 1, 'source.kind': 1, 'source.id': 1 }, { name: 'alerts_user_source' });
+    .createIndex(
+      { userId: 1, 'source.kind': 1, 'source.id': 1 },
+      { name: 'alerts_user_source' },
+    );
 }
 
 /** @param {import('mongodb').Db} db */

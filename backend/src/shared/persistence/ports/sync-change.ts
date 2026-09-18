@@ -52,13 +52,7 @@
  * take their `default` branch for both today.
  */
 export type SyncOp =
-  | 'create'
-  | 'update'
-  | 'delete'
-  | 'restore'
-  | 'purge'
-  | 'upsert'
-  | 'clear';
+  'create' | 'update' | 'delete' | 'restore' | 'purge' | 'upsert' | 'clear';
 
 export interface SyncChange<Fields = Record<string, unknown>> {
   id: string;

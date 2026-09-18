@@ -36,9 +36,7 @@ import {
   MongoSeq,
   type CounterDoc,
 } from './infrastructure/mongo-seq.adapter.js';
-import {
-  QuickQuestionSchema,
-} from '../../shared/persistence/mongo/schemas.js';
+import { QuickQuestionSchema } from '../../shared/persistence/mongo/schemas.js';
 import { LlmModule } from '../../shared/llm/llm.module.js';
 import { MemberContextPort } from '../../shared/member/member-context.port.js';
 import { OllamaClient } from '../../shared/llm/ollama.client.js';
@@ -477,8 +475,7 @@ import {
         meetings: MeetingActionsPort,
         training: TrainingActionsPort,
         nutrition: NutritionActionsPort,
-      ) =>
-        new IntentExecutor(planner, profile, meetings, training, nutrition),
+      ) => new IntentExecutor(planner, profile, meetings, training, nutrition),
     },
     {
       provide: PromptAssemblerPort,

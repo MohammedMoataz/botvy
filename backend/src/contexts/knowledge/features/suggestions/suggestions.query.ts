@@ -77,7 +77,9 @@ export class SuggestionsQueryHandler {
       draft: row.draft,
       sources: row.sourceLinkIds
         .map((id) => found.get(id))
-        .filter((source): source is SuggestionSourceView => source !== undefined),
+        .filter(
+          (source): source is SuggestionSourceView => source !== undefined,
+        ),
       rationale: row.rationale,
       status: row.status,
       sessionId: row.sessionId,

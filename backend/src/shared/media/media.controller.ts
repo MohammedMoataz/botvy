@@ -126,7 +126,9 @@ export class MediaController {
     const finalUrl = upstream.url || target;
     const finalVerdict = await checkResolvedTarget(finalUrl);
     if (!finalVerdict.allowed) {
-      this.logger.warn(`media redirected somewhere refused: ${finalVerdict.reason}`);
+      this.logger.warn(
+        `media redirected somewhere refused: ${finalVerdict.reason}`,
+      );
       response.status(400).end();
       return;
     }

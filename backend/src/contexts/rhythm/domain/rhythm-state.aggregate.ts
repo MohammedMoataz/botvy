@@ -1,9 +1,5 @@
 import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.js';
-import {
-  bestStreak,
-  currentStreak,
-  type CheckinRecord,
-} from './adherence.js';
+import { bestStreak, currentStreak, type CheckinRecord } from './adherence.js';
 
 export interface StreakState {
   current: number;

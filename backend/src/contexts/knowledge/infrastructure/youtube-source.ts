@@ -74,7 +74,9 @@ export class YoutubeSourceFetcher extends SourceFetcher {
       // `playlist` when it has recognised an id. Refused rather than thrown so
       // a row that somehow arrived this way fails once with a reason instead of
       // looping through the sweep for ever.
-      throw new SourceRefused('This YouTube link carries no video or playlist id.');
+      throw new SourceRefused(
+        'This YouTube link carries no video or playlist id.',
+      );
     }
 
     const client = await this.client();
@@ -111,7 +113,8 @@ export class YoutubeSourceFetcher extends SourceFetcher {
   ): Promise<RawSource> {
     const info = await this.call(() => client.getInfo(id), 'video');
     const basic = (info as { basic_info?: Record<string, unknown> }).basic_info;
-    if (!basic) throw new SourceRefused('YouTube returned nothing about this video.');
+    if (!basic)
+      throw new SourceRefused('YouTube returned nothing about this video.');
 
     return {
       url,
@@ -210,7 +213,10 @@ export class YoutubeSourceFetcher extends SourceFetcher {
       playlist: {
         title: asString(info.title),
         items,
-        total: Number.isFinite(declared) && declared > 0 ? declared : rawItems.length,
+        total:
+          Number.isFinite(declared) && declared > 0
+            ? declared
+            : rawItems.length,
       },
     };
   }
@@ -230,7 +236,9 @@ export class YoutubeSourceFetcher extends SourceFetcher {
     } catch (error) {
       const message = (error as Error).message ?? String(error);
       if (/private|unavailable|deleted|not exist|age|removed/i.test(message)) {
-        throw new SourceRefused(`YouTube will not show this ${what}: ${message}`);
+        throw new SourceRefused(
+          `YouTube will not show this ${what}: ${message}`,
+        );
       }
       throw new SourceUnavailable(`YouTube did not answer: ${message}`);
     }
@@ -315,7 +323,8 @@ function asString(value: unknown): string | null {
 }
 
 function asDate(value: unknown): Date | null {
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (value instanceof Date)
+    return Number.isNaN(value.getTime()) ? null : value;
   if (typeof value !== 'string') return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;

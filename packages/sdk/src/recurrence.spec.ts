@@ -23,7 +23,10 @@ import {
  * of October) are the ones every ICU build agrees about.
  */
 
-const NO_LOCATION = { onlineLink: 'https://meet.example/standup', address: null };
+const NO_LOCATION = {
+  onlineLink: 'https://meet.example/standup',
+  address: null,
+};
 
 function meeting(over: Partial<Repeating> = {}): Repeating {
   return {
@@ -177,7 +180,9 @@ describe('expandOccurrences', () => {
   it('stops at UNTIL', () => {
     const found = expandOccurrences(
       meeting({
-        recurrence: rule({ rrule: 'FREQ=WEEKLY;BYDAY=MO;UNTIL=20260921T235959Z' }),
+        recurrence: rule({
+          rrule: 'FREQ=WEEKLY;BYDAY=MO;UNTIL=20260921T235959Z',
+        }),
       }),
       new Date('2026-09-01T00:00:00.000Z'),
       new Date('2026-10-31T00:00:00.000Z'),
@@ -200,8 +205,8 @@ describe('expandOccurrences', () => {
     };
 
     expect(
-      expandOccurrences(meeting(anchored), ...window, 'UTC').map(
-        (one) => one.startAt.slice(0, 10),
+      expandOccurrences(meeting(anchored), ...window, 'UTC').map((one) =>
+        one.startAt.slice(0, 10),
       ),
     ).toEqual(['2026-01-31', '2026-03-31']);
 
@@ -348,11 +353,7 @@ describe('canExpandRule', () => {
 
     // Indistinguishable by their output alone — one occurrence either way.
     expect(
-      expandOccurrences(
-        meeting({ recurrence: unreadable }),
-        ...window,
-        'UTC',
-      ),
+      expandOccurrences(meeting({ recurrence: unreadable }), ...window, 'UTC'),
     ).toHaveLength(1);
     expect(expandOccurrences(meeting(), ...window, 'UTC')).toHaveLength(1);
 
@@ -364,9 +365,9 @@ describe('canExpandRule', () => {
 
 describe('wallClockToUtc', () => {
   it('resolves a zoneless wall clock against the zone asked for', () => {
-    expect(wallClockToUtc('2026-09-11T15:00', 'Europe/Berlin')?.toISOString()).toBe(
-      '2026-09-11T13:00:00.000Z',
-    );
+    expect(
+      wallClockToUtc('2026-09-11T15:00', 'Europe/Berlin')?.toISOString(),
+    ).toBe('2026-09-11T13:00:00.000Z');
   });
 
   it('moves an hour that never happened forward, never back', () => {

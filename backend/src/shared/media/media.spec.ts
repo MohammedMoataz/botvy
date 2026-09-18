@@ -13,17 +13,27 @@ const TARGET = 'https://images.example.test/photo.jpg';
 
 describe('media signing', () => {
   it('verifies a signature it produced', () => {
-    expect(verifyMediaUrl(TARGET, signMediaUrl(TARGET, SECRET), SECRET)).toBe(true);
+    expect(verifyMediaUrl(TARGET, signMediaUrl(TARGET, SECRET), SECRET)).toBe(
+      true,
+    );
   });
 
   it('refuses a signature for a different target', () => {
     const signature = signMediaUrl(TARGET, SECRET);
 
-    expect(verifyMediaUrl('https://images.example.test/other.jpg', signature, SECRET)).toBe(false);
+    expect(
+      verifyMediaUrl(
+        'https://images.example.test/other.jpg',
+        signature,
+        SECRET,
+      ),
+    ).toBe(false);
   });
 
   it('refuses a signature made with another secret', () => {
-    expect(verifyMediaUrl(TARGET, signMediaUrl(TARGET, 'another-secret'), SECRET)).toBe(false);
+    expect(
+      verifyMediaUrl(TARGET, signMediaUrl(TARGET, 'another-secret'), SECRET),
+    ).toBe(false);
   });
 
   it('refuses a signature of the wrong length without comparing byte by byte', () => {
@@ -32,7 +42,9 @@ describe('media signing', () => {
   });
 
   it('builds a relative path, and nothing at all when signing is disabled', () => {
-    expect(mediaPath(TARGET, SECRET)).toMatch(/^\/media\?url=https%3A%2F%2Fimages/);
+    expect(mediaPath(TARGET, SECRET)).toMatch(
+      /^\/media\?url=https%3A%2F%2Fimages/,
+    );
     expect(mediaPath(TARGET, undefined)).toBeNull();
   });
 });
@@ -48,7 +60,11 @@ describe('proxy target guard', () => {
   });
 
   it('refuses a container name on the compose network', () => {
-    for (const host of ['http://n8n:5678/webhook', 'http://mongo:27017', 'http://postgres/x']) {
+    for (const host of [
+      'http://n8n:5678/webhook',
+      'http://mongo:27017',
+      'http://postgres/x',
+    ]) {
       expect(checkTarget(host).allowed, host).toBe(false);
     }
   });
@@ -77,7 +93,9 @@ describe('proxy target guard', () => {
 
   /** The address a cloud instance answers its own credentials on. */
   it('refuses the link-local metadata address', () => {
-    expect(checkTarget('http://169.254.169.254/latest/meta-data/').allowed).toBe(false);
+    expect(
+      checkTarget('http://169.254.169.254/latest/meta-data/').allowed,
+    ).toBe(false);
   });
 
   it('refuses schemes that are not http', () => {
@@ -116,9 +134,10 @@ describe('resolving the name before trusting it', () => {
    * a name costs nothing and is the textbook way past this class of guard.
    */
   it('refuses a public name that resolves to a private address', async () => {
-    const verdict = await checkResolvedTarget('https://looks-fine.example/x', async () => [
-      { address: '10.0.0.5' },
-    ]);
+    const verdict = await checkResolvedTarget(
+      'https://looks-fine.example/x',
+      async () => [{ address: '10.0.0.5' }],
+    );
 
     expect(verdict).toEqual({
       allowed: false,
@@ -130,18 +149,22 @@ describe('resolving the name before trusting it', () => {
     // A name with one public and one private address would otherwise pass
     // whenever the ordering came out in the attacker's favour, which is a
     // guard that works most of the time.
-    const verdict = await checkResolvedTarget('https://mixed.example/x', async () => [
-      { address: '93.184.216.34' },
-      { address: '169.254.169.254' },
-    ]);
+    const verdict = await checkResolvedTarget(
+      'https://mixed.example/x',
+      async () => [
+        { address: '93.184.216.34' },
+        { address: '169.254.169.254' },
+      ],
+    );
 
     expect(verdict.allowed).toBe(false);
   });
 
   it('allows an ordinary public name', async () => {
-    const verdict = await checkResolvedTarget('https://example.com/x', async () => [
-      { address: '93.184.216.34' },
-    ]);
+    const verdict = await checkResolvedTarget(
+      'https://example.com/x',
+      async () => [{ address: '93.184.216.34' }],
+    );
 
     expect(verdict).toEqual({ allowed: true });
   });
@@ -150,10 +173,13 @@ describe('resolving the name before trusting it', () => {
     // `checkTarget` has already judged it, and a lookup of a literal is a
     // question the resolver has no business answering.
     let asked = false;
-    const verdict = await checkResolvedTarget('https://93.184.216.34/x', async () => {
-      asked = true;
-      return [];
-    });
+    const verdict = await checkResolvedTarget(
+      'https://93.184.216.34/x',
+      async () => {
+        asked = true;
+        return [];
+      },
+    );
 
     expect(verdict.allowed).toBe(true);
     expect(asked).toBe(false);
@@ -167,9 +193,12 @@ describe('resolving the name before trusting it', () => {
    * the limit of every link in flight the next time the resolver hiccuped.
    */
   it('does not turn a failed lookup into a refusal', async () => {
-    const verdict = await checkResolvedTarget('https://example.com/x', async () => {
-      throw new Error('EAI_AGAIN');
-    });
+    const verdict = await checkResolvedTarget(
+      'https://example.com/x',
+      async () => {
+        throw new Error('EAI_AGAIN');
+      },
+    );
 
     expect(verdict).toEqual({ allowed: true });
   });

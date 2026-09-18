@@ -122,14 +122,12 @@ export class MealSyncAdapter implements SyncableEntity {
           await this.uow.run(() => this.meals.remove(existing));
           return { applied: true, id: existing.id };
         default:
-          existing.edit(
-            {
-              name: fields.name,
-              kind: fields.kind,
-              ingredients: fields.ingredients,
-              tags: fields.tags,
-            },
-          );
+          existing.edit({
+            name: fields.name,
+            kind: fields.kind,
+            ingredients: fields.ingredients,
+            tags: fields.tags,
+          });
       }
 
       await this.uow.run(() => this.meals.save(existing));

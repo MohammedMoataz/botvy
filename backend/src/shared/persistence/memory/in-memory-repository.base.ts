@@ -1,7 +1,10 @@
 import type { AggregateRoot } from '../ports/aggregate-root.js';
 import { StaleWriteError } from '../ports/errors.js';
 import { Repository } from '../ports/repository.js';
-import type { InMemoryParticipant, InMemoryUnitOfWork } from './in-memory-unit-of-work.js';
+import type {
+  InMemoryParticipant,
+  InMemoryUnitOfWork,
+} from './in-memory-unit-of-work.js';
 
 /**
  * The store a handler spec runs against. Rows are keyed by `userId:id` — keyed

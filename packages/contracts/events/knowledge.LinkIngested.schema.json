@@ -25,10 +25,6 @@
       }
     }
   },
-  "required": [
-    "linkId",
-    "docId",
-    "tags"
-  ],
+  "required": ["linkId", "docId", "tags"],
   "additionalProperties": false
 }

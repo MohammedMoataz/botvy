@@ -104,7 +104,14 @@ export class BuildMealLineHandler {
         ? await this.fromLibrary(userId, date, perDay)
         : await this.fromModel(userId, date, perDay);
 
-    const changed = await this.store(userId, date, mode, chosen, at, causeEventId);
+    const changed = await this.store(
+      userId,
+      date,
+      mode,
+      chosen,
+      at,
+      causeEventId,
+    );
     return {
       date,
       mode,
@@ -196,7 +203,9 @@ export class BuildMealLineHandler {
      * and a null it has to interpret is a null it will interpret differently
      * next month. The word "rest day" is in the prompt.
      */
-    const trainingFocus = session ? `${session.sport} — ${session.title}` : null;
+    const trainingFocus = session
+      ? `${session.sport} — ${session.title}`
+      : null;
 
     const first = await this.drafter.draft({
       trainingFocus,
@@ -214,7 +223,11 @@ export class BuildMealLineHandler {
 
     const matches = findAllergens(text(first.meals), allergies, families);
     if (matches.length === 0) {
-      return { meals: chosenFrom(first.meals), reason: null, model: first.model };
+      return {
+        meals: chosenFrom(first.meals),
+        reason: null,
+        model: first.model,
+      };
     }
 
     this.logger.warn(
@@ -250,7 +263,11 @@ export class BuildMealLineHandler {
       return { meals: [], reason: 'allergen', model: null };
     }
 
-    return { meals: chosenFrom(second.meals), reason: null, model: second.model };
+    return {
+      meals: chosenFrom(second.meals),
+      reason: null,
+      model: second.model,
+    };
   }
 
   // ---------------------------------------------------------------- the write
@@ -327,7 +344,9 @@ interface Chosen {
   model: string | null;
 }
 
-function chosenFrom(meals: Array<{ kind: string; name: string }>): ChosenMeal[] {
+function chosenFrom(
+  meals: Array<{ kind: string; name: string }>,
+): ChosenMeal[] {
   return meals.map((meal) => ({
     kind: meal.kind as ChosenMeal['kind'],
     name: meal.name,

@@ -39,12 +39,17 @@ declare global {
   }
 }
 
-test('the web app sends the policy, and still renders (E-025)', async ({ page }) => {
+test('the web app sends the policy, and still renders (E-025)', async ({
+  page,
+}) => {
   const response = await page.goto(`${BASE}/`);
   const headers = response?.headers() ?? {};
 
   expect(headers[SENT], `expected a ${SENT} header`).toBeTruthy();
-  expect(headers[NOT_SENT], `did not expect a ${NOT_SENT} header`).toBeUndefined();
+  expect(
+    headers[NOT_SENT],
+    `did not expect a ${NOT_SENT} header`,
+  ).toBeUndefined();
 
   const policy = headers[SENT] ?? '';
   const scriptSrc = /(?:^|;)\s*script-src([^;]*)/.exec(policy)?.[1] ?? '';
@@ -60,7 +65,9 @@ test('the web app sends the policy, and still renders (E-025)', async ({ page })
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
-test('the nonce in the header is the one on the scripts (E-025)', async ({ page }) => {
+test('the nonce in the header is the one on the scripts (E-025)', async ({
+  page,
+}) => {
   const response = await page.goto(`${BASE}/`);
   const policy = (response?.headers() ?? {})[SENT] ?? '';
   const nonce = /'nonce-([A-Za-z0-9+/=_-]+)'/.exec(policy)?.[1];

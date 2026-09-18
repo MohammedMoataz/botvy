@@ -98,11 +98,14 @@ function nextOffsetChange(zone: string): string | null {
 
 function offsetAtNoon(date: string, zone: string): number {
   const instant = at(date, '12:00', zone);
-  return instant.getTime() - Date.UTC(
-    Number(date.slice(0, 4)),
-    Number(date.slice(5, 7)) - 1,
-    Number(date.slice(8, 10)),
-    12,
+  return (
+    instant.getTime() -
+    Date.UTC(
+      Number(date.slice(0, 4)),
+      Number(date.slice(5, 7)) - 1,
+      Number(date.slice(8, 10)),
+      12,
+    )
   );
 }
 
@@ -248,7 +251,10 @@ describe('a weekly series', () => {
       // A zone that has stopped observing daylight saving would make this
       // vacuous rather than failing, and saying so is better than a green tick
       // that proves nothing.
-      expect(change, 'Europe/Berlin no longer changes its clocks').not.toBeNull();
+      expect(
+        change,
+        'Europe/Berlin no longer changes its clocks',
+      ).not.toBeNull();
       return;
     }
 
@@ -463,9 +469,9 @@ describe('skipping and moving one occurrence (FR-005)', () => {
     expect(() => meeting.skipOccurrence(meeting.startAt)).toThrow(
       MeetingRuleError,
     );
-    expect(() =>
-      meeting.moveOccurrence(meeting.startAt, new Date()),
-    ).toThrow(MeetingRuleError);
+    expect(() => meeting.moveOccurrence(meeting.startAt, new Date())).toThrow(
+      MeetingRuleError,
+    );
   });
 
   it('includes an occurrence an override moved in from outside the window', () => {

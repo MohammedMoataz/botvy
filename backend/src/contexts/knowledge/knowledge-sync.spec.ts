@@ -60,7 +60,12 @@ function harness() {
     uow,
     links,
     settings,
-    adapter: new LinkSyncAdapter(uow, links, new FixedMemberContext(), settings),
+    adapter: new LinkSyncAdapter(
+      uow,
+      links,
+      new FixedMemberContext(),
+      settings,
+    ),
   };
 }
 
@@ -171,7 +176,9 @@ describe('links over sync', () => {
   it('normalises a pushed URL, so the phone and the API agree', async () => {
     await h.adapter.apply(
       MEMBER,
-      change({ fields: { url: 'http://WWW.example.com/piece?utm_source=x#top' } }),
+      change({
+        fields: { url: 'http://WWW.example.com/piece?utm_source=x#top' },
+      }),
       new Date(),
     );
     expect((await h.links.findById(MEMBER, LINK_A))!.url).toBe(

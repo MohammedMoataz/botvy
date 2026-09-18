@@ -18,10 +18,7 @@ export class RestoreProgramHandler {
     private readonly programs: ProgramRepository,
   ) {}
 
-  async handle(
-    userId: string,
-    id: string,
-  ): Promise<{ updatedAt: Date }> {
+  async handle(userId: string, id: string): Promise<{ updatedAt: Date }> {
     const program = await this.programs.findById(userId, id);
     if (!program) throw new ProgramNotFound(id);
     if (!program.isDeleted) return { updatedAt: program.updatedAt };

@@ -101,7 +101,10 @@ import {
   providers: [
     {
       provide: MealRepository,
-      inject: [getModelToken(MODEL_NAMES.meal), getModelToken(MODEL_NAMES.outbox)],
+      inject: [
+        getModelToken(MODEL_NAMES.meal),
+        getModelToken(MODEL_NAMES.outbox),
+      ],
       useFactory: (model: Model<MealDoc>, outbox: Model<OutboxInsert>) =>
         new MongoMealRepository(model, outbox),
     },

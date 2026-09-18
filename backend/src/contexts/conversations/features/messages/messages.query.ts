@@ -123,23 +123,20 @@ export class MessagesQueryHandler {
       first + 1,
     );
 
-    const nodes = rows.slice(0, first).map(
-      (message): MessageView => ({
-        seq: message.seq,
-        conversationId: message.conversationId,
-        role: message.role,
-        content: message.content,
-        clientId: message.clientId,
-        composedAt: message.composedAt,
-        intent: message.intent,
-        createdAt: message.createdAt,
-      }),
-    );
+    const nodes = rows.slice(0, first).map((message): MessageView => ({
+      seq: message.seq,
+      conversationId: message.conversationId,
+      role: message.role,
+      content: message.content,
+      clientId: message.clientId,
+      composedAt: message.composedAt,
+      intent: message.intent,
+      createdAt: message.createdAt,
+    }));
 
     return {
       nodes,
-      endCursor:
-        nodes.length > 0 ? String(nodes[nodes.length - 1]!.seq) : null,
+      endCursor: nodes.length > 0 ? String(nodes[nodes.length - 1]!.seq) : null,
       hasNextPage: rows.length > first,
     };
   }

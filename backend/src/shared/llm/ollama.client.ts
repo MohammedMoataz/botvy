@@ -82,14 +82,22 @@ export class OllamaClient {
     });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Ollama refused the chat request: HTTP ${response.status}`);
+      throw new Error(
+        `Ollama refused the chat request: HTTP ${response.status}`,
+      );
     }
 
     let usage: ChatUsage | null = null;
-    for await (const line of readLines(response.body, options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS)) {
+    for await (const line of readLines(
+      response.body,
+      options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS,
+    )) {
       const frame = parseFrame(line);
       if (!frame) continue;
-      if (typeof frame.message?.content === 'string' && frame.message.content.length > 0) {
+      if (
+        typeof frame.message?.content === 'string' &&
+        frame.message.content.length > 0
+      ) {
         yield frame.message.content;
       }
       /*
@@ -149,12 +157,16 @@ export class OllamaClient {
       });
 
       if (!response.ok) return null;
-      const body = (await response.json()) as { message?: { content?: string } };
+      const body = (await response.json()) as {
+        message?: { content?: string };
+      };
       const content = body.message?.content;
       if (!content) return null;
       return JSON.parse(content) as T;
     } catch (error) {
-      this.logger.warn(`extraction produced nothing usable: ${(error as Error).message}`);
+      this.logger.warn(
+        `extraction produced nothing usable: ${(error as Error).message}`,
+      );
       return null;
     }
   }
@@ -215,7 +227,10 @@ async function withIdleTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     return await Promise.race([
       promise,
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`model produced nothing for ${ms}ms`)), ms);
+        timer = setTimeout(
+          () => reject(new Error(`model produced nothing for ${ms}ms`)),
+          ms,
+        );
       }),
     ]);
   } finally {

@@ -73,7 +73,9 @@ function OverviewPage() {
     })();
   }, [admin, zone]);
 
-  const registration = settings?.find((entry) => entry.key === REGISTRATION_KEY);
+  const registration = settings?.find(
+    (entry) => entry.key === REGISTRATION_KEY,
+  );
   const registrationOpen = registration?.value === true;
 
   const calls = (today ?? []).reduce((sum, row) => sum + row.calls, 0);
@@ -145,7 +147,9 @@ function OverviewPage() {
             {report ? (
               <Tag
                 severity={report.status === 'ok' ? 'success' : 'warning'}
-                value={t(report.status === 'ok' ? 'statusOk' : 'statusDegraded')}
+                value={t(
+                  report.status === 'ok' ? 'statusOk' : 'statusDegraded',
+                )}
               />
             ) : (
               '—'
@@ -160,11 +164,20 @@ function OverviewPage() {
         {!report && <p className="muted">{t('loading')}</p>}
         {report && (
           <div className="row" style={{ gap: 8 }}>
-            <Tag severity={report.postgres ? 'success' : 'danger'} value="PostgreSQL" />
-            <Tag severity={report.mongo ? 'success' : 'danger'} value="MongoDB" />
+            <Tag
+              severity={report.postgres ? 'success' : 'danger'}
+              value="PostgreSQL"
+            />
+            <Tag
+              severity={report.mongo ? 'success' : 'danger'}
+              value="MongoDB"
+            />
             {/* Neither of these degrades the platform on its own, so they are
                 shown as plain information rather than as faults. */}
-            <Tag severity={report.ollama ? 'success' : 'warning'} value="Ollama" />
+            <Tag
+              severity={report.ollama ? 'success' : 'warning'}
+              value="Ollama"
+            />
             <Tag
               severity={report.pushConfigured ? 'success' : 'info'}
               value={t(report.pushConfigured ? 'pushOn' : 'pushOff')}
@@ -180,11 +193,18 @@ function OverviewPage() {
             <ul className="plain-list">
               {report.jobs.map((job) => (
                 <li key={job.job} className="row" style={{ gap: 8 }}>
-                  <Tag severity={job.stale ? 'danger' : 'success'} value={job.job} />
+                  <Tag
+                    severity={job.stale ? 'danger' : 'success'}
+                    value={job.job}
+                  />
                   <span className="muted">
-                    {job.lastOkAt ? format.format(new Date(job.lastOkAt)) : t('neverRan')}
+                    {job.lastOkAt
+                      ? format.format(new Date(job.lastOkAt))
+                      : t('neverRan')}
                   </span>
-                  {job.lastError && <span className="muted">{job.lastError}</span>}
+                  {job.lastError && (
+                    <span className="muted">{job.lastError}</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -201,9 +221,13 @@ function OverviewPage() {
             <InputSwitch
               checked={registrationOpen}
               disabled={saving || !settings}
-              onChange={(event) => void toggleRegistration(event.value === true)}
+              onChange={(event) =>
+                void toggleRegistration(event.value === true)
+              }
             />
-            <span>{t(registrationOpen ? 'registrationOpen' : 'registrationClosed')}</span>
+            <span>
+              {t(registrationOpen ? 'registrationOpen' : 'registrationClosed')}
+            </span>
           </div>
         </section>
 

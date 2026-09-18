@@ -29,7 +29,10 @@ async function up(db) {
 
   await db
     .collection('user_preferences')
-    .createIndex({ userId: 1 }, { unique: true, name: 'user_preferences_user' });
+    .createIndex(
+      { userId: 1 },
+      { unique: true, name: 'user_preferences_user' },
+    );
 
   // The purge handler's own lookup, and the only query either collection
   // serves that is not "this member's row": P11 sweeps for documents whose

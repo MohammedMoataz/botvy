@@ -42,8 +42,12 @@ export class InMemoryAuditReadRepository extends AuditReadRepository {
     const matching = this.rows
       .filter((row) => !filter.actor || row.actorId === filter.actor)
       .filter((row) => !filter.action || row.action === filter.action)
-      .filter((row) => !filter.targetType || row.targetType === filter.targetType)
-      .filter((row) => !filter.from || row.at.getTime() >= filter.from.getTime())
+      .filter(
+        (row) => !filter.targetType || row.targetType === filter.targetType,
+      )
+      .filter(
+        (row) => !filter.from || row.at.getTime() >= filter.from.getTime(),
+      )
       .filter((row) => !filter.to || row.at.getTime() < filter.to.getTime())
       .sort((a, b) => b.id.localeCompare(a.id));
 

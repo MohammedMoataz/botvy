@@ -27,10 +27,10 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const isPublic = this.reflector.getAllAndOverride<boolean | undefined>(IS_PUBLIC, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const isPublic = this.reflector.getAllAndOverride<boolean | undefined>(
+      IS_PUBLIC,
+      [context.getHandler(), context.getClass()],
+    );
     if (isPublic) return true;
 
     // The socket authenticated in its handshake and carries the principal on
@@ -40,10 +40,10 @@ export class JwtAuthGuard implements CanActivate {
 
     // A machine route authenticates with a service token, not a JWT; the
     // ServiceTokenGuard that follows this one owns that check.
-    const requiredKind = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_KIND, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredKind = this.reflector.getAllAndOverride<string | undefined>(
+      REQUIRED_KIND,
+      [context.getHandler(), context.getClass()],
+    );
     if (requiredKind === 'service') return true;
 
     const request = requestOf(context);
@@ -66,7 +66,11 @@ export class JwtAuthGuard implements CanActivate {
   }
 }
 
-function requestOf(context: ExecutionContext): { headers?: Record<string, string | undefined>; principal?: unknown } | undefined {
+function requestOf(
+  context: ExecutionContext,
+):
+  | { headers?: Record<string, string | undefined>; principal?: unknown }
+  | undefined {
   if (context.getType<string>() === 'graphql') {
     return context.getArgByIndex(2)?.req;
   }

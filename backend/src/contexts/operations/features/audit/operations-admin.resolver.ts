@@ -8,7 +8,11 @@ import {
   Resolver,
 } from '@nestjs/graphql';
 import { Roles, UsersOnly } from '../../../../shared/auth/decorators.js';
-import { DateScalar, DateTimeScalar, JSONScalar } from '../../../../graphql/scalars.js';
+import {
+  DateScalar,
+  DateTimeScalar,
+  JSONScalar,
+} from '../../../../graphql/scalars.js';
 import { UsageQueryHandler } from '../usage/usage.query.js';
 import { AuditQueryHandler } from './audit.query.js';
 

@@ -15,7 +15,10 @@ import {
   PlannedTasksPort,
   type MemberSchedule,
 } from '../../domain/rhythm.ports.js';
-import type { RhythmState, TouchKind } from '../../domain/rhythm-state.aggregate.js';
+import type {
+  RhythmState,
+  TouchKind,
+} from '../../domain/rhythm-state.aggregate.js';
 import {
   DailyPlanRepository,
   RhythmStateRepository,
@@ -479,11 +482,7 @@ export class TickHandler {
       userId,
       kind: 'coach',
       touch: 'morning_briefing',
-      content: morningBriefingMessage(
-        plan,
-        schedule.timezone,
-        schedule.locale,
-      ),
+      content: morningBriefingMessage(plan, schedule.timezone, schedule.locale),
       at: now,
     });
   }

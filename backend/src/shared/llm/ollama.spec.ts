@@ -38,14 +38,16 @@ describe('frame parsing', () => {
 describe('line reading', () => {
   it('joins a frame split across two chunks', async () => {
     const lines: string[] = [];
-    for await (const line of readLines(streamOf(['{"a":', '1}\n']), 1_000)) lines.push(line);
+    for await (const line of readLines(streamOf(['{"a":', '1}\n']), 1_000))
+      lines.push(line);
 
     expect(lines).toEqual(['{"a":1}']);
   });
 
   it('yields a trailing line with no newline after it', async () => {
     const lines: string[] = [];
-    for await (const line of readLines(streamOf(['{"a":1}']), 1_000)) lines.push(line);
+    for await (const line of readLines(streamOf(['{"a":1}']), 1_000))
+      lines.push(line);
 
     expect(lines).toEqual(['{"a":1}']);
   });
@@ -69,16 +71,18 @@ describe('line reading', () => {
 
 describe('chat', () => {
   it('yields content as it arrives and reports usage at the end', async () => {
-    const client = new OllamaClient('http://ollama:11434', async () =>
-      ({
-        ok: true,
-        status: 200,
-        body: streamOf([
-          '{"message":{"content":"Hel"}}\n',
-          '{"message":{"content":"lo"}}\n',
-          '{"done":true,"prompt_eval_count":12,"eval_count":5}\n',
-        ]),
-      }) as unknown as Response,
+    const client = new OllamaClient(
+      'http://ollama:11434',
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          body: streamOf([
+            '{"message":{"content":"Hel"}}\n',
+            '{"message":{"content":"lo"}}\n',
+            '{"done":true,"prompt_eval_count":12,"eval_count":5}\n',
+          ]),
+        }) as unknown as Response,
     );
 
     const pieces: string[] = [];
@@ -90,15 +94,25 @@ describe('chat', () => {
     }
 
     expect(pieces.join('')).toBe('Hello');
-    expect(result.value).toMatchObject({ promptTokens: 12, completionTokens: 5 });
+    expect(result.value).toMatchObject({
+      promptTokens: 12,
+      completionTokens: 5,
+    });
   });
 
   it('sends one context size, the configured one', async () => {
     let sent: Record<string, unknown> = {};
-    const client = new OllamaClient('http://ollama:11434', async (_url, init) => {
-      sent = JSON.parse(String((init as RequestInit).body));
-      return { ok: true, status: 200, body: streamOf(['{"done":true}\n']) } as unknown as Response;
-    });
+    const client = new OllamaClient(
+      'http://ollama:11434',
+      async (_url, init) => {
+        sent = JSON.parse(String((init as RequestInit).body));
+        return {
+          ok: true,
+          status: 200,
+          body: streamOf(['{"done":true}\n']),
+        } as unknown as Response;
+      },
+    );
 
     const stream = client.chat([{ role: 'user', content: 'hi' }], options);
     while (!(await stream.next()).done) {
@@ -110,8 +124,10 @@ describe('chat', () => {
   });
 
   it('throws when the model server refuses the request', async () => {
-    const client = new OllamaClient('http://ollama:11434', async () =>
-      ({ ok: false, status: 503, body: null }) as unknown as Response,
+    const client = new OllamaClient(
+      'http://ollama:11434',
+      async () =>
+        ({ ok: false, status: 503, body: null }) as unknown as Response,
     );
 
     const stream = client.chat([{ role: 'user', content: 'hi' }], options);
@@ -122,7 +138,9 @@ describe('chat', () => {
 describe('extraction', () => {
   it('parses a schema-shaped answer', async () => {
     const client = new OllamaClient('http://ollama:11434', async () =>
-      jsonResponse({ message: { content: '{"title":"Call Dad","at":"2026-09-07T18:00"}' } }),
+      jsonResponse({
+        message: { content: '{"title":"Call Dad","at":"2026-09-07T18:00"}' },
+      }),
     );
 
     const extracted = await client.extract<{ title: string }>([], {}, options);
@@ -152,10 +170,13 @@ describe('extraction', () => {
 
   it('asks for the schema and no creativity', async () => {
     let sent: Record<string, unknown> = {};
-    const client = new OllamaClient('http://ollama:11434', async (_url, init) => {
-      sent = JSON.parse(String((init as RequestInit).body));
-      return jsonResponse({ message: { content: '{}' } });
-    });
+    const client = new OllamaClient(
+      'http://ollama:11434',
+      async (_url, init) => {
+        sent = JSON.parse(String((init as RequestInit).body));
+        return jsonResponse({ message: { content: '{}' } });
+      },
+    );
 
     await client.extract([], { type: 'object' }, options);
 
@@ -166,7 +187,9 @@ describe('extraction', () => {
 
 describe('reachability', () => {
   it('is true when the model server answers', async () => {
-    const client = new OllamaClient('http://ollama:11434', async () => jsonResponse({}, true));
+    const client = new OllamaClient('http://ollama:11434', async () =>
+      jsonResponse({}, true),
+    );
     expect(await client.isReachable()).toBe(true);
   });
 

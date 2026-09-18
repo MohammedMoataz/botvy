@@ -15,7 +15,11 @@ import {
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
-import { localDate, localHhMm, wallClockToUtc } from '../../shared/time/time.js';
+import {
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../shared/time/time.js';
 import { MEMBER_CHOSEN_LABEL } from './domain/alert.aggregate.js';
 import {
   MeetingMembersPort,
@@ -441,9 +445,7 @@ describe('planning a recurring meeting', () => {
     const rows = await alertsFor(b);
     expect(rows).toHaveLength(3);
     expect(new Set(rows.map((row) => row.label))).toEqual(new Set(['1h']));
-    expect(
-      new Set(rows.map((row) => row.notifyAt.getTime())).size,
-    ).toBe(3);
+    expect(new Set(rows.map((row) => row.notifyAt.getTime())).size).toBe(3);
   });
 
   it('never plans a warning whose moment has already passed', async () => {
@@ -555,9 +557,9 @@ describe('skipping and moving one occurrence', () => {
     // Every survivor was there before, and none of them belongs to the day the
     // member dropped.
     expect(before).toEqual(expect.arrayContaining(after));
-    expect(
-      after.some((key) => key.startsWith(dropped.toISOString())),
-    ).toBe(false);
+    expect(after.some((key) => key.startsWith(dropped.toISOString()))).toBe(
+      false,
+    );
     expect(after.filter((key) => key.endsWith('|1h'))).toHaveLength(2);
   });
 
@@ -688,7 +690,9 @@ describe('a member who flies from Cairo to Berlin (FR-014)', () => {
       wasByLabel.set(row.label, seen);
     }
     for (const row of after) {
-      expect(wasByLabel.get(row.label)?.has(row.notifyAt.getTime())).toBe(false);
+      expect(wasByLabel.get(row.label)?.has(row.notifyAt.getTime())).toBe(
+        false,
+      );
     }
   });
 
@@ -865,9 +869,9 @@ describe('the internal reconcile endpoint', () => {
   });
 
   it('refuses a member’s JWT whatever their role', () => {
-    expect(
-      guardFor({ kind: 'user', id: MEMBER, role: 'admin' }),
-    ).toThrow(/member token is not one/);
+    expect(guardFor({ kind: 'user', id: MEMBER, role: 'admin' })).toThrow(
+      /member token is not one/,
+    );
   });
 
   it('refuses a service token that does not hold internal:tick', () => {

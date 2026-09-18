@@ -308,10 +308,10 @@ export class PanelStore {
        * and signing the member out of a session they never touched.
        */
       (refreshToken) =>
-        refreshUnderLock(
-          (current) => this.auth.refreshFn(current),
-          { accessToken: held?.accessToken ?? '', refreshToken },
-        ),
+        refreshUnderLock((current) => this.auth.refreshFn(current), {
+          accessToken: held?.accessToken ?? '',
+          refreshToken,
+        }),
     );
 
     this.client = new BotvyClient({
@@ -377,7 +377,10 @@ export class PanelStore {
   get syncState(): 'blocked' | 'catching-up' | 'offline' | 'in-step' | 'stale' {
     if (this.blockedCount > 0) return 'blocked';
     if (this.syncing) return 'catching-up';
-    if (this.unreachable || (typeof navigator !== 'undefined' && !navigator.onLine))
+    if (
+      this.unreachable ||
+      (typeof navigator !== 'undefined' && !navigator.onLine)
+    )
       return 'offline';
     if (this.unsentCount > 0) return 'catching-up';
     if (!this.lastSyncedAt) return 'stale';
@@ -692,7 +695,10 @@ export class PanelStore {
     }
 
     try {
-      const member = await this.auth.google(idToken, await this.deviceDescriptor());
+      const member = await this.auth.google(
+        idToken,
+        await this.deviceDescriptor(),
+      );
       await this.rememberDevice();
       runInAction(() => {
         this.member = member;

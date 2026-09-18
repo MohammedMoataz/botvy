@@ -48,9 +48,13 @@ const CONFIG = join(ROOT, 'oxlint.json');
 const CONTEXTS_DIR = join(ROOT, 'backend', 'src', 'contexts');
 
 /** The override this script owns, identified by what it is scoped to. */
-const OVERRIDE_FILES = ['backend/src/contexts/*/domain/**', 'backend/src/contexts/*/features/**'];
+const OVERRIDE_FILES = [
+  'backend/src/contexts/*/domain/**',
+  'backend/src/contexts/*/features/**',
+];
 /** …and, within it, the one group whose message starts like this. */
-const GROUP_MESSAGE_PREFIX = 'Constitution IX: a context may not import another context';
+const GROUP_MESSAGE_PREFIX =
+  'Constitution IX: a context may not import another context';
 
 /**
  * The twelve patterns for one context.
@@ -104,8 +108,8 @@ const override = config.overrides?.find(
     candidate.files.length === OVERRIDE_FILES.length &&
     OVERRIDE_FILES.every((file) => candidate.files.includes(file)),
 );
-const group = override?.rules?.['no-restricted-imports']?.[1]?.patterns?.find((entry) =>
-  entry.message?.startsWith(GROUP_MESSAGE_PREFIX),
+const group = override?.rules?.['no-restricted-imports']?.[1]?.patterns?.find(
+  (entry) => entry.message?.startsWith(GROUP_MESSAGE_PREFIX),
 );
 
 if (!group) {
@@ -136,17 +140,23 @@ const stale = [...current]
   .filter((name) => !contexts.includes(name));
 
 if (check) {
-  console.error('gen-lint-contexts: oxlint.json is out of date with backend/src/contexts/.');
+  console.error(
+    'gen-lint-contexts: oxlint.json is out of date with backend/src/contexts/.',
+  );
   if (missing.length > 0) {
     console.error(
       `  Unpoliced contexts (nothing stops another context importing them): ${missing.join(', ')}`,
     );
   }
   if (stale.length > 0) {
-    console.error(`  Named in the rule but not on disk: ${[...new Set(stale)].join(', ')}`);
+    console.error(
+      `  Named in the rule but not on disk: ${[...new Set(stale)].join(', ')}`,
+    );
   }
   if (missing.length === 0 && stale.length === 0) {
-    console.error('  Same contexts, different pattern list — order or shape has drifted.');
+    console.error(
+      '  Same contexts, different pattern list — order or shape has drifted.',
+    );
   }
   console.error('  Run `pnpm lint:contexts:write` and commit the result.');
   process.exit(1);

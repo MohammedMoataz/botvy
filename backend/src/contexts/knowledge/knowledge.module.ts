@@ -134,7 +134,10 @@ import {
   providers: [
     {
       provide: LinkRepository,
-      inject: [getModelToken(MODEL_NAMES.link), getModelToken(MODEL_NAMES.outbox)],
+      inject: [
+        getModelToken(MODEL_NAMES.link),
+        getModelToken(MODEL_NAMES.outbox),
+      ],
       useFactory: (model: Model<LinkDoc>, outbox: Model<OutboxInsert>) =>
         new MongoLinkRepository(model, outbox),
     },
@@ -167,7 +170,10 @@ import {
     // `UnknownDependenciesException` at boot that no typecheck sees, which is
     // the class of defect `app.module.spec.ts` exists to turn red.
     { provide: HttpSourceFetcher, useFactory: () => new HttpSourceFetcher() },
-    { provide: YoutubeSourceFetcher, useFactory: () => new YoutubeSourceFetcher() },
+    {
+      provide: YoutubeSourceFetcher,
+      useFactory: () => new YoutubeSourceFetcher(),
+    },
     ReadabilityExtractor,
     YoutubeExtractor,
     {
@@ -196,7 +202,10 @@ import {
     },
 
     // ---- other contexts' facts -------------------------------------------
-    { provide: KnowledgeTranscriptPort, useClass: ConversationsKnowledgeTranscript },
+    {
+      provide: KnowledgeTranscriptPort,
+      useClass: ConversationsKnowledgeTranscript,
+    },
 
     // ---- ids --------------------------------------------------------------
     //

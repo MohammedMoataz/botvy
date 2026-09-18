@@ -31,9 +31,10 @@ const LIMITS: FetchLimits = { maxChars: 10_000, playlistMaxItems: 50 };
 const link = { url: 'https://example.com/piece', kind: 'article' } as Link;
 
 /** A fetch that answers from a script keyed by URL, and records what it asked. */
-function scripted(
-  script: Record<string, Response | (() => never)>,
-): { impl: typeof fetch; asked: string[] } {
+function scripted(script: Record<string, Response | (() => never)>): {
+  impl: typeof fetch;
+  asked: string[];
+} {
   const asked: string[] = [];
   const impl = (async (url: string) => {
     asked.push(String(url));

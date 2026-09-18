@@ -400,7 +400,9 @@ function applyPushedStatus(
 }
 
 function isMeetingStatus(value: unknown): value is MeetingStatus {
-  return value === 'scheduled' || value === 'completed' || value === 'cancelled';
+  return (
+    value === 'scheduled' || value === 'completed' || value === 'cancelled'
+  );
 }
 
 /**
@@ -441,9 +443,7 @@ export function normaliseRecurrence(
   };
 }
 
-export function asDate(
-  value: string | Date | null | undefined,
-): Date | null {
+export function asDate(value: string | Date | null | undefined): Date | null {
   if (value === null || value === undefined) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;

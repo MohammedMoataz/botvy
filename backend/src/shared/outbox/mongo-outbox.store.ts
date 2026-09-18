@@ -62,14 +62,21 @@ export class MongoOutboxStore implements RelayStore {
   }
 
   async markDelivered(eventId: string): Promise<void> {
-    await this.outbox.updateOne({ eventId }, { $set: { deliveredAt: new Date(), lastError: null } });
+    await this.outbox.updateOne(
+      { eventId },
+      { $set: { deliveredAt: new Date(), lastError: null } },
+    );
   }
 
   async recordFailure(eventId: string, error: string): Promise<number> {
     // `new: true` so the count that comes back is the one just written. Reading
     // it afterwards would be a second query racing the first.
     const row = await this.outbox
-      .findOneAndUpdate({ eventId }, { $set: { lastError: error }, $inc: { attempts: 1 } }, { new: true })
+      .findOneAndUpdate(
+        { eventId },
+        { $set: { lastError: error }, $inc: { attempts: 1 } },
+        { new: true },
+      )
       .lean<OutboxDoc>()
       .exec();
     return row?.attempts ?? 1;
@@ -88,7 +95,10 @@ export class MongoOutboxStore implements RelayStore {
   }
 
   async loadResumeToken(): Promise<unknown | null> {
-    const row = await this.state.findById(RELAY_STATE_ID).lean<RelayStateDoc>().exec();
+    const row = await this.state
+      .findById(RELAY_STATE_ID)
+      .lean<RelayStateDoc>()
+      .exec();
     return row?.resumeToken ?? null;
   }
 
@@ -119,7 +129,9 @@ export class MongoOutboxStore implements RelayStore {
       [{ $match: { operationType: 'insert' } }],
       {
         fullDocument: 'updateLookup',
-        ...(resumeToken ? { resumeAfter: resumeToken as Record<string, unknown> } : {}),
+        ...(resumeToken
+          ? { resumeAfter: resumeToken as Record<string, unknown> }
+          : {}),
       },
     );
     this.#stream = stream;
@@ -131,7 +143,9 @@ export class MongoOutboxStore implements RelayStore {
       }
     } catch (error) {
       if ((error as { code?: number }).code === CHANGE_STREAM_HISTORY_LOST) {
-        this.logger.warn('resume token fell off the oplog; clearing it so the next run starts fresh');
+        this.logger.warn(
+          'resume token fell off the oplog; clearing it so the next run starts fresh',
+        );
         await this.saveResumeToken(null);
       }
       throw error;

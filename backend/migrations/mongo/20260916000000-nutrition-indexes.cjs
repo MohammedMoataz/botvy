@@ -69,15 +69,13 @@ async function up(db) {
   // this collection that crosses members: "every row deleted before the
   // horizon", with no member in the filter. Without it the sweep is a full
   // collection scan every night for a count that is zero on almost every run.
-  await db
-    .collection('meals')
-    .createIndex(
-      { deletedAt: 1 },
-      {
-        name: 'meals_tombstones',
-        partialFilterExpression: { deletedAt: { $type: 'date' } },
-      },
-    );
+  await db.collection('meals').createIndex(
+    { deletedAt: 1 },
+    {
+      name: 'meals_tombstones',
+      partialFilterExpression: { deletedAt: { $type: 'date' } },
+    },
+  );
 
   // ----------------------------------------------------- `meal_suggestions`
   //

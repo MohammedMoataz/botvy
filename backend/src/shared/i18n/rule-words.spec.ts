@@ -125,7 +125,9 @@ describe('a repeat rule in words', () => {
 
   it('writes the end date as an ISO date in both languages', () => {
     const until = new Date('2026-12-31T23:59:59Z');
-    expect(ruleWords(parts({ until }), 'en')).toBe('every week, until 2026-12-31');
+    expect(ruleWords(parts({ until }), 'en')).toBe(
+      'every week, until 2026-12-31',
+    );
     expect(ruleWords(parts({ until }), 'ar')).toBe('كل أسبوع، حتى 2026-12-31');
   });
 
@@ -140,7 +142,9 @@ describe('a repeat rule in words', () => {
    */
   it('refuses a shape it cannot say rather than guessing', () => {
     expect(ruleWords(parts({ byMonthDay: [3, 17] }), 'ar')).toBeNull();
-    expect(ruleWords(parts({ freq: 'daily', byWeekday: [0] }), 'ar')).toBeNull();
+    expect(
+      ruleWords(parts({ freq: 'daily', byWeekday: [0] }), 'ar'),
+    ).toBeNull();
     expect(ruleWords(parts({ count: 3, until: new Date() }), 'en')).toBeNull();
     expect(ruleWords(parts({ interval: 0 }), 'en')).toBeNull();
   });

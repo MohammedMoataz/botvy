@@ -7,7 +7,11 @@ import {
   type SyncTable,
 } from '@botvy/sdk';
 import { db, getMeta, setMeta, type PanelTaskRow } from './db';
-import { DexieSyncTable, SYNC_CURSOR_KEY, dexieCursorStorage } from './sync-table';
+import {
+  DexieSyncTable,
+  SYNC_CURSOR_KEY,
+  dexieCursorStorage,
+} from './sync-table';
 
 /**
  * The sync wiring both contexts share (P9).

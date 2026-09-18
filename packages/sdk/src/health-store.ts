@@ -82,7 +82,9 @@ export class HealthStore {
 
   /** Jobs that have gone quiet, named — which is what FR-001 asks for. */
   get staleJobs(): string[] {
-    return (this.#report?.jobs ?? []).filter((job) => job.stale).map((job) => job.job);
+    return (this.#report?.jobs ?? [])
+      .filter((job) => job.stale)
+      .map((job) => job.job);
   }
 
   subscribe(listener: () => void): () => void {
@@ -96,11 +98,15 @@ export class HealthStore {
     this.#epoch += 1;
 
     const every = this.options.setInterval ?? setInterval;
-    this.#timer = every(() => void this.refresh(), this.options.pollMs ?? HEALTH_POLL_MS);
+    this.#timer = every(
+      () => void this.refresh(),
+      this.options.pollMs ?? HEALTH_POLL_MS,
+    );
 
     this.#offSocket =
-      this.options.socket?.on('ops.heartbeat', (payload) => this.#applyHeartbeat(payload)) ??
-      null;
+      this.options.socket?.on('ops.heartbeat', (payload) =>
+        this.#applyHeartbeat(payload),
+      ) ?? null;
 
     void this.refresh();
   }
@@ -150,7 +156,9 @@ export class HealthStore {
     const updated = {
       job,
       // Only ever forward, matching the server.
-      lastOkAt: ok ? (lastOkAt ?? new Date().toISOString()) : (existing?.lastOkAt ?? null),
+      lastOkAt: ok
+        ? (lastOkAt ?? new Date().toISOString())
+        : (existing?.lastOkAt ?? null),
       lastError: ok ? null : (existing?.lastError ?? 'failed'),
       // A heartbeat that just arrived is by definition not quiet. Whether it
       // *failed* is a different question, and `lastError` is where that is said.

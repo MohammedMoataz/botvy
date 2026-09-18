@@ -261,12 +261,7 @@ export class Task extends AggregateRoot<string> {
 
     this.updatedAt = new Date();
     if (changed.some((field) => ALERT_FIELDS.has(field))) {
-      this.raise(
-        'planning.TaskRescheduled',
-        'task',
-        this.alertFacts(),
-        at,
-      );
+      this.raise('planning.TaskRescheduled', 'task', this.alertFacts(), at);
     }
     return changed;
   }
@@ -467,12 +462,7 @@ export class Task extends AggregateRoot<string> {
     const next = reparsed?.next(occurrence, timezone) ?? null;
     this.dueAt = next;
     this.updatedAt = new Date();
-    this.raise(
-      'planning.TaskRescheduled',
-      'task',
-      this.alertFacts(),
-      at,
-    );
+    this.raise('planning.TaskRescheduled', 'task', this.alertFacts(), at);
     return next;
   }
 

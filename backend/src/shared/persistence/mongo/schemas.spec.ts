@@ -46,11 +46,13 @@ import * as schemas from './schemas.js';
 const NOT_THROUGH_THE_BASE: Record<string, string> = {
   outbox: 'appended to directly, inside the same session as the aggregate save',
   relay_state: 'the relay writes its own resume token with a bare updateOne',
-  settings: 'SettingsService owns its store adapter and writes updatedAt itself',
+  settings:
+    'SettingsService owns its store adapter and writes updatedAt itself',
   ops_heartbeats: 'HeartbeatService stamps rows; there is no aggregate',
   audit_log: 'append-only, written by the audit adapter',
   idempotency_keys: 'written by the interceptor, and expire on a TTL index',
-  counters: 'one findOneAndUpdate with $inc; no aggregate and no optimistic check',
+  counters:
+    'one findOneAndUpdate with $inc; no aggregate and no optimistic check',
   /*
    * Append-only, one row per model call, inserted by Operations' handler from
    * `conversations.MessageSent`. There is no aggregate and nothing ever
@@ -63,7 +65,8 @@ const NOT_THROUGH_THE_BASE: Record<string, string> = {
    * discover it against a real Mongo two phases later, which is how both
    * `AlertSchema` and `MessageSchema` shipped broken.
    */
-  usage_log: 'append-only inserts by Operations; unique on eventId, never modified',
+  usage_log:
+    'append-only inserts by Operations; unique on eventId, never modified',
 };
 
 interface SchemaLike {
@@ -72,8 +75,13 @@ interface SchemaLike {
   options: { collection?: string } & Record<string, any>;
 }
 
-function collectionsOf(): Array<{ name: string; collection: string; schema: SchemaLike }> {
-  const found: Array<{ name: string; collection: string; schema: SchemaLike }> = [];
+function collectionsOf(): Array<{
+  name: string;
+  collection: string;
+  schema: SchemaLike;
+}> {
+  const found: Array<{ name: string; collection: string; schema: SchemaLike }> =
+    [];
   for (const [name, value] of Object.entries(schemas)) {
     if (!name.endsWith('Schema')) continue;
     const schema = value as unknown as SchemaLike;
@@ -142,7 +150,9 @@ describe('the schemas and the repository base agree', () => {
      * every nightly job back on the fifteen-minute window — which is the defect
      * that enhancement exists to remove, restored by a missing line in a schema.
      */
-    const heartbeat = all.find((entry) => entry.collection === 'ops_heartbeats');
+    const heartbeat = all.find(
+      (entry) => entry.collection === 'ops_heartbeats',
+    );
     expect(heartbeat).toBeDefined();
     for (const field of [
       'lastRunAt',

@@ -10,13 +10,16 @@ export const DateTimeScalar = new GraphQLScalarType({
     throw new TypeError('DateTime can only serialise a Date or an ISO string.');
   },
   parseValue(value) {
-    if (typeof value !== 'string') throw new TypeError('DateTime must arrive as a string.');
+    if (typeof value !== 'string')
+      throw new TypeError('DateTime must arrive as a string.');
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) throw new TypeError(`Not a DateTime: ${value}`);
+    if (Number.isNaN(parsed.getTime()))
+      throw new TypeError(`Not a DateTime: ${value}`);
     return parsed;
   },
   parseLiteral(ast) {
-    if (ast.kind !== Kind.STRING) throw new TypeError('DateTime must arrive as a string.');
+    if (ast.kind !== Kind.STRING)
+      throw new TypeError('DateTime must arrive as a string.');
     return new Date(ast.value);
   },
 });
@@ -32,7 +35,8 @@ export const DateScalar = new GraphQLScalarType({
   name: 'Date',
   description: "A calendar date in the member's own time zone, as YYYY-MM-DD.",
   serialize(value) {
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
+      return value;
     throw new TypeError('Date can only serialise a YYYY-MM-DD string.');
   },
   parseValue(value) {
@@ -51,7 +55,8 @@ export const DateScalar = new GraphQLScalarType({
 
 export const JSONScalar = new GraphQLScalarType({
   name: 'JSON',
-  description: 'Arbitrary JSON, used for a settings value and an audit entry’s metadata.',
+  description:
+    'Arbitrary JSON, used for a settings value and an audit entry’s metadata.',
   serialize: (value) => value,
   parseValue: (value) => value,
   parseLiteral: parseJsonLiteral,

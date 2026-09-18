@@ -102,7 +102,11 @@ export class Conversation extends AggregateRoot<string> {
     conversation.raise(
       'conversations.ConversationCreated',
       'conversation',
-      { conversationId: input.id, kind: input.kind, pinned: conversation.pinned },
+      {
+        conversationId: input.id,
+        kind: input.kind,
+        pinned: conversation.pinned,
+      },
       input.at,
     );
     return conversation;

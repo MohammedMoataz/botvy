@@ -133,7 +133,9 @@ export class LlmSuggestionDrafter extends SuggestionDrafterPort {
     );
 
     if (!decoded || !Array.isArray(decoded.exercises)) {
-      this.logger.debug('the session draft did not decode; falling back to prose');
+      this.logger.debug(
+        'the session draft did not decode; falling back to prose',
+      );
       return {
         draft: null,
         rationale: '',
@@ -148,12 +150,14 @@ export class LlmSuggestionDrafter extends SuggestionDrafterPort {
       .map((exercise) => ({
         name: String(exercise.name),
         notes: typeof exercise.notes === 'string' ? exercise.notes : null,
-        sets: (Array.isArray(exercise.sets) ? exercise.sets : []).map((set) => ({
-          targetReps: asNumber(set?.targetReps),
-          targetWeightKg: asNumber(set?.targetWeightKg),
-          targetDurationSec: asNumber(set?.targetDurationSec),
-          targetDistanceM: asNumber(set?.targetDistanceM),
-        })),
+        sets: (Array.isArray(exercise.sets) ? exercise.sets : []).map(
+          (set) => ({
+            targetReps: asNumber(set?.targetReps),
+            targetWeightKg: asNumber(set?.targetWeightKg),
+            targetDurationSec: asNumber(set?.targetDurationSec),
+            targetDistanceM: asNumber(set?.targetDistanceM),
+          }),
+        ),
       }));
 
     // The model saying "these sources do not support a session" is a decoded
@@ -165,7 +169,8 @@ export class LlmSuggestionDrafter extends SuggestionDrafterPort {
     }
 
     const draft: SuggestionDraft = {
-      title: typeof decoded.title === 'string' ? decoded.title : 'Suggested session',
+      title:
+        typeof decoded.title === 'string' ? decoded.title : 'Suggested session',
       focus: typeof decoded.focus === 'string' ? decoded.focus : input.focus,
       exercises,
     };

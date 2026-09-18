@@ -29,14 +29,20 @@ function contextOf(options: {
   };
   return {
     getType: () => type,
-    getArgByIndex: (index: number) => (index === 2 ? { req: request } : undefined),
+    getArgByIndex: (index: number) =>
+      index === 2 ? { req: request } : undefined,
     switchToHttp: () => ({ getRequest: () => request }),
     switchToWs: () => ({ getClient: () => ({ data: {} }) }),
   } as unknown as ExecutionContext;
 }
 
 const member: Principal = { kind: 'user', id: 'user-1', role: 'user' };
-const machine: Principal = { kind: 'service', id: 'n8n', name: 'n8n', scopes: [] };
+const machine: Principal = {
+  kind: 'service',
+  id: 'n8n',
+  name: 'n8n',
+  scopes: [],
+};
 
 function guardWith(limits: Record<string, number>) {
   const limiter = new RateLimiter();
@@ -77,8 +83,12 @@ describe('the counter', () => {
     const now = 1_000_000;
 
     limiter.take('rest', 'a', 1, MINUTE, now);
-    expect(limiter.take('rest', 'a', 1, MINUTE, now + MINUTE - 1).allowed).toBe(false);
-    expect(limiter.take('rest', 'a', 1, MINUTE, now + MINUTE).allowed).toBe(true);
+    expect(limiter.take('rest', 'a', 1, MINUTE, now + MINUTE - 1).allowed).toBe(
+      false,
+    );
+    expect(limiter.take('rest', 'a', 1, MINUTE, now + MINUTE).allowed).toBe(
+      true,
+    );
   });
 
   it('a refusal does not extend the window', () => {
@@ -88,15 +98,20 @@ describe('the counter', () => {
     const now = 1_000_000;
 
     limiter.take('rest', 'a', 1, MINUTE, now);
-    for (let i = 0; i < 50; i += 1) limiter.take('rest', 'a', 1, MINUTE, now + 1_000);
+    for (let i = 0; i < 50; i += 1)
+      limiter.take('rest', 'a', 1, MINUTE, now + 1_000);
 
-    expect(limiter.take('rest', 'a', 1, MINUTE, now + MINUTE).allowed).toBe(true);
+    expect(limiter.take('rest', 'a', 1, MINUTE, now + MINUTE).allowed).toBe(
+      true,
+    );
   });
 
   it('treats zero as unlimited, which is how an operator turns it off', () => {
     const limiter = new RateLimiter();
     for (let i = 0; i < 100; i += 1) {
-      expect(limiter.take('rest', 'a', 0, MINUTE, 1_000_000).allowed).toBe(true);
+      expect(limiter.take('rest', 'a', 0, MINUTE, 1_000_000).allowed).toBe(
+        true,
+      );
     }
   });
 
@@ -106,7 +121,8 @@ describe('the counter', () => {
     const limiter = new RateLimiter();
     const now = 1_000_000;
 
-    for (let i = 0; i < 500; i += 1) limiter.take('anonymous', `addr-${i}`, 5, MINUTE, now);
+    for (let i = 0; i < 500; i += 1)
+      limiter.take('anonymous', `addr-${i}`, 5, MINUTE, now);
     expect(limiter.size).toBe(500);
 
     // One call after the sweep interval, past every window's close.
@@ -122,7 +138,9 @@ describe('which limit applies', () => {
     const { guard } = guardWith({});
 
     expect(
-      guard.bucketFor(contextOf({ headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' } })),
+      guard.bucketFor(
+        contextOf({ headers: { 'x-forwarded-for': '203.0.113.9, 10.0.0.1' } }),
+      ),
     ).toEqual({
       name: 'anonymous',
       key: '203.0.113.9',
@@ -138,7 +156,10 @@ describe('which limit applies', () => {
 
     const direct = guard.bucketFor(contextOf({ ip: '10.0.0.7' }));
     const proxied = guard.bucketFor(
-      contextOf({ ip: '10.0.0.7', headers: { 'x-forwarded-for': '198.51.100.4' } }),
+      contextOf({
+        ip: '10.0.0.7',
+        headers: { 'x-forwarded-for': '198.51.100.4' },
+      }),
     );
 
     expect(direct?.key).toBe('10.0.0.7');
@@ -164,7 +185,8 @@ describe('which limit applies', () => {
       'limits.restPerMinute',
     );
     expect(
-      guard.bucketFor(contextOf({ type: 'graphql', principal: member }))?.setting,
+      guard.bucketFor(contextOf({ type: 'graphql', principal: member }))
+        ?.setting,
     ).toBe('limits.graphqlPerMinute');
   });
 });
@@ -179,7 +201,10 @@ describe('the guard', () => {
 
     await expect(guard.canActivate(context)).rejects.toMatchObject({
       status: 429,
-      response: { code: 'too_many_requests', retryAfterSeconds: expect.any(Number) },
+      response: {
+        code: 'too_many_requests',
+        retryAfterSeconds: expect.any(Number),
+      },
     });
   });
 
@@ -215,7 +240,9 @@ describe('the guard', () => {
     } as unknown as SettingsService;
     const guard = new RateLimitGuard(limiter, settings);
 
-    await expect(guard.canActivate(contextOf({ principal: member }))).resolves.toBe(true);
+    await expect(
+      guard.canActivate(contextOf({ principal: member })),
+    ).resolves.toBe(true);
   });
 
   it('never counts a socket message, which the gateway counts itself', async () => {
@@ -224,7 +251,9 @@ describe('the guard', () => {
     const { guard } = guardWith({ 'limits.socketPerMinute': 0 });
     const ws = {
       getType: () => 'ws',
-      switchToWs: () => ({ getClient: () => ({ data: { principal: member } }) }),
+      switchToWs: () => ({
+        getClient: () => ({ data: { principal: member } }),
+      }),
     } as unknown as ExecutionContext;
 
     const bucket = vi.spyOn(guard, 'bucketFor');

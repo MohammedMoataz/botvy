@@ -88,9 +88,9 @@ export class TrainingDayTraining extends DayTrainingPort {
   async trainingOn(userId: string, date: string): Promise<DayTraining | null> {
     const rows = await this.sessions.everythingOnDate(userId, date);
     const trained = rows.find(
-      (session) => session.status === 'planned' || session.status === 'completed',
+      (session) =>
+        session.status === 'planned' || session.status === 'completed',
     );
     return trained ? { sport: trained.sport, title: trained.title } : null;
   }
 }
-

@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { NudgeService } from '../../../../ws/nudge.service.js';
-import type { Conversation, ConversationKind } from '../../domain/conversation.aggregate.js';
+import type {
+  Conversation,
+  ConversationKind,
+} from '../../domain/conversation.aggregate.js';
 import {
   ConversationRepository,
   MessageRepository,
@@ -186,9 +189,9 @@ export class AppendMessageHandler {
         clientId: input.clientId ?? null,
         composedAt: input.composedAt ?? null,
         at: input.at,
-              usage: input.usage ?? null,
+        usage: input.usage ?? null,
         intent: input.intent ?? null,
-});
+      });
 
       // The message and the touch in one transaction. A crash between them
       // would leave a message the chat list cannot order, because

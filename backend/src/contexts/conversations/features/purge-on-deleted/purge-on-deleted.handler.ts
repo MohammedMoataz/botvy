@@ -58,35 +58,37 @@ export class ConversationsPurgeOnDeletedHandler {
       return 'nothing-to-do';
     }
 
-    const [messages, conversations, questions] = await this.uow.run(async () => {
-      // Messages before conversations, mirroring the dependency direction: a
-      // message names the conversation it belongs to. Nothing observes the
-      // intermediate state inside one transaction, but a future reader looking
-      // for which owns which should find one answer, not two.
-      const removedMessages = await this.messages.removeAllFor(userId);
-      const removedConversations =
-        await this.conversations.removeAllFor(userId);
-      // Last, and unconditional. The counter is not a row anybody counts — it
-      // is the sequence's memory, and it has to go whether or not the two above
-      // found anything, because a partly purged member from an earlier failed
-      // delivery would otherwise keep theirs forever.
-      await this.seq.reset(userId);
-      /*
-       * And the member's own quick questions, which this handler was missing.
-       *
-       * The fourth collection this context owns, and the easiest to forget
-       * because nothing else reads it: a deleted member's chips would have
-       * outlived them, referencing a `userId` nothing could resolve. That is a
-       * privacy leak of exactly the kind the purge exists to prevent — a
-       * question somebody wrote is a sentence they wrote.
-       *
-       * The seeded globals are untouched. `removeAllFor` filters on this
-       * member's id, and a global carries `null`, so the filter cannot reach
-       * them — by the shape of the query rather than by a guard.
-       */
-      const removedQuestions = await this.questions.removeAllFor(userId);
-      return [removedMessages, removedConversations, removedQuestions];
-    });
+    const [messages, conversations, questions] = await this.uow.run(
+      async () => {
+        // Messages before conversations, mirroring the dependency direction: a
+        // message names the conversation it belongs to. Nothing observes the
+        // intermediate state inside one transaction, but a future reader looking
+        // for which owns which should find one answer, not two.
+        const removedMessages = await this.messages.removeAllFor(userId);
+        const removedConversations =
+          await this.conversations.removeAllFor(userId);
+        // Last, and unconditional. The counter is not a row anybody counts — it
+        // is the sequence's memory, and it has to go whether or not the two above
+        // found anything, because a partly purged member from an earlier failed
+        // delivery would otherwise keep theirs forever.
+        await this.seq.reset(userId);
+        /*
+         * And the member's own quick questions, which this handler was missing.
+         *
+         * The fourth collection this context owns, and the easiest to forget
+         * because nothing else reads it: a deleted member's chips would have
+         * outlived them, referencing a `userId` nothing could resolve. That is a
+         * privacy leak of exactly the kind the purge exists to prevent — a
+         * question somebody wrote is a sentence they wrote.
+         *
+         * The seeded globals are untouched. `removeAllFor` filters on this
+         * member's id, and a global carries `null`, so the filter cannot reach
+         * them — by the shape of the query rather than by a guard.
+         */
+        const removedQuestions = await this.questions.removeAllFor(userId);
+        return [removedMessages, removedConversations, removedQuestions];
+      },
+    );
 
     if (messages === 0 && conversations === 0 && questions === 0) {
       return 'nothing-to-do';

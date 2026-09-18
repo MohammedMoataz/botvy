@@ -66,9 +66,18 @@ export class PurgeTrainingTombstonesHandler {
    */
   async purgeTombstones(before: Date, userId?: string): Promise<number> {
     return this.uow.run(async () => {
-      const sessions = await this.sessions.purgeTombstonesBefore(before, userId);
-      const programs = await this.programs.purgeTombstonesBefore(before, userId);
-      const workouts = await this.workouts.purgeTombstonesBefore(before, userId);
+      const sessions = await this.sessions.purgeTombstonesBefore(
+        before,
+        userId,
+      );
+      const programs = await this.programs.purgeTombstonesBefore(
+        before,
+        userId,
+      );
+      const workouts = await this.workouts.purgeTombstonesBefore(
+        before,
+        userId,
+      );
       const total = sessions + programs + workouts;
 
       if (total > 0) {

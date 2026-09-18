@@ -456,7 +456,10 @@ describe('profile query', () => {
     query = new ProfileQueryHandler(
       profiles,
       preferences,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     );
     await new BootstrapOnRegisteredHandler(
       uow,

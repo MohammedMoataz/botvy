@@ -204,7 +204,10 @@ export class Session extends AggregateRoot<string> {
         changed.push('sport');
       }
     }
-    if (patch.plannedAt !== undefined && patch.plannedAt.getTime() !== this.plannedAt.getTime()) {
+    if (
+      patch.plannedAt !== undefined &&
+      patch.plannedAt.getTime() !== this.plannedAt.getTime()
+    ) {
       this.plannedAt = patch.plannedAt;
       changed.push('plannedAt');
     }
@@ -441,12 +444,7 @@ export class Session extends AggregateRoot<string> {
     this.weekIndex = filling.weekIndex;
     this.exercises = validatedExercises(filling.exercises);
     this.updatedAt = new Date();
-    this.raise(
-      'training.SessionRescheduled',
-      'session',
-      this.alertFacts(),
-      at,
-    );
+    this.raise('training.SessionRescheduled', 'session', this.alertFacts(), at);
   }
 
   /**
@@ -490,10 +488,7 @@ export class Session extends AggregateRoot<string> {
     this.raise('training.SessionRescheduled', 'session', this.alertFacts(), at);
   }
 
-  applyWorkout(
-    exercises: Exercise[],
-    nextId: () => string,
-  ): void {
+  applyWorkout(exercises: Exercise[], nextId: () => string): void {
     this.exercises = validatedExercises(
       exercises.map((exercise) => ({
         ...exercise,
@@ -561,12 +556,7 @@ export class Session extends AggregateRoot<string> {
   }
 
   private announceScheduled(at: Date): void {
-    this.raise(
-      'training.SessionScheduled',
-      'session',
-      this.alertFacts(),
-      at,
-    );
+    this.raise('training.SessionScheduled', 'session', this.alertFacts(), at);
   }
 
   /**
@@ -674,7 +664,10 @@ function validatedExercises(exercises: Exercise[]): Exercise[] {
   });
 }
 
-function truncate(value: string | null | undefined, max: number): string | null {
+function truncate(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.slice(0, max);
   return trimmed === '' ? null : trimmed;

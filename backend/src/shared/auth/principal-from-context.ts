@@ -8,7 +8,9 @@ import type { Principal } from './principal.js';
  * that reached for the wrong one would silently see no principal and refuse
  * every call, or worse, allow one.
  */
-export function principalFrom(context: ExecutionContext): Principal | undefined {
+export function principalFrom(
+  context: ExecutionContext,
+): Principal | undefined {
   switch (context.getType<string>()) {
     case 'ws':
       return context.switchToWs().getClient()?.data?.principal;

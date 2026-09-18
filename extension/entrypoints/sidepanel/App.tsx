@@ -55,7 +55,9 @@ export const App = observer(function App() {
     chrome.runtime.onMessage.addListener(onMessage);
     // Tell the worker the panel is up, which is the third of the three ways
     // this surface catches up (the socket and the alarm are the others).
-    void chrome.runtime.sendMessage({ type: MESSAGES.syncNow }).catch(() => undefined);
+    void chrome.runtime
+      .sendMessage({ type: MESSAGES.syncNow })
+      .catch(() => undefined);
     return () => chrome.runtime.onMessage.removeListener(onMessage);
   }, [store]);
 
@@ -126,35 +128,42 @@ export const App = observer(function App() {
               screens: the panel is a column beside their work, and a form they
               have to navigate to is a form they use on the phone instead. */}
           <div className="panel-card">
-          <ul className="nav nav-pills nav-fill mb-2 small">
-            {(['task', 'reminder', 'meeting'] as const).map((kind) => (
-              <li className="nav-item" key={kind}>
+            <ul className="nav nav-pills nav-fill mb-2 small">
+              {(['task', 'reminder', 'meeting'] as const).map((kind) => (
+                <li className="nav-item" key={kind}>
+                  <button
+                    className={`nav-link py-1 ${adding === kind ? 'active' : ''}`}
+                    onClick={() => setAdding(kind)}
+                  >
+                    {store.t(`add.${kind}`)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            {adding === 'task' && (
+              <form
+                className="input-group input-group-sm mb-3"
+                onSubmit={onAdd}
+              >
+                <input
+                  className="form-control"
+                  placeholder={store.t('tasks.add')}
+                  aria-label={store.t('tasks.add')}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                />
                 <button
-                  className={`nav-link py-1 ${adding === kind ? 'active' : ''}`}
-                  onClick={() => setAdding(kind)}
+                  className="btn btn-primary"
+                  type="submit"
+                  disabled={!draft.trim()}
                 >
-                  {store.t(`add.${kind}`)}
+                  {store.t('tasks.addSubmit')}
                 </button>
-              </li>
-            ))}
-          </ul>
+              </form>
+            )}
 
-          {adding === 'task' && (
-            <form className="input-group input-group-sm mb-3" onSubmit={onAdd}>
-              <input
-                className="form-control"
-                placeholder={store.t('tasks.add')}
-                aria-label={store.t('tasks.add')}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              <button className="btn btn-primary" type="submit" disabled={!draft.trim()}>
-                {store.t('tasks.addSubmit')}
-              </button>
-            </form>
-          )}
-
-          {adding === 'reminder' && <AddReminder store={store} />}
+            {adding === 'reminder' && <AddReminder store={store} />}
           </div>
 
           {undoable && (
@@ -170,53 +179,61 @@ export const App = observer(function App() {
           )}
 
           <section className="panel-card">
-          <h1 className="panel-title">{store.t('tasks.today')}</h1>
+            <h1 className="panel-title">{store.t('tasks.today')}</h1>
 
-          {/* Drawn only once the member's own zone is known. An empty list would
+            {/* Drawn only once the member's own zone is known. An empty list would
               be a lie while it is not: without a zone there is no "today", and
               guessing at one from the browser is the mistake that shifted every
               extracted reminder by three hours in v1. */}
-          {store.timezone === null ? (
-            <p className="text-muted small">{store.t('tasks.waiting')}</p>
-          ) : store.today.length === 0 ? (
-            <p className="text-muted small">{store.t('tasks.empty')}</p>
-          ) : (
-            <ul className="list-unstyled task-list">
-              {store.today.map((task) => (
-                <li key={task.id} className="task-row">
-                  <input
-                    type="checkbox"
-                    className="form-check-input"
-                    checked={false}
-                    aria-label={`${store.t('tasks.complete')}: ${task.title}`}
-                    // A task whose create is still queued has no server row to
-                    // complete, so the route would answer 404. Disabled rather
-                    // than allowed to fail.
-                    disabled={task.pendingOp === 'create'}
-                    onChange={() => onComplete(task)}
-                  />
-                  <span
-                    className={`prio prio-${task.priority}`}
-                    aria-label={store.t('tasks.priority', { level: task.priority })}
-                    role="img"
-                  />
-                  <span className="task-title text-truncate">{task.title}</span>
-                  {task.label && (
-                    // The colour is the server's — labels are coloured from
-                    // `settings.labels.palette`, an operator knob, so a client
-                    // that shipped its own copy would be a hard-coded default.
-                    <span className="label-chip" style={{ background: task.label.color }}>
-                      {task.label.name}
+            {store.timezone === null ? (
+              <p className="text-muted small">{store.t('tasks.waiting')}</p>
+            ) : store.today.length === 0 ? (
+              <p className="text-muted small">{store.t('tasks.empty')}</p>
+            ) : (
+              <ul className="list-unstyled task-list">
+                {store.today.map((task) => (
+                  <li key={task.id} className="task-row">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={false}
+                      aria-label={`${store.t('tasks.complete')}: ${task.title}`}
+                      // A task whose create is still queued has no server row to
+                      // complete, so the route would answer 404. Disabled rather
+                      // than allowed to fail.
+                      disabled={task.pendingOp === 'create'}
+                      onChange={() => onComplete(task)}
+                    />
+                    <span
+                      className={`prio prio-${task.priority}`}
+                      aria-label={store.t('tasks.priority', {
+                        level: task.priority,
+                      })}
+                      role="img"
+                    />
+                    <span className="task-title text-truncate">
+                      {task.title}
                     </span>
-                  )}
-                  {task.pendingOp && (
-                    <span className="badge text-bg-light">{store.t('tasks.unsent')}</span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
+                    {task.label && (
+                      // The colour is the server's — labels are coloured from
+                      // `settings.labels.palette`, an operator knob, so a client
+                      // that shipped its own copy would be a hard-coded default.
+                      <span
+                        className="label-chip"
+                        style={{ background: task.label.color }}
+                      >
+                        {task.label.name}
+                      </span>
+                    )}
+                    {task.pendingOp && (
+                      <span className="badge text-bg-light">
+                        {store.t('tasks.unsent')}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {/* Today, then the week ahead. The meetings are expanded from their

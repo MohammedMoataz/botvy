@@ -284,7 +284,11 @@ describe('the member’s own meals (SC-002)', () => {
 
   it('withholds the whole day when every meal they own names an allergen', async () => {
     const other = 'member-3';
-    await b.add.handle(other, { id: newId(), name: 'almond cake', kind: 'any' });
+    await b.add.handle(other, {
+      id: newId(),
+      name: 'almond cake',
+      kind: 'any',
+    });
     b.foods.allergies = ['nuts'];
 
     const built = await b.build.handle(other, '2026-09-11', 'library');
@@ -419,9 +423,9 @@ describe('the day a member can change (FR-010, FR-011)', () => {
   });
 
   it('refuses to rebuild a day that has already happened', async () => {
-    await expect(b.days.regenerate(MEMBER, '2020-01-01')).rejects.toBeInstanceOf(
-      PastDayIsSettled,
-    );
+    await expect(
+      b.days.regenerate(MEMBER, '2020-01-01'),
+    ).rejects.toBeInstanceOf(PastDayIsSettled);
   });
 
   it('answers an unasked past day with nothing rather than inventing one', async () => {

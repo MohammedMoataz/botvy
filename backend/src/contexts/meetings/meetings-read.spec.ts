@@ -87,7 +87,10 @@ class FakeMemberContext extends MemberContextPort {
   }
 
   async alertPreferences(): Promise<MemberAlertPreferences> {
-    return { leadTimes: ['1h', '0m'], quietHours: { from: '22:00', to: '07:00' } };
+    return {
+      leadTimes: ['1h', '0m'],
+      quietHours: { from: '22:00', to: '07:00' },
+    };
   }
 }
 
@@ -159,7 +162,10 @@ interface Rig {
  * this file: the calendar and the alert saga read one method, so they cannot
  * disagree about where an occurrence is.
  */
-function rig(timezone = CAIRO, sessions: TrainingSessionsPort = new FakeTrainingSessions()): Rig {
+function rig(
+  timezone = CAIRO,
+  sessions: TrainingSessionsPort = new FakeTrainingSessions(),
+): Rig {
   const uow = new InMemoryUnitOfWork();
   const meetings = new InMemoryMeetingRepository(uow);
   const events = new InMemoryCalendarEventRepository(uow);
@@ -513,9 +519,7 @@ describe('training on the agenda (T641)', () => {
     );
 
     expect(days[0]!.items.map((item) => item.kind)).toEqual(['meeting']);
-    expect(
-      days[0]!.items.some((item) => item.kind === 'session'),
-    ).toBe(false);
+    expect(days[0]!.items.some((item) => item.kind === 'session')).toBe(false);
   });
 
   it('leaves out a session that falls outside the window asked about', async () => {
@@ -632,10 +636,7 @@ describe('the occurrence port and the agenda', () => {
     const first = at(date, '09:00', CAIRO);
     const meeting = await scheduleMeeting(app, {
       startAt: first,
-      recurrence: rule(
-        `FREQ=WEEKLY;BYDAY=${byDayOf(date)};COUNT=4`,
-        first,
-      ),
+      recurrence: rule(`FREQ=WEEKLY;BYDAY=${byDayOf(date)};COUNT=4`, first),
     });
 
     const week = 7 * 86_400_000;

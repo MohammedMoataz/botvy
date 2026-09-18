@@ -60,7 +60,8 @@ function at(hhmm: string, dayOffset: number): Date {
     CAIRO,
   );
   const instant = wallClockToUtc(`${date}T${hhmm}`, CAIRO);
-  if (!instant) throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
+  if (!instant)
+    throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
   return instant;
 }
 
@@ -123,7 +124,9 @@ interface Bench {
   alerts: InMemoryAlertRepository;
   member: StubMemberContext;
   saga: PlanAlertsSaga;
-  pending(userId?: string): Promise<
+  pending(
+    userId?: string,
+  ): Promise<
     Array<{ label: string; notifyAt: Date; title: string; deepLink: string }>
   >;
 }
@@ -304,10 +307,12 @@ describe('a session dealt with stops reminding (FR-014)', () => {
     const pending = await b.pending();
     expect(pending).toHaveLength(2);
     expect(
-      (await b.alerts.pendingForSource(MEMBER, {
-        kind: 'session',
-        id: 'session-2',
-      })).length,
+      (
+        await b.alerts.pendingForSource(MEMBER, {
+          kind: 'session',
+          id: 'session-2',
+        })
+      ).length,
     ).toBe(2);
   });
 

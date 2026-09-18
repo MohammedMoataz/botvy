@@ -12,7 +12,9 @@ import {
 } from './identity-outbox-forwarder.js';
 import { WebhookFanout, signPayload, type HttpPost } from './webhook-fanout.js';
 
-function pendingRow(overrides: Partial<PendingIdentityEvent> = {}): PendingIdentityEvent {
+function pendingRow(
+  overrides: Partial<PendingIdentityEvent> = {},
+): PendingIdentityEvent {
   return {
     id: 'evt-1',
     name: 'identity.UserRegistered',
@@ -75,7 +77,10 @@ describe('identity outbox forwarder', () => {
     const postgres = new FakeIdentityOutbox([pendingRow()]);
     const mongo = new FakeMongoOutbox();
 
-    const moved = await new IdentityOutboxForwarder(postgres, mongo).forwardOnce();
+    const moved = await new IdentityOutboxForwarder(
+      postgres,
+      mongo,
+    ).forwardOnce();
 
     expect(moved).toBe(1);
     expect(mongo.byId.get('evt-1')).toMatchObject({
@@ -87,7 +92,9 @@ describe('identity outbox forwarder', () => {
   });
 
   it("fills the Mongo row's context from the event name", () => {
-    expect(toDomainEvent(pendingRow({ name: 'identity.PasswordChanged' }))).toMatchObject({
+    expect(
+      toDomainEvent(pendingRow({ name: 'identity.PasswordChanged' })),
+    ).toMatchObject({
       name: 'identity.PasswordChanged',
       context: 'identity',
     });
@@ -113,7 +120,10 @@ describe('identity outbox forwarder', () => {
   });
 
   it('is a no-op on a second pass once everything is forwarded', async () => {
-    const postgres = new FakeIdentityOutbox([pendingRow(), pendingRow({ id: 'evt-2' })]);
+    const postgres = new FakeIdentityOutbox([
+      pendingRow(),
+      pendingRow({ id: 'evt-2' }),
+    ]);
     const mongo = new FakeMongoOutbox();
     const forwarder = new IdentityOutboxForwarder(postgres, mongo);
 
@@ -183,17 +193,34 @@ describe('webhook fanout', () => {
   };
 
   const subscriptions = [
-    { event: 'operations.Pinged', url: 'http://n8n:5678/webhook/botvy/pinged', enabled: true },
-    { event: 'operations.Pinged', url: 'http://n8n:5678/webhook/disabled', enabled: false },
-    { event: 'identity.UserRegistered', url: 'http://n8n:5678/webhook/other', enabled: true },
+    {
+      event: 'operations.Pinged',
+      url: 'http://n8n:5678/webhook/botvy/pinged',
+      enabled: true,
+    },
+    {
+      event: 'operations.Pinged',
+      url: 'http://n8n:5678/webhook/disabled',
+      enabled: false,
+    },
+    {
+      event: 'identity.UserRegistered',
+      url: 'http://n8n:5678/webhook/other',
+      enabled: true,
+    },
   ];
 
   it('delivers only to enabled subscriptions for that event', async () => {
     const { post, calls } = recordingPost();
 
-    const outcomes = await new WebhookFanout('a-secret', post).deliver(event, subscriptions);
+    const outcomes = await new WebhookFanout('a-secret', post).deliver(
+      event,
+      subscriptions,
+    );
 
-    expect(calls.map((call) => call.url)).toEqual(['http://n8n:5678/webhook/botvy/pinged']);
+    expect(calls.map((call) => call.url)).toEqual([
+      'http://n8n:5678/webhook/botvy/pinged',
+    ]);
     expect(outcomes).toEqual([
       { url: 'http://n8n:5678/webhook/botvy/pinged', ok: true, status: 200 },
     ]);
@@ -211,20 +238,27 @@ describe('webhook fanout', () => {
     const headers = calls[0]!.headers;
     expect(headers['x-botvy-event']).toBe('operations.Pinged');
     expect(headers['x-botvy-event-id']).toBe('evt-9');
-    expect(headers['x-botvy-signature']).toBe(signPayload('a-secret', calls[0]!.body));
+    expect(headers['x-botvy-signature']).toBe(
+      signPayload('a-secret', calls[0]!.body),
+    );
   });
 
   it('signs with the secret, so another secret does not verify', () => {
     const body = JSON.stringify(event);
 
-    expect(signPayload('a-secret', body)).not.toBe(signPayload('another-secret', body));
+    expect(signPayload('a-secret', body)).not.toBe(
+      signPayload('another-secret', body),
+    );
     expect(signPayload('a-secret', body)).toMatch(/^sha256=[0-9a-f]{64}$/);
   });
 
   it('reports a refusing endpoint as failed rather than throwing', async () => {
     const post: HttpPost = async () => ({ ok: false, status: 500 });
 
-    const outcomes = await new WebhookFanout('a-secret', post).deliver(event, subscriptions);
+    const outcomes = await new WebhookFanout('a-secret', post).deliver(
+      event,
+      subscriptions,
+    );
 
     expect(outcomes[0]).toMatchObject({ ok: false, status: 500 });
   });
@@ -234,7 +268,10 @@ describe('webhook fanout', () => {
       throw new Error('ECONNREFUSED');
     };
 
-    const outcomes = await new WebhookFanout('a-secret', post).deliver(event, subscriptions);
+    const outcomes = await new WebhookFanout('a-secret', post).deliver(
+      event,
+      subscriptions,
+    );
 
     expect(outcomes[0]).toMatchObject({ ok: false, error: 'ECONNREFUSED' });
   });

@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "files": ["dist", "tokens.json"],
+  "files": [
+    "dist",
+    "tokens.json"
+  ],
   "exports": {
     "./tokens.json": "./tokens.json",
     "./tokens.css": "./dist/tokens.css",
