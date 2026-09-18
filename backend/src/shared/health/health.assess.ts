@@ -132,7 +132,9 @@ export function assessHealth(inputs: HealthInputs): HealthReport {
 
   const anyStale = jobs.some((job) => job.stale);
   const status =
-    inputs.postgres && inputs.mongo && inputs.ollama && !anyStale ? 'ok' : 'degraded';
+    inputs.postgres && inputs.mongo && inputs.ollama && !anyStale
+      ? 'ok'
+      : 'degraded';
 
   return {
     status,

@@ -1,0 +1,17 @@
+# False positives for `node infra/scan-logs.mjs`, one regular expression per
+# line, matched against the whole log line. A line any of these matches is not
+# scanned at all, so keep each one tight enough that it cannot hide a real hit.
+#
+# Every entry here is also written down in `docs/security-review.md` with its
+# reason. An allow rule with no entry there is an unexplained exception, which
+# is the thing this file exists to prevent rather than to enable.
+
+# A gate mints its own accounts at `@example.test` / `@example.com`. They belong
+# to nobody, they exist for the length of one run, and the address is the only
+# way a gate log can say which account a line is about.
+(gate|p[0-9]+)-[0-9a-f]+@example.(test|com)
+\b(alice|bob)@example\.com\b
+
+# systemd unit names carry an `@`: `getty@tty1.service`, `user@1000.service`.
+# Docker build output prints them when an image installs a unit.
+[a-z0-9.-]+@[a-z0-9]*\.(service|socket|target|timer|mount|slice)\b

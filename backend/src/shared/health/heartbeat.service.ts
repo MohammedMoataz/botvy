@@ -49,20 +49,36 @@ export class HeartbeatService {
         everyMinutes: everyMinutes ?? null,
       });
       // The admin overview's tiles read this rather than polling.
-      this.nudge?.emitToOps('ops.heartbeat', { job, lastOkAt: ok ? now : null, ok });
+      this.nudge?.emitToOps('ops.heartbeat', {
+        job,
+        lastOkAt: ok ? now : null,
+        ok,
+      });
     } catch (cause) {
       // A heartbeat that cannot be written must not take down the job it is
       // reporting on — the job doing its work matters more than the record of it.
-      this.logger.warn(`could not stamp heartbeat for ${job}: ${(cause as Error).message}`);
+      this.logger.warn(
+        `could not stamp heartbeat for ${job}: ${(cause as Error).message}`,
+      );
     }
   }
 
   /** Times a piece of work and stamps whichever way it goes. */
-  async track<R>(job: string, work: () => Promise<R>, everyMinutes?: number): Promise<R> {
+  async track<R>(
+    job: string,
+    work: () => Promise<R>,
+    everyMinutes?: number,
+  ): Promise<R> {
     const started = Date.now();
     try {
       const result = await work();
-      await this.stamp(job, true, undefined, Date.now() - started, everyMinutes);
+      await this.stamp(
+        job,
+        true,
+        undefined,
+        Date.now() - started,
+        everyMinutes,
+      );
       return result;
     } catch (error) {
       await this.stamp(

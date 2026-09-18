@@ -49,6 +49,12 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# — except the soak record, which is evidence rather than output. P11's SC-007
+# is "seven consecutive daily samples, every one healthy", and the seven rows
+# *are* the record; `*.log` would have quietly kept them out of the repository
+# and left the criterion with nothing behind it.
+!ops/soak-*.log
+
 # Prisma-generated client output
 **/generated/prisma/
 

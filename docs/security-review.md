@@ -286,15 +286,76 @@ by anything; `password`, `refreshToken`, `accessToken`, `serviceToken`,
 planted in a seeded conversation before the sample began — which is how member
 *content* is searched for rather than guessed at.
 
-> **Not yet run.** The sample needs a day of logs from a running stack, and the
-> engine was unavailable while this phase was written. The grep set and the
-> planted-sentence method are settled; the run and its findings belong here.
+**Run on 18 September 2026**, against every container the compose project has,
+with the sentence *"the brass kettle on the third shelf whistles at dawn"*
+written into a task's title and notes and a conversation's title by a member
+registered for the purpose, before the sample window opened. The pass is
+`node infra/scan-logs.mjs --since <window> --canary "<sentence>"`, and it asks
+compose for the service list rather than carrying one — the first version named
+the blueprint's `edge` and `api`, which compose calls `caddy` and `backend`, so
+it reported cleanly on four containers and silently skipped the two loudest.
+
+### Finding — MongoDB's slow-query log printed member content · **fixed**
+
+Six hits, all in the `mongo` container, none anywhere else: the canary in a task
+title and its notes, and a member's email address inside an outbox payload.
+Every one came from the same line — `"msg":"Slow query"`, log id 51803 — which
+prints the **command document** of any operation over `slowms`, and on this
+host's disk an ordinary task write takes 400 ms.
+
+So a member's own words were in a log, and the log is the one place this phase
+promises they will not be.
+
+MongoDB Community cannot redact log contents — `redactClientLogData` is an
+Enterprise parameter — so the fix is the threshold: `mongod` now runs with
+`--quiet --slowms 30000`. Re-run afterwards with a fresh canary planted the same
+way: **0 hits across every container**, with the canary present in the corpus,
+which is what makes the zero mean something.
+
+**The residual, stated rather than implied:** an operation slower than thirty
+seconds still logs its command, and that command may carry member content. It is
+on the Owner's own host, readable by whoever can already read the volume, and it
+cannot be redacted without Enterprise. If that becomes unacceptable the answer is
+a log driver that filters, not a higher number.
+
+`gate-logs/T1112-scrub-*.log` holds both runs — the finding and the clean pass.
+The three allow rules in `infra/scan-logs.allow.txt` are the gate's own
+`@example.test` accounts, `alice`/`bob` seeds, and systemd unit names in build
+output (`getty@tty1.service`); each is a shape that cannot hide a real address.
 
 ## 9. Dependencies
 
 `pnpm audit` on every workspace, recorded per release rather than once.
 
-> **Not yet run** — same blocker as §8.
+**Run on 18 September 2026: 24 advisories, of which 9 were runtime and are
+closed.** The runtime ones were all transitive — `multer` (four, through
+`@nestjs/platform-express`), `qs` (two), `uuid`, `js-yaml` and `deepmerge-ts` —
+and `pnpm.overrides` in the root package now pins each to its patched range.
+The backend suite (1690), both typecheck projects, the build and
+`infra/verify-esm.mjs` are green on the pinned tree, which is the evidence that
+the pins are not a paper fix.
+
+### Accepted, with reasons
+
+**The dev toolchain: `vitest`, `vite`, `esbuild`, `@vitest/mocker`.** None of
+them is in either image — they are test and build tooling, and the critical one
+(arbitrary file read through the Vitest UI server) needs a UI server this
+repository never starts. Pinning `vite` to the patched range was *tried* and
+broke vitest outright (`__vite_ssr_exportName__ is not defined`, every suite
+red), because vitest 4 carries its own vite. So the decision is explicit: they
+stay as the tool ships them, and they are re-checked at each vitest major rather
+than forced.
+
+**`lodash`, two advisories.** The patched range the advisory names is `>=4.18.0`
+and that version does not exist for the package the warning is about — the
+affected copies are `4.17.23`, pulled by `@graphql-codegen/plugin-helpers`, a
+development dependency. Nothing in this repository imports lodash directly
+(grepped across `backend/`, `frontend/`, `extension/` and `packages/`), and
+`_.template` — the code-injection path — is not reachable from anything we call.
+`migrate-mongo` carries `4.18.1`, which is past the range.
+
+Re-check both lists at the next release; an advisory that has been accepted once
+is not accepted for ever.
 
 ## 10. The default administrator password
 

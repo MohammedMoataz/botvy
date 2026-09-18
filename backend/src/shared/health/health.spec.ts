@@ -14,7 +14,8 @@ function heartbeat(
   error: string | null = null,
   everyMinutes: number | null = null,
 ): Heartbeat {
-  const at = minutesAgo === null ? null : new Date(NOW.getTime() - minutesAgo * 60_000);
+  const at =
+    minutesAgo === null ? null : new Date(NOW.getTime() - minutesAgo * 60_000);
   return {
     job,
     lastRunAt: at ?? new Date(NOW.getTime() - 60_000),
@@ -98,12 +99,14 @@ describe('assessHealth', () => {
   it('lets the operator widen and narrow the nightly window', () => {
     const nightly = [heartbeat('backup', 30 * 60, null, NIGHTLY)];
 
-    expect(assessHealth({ ...healthy, heartbeats: nightly, backupStaleHours: 48 }).status).toBe(
-      'ok',
-    );
-    expect(assessHealth({ ...healthy, heartbeats: nightly, backupStaleHours: 24 }).status).toBe(
-      'degraded',
-    );
+    expect(
+      assessHealth({ ...healthy, heartbeats: nightly, backupStaleHours: 48 })
+        .status,
+    ).toBe('ok');
+    expect(
+      assessHealth({ ...healthy, heartbeats: nightly, backupStaleHours: 24 })
+        .status,
+    ).toBe('degraded');
   });
 
   /** A job slower than the nightly window is not stale by arithmetic. */
@@ -155,7 +158,10 @@ describe('assessHealth', () => {
     // by the operator's window, because it is the wider of the two.
     const report = assessHealth({
       ...healthy,
-      heartbeats: [heartbeat('rhythm.tick', 3 * 60), heartbeat('notifications.sweep', 3 * 60, null, 5)],
+      heartbeats: [
+        heartbeat('rhythm.tick', 3 * 60),
+        heartbeat('notifications.sweep', 3 * 60, null, 5),
+      ],
     });
 
     expect(report.jobs.map((job) => job.stale)).toEqual([true, true]);
@@ -199,16 +205,22 @@ describe('assessHealth', () => {
   });
 
   it('degrades when a store is down, and says which', () => {
-    expect(assessHealth({ ...healthy, mongo: false, heartbeats: [] })).toMatchObject({
+    expect(
+      assessHealth({ ...healthy, mongo: false, heartbeats: [] }),
+    ).toMatchObject({
       status: 'degraded',
       mongo: false,
       postgres: true,
     });
-    expect(assessHealth({ ...healthy, postgres: false, heartbeats: [] }).status).toBe('degraded');
+    expect(
+      assessHealth({ ...healthy, postgres: false, heartbeats: [] }).status,
+    ).toBe('degraded');
   });
 
   it('degrades when the model is unreachable', () => {
-    expect(assessHealth({ ...healthy, ollama: false, heartbeats: [] }).status).toBe('degraded');
+    expect(
+      assessHealth({ ...healthy, ollama: false, heartbeats: [] }).status,
+    ).toBe('degraded');
   });
 
   /**
@@ -222,17 +234,23 @@ describe('assessHealth', () => {
     });
 
     expect(report.status).toBe('degraded');
-    expect(report.jobs.find((job) => job.job === 'outbox.relay')?.stale).toBe(true);
+    expect(report.jobs.find((job) => job.job === 'outbox.relay')?.stale).toBe(
+      true,
+    );
     expect(report.jobs.find((job) => job.job === 'ping')?.stale).toBe(false);
   });
 
   it('reads the staleness window from the setting rather than a constant', () => {
     const quiet = [heartbeat('outbox.relay', 20)];
 
-    expect(assessHealth({ ...healthy, heartbeats: quiet, staleAfterMinutes: 15 }).status).toBe(
-      'degraded',
-    );
-    expect(assessHealth({ ...healthy, heartbeats: quiet, staleAfterMinutes: 30 }).status).toBe('ok');
+    expect(
+      assessHealth({ ...healthy, heartbeats: quiet, staleAfterMinutes: 15 })
+        .status,
+    ).toBe('degraded');
+    expect(
+      assessHealth({ ...healthy, heartbeats: quiet, staleAfterMinutes: 30 })
+        .status,
+    ).toBe('ok');
   });
 
   /** "No news" from a job that has never worked is the worst thing to call healthy. */
@@ -243,7 +261,10 @@ describe('assessHealth', () => {
     });
 
     expect(report.status).toBe('degraded');
-    expect(report.jobs[0]).toMatchObject({ stale: true, lastError: 'model unavailable' });
+    expect(report.jobs[0]).toMatchObject({
+      stale: true,
+      lastError: 'model unavailable',
+    });
   });
 
   /**
@@ -251,7 +272,11 @@ describe('assessHealth', () => {
    * this reports the fact without dragging the status down with it.
    */
   it('reports push as unconfigured without degrading anything', () => {
-    const report = assessHealth({ ...healthy, pushConfigured: false, heartbeats: [] });
+    const report = assessHealth({
+      ...healthy,
+      pushConfigured: false,
+      heartbeats: [],
+    });
 
     expect(report).toMatchObject({ status: 'ok', pushConfigured: false });
   });
@@ -259,10 +284,18 @@ describe('assessHealth', () => {
   it('lists jobs in a stable order so the overview does not shuffle', () => {
     const report = assessHealth({
       ...healthy,
-      heartbeats: [heartbeat('ping', 1), heartbeat('outbox.relay', 1), heartbeat('knowledge.ingest', 1)],
+      heartbeats: [
+        heartbeat('ping', 1),
+        heartbeat('outbox.relay', 1),
+        heartbeat('knowledge.ingest', 1),
+      ],
     });
 
-    expect(report.jobs.map((job) => job.job)).toEqual(['knowledge.ingest', 'outbox.relay', 'ping']);
+    expect(report.jobs.map((job) => job.job)).toEqual([
+      'knowledge.ingest',
+      'outbox.relay',
+      'ping',
+    ]);
   });
 });
 
@@ -282,11 +315,16 @@ describe('HeartbeatService', () => {
   it('records a success and tells the ops room', async () => {
     const repository = new RecordingHeartbeats();
     const emitted: Array<{ event: string; payload: unknown }> = [];
-    const nudge: OpsNudge = { emitToOps: (event, payload) => emitted.push({ event, payload }) };
+    const nudge: OpsNudge = {
+      emitToOps: (event, payload) => emitted.push({ event, payload }),
+    };
 
     await new HeartbeatService(repository, nudge).stamp('outbox.relay', true);
 
-    expect(repository.stamps[0]).toMatchObject({ job: 'outbox.relay', lastError: null });
+    expect(repository.stamps[0]).toMatchObject({
+      job: 'outbox.relay',
+      lastError: null,
+    });
     expect(repository.stamps[0]?.lastOkAt).not.toBeNull();
     expect(emitted[0]?.event).toBe('ops.heartbeat');
   });
@@ -294,7 +332,11 @@ describe('HeartbeatService', () => {
   it('records a failure with its reason and no success time', async () => {
     const repository = new RecordingHeartbeats();
 
-    await new HeartbeatService(repository).stamp('outbox.relay', false, 'change stream closed');
+    await new HeartbeatService(repository).stamp(
+      'outbox.relay',
+      false,
+      'change stream closed',
+    );
 
     expect(repository.stamps[0]).toMatchObject({
       lastOkAt: null,
@@ -310,7 +352,9 @@ describe('HeartbeatService', () => {
     const repository = new RecordingHeartbeats();
     repository.failStamp = true;
 
-    await expect(new HeartbeatService(repository).stamp('ping', true)).resolves.toBeUndefined();
+    await expect(
+      new HeartbeatService(repository).stamp('ping', true),
+    ).resolves.toBeUndefined();
   });
 
   it('times tracked work and stamps it either way', async () => {
@@ -318,9 +362,11 @@ describe('HeartbeatService', () => {
     const service = new HeartbeatService(repository);
 
     await service.track('ping', async () => 'done');
-    await service.track('ping', async () => {
-      throw new Error('boom');
-    }).catch(() => undefined);
+    await service
+      .track('ping', async () => {
+        throw new Error('boom');
+      })
+      .catch(() => undefined);
 
     expect(repository.stamps).toHaveLength(2);
     expect(repository.stamps[0]?.lastError).toBeNull();
@@ -333,6 +379,8 @@ describe('HeartbeatService', () => {
       throw new Error('relay died');
     });
 
-    await expect(service.track('outbox.relay', failing)).rejects.toThrow('relay died');
+    await expect(service.track('outbox.relay', failing)).rejects.toThrow(
+      'relay died',
+    );
   });
 });
