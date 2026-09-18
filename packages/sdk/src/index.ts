@@ -89,8 +89,15 @@ export {
   type DayWindow,
 } from './day.js';
 export {
-  TasksStore,
+  compareTasksIn,
   localDay,
+  matchesTaskView,
+  taskView,
+  taskViewDay,
+  type TaskViewDay,
+} from './taskViews.js';
+export {
+  TasksStore,
   type CompleteTaskAck,
   type CreateTaskAck,
   type LabelSnapshot,
@@ -118,6 +125,7 @@ export {
   type NewMeeting,
 } from './meetings-store.js';
 export {
+  canExpandRule,
   expandOccurrences,
   wallClockToUtc,
   type MeetingLocation,

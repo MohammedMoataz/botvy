@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canExpandRule,
   expandOccurrences,
   wallClockToUtc,
   type MeetingRecurrence,
@@ -265,6 +266,99 @@ describe('expandOccurrences', () => {
       'UTC',
     );
     expect(found).toHaveLength(1);
+  });
+});
+
+/**
+ * The subset's boundary, and that it is loud (E-014).
+ *
+ * The degradation itself is right — the server takes the same fallback for a
+ * rule `rrule` refuses, and a meeting the member can see and fix beats one that
+ * vanished. What was wrong was that it was *silent*: one occurrence is exactly
+ * what a non-repeating meeting looks like, so a weekly series whose rule this
+ * parser cannot read drew as a single Monday and a member reading their side
+ * panel would believe they were free on Friday.
+ *
+ * So the boundary is asked about rather than inferred. Nothing widens the
+ * parser here; the subset is still `FREQ` daily/weekly/monthly/yearly with
+ * `INTERVAL`, `COUNT`, `UNTIL`, `BYDAY` for weekly and `BYMONTHDAY` for
+ * monthly, which is everything the repeat picker and the chat can write.
+ */
+describe('canExpandRule', () => {
+  /**
+   * The rules this file's own fixtures use — which are the rules the product
+   * produces. Every one of them must stay readable: a parser change that made
+   * any of these degrade would otherwise show up as a plausible calendar rather
+   * than as a red line.
+   */
+  const READABLE = [
+    'FREQ=WEEKLY;BYDAY=MO;COUNT=6',
+    'FREQ=WEEKLY;BYDAY=MO;COUNT=3',
+    'FREQ=WEEKLY;BYDAY=MO;UNTIL=20260921T235959Z',
+    'FREQ=MONTHLY;BYMONTHDAY=31',
+    'FREQ=MONTHLY;BYMONTHDAY=-1',
+    'FREQ=DAILY',
+    'FREQ=DAILY;INTERVAL=2',
+    'FREQ=WEEKLY;BYDAY=MO,WE,FR',
+    'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU;WKST=MO',
+    'FREQ=YEARLY',
+    'RRULE:FREQ=WEEKLY;BYDAY=MO',
+  ];
+
+  for (const rrule of READABLE) {
+    it(`reads ${rrule}`, () => {
+      expect(canExpandRule(rrule)).toBe(true);
+    });
+  }
+
+  /**
+   * Each of these needs a part of RFC 5545 this file does not carry, and each
+   * would draw a *wrong* calendar if it were ignored rather than refused —
+   * `BYSETPOS=-1;BYDAY=FR` as every Friday rather than the last one.
+   */
+  const UNREADABLE = [
+    'FREQ=MONTHLY;BYDAY=FR;BYSETPOS=-1',
+    'FREQ=WEEKLY;BYWEEKNO=3',
+    'FREQ=MONTHLY;BYDAY=2TU',
+    'FREQ=HOURLY',
+    'FREQ=MONTHLY;BYMONTHDAY=1,15',
+    'not a rule at all',
+  ];
+
+  for (const rrule of UNREADABLE) {
+    it(`refuses ${rrule}`, () => {
+      expect(canExpandRule(rrule)).toBe(false);
+    });
+  }
+
+  /**
+   * The point of the whole thing: a caller can now tell the two apart.
+   *
+   * A weekly series the parser cannot read and a genuinely single meeting both
+   * expand to one occurrence — that is the degradation and it stays. What has
+   * changed is that `canExpandRule` separates them, which is what lets the
+   * panel say "this series cannot be shown here" instead of drawing the one.
+   */
+  it('tells an unreadable series apart from a single occurrence', () => {
+    const unreadable = rule({ rrule: 'FREQ=WEEKLY;BYSETPOS=-1;BYDAY=FR' });
+    const window = [
+      new Date('2026-09-01T00:00:00.000Z'),
+      new Date('2026-12-01T00:00:00.000Z'),
+    ] as const;
+
+    // Indistinguishable by their output alone — one occurrence either way.
+    expect(
+      expandOccurrences(
+        meeting({ recurrence: unreadable }),
+        ...window,
+        'UTC',
+      ),
+    ).toHaveLength(1);
+    expect(expandOccurrences(meeting(), ...window, 'UTC')).toHaveLength(1);
+
+    // And distinguishable by asking, which is what a calendar has to do.
+    expect(canExpandRule(unreadable.rrule)).toBe(false);
+    expect(canExpandRule('FREQ=WEEKLY;BYDAY=FR')).toBe(true);
   });
 });
 

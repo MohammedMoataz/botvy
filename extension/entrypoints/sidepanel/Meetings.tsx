@@ -38,22 +38,49 @@ export const Meetings = observer(function Meetings({
           v1. */}
       {store.timezone === null ? (
         <p className="text-muted small">{store.t('meetings.waiting')}</p>
-      ) : store.nextSevenDays.length === 0 ? (
-        <p className="text-muted small">{store.t('meetings.empty')}</p>
       ) : (
-        <ul className="list-unstyled">
-          {store.nextSevenDays.map((entry) => (
-            <MeetingRowView
-              // An occurrence has no id of its own — it is derived from the
-              // rule — so the meeting and the moment the rule produced are its
-              // identity. `originalStart` rather than `startAt`, because a
-              // moved occurrence keeps its key and only its moment changes.
-              key={`${entry.meetingId}:${entry.occurrence.originalStart}`}
-              entry={entry}
-              store={store}
-            />
-          ))}
-        </ul>
+        <>
+          {store.nextSevenDays.length === 0 &&
+          store.unreadableSeries.length === 0 ? (
+            <p className="text-muted small">{store.t('meetings.empty')}</p>
+          ) : (
+            <ul className="list-unstyled">
+              {store.nextSevenDays.map((entry) => (
+                <MeetingRowView
+                  // An occurrence has no id of its own — it is derived from the
+                  // rule — so the meeting and the moment the rule produced are
+                  // its identity. `originalStart` rather than `startAt`, because
+                  // a moved occurrence keeps its key and only its moment
+                  // changes.
+                  key={`${entry.meetingId}:${entry.occurrence.originalStart}`}
+                  entry={entry}
+                  store={store}
+                />
+              ))}
+            </ul>
+          )}
+
+          {/* A series whose repeat rule this build cannot read (E-014). Named
+              rather than drawn: the SDK would answer it with the series' single
+              first occurrence, which is exactly what a meeting that happens
+              once looks like — so a weekly series would render as one Monday
+              and the member would believe they are free on Friday. Being told
+              the dates are missing is the only honest version. Empty on every
+              installation as it stands, because nothing writes such a rule
+              yet. */}
+          {store.unreadableSeries.length > 0 && (
+            <ul className="list-unstyled">
+              {store.unreadableSeries.map((meeting) => (
+                <li key={meeting.id} className="py-1 border-bottom">
+                  <div className="text-truncate">{meeting.title}</div>
+                  <div className="text-warning small">
+                    {store.t('meetings.unreadable')}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       {showForm && <QuickAdd store={store} />}

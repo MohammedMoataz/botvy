@@ -26,6 +26,23 @@
  * meeting the member can see and fix beats a meeting that vanished, and it is
  * the same fallback the server takes for a rule `rrule` itself refuses.
  *
+ * ## And the degradation is loud (E-014)
+ *
+ * That fallback used to be indistinguishable, from outside this file, from a
+ * series that genuinely has one occurrence — so a weekly meeting whose rule
+ * this parser cannot read would draw as a single Monday and a member would
+ * read their side panel and believe they are free on Friday. A wrong calendar
+ * is worse than a missing one, and it is worse still when nothing says so.
+ *
+ * `canExpandRule` is the answer: a caller asks before it draws, and the panel
+ * says "this series cannot be shown here" rather than drawing a plausible
+ * wrong week. The console gets a warning once per rule besides, so a future
+ * picker option — `BYSETPOS=-1;BYDAY=FR`, an external calendar import, a rule
+ * repaired by hand — fails visibly on its first render rather than quietly for
+ * as long as nobody compares the panel with the phone. The parser itself is
+ * unchanged and the subset is still the documented one: widening it is the
+ * other enhancement, and it is not this one.
+ *
  * Everything below that is not the parser — the two zones, the wall-clock
  * expansion, exdates matched to the minute, overrides keyed by `originalStart`,
  * orphan overrides, the window test — mirrors the server case for case, because
@@ -149,6 +166,9 @@ export function expandOccurrences(
 
   const recurrence = item.recurrence;
   const rule = parseRule(recurrence.rrule);
+  // Said once per rule, and said here rather than only in `canExpandRule`, so
+  // that a caller which never asked still leaves a trace of the degradation.
+  if (!rule) warnUnreadable(recurrence.rrule);
 
   /*
    * The window is widened before the rule is asked, and narrowed after.
@@ -179,7 +199,10 @@ export function expandOccurrences(
         .filter((instant): instant is Date => instant !== null)
     : // A rule nothing here can read still shows its first occurrence, exactly
       // as the server does for a rule `rrule` refuses. The stored instant, not
-      // a re-read one, so the two agree field for field.
+      // a re-read one, so the two agree field for field. Loudly, though: a
+      // caller drawing a calendar should have asked `canExpandRule` and said so
+      // to the member, and the warning above is how the one that did not finds
+      // out.
       [startAt];
 
   const overrides = overridesByKey(recurrence.overrides ?? []);
@@ -254,6 +277,30 @@ function orphansIntoWindow(
  *
  * Returns null for anything unparseable, which the caller treats as "no time".
  */
+/**
+ * Whether this file can read a rule at all — ask before drawing it.
+ *
+ * `expandOccurrences` answers a rule it cannot parse with the series' single
+ * first occurrence, which is the server's own fallback and is the right thing
+ * for it to return. It is the wrong thing for a *surface* to draw unannounced:
+ * one occurrence is exactly what a genuinely non-repeating meeting looks like,
+ * so the whole rest of the series disappears with nothing to mark its absence.
+ *
+ * A caller that draws a calendar therefore asks this first and tells the member
+ * the series cannot be shown here. A caller that only needs "the next thing" —
+ * or one for which the first occurrence is a useful floor — can ignore it and
+ * take the degradation.
+ *
+ * Takes the rule string rather than a `Repeating` so it can be asked of a rule
+ * that is not attached to anything yet. A series with no recurrence at all is
+ * not this function's business: it has no rule to fail on.
+ */
+export function canExpandRule(rrule: string): boolean {
+  if (parseRule(rrule) !== null) return true;
+  warnUnreadable(rrule);
+  return false;
+}
+
 export function wallClockToUtc(
   wallClock: string,
   timeZone: string,
@@ -321,6 +368,27 @@ const MINUTE_MS = 60_000;
 const STEP_CAP = 20_000;
 
 const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+/**
+ * Rules already complained about, so a re-render is not a second line.
+ *
+ * ponytail: unbounded, and bounded in practice by the number of *distinct*
+ * unreadable rules one page holds — which is zero for every build that ships
+ * today, because nothing can write one. If that ever stops being true, the
+ * upgrade is a cap, not a cleverer key.
+ */
+const warned = new Set<string>();
+
+/** One console line per unreadable rule. Silent in a runtime with no console. */
+function warnUnreadable(rrule: string): void {
+  if (warned.has(rrule)) return;
+  warned.add(rrule);
+  console.warn(
+    `[botvy] this build cannot read the repeat rule "${rrule}", so the series ` +
+      'is shown as a single occurrence. Surfaces drawing a calendar should ' +
+      'call canExpandRule and tell the member instead.',
+  );
+}
 
 /**
  * The parts of RFC 5545 the repeat picker can produce. Anything else makes

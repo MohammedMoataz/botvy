@@ -6,10 +6,11 @@ import {
   ProfileStore,
   SyncStore,
   TokenStore,
+  canExpandRule,
   expandOccurrences,
-  localDay,
   meetingAsRepeating,
   newId,
+  taskView,
   wallClockToUtc,
   type CalendarEventRow,
   type CompleteTaskAck,
@@ -415,40 +416,24 @@ export class PanelStore {
   /**
    * Today's list — open tasks due on or before the member's today.
    *
-   * A mirror of `TasksStore.view('today', …)` in the SDK, which is the shared
-   * definition and would be called here if it could be. It cannot: its rows
-   * live in a `MemorySyncTable` it constructs itself and does not accept, so
-   * there is no way to point it at Dexie, and the rows the pull actually sends
-   * are `PanelTaskRow` rather than the `TaskRow` it is typed for. Both are
-   * recorded as defects rather than worked around silently.
+   * **The definition is the SDK's, not this file's.** It used to be restated
+   * here, because `TasksStore.view('today', …)` reads rows out of a
+   * `MemorySyncTable` it constructs itself and the panel's rows are in Dexie —
+   * which made this the fourth copy of the member's-day rule after the two
+   * server adapters and the store, and the expensive kind, since Today is a
+   * *rule* (today's tasks plus everything still open whose moment has passed)
+   * rather than a filter anyone re-derives correctly by reading it. That was
+   * E-011; `taskViews.ts` is the fix, and it takes whatever rows the caller
+   * holds, so the panel and the portal now apply one predicate.
    *
-   * The two rules that must not drift from the server's `taskPredicateFor` are
-   * therefore restated: **today includes the overdue ones** (`dueAt` before the
-   * *end* of today, not inside today) because a task the member has not dealt
-   * with is still theirs to deal with today; and the order is due date, then
-   * priority. Nothing here compares instants across a day boundary — `localDay`
-   * turns both sides into `YYYY-MM-DD` first, so a 23-hour spring-forward day
-   * needs no arithmetic and cannot be got wrong.
+   * The zone is the member's, from their profile, and there is no fallback to
+   * the browser's: without it there is no "today", and guessing is the mistake
+   * that shifted every extracted reminder by three hours in v1.
    */
   get today(): PanelTaskRow[] {
     const zone = this.timezone;
     if (!zone) return [];
-    const today = localDay(new Date(), zone);
-
-    return this.tasks
-      .filter(
-        (row) =>
-          row.deletedAt === null &&
-          row.status === 'open' &&
-          row.dueAt !== null &&
-          localDay(row.dueAt, zone) <= today,
-      )
-      .sort(
-        (left, right) =>
-          new Date(left.dueAt ?? 0).getTime() -
-            new Date(right.dueAt ?? 0).getTime() ||
-          left.priority - right.priority,
-      );
+    return taskView('today', this.tasks, { timezone: zone });
   }
 
   /**
@@ -462,14 +447,20 @@ export class PanelStore {
    * written to agree with the server's expander case for case: a panel showing
    * an occurrence the phone does not is worse than a panel showing none.
    *
-   * Cancelled, completed and deleted meetings are left out. That mirrors the
-   * aggregate, which produces no occurrences unless it is `scheduled` and
-   * live — and it is the same filter the alert saga gets its silence from, so a
-   * meeting the member cancelled is neither drawn here nor notified about.
+   * Cancelled, completed and deleted ones are left out by `liveMeetings`, for
+   * the reason recorded there.
    *
    * Drawn only once the member's own zone is known: without it there is no
    * "next seven days", and guessing at one from the browser is the mistake that
    * shifted every extracted reminder by three hours in v1.
+   *
+   * A series whose rule the SDK's parser cannot read is left out and reported
+   * by `unreadableSeries` instead. `expandOccurrences` would answer it with the
+   * series' single first occurrence — the server's own fallback, and the right
+   * answer for the SDK to give — but drawing that here is indistinguishable
+   * from a meeting that happens once, so a weekly series would render as one
+   * Monday and the member would read this panel and believe they are free on
+   * Friday (E-014). Saying so is the only honest option.
    */
   get nextSevenDays(): AgendaEntry[] {
     const zone = this.timezone;
@@ -478,8 +469,8 @@ export class PanelStore {
     const from = new Date();
     const to = new Date(from.getTime() + AGENDA_DAYS * 86_400_000);
 
-    return this.meetings
-      .filter((row) => row.deletedAt === null && row.status === 'scheduled')
+    return this.liveMeetings
+      .filter((row) => !row.recurrence || canExpandRule(row.recurrence.rrule))
       .flatMap((row) =>
         expandOccurrences(meetingAsRepeating(row), from, to, zone).map(
           (occurrence) => ({ meetingId: row.id, occurrence }),
@@ -490,6 +481,38 @@ export class PanelStore {
           new Date(left.occurrence.startAt).getTime() -
           new Date(right.occurrence.startAt).getTime(),
       );
+  }
+
+  /**
+   * The series this build cannot draw, so the panel can say so (E-014).
+   *
+   * Nothing the product writes today produces such a rule — the repeat picker
+   * and the chat both write the subset the SDK parses — so this is empty on
+   * every installation as it stands. It stops being empty the moment anything
+   * writes a `BYSETPOS` rule, an external calendar is imported, or a row is
+   * repaired by hand, and the point is that the member is told on the first
+   * render rather than shown a plausible wrong week. `canExpandRule` also puts
+   * a line in the console, once per rule.
+   */
+  get unreadableSeries(): MeetingRow[] {
+    return this.liveMeetings.filter(
+      (row) => row.recurrence !== null && !canExpandRule(row.recurrence.rrule),
+    );
+  }
+
+  /**
+   * Meetings that are still the member's to attend.
+   *
+   * Cancelled, completed and deleted ones are left out. That mirrors the
+   * aggregate, which produces no occurrences unless it is `scheduled` and live,
+   * and it is the same filter the alert saga gets its silence from — so a
+   * meeting the member cancelled is neither drawn, nor notified about, nor
+   * complained about for having a rule nobody can read.
+   */
+  private get liveMeetings(): MeetingRow[] {
+    return this.meetings.filter(
+      (row) => row.deletedAt === null && row.status === 'scheduled',
+    );
   }
 
   t = (key: string, params?: Record<string, string | number>): string =>
