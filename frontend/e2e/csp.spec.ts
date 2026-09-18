@@ -21,7 +21,7 @@ test.skip(!BASE, 'set BOTVY_E2E_URL to run the policy suite');
  * `CSP_ENFORCE=on` for the installation — one line here, one line in `.env`.
  * Nothing else in this file changes.
  */
-const ENFORCED = false;
+const ENFORCED = true;
 
 const SENT = ENFORCED
   ? 'content-security-policy'

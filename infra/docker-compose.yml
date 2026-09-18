@@ -51,10 +51,12 @@ services:
       # A bare ":80" serves plain HTTP behind the tunnel, which terminates TLS.
       # Set it to a hostname to have Caddy get its own certificate instead.
       CADDY_SITE: ${CADDY_SITE:-:80}
-      # The content security policy is report-only until this says `on`
-      # (E-025). Read by the Caddyfile, which tells the web app which header
+      # The content security policy. `on` by default since it was verified
+      # against a real browser on every portal screen and the public page — nine
+      # pages, zero violations, in both modes (E-025). `off` sends it as
+      # report-only, which is the way back if a page ever needs one. Read by the Caddyfile, which tells the web app which header
       # name to send; see `frontend/middleware.ts` for the policy itself.
-      CSP_ENFORCE: ${CSP_ENFORCE:-off}
+      CSP_ENFORCE: ${CSP_ENFORCE:-on}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

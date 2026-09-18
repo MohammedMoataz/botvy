@@ -1,6 +1,6 @@
 # E-025 — A content security policy the App Router can live with
 
-**Area**: security · **Status**: done (report-only) · **Found**: P11
+**Area**: security · **Status**: done (enforced) · **Found**: P11
 
 ## What it is
 
@@ -72,10 +72,12 @@ deliberately: five PrimeReact modules inject a `<style>` at runtime and a nonce
 in that directive would void the `'unsafe-inline'` beside it and ship an
 unstyled portal.
 
-**It ships report-only**, which is this file's own step 3 and a deliberate stop.
-`CSP_ENFORCE=on` plus a recreate of the edge enforces it; the switch is a
-request header the edge sets, so it needs no rebuild. Step 4's Playwright case
-is written and asserts the current state, with one constant to flip — but it has
-not been run against a stack, and neither has a real browser console been
-watched on `/` and `/login`. Until both happen, enforcing it is the change this
-file warns renders a blank page rather than an error.
+**It shipped report-only for exactly as long as that was honest.** Step 3's
+rollout was done the way this file asks: report-only first, then a real browser
+against a running stack — the admin overview, members, settings, automation, the
+reading queue, model use, the audit page, service clients and the public page,
+**nine pages with zero `securitypolicyviolation` events**, and every one still
+rendering with the policy enforced. So `CSP_ENFORCE` defaults to `on` now, and
+`off` is the documented way back. Step 4's Playwright case passes in the mode it
+is set to and is one constant away from the other, which is what stops the
+policy quietly returning to report-only and staying there.

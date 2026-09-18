@@ -192,17 +192,17 @@ Use `https` wherever the browser can reach it. An extension talking to a plain
 
 ### `CSP_ENFORCE`
 
-The web app ships a content security policy as
-`Content-Security-Policy-Report-Only`: the header is there, the browser reports
-violations to its own console, and nothing is blocked. `CSP_ENFORCE=on` in
-`.env`, then `docker compose up -d caddy`, turns it into the enforcing header —
-the edge tells the app which name to send, so the switch needs no rebuild.
+The web app sends a content security policy, enforced. It was verified in a real
+browser across every portal screen and the public page — nine pages, zero
+violations — in both modes, which is the check that had been owed since the
+policy was written.
 
-Enforce it only after watching a real browser console on `/` and `/login` with
-no violations, and flip `ENFORCED` in `frontend/e2e/csp.spec.ts` in the same
-change so the suite is checking the state you are actually in. A wrong policy
-on the App Router renders a blank page rather than an error, which is the whole
-reason it does not start enforced.
+`CSP_ENFORCE=off` in `.env` and `docker compose up -d caddy` sends it as
+`Content-Security-Policy-Report-Only` instead: the header is there, the browser
+reports violations to its own console, and nothing is blocked. That is the way
+back if a page you add needs one — a wrong policy on the App Router renders a
+blank page rather than an error. Flip `ENFORCED` in `frontend/e2e/csp.spec.ts`
+in the same change, so the suite is checking the state you are actually in.
 
 ## The tunnel
 

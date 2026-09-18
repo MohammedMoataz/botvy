@@ -54,7 +54,7 @@ Set by `helmet` in the API and by Caddy at the edge.
 | `Strict-Transport-Security` | helmet | set by default on HTTPS responses |
 | `Content-Security-Policy` | web app only | report-only by default; see below |
 
-### Finding — no content security policy · **closed, report-only pending one flip**
+### Finding — no content security policy · **closed, and enforced**
 
 `contentSecurityPolicy: false` in helmet stays, and that is not the gap: `/api/*`,
 `/graphql` and `/media` are JSON and images, where a script-source directive has

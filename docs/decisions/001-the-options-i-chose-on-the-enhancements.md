@@ -22,7 +22,7 @@ overridden silently is the thing this directory exists to prevent.
 | E-018 | The job declares its cadence when it stamps | Exporting the cadence beside each job's name constant, which points the health module at four contexts |
 | E-019 | `bootstrapped` on the auth responses | A retry inside a query handler, and on-demand row creation — two seeders for one document |
 | E-020 | A typed accessor keyed by field | The whole preferences view behind one port, which lets five contexts see every field |
-| E-025 | The policy on the edge, nonce from the middleware | Deleting `contentSecurityPolicy: false` from the API, which breaks the playground and covers no page |
+| E-025 | The policy on the edge, nonce from the middleware, **enforced** once nine pages had been watched in a real browser | Deleting `contentSecurityPolicy: false` from the API, which breaks the playground and covers no page |
 
 ## Where I overrode the file, and why
 
