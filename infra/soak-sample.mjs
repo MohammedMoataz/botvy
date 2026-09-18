@@ -19,16 +19,22 @@
  * Exit code is 0 for a healthy sample and 1 for anything else, so a scheduler
  * can fail loudly rather than appending quietly.
  */
-import { appendFile, mkdir } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 function parseArgs(argv) {
-  const args = { url: 'http://localhost/health', version: null, out: null };
+  const args = {
+    url: 'http://localhost/health',
+    version: null,
+    out: null,
+    force: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const value = argv[i + 1];
     if (argv[i] === '--url') ((args.url = value), (i += 1));
     else if (argv[i] === '--version') ((args.version = value), (i += 1));
     else if (argv[i] === '--out') ((args.out = value), (i += 1));
+    else if (argv[i] === '--force') args.force = true;
     else throw new Error(`unknown argument: ${argv[i]}`);
   }
   return args;
@@ -88,10 +94,33 @@ const row = [
   .join('  ');
 
 const out = args.out ?? `ops/soak-${version}.log`;
-await mkdir(dirname(out), { recursive: true });
-await appendFile(out, `${row}\n`, 'utf8');
 
-console.log(`${row}\n→ ${out}`);
+/*
+ * One row per day, so that counting rows is counting days.
+ *
+ * SC-007 is "seven consecutive daily samples, every one healthy", and the seven
+ * rows are the record — so a second sample on a day that already has one would
+ * make the record say something it does not mean. It is refused rather than
+ * appended, and `--force` is there for the case where the first row of a day
+ * was taken against the wrong system.
+ */
+const today = at.slice(0, 10);
+const alreadyToday =
+  !args.force &&
+  (await readFile(out, 'utf8')
+    .then((existing) => existing.includes(today))
+    .catch(() => false));
+
+if (alreadyToday) {
+  console.log(
+    `${today} already has a sample in ${out} — not appending a second.`,
+  );
+  console.log(row);
+} else {
+  await mkdir(dirname(out), { recursive: true });
+  await appendFile(out, `${row}\n`, 'utf8');
+  console.log(`${row}\n→ ${out}`);
+}
 /*
  * `exitCode`, not `process.exit`: Node on Windows prints an assertion from its
  * own event loop when the process is torn down with `fetch`'s handle still
