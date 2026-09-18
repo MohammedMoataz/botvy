@@ -21,7 +21,18 @@ test.skip(
   'set BOTVY_E2E_URL, BOTVY_E2E_EMAIL and BOTVY_E2E_PASSWORD to run the portal suite',
 );
 
-async function signIn(page: Page): Promise<void> {
+/**
+ * Signs in, and waits out the credential-stuffing limit rather than failing it.
+ *
+ * Every case here signs in as the same administrator, and
+ * `limits.anonymousPerMinute` is twenty — deliberately low, because sign-in,
+ * registration and the refresh exchange are the routes with no principal behind
+ * them. Nineteen cases in ninety seconds reaches it, so the suite was failing
+ * one case per run on a `429` that was the platform working exactly as it is
+ * meant to. Waiting the window out is the honest answer: the limit stays where
+ * an operator set it, and the suite stops reporting it as a defect.
+ */
+async function signIn(page: Page, secondAttempt = false): Promise<void> {
   await page.goto(`${BASE}/login`);
   // Bilingual, because the Arabic case signs in through this same helper and
   // the label there is `البريد الإلكتروني` — `/email/i` matched nothing and the
@@ -41,6 +52,16 @@ async function signIn(page: Page): Promise<void> {
     // the network rather than at the locator.
     page.getByRole('button', { name: /sign in|تسجيل الدخول/i }).click(),
   ]);
+  if (answer.status() === 429 && !secondAttempt) {
+    // The window is a minute. Sixty-five seconds, because a limiter that counts
+    // to the second and a test that waits exactly sixty is a race the test
+    // loses roughly half the time — and the case's own timeout has to make room
+    // for the wait, or the fix trades a 429 for a timeout.
+    test.setTimeout(150_000);
+    await page.waitForTimeout(65_000);
+    await signIn(page, true);
+    return;
+  }
   expect(answer.status()).toBe(200);
 
   await expect(page).toHaveURL(/\/overview/, { timeout: 15_000 });
