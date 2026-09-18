@@ -284,6 +284,28 @@ jobs:
                 { $set: { lastRunAt: longAgo, lastOkAt: longAgo, lastError: "seeded stale" } },
                 { upsert: true },
               );
+
+              // And lift the rate limits for the run.
+              //
+              // `limits.anonymousPerMinute` is twenty, deliberately: sign-in,
+              // registration and the refresh exchange are the routes with no
+              // principal behind them, and that is the credential-stuffing
+              // limit. A suite of twenty cases that each sign in as the same
+              // administrator reaches it, and then fails on a `429` that is the
+              // platform working — which is a red line that teaches whoever
+              // sees it to ignore red. Zero means unlimited, and it is set on
+              // the throwaway stack this job builds rather than in the product.
+              for (const key of [
+                "limits.anonymousPerMinute",
+                "limits.restPerMinute",
+                "limits.graphqlPerMinute",
+              ]) {
+                db.settings.updateOne(
+                  { _id: key },
+                  { $set: { value: 0, updatedAt: new Date(), updatedBy: "system" } },
+                  { upsert: true },
+                );
+              }
             '
 
       - name: The operator's acts
