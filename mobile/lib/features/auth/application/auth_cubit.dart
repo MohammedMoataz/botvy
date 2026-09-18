@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/api/api_client.dart';
@@ -20,6 +22,19 @@ enum AuthFailure {
 }
 
 enum AuthPhase { unknown, signedOut, working, signedIn }
+
+/// How long the phone waits for a new account's server-side records (E-019).
+///
+/// Registration commits the account and an outbox entry; the relay writes
+/// `profiles` and `user_preferences` on a later tick — about three seconds on
+/// the reference installation, and longer when the outbox is busy or the worker
+/// has just restarted. So this is a *budget*, not an expectation: the poll stops
+/// the moment the rows appear, and the ceiling is what stops a relay outage
+/// turning into a phone that never finishes signing in. Past it the member is
+/// let into the app, which will tell them honestly that something is missing,
+/// rather than held on a spinner that cannot end.
+const Duration kBootstrapPollInterval = Duration(milliseconds: 600);
+const int kBootstrapPollAttempts = 20;
 
 class AuthState {
   const AuthState({
@@ -187,7 +202,7 @@ class AuthCubit extends Cubit<AuthState> {
       await _db.setValue(DbKeys.userId, session.userId);
 
       // Before signedIn, deliberately. See the note on the class.
-      await _mirror.fill();
+      await _fillMirror(session);
 
       emit(
         AuthState(
@@ -236,6 +251,33 @@ class AuthCubit extends Cubit<AuthState> {
     final profile = await _mirror.readProfile();
     if (profile == null) return false;
     return profile.onboardingCompletedAt == null;
+  }
+
+  /// Fills the mirror, waiting out the bootstrap window if the server says so.
+  ///
+  /// `bootstrapped` is false for the seconds between an account being created
+  /// and the relay writing its `profiles` and `user_preferences` documents
+  /// (E-019). Onboarding is the first screen after registration and it patches
+  /// both, so a member who taps through fast used to send `PATCH /preferences`
+  /// into a 404 — and before that, `fill` cast a null profile to a `Map` and
+  /// threw a `TypeError` straight past the `ApiException` handler, which is the
+  /// only thing this cubit catches. So the wait is what makes the first-run path
+  /// work, not a nicety.
+  ///
+  /// No poll at all when the server says the records are there: a sign-in by a
+  /// returning member is the common case and must not pay for this. A `fill`
+  /// that fails anyway leaves the mirror empty, which `_needsOnboarding` already
+  /// reads as "do not trap them in a walkthrough whose writes cannot land".
+  Future<void> _fillMirror(Session session) async {
+    if (session.bootstrapped) {
+      await _mirror.fill();
+      return;
+    }
+
+    for (var attempt = 0; attempt < kBootstrapPollAttempts; attempt++) {
+      await Future<void>.delayed(kBootstrapPollInterval);
+      if (await _mirror.fill()) return;
+    }
   }
 
   /// This handset, as the server needs to know it.

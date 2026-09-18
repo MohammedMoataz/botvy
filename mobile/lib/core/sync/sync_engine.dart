@@ -469,9 +469,11 @@ class SyncEngine {
   ///   against a row it is never allowed to change it would retry for ever.
   /// * `gone` means there is nothing to edit. The local row goes.
   /// * `invalid` is a domain rule refusing the row itself — an empty title, a
-  ///   moment in the past. Its `server` field carries a *message*, not a row,
-  ///   so writing it through the row path would fill the table with nulls.
-  ///   The edit is kept and the pushing stops; the rejection is surfaced.
+  ///   moment in the past — or, with `code: deleted_row`, an edit onto a row
+  ///   somebody else deleted. Its `server` field carries a *message* in the
+  ///   first case and the server row in the second, so writing it through the
+  ///   row path would fill the table with nulls. The edit is kept and the
+  ///   pushing stops; the rejection is surfaced.
   Future<void> _applyRejection(_EntityApplier applier, Rejection r) async {
     switch (r.reason) {
       case 'gone':
@@ -481,6 +483,12 @@ class SyncEngine {
         // Straight to the cap rather than one strike: retrying an unchanged
         // row against an unchanged rule fails identically four more times, and
         // each of those is a round trip the member waits for.
+        //
+        // `deleted_row` takes this branch on purpose and is *not* written
+        // through the row path, even though it carries a server row. The
+        // tombstone is already on its way in the next pull, which is what will
+        // remove the local copy; until then the member keeps their words on
+        // screen beside the refusal instead of watching them vanish twice.
         await applier.block(_db, r.id, maxPushAttempts);
         return;
       default:
@@ -664,6 +672,7 @@ class Rejection {
     required this.entity,
     required this.id,
     required this.reason,
+    this.code,
     this.server,
   });
 
@@ -671,6 +680,7 @@ class Rejection {
     entity: json['entity'] as String? ?? '',
     id: json['id'] as String? ?? '',
     reason: json['reason'] as String? ?? 'invalid',
+    code: json['code'] as String?,
     server: json['server'],
   );
 
@@ -679,6 +689,20 @@ class Rejection {
 
   /// `stale` | `gone` | `protected` | `not_deleted` | `invalid`.
   final String reason;
+
+  /// Refines [reason], and absent for most refusals. `deleted_row` is the one
+  /// the phone branches on: an `update` pushed onto a row another device has
+  /// deleted. Unknown codes fall back to plain [reason] handling, which is why
+  /// this is a `String?` and not an enum — a server that learns a new code
+  /// must not break an older build.
+  final String? code;
+
+  /// An edit pushed onto a row somebody else deleted.
+  ///
+  /// The write will never be accepted while the row is a tombstone — `restore`
+  /// is the only way back — so this is the one refusal the member has to be
+  /// *told* about rather than shown a retry badge for.
+  bool get isDeletedRow => reason == 'invalid' && code == 'deleted_row';
 
   /// The server's own row, for the reasons that carry one. Untyped because an
   /// `invalid` puts a `{message}` here instead, which is exactly why
@@ -698,8 +722,17 @@ class Rejection {
     return Map<String, dynamic>.from(raw);
   }
 
-  /// What the server said, for a rejection the member has to see.
+  /// What the member has to see, for a rejection that carries it.
+  ///
+  /// Usually the domain rule's own words, out of the `{message}` an `invalid`
+  /// puts in `server`. [isDeletedRow] has no message there — it carries the
+  /// tombstone instead — so it answers here rather than in each feature's
+  /// refusal table, where four copies would be four chances to leave one
+  /// saying "Botvy refused that change" about a row that is simply deleted.
   String? get message {
+    if (isDeletedRow) {
+      return 'That was deleted on another device. Restore it to keep this change.';
+    }
     final raw = server;
     if (raw is Map && raw['message'] is String) return raw['message'] as String;
     return null;

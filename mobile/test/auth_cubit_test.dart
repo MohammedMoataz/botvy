@@ -11,6 +11,14 @@ class _Fake {
   final List<RequestOptions> calls = [];
   final Map<String, Object> replies = {};
 
+  /// How many GraphQL reads answer with no profile and no preferences before
+  /// the canned rows appear (E-019).
+  ///
+  /// That is what the server says for the seconds between an account being
+  /// created and the relay writing its two Mongo documents: the query resolves,
+  /// both fields are null, and nothing is wrong.
+  int emptyBootstrapReads = 0;
+
   void on(String method, String path, Object reply) {
     replies['$method $path'] = reply;
   }
@@ -18,6 +26,20 @@ class _Fake {
   Interceptor get interceptor => InterceptorsWrapper(
     onRequest: (options, handler) {
       calls.add(options);
+
+      if (emptyBootstrapReads > 0 && options.path.endsWith('/graphql')) {
+        emptyBootstrapReads -= 1;
+        return handler.resolve(
+          Response<dynamic>(
+            requestOptions: options,
+            statusCode: 200,
+            data: {
+              'data': {'profile': null, 'preferences': null},
+            },
+          ),
+        );
+      }
+
       final reply = replies['${options.method} ${options.path}'];
 
       if (reply is DioException) {
@@ -283,5 +305,51 @@ void main() {
 
     expect(cubit.state.isSignedIn, isTrue);
     expect(fake.calls.length, before);
+  });
+
+  /// E-019: registration commits the account and an outbox entry, and the relay
+  /// writes `profiles` and `user_preferences` on a later tick. Onboarding is
+  /// the very next screen and it patches both, so a member who taps through
+  /// fast used to be told their preference could not be saved — and before
+  /// that, the null profile was cast to a `Map` and threw a `TypeError` past
+  /// the one handler this cubit catches, reporting a failed sign-in for an
+  /// account that had been created.
+  test('a registration inside the bootstrap window waits for the rows', () async {
+    fake
+      ..on('POST', '/auth/register', {
+        'userId': 'user-1',
+        'email': 'member@example.test',
+        'bootstrapped': false,
+      })
+      ..on('POST', '/auth/login', {..._session, 'bootstrapped': false})
+      ..emptyBootstrapReads = 1;
+
+    await cubit.register(
+      email: 'member@example.test',
+      password: 'a-long-password',
+      passwordConfirm: 'a-long-password',
+    );
+
+    expect(cubit.state.isSignedIn, isTrue);
+    expect(cubit.state.failure, isNull);
+    // The point of the wait: onboarding writes into these, and a walkthrough
+    // that opened on an empty mirror would patch a row the server does not have.
+    expect(await mirror.readProfile(), isNotNull);
+    expect(await mirror.readPreferences(), isNotNull);
+  });
+
+  /// The other direction, and the reason the flag is read rather than the poll
+  /// simply always running: a returning member is the common case and must not
+  /// pay a retry for a read that legitimately came back empty.
+  test('a sign-in the server reports as ready is never polled', () async {
+    fake.emptyBootstrapReads = 1;
+
+    await cubit.signIn('member@example.test', 'a-password');
+
+    expect(cubit.state.isSignedIn, isTrue);
+    expect(
+      fake.calls.where((c) => c.path.endsWith('/graphql')),
+      hasLength(1),
+    );
   });
 }

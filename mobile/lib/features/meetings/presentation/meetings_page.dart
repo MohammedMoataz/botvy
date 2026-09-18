@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart' show memberZone;
 import '../../../core/recurrence/expander.dart';
@@ -25,10 +26,11 @@ class MeetingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<MeetingsCubit>();
+    final l10n = AppLocalizations.of(context);
 
     return BlocBuilder<MeetingsCubit, MeetingsState>(
       builder: (context, state) => Scaffold(
-        appBar: AppBar(title: const Text('Meetings')),
+        appBar: AppBar(title: Text(l10n.meetingsTitle)),
         floatingActionButton: FloatingActionButton(
           onPressed: () => unawaited(showMeetingSheet(context, cubit)),
           child: const Icon(Icons.add),
@@ -38,15 +40,18 @@ class MeetingsPage extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: SegmentedButton<MeetingView>(
-                segments: const [
+                segments: [
                   ButtonSegment(
                     value: MeetingView.upcoming,
-                    label: Text('Upcoming'),
+                    label: Text(l10n.meetingsUpcoming),
                   ),
-                  ButtonSegment(value: MeetingView.past, label: Text('Past')),
+                  ButtonSegment(
+                    value: MeetingView.past,
+                    label: Text(l10n.meetingsPast),
+                  ),
                   ButtonSegment(
                     value: MeetingView.deleted,
-                    label: Text('Deleted'),
+                    label: Text(l10n.meetingsDeleted),
                   ),
                 ],
                 selected: {state.view},
@@ -60,7 +65,7 @@ class MeetingsPage extends StatelessWidget {
                 actions: [
                   TextButton(
                     onPressed: cubit.clearProblem,
-                    child: const Text('Dismiss'),
+                    child: Text(l10n.meetingsDismiss),
                   ),
                 ],
               ),
@@ -68,7 +73,7 @@ class MeetingsPage extends StatelessWidget {
               child: state.loading
                   ? const Center(child: CircularProgressIndicator())
                   : state.meetings.isEmpty
-                        ? const Center(child: Text('Nothing here yet.'))
+                        ? Center(child: Text(l10n.meetingsNoneYet))
                         : ListView.builder(
                             itemCount: state.meetings.length,
                             itemBuilder: (context, index) => _MeetingRow(
@@ -98,6 +103,7 @@ class _MeetingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final zone = memberZone(state.timezone);
     final rule = MeetingRecurrence.decode(meeting.recurrenceJson);
     final next = state.nextOccurrences[meeting.id];
@@ -107,12 +113,13 @@ class _MeetingRow extends StatelessWidget {
       if (rule != null)
         describeRule(rule.rrule, Localizations.localeOf(context).languageCode),
       if (next != null)
-        'next ${formatInZone(next, zone)}'
+        l10n.meetingsNext(formatInZone(next, zone))
       else if (rule != null)
-        'no more occurrences'
+        l10n.meetingsNoMoreOccurrences
       else
         formatInZone(meeting.startAt, zone),
-      if (meeting.lockTimezone != null) 'on ${meeting.lockTimezone}\'s clock',
+      if (meeting.lockTimezone != null)
+        l10n.meetingsOnClock(meeting.lockTimezone!),
     ].join(' · ');
 
     return ListTile(
@@ -130,7 +137,7 @@ class _MeetingRow extends StatelessWidget {
       trailing: state.blocked.contains(meeting.id)
           ? IconButton(
               icon: const Icon(Icons.sync_problem),
-              tooltip: 'Not saved to the server. Tap to try again.',
+              tooltip: l10n.meetingsNotSaved,
               onPressed: () => unawaited(cubit.retry(meeting.id)),
             )
           : null,
@@ -162,10 +169,12 @@ Future<void> showMeetingActions(
   required tz.Location zone,
 }) => showModalBottomSheet<void>(
   context: context,
-  builder: (sheetContext) => SafeArea(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
+  builder: (sheetContext) {
+    final l10n = AppLocalizations.of(sheetContext);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
         ListTile(
           title: Text(meeting.title),
           subtitle: Text(formatInZone(meeting.startAt, zone)),
@@ -179,13 +188,13 @@ Future<void> showMeetingActions(
         if (meeting.status == 'scheduled') ...[
           ListTile(
             leading: const Icon(Icons.check),
-            title: const Text('Mark as happened'),
+            title: Text(l10n.meetingsMarkHappened),
             // The whole meeting, series included: a completed series is one
             // that has run its course. A member who wants to record one date
             // and keep the rest skips or moves instead.
             subtitle: meeting.recurrenceJson == null
                 ? null
-                : const Text('The whole series'),
+                : Text(l10n.meetingsWholeSeries),
             onTap: () {
               Navigator.of(sheetContext).pop();
               unawaited(cubit.complete(meeting.id));
@@ -193,10 +202,10 @@ Future<void> showMeetingActions(
           ),
           ListTile(
             leading: const Icon(Icons.block),
-            title: const Text('Cancel'),
+            title: Text(l10n.meetingsCancel),
             subtitle: meeting.recurrenceJson == null
                 ? null
-                : const Text('The whole series'),
+                : Text(l10n.meetingsWholeSeries),
             onTap: () {
               Navigator.of(sheetContext).pop();
               unawaited(cubit.cancelMeeting(meeting.id));
@@ -205,7 +214,7 @@ Future<void> showMeetingActions(
         ] else
           ListTile(
             leading: const Icon(Icons.undo),
-            title: const Text('Put back in the diary'),
+            title: Text(l10n.meetingsReopen),
             onTap: () {
               Navigator.of(sheetContext).pop();
               unawaited(cubit.reopen(meeting.id));
@@ -213,15 +222,16 @@ Future<void> showMeetingActions(
           ),
         ListTile(
           leading: const Icon(Icons.delete_outline),
-          title: const Text('Delete'),
+          title: Text(l10n.delete),
           onTap: () {
             Navigator.of(sheetContext).pop();
             unawaited(deleteMeetingWithUndo(context, cubit, meeting));
           },
         ),
-      ],
-    ),
-  ),
+        ],
+      ),
+    );
+  },
 );
 
 /// Join, or open the address in a map — whichever the meeting has, or both.
@@ -229,6 +239,7 @@ Future<void> showMeetingActions(
 /// Both are offered when both are stored, because a room that is also dialled
 /// into is one meeting and the member decides on the day which half they need.
 List<Widget> _locationTiles(BuildContext context, LocalMeeting meeting) {
+  final l10n = AppLocalizations.of(context);
   final location = MeetingLocation.decode(meeting.locationJson);
   final messenger = ScaffoldMessenger.of(context);
 
@@ -239,7 +250,7 @@ List<Widget> _locationTiles(BuildContext context, LocalMeeting meeting) {
     // Said rather than swallowed: a member who taps Join and gets nothing has
     // no way to tell a broken link from a broken button.
     messenger.showSnackBar(
-      const SnackBar(content: Text('Nothing on this phone can open that.')),
+      SnackBar(content: Text(l10n.meetingsCannotOpen)),
     );
   }
 
@@ -247,7 +258,7 @@ List<Widget> _locationTiles(BuildContext context, LocalMeeting meeting) {
     if (location.onlineLink != null)
       ListTile(
         leading: const Icon(Icons.videocam),
-        title: const Text('Join'),
+        title: Text(l10n.meetingsJoin),
         subtitle: Text(location.onlineLink!, maxLines: 1),
         onTap: () => unawaited(
           open(MeetingLocation(onlineLink: location.onlineLink)),
@@ -256,7 +267,7 @@ List<Widget> _locationTiles(BuildContext context, LocalMeeting meeting) {
     if (location.address != null)
       ListTile(
         leading: const Icon(Icons.map),
-        title: const Text('Open in a map'),
+        title: Text(l10n.meetingsOpenInMap),
         subtitle: Text(location.address!, maxLines: 2),
         onTap: () => unawaited(open(MeetingLocation(address: location.address))),
       ),
@@ -283,10 +294,12 @@ Future<void> showOccurrenceActions(
   required tz.Location zone,
 }) => showModalBottomSheet<void>(
   context: context,
-  builder: (sheetContext) => SafeArea(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
+  builder: (sheetContext) {
+    final l10n = AppLocalizations.of(sheetContext);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
         ListTile(
           title: Text(meeting.title),
           subtitle: Text(formatInZone(startAt, zone)),
@@ -294,8 +307,8 @@ Future<void> showOccurrenceActions(
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.event_busy),
-          title: const Text('Skip this one'),
-          subtitle: const Text('The rest of the series is untouched'),
+          title: Text(l10n.meetingsSkipOne),
+          subtitle: Text(l10n.meetingsRestUntouched),
           onTap: () {
             Navigator.of(sheetContext).pop();
             unawaited(cubit.skipOccurrence(meeting.id, originalStart));
@@ -303,7 +316,7 @@ Future<void> showOccurrenceActions(
         ),
         ListTile(
           leading: const Icon(Icons.schedule_send),
-          title: const Text('Move this one'),
+          title: Text(l10n.meetingsMoveOne),
           onTap: () async {
             Navigator.of(sheetContext).pop();
             await moveOccurrenceWithPicker(
@@ -317,15 +330,16 @@ Future<void> showOccurrenceActions(
         ),
         ListTile(
           leading: const Icon(Icons.tune),
-          title: const Text('Edit the whole series'),
+          title: Text(l10n.meetingsEditSeries),
           onTap: () {
             Navigator.of(sheetContext).pop();
             unawaited(showMeetingSheet(context, cubit, meeting: meeting));
           },
         ),
-      ],
-    ),
-  ),
+        ],
+      ),
+    );
+  },
 );
 
 /// Moves one occurrence, asking for the new date and time.
@@ -375,13 +389,14 @@ Future<void> deleteMeetingWithUndo(
   MeetingsCubit cubit,
   LocalMeeting meeting,
 ) async {
+  final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
   await cubit.delete(meeting.id);
   messenger.showSnackBar(
     SnackBar(
-      content: Text('Deleted "${meeting.title}"'),
+      content: Text(l10n.meetingDeletedMessage(meeting.title)),
       action: SnackBarAction(
-        label: 'Undo',
+        label: l10n.undo,
         onPressed: () => unawaited(cubit.restore(meeting.id)),
       ),
     ),

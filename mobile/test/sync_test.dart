@@ -423,6 +423,45 @@ void main() {
           'remindAt is in the past');
     });
 
+    test('a deleted_row rejection stops the push and says so, and does not '
+        'write the tombstone over the edit', () async {
+      // E-016. The server refuses an `update` onto a row another device
+      // deleted. It is `invalid` and never `stale`, which would have the phone
+      // overwrite and retry for ever against a rule that will not take the
+      // write — so the row goes straight to the cap, the member's words stay on
+      // screen, and the refusal names what actually happened. The tombstone
+      // arrives in the next pull, which is what removes the local copy.
+      await insertTask(
+        'binned',
+        title: 'the member typed this',
+        pendingOp: PendingOps.update,
+      );
+      api.next = reply(
+        rejections: [
+          {
+            'entity': 'tasks',
+            'id': 'binned',
+            'reason': 'invalid',
+            'code': 'deleted_row',
+            'server': {
+              'id': 'binned',
+              'title': 'the server tombstone',
+              'deletedAt': '2026-09-10T12:00:00.000Z',
+            },
+          },
+        ],
+      );
+
+      await engine.sync();
+
+      final row = await task('binned');
+      expect(row!.title, 'the member typed this');
+      expect(row.pushAttempts, SyncEngine.maxPushAttempts);
+      final rejection = engine.lastOutcome!.rejections.single;
+      expect(rejection.isDeletedRow, isTrue);
+      expect(rejection.message, contains('deleted on another device'));
+    });
+
     test('a rejection is branched on entity before any table is touched',
         () async {
       await insertTask('same-id', title: 'untouched');

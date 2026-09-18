@@ -92,6 +92,7 @@ class Session {
     required this.role,
     required this.deviceId,
     required this.mustChangePassword,
+    required this.bootstrapped,
   });
 
   factory Session.fromJson(Map<String, dynamic> json) => Session(
@@ -101,6 +102,11 @@ class Session {
     role: json['role'] as String? ?? 'user',
     deviceId: json['deviceId'] as String?,
     mustChangePassword: json['mustChangePassword'] as bool? ?? false,
+    // Absent means an older server, and the honest reading of that is "assume
+    // it is there": every gateway before this field shipped had the same
+    // window and the same clients, and a phone that waited for a flag no
+    // server sends would sit on the splash screen forever.
+    bootstrapped: json['bootstrapped'] as bool? ?? true,
   );
 
   final TokenPair tokens;
@@ -109,6 +115,15 @@ class Session {
   final String role;
   final String? deviceId;
   final bool mustChangePassword;
+
+  /// Whether this account's `profiles` and `user_preferences` documents exist.
+  ///
+  /// `POST /auth/register` commits the account and an outbox entry; the relay
+  /// writes those two documents on a later tick, and until it has,
+  /// `PATCH /preferences` is a 404 and the two reads resolve to null. A member
+  /// who taps through onboarding fast enough gets there first, which is what
+  /// this flag exists to stop (E-019).
+  final bool bootstrapped;
 }
 
 /// The three operations [TokenStore] needs from a keystore.
@@ -647,7 +662,14 @@ class ApiClient {
   /// The screen needs both and the phone pays for every round trip twice on a
   /// bad connection, which is the read edge earning its keep - two REST reads
   /// could not be combined without inventing an endpoint that served both.
-  Future<({Map<String, dynamic> profile, Map<String, dynamic> preferences})>
+  ///
+  /// Either half is null for a member whose bootstrap has not run yet — the
+  /// relay writes both documents on a tick after registration, so the window is
+  /// real and the server answers null rather than failing (E-019). Casting a
+  /// null to `Map` here is what used to throw a `TypeError` out of sign-in,
+  /// past the `ApiException` handler that was the only thing catching, so the
+  /// nullability is the fix and not a convenience.
+  Future<({Map<String, dynamic>? profile, Map<String, dynamic>? preferences})>
   profileAndPreferences() async {
     final data = await query('''
       query ProfileAndPreferences {
@@ -655,9 +677,13 @@ class ApiClient {
         preferences { $_preferencesFields }
       }
     ''');
+    final profile = data['profile'];
+    final preferences = data['preferences'];
     return (
-      profile: Map<String, dynamic>.from(data['profile'] as Map),
-      preferences: Map<String, dynamic>.from(data['preferences'] as Map),
+      profile: profile is Map ? Map<String, dynamic>.from(profile) : null,
+      preferences: preferences is Map
+          ? Map<String, dynamic>.from(preferences)
+          : null,
     );
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/recurrence/expander.dart';
 import '../../../core/recurrence/rule_words.dart';
@@ -96,6 +97,7 @@ class _EventSheetState extends State<_EventSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -103,7 +105,7 @@ class _EventSheetState extends State<_EventSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.event == null ? 'New event' : 'Event',
+              widget.event == null ? l10n.eventNew : l10n.eventEdit,
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
@@ -111,7 +113,7 @@ class _EventSheetState extends State<_EventSheet> {
               controller: _title,
               autofocus: widget.event == null,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Title'),
+              decoration: InputDecoration(labelText: l10n.eventTitle),
             ),
 
             const SizedBox(height: 16),
@@ -124,7 +126,7 @@ class _EventSheetState extends State<_EventSheet> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _allDay,
-              title: const Text('All day'),
+              title: Text(l10n.eventAllDay),
               // FR-011's other shape. A whole-day event is drawn apart from the
               // timed items rather than stretched across them (story 4), which
               // is why this is a flag on the row and not a 00:00–23:59 window.
@@ -137,21 +139,21 @@ class _EventSheetState extends State<_EventSheet> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => unawaited(_pickTime(from: true)),
-                      child: Text('From ${_from.format(context)}'),
+                      child: Text(l10n.eventFrom(_from.format(context))),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => unawaited(_pickTime(from: false)),
-                      child: Text('To ${_to.format(context)}'),
+                      child: Text(l10n.eventTo(_to.format(context))),
                     ),
                   ),
                 ],
               ),
 
             const SizedBox(height: 16),
-            Text('Colour', style: theme.textTheme.titleMedium),
+            Text(l10n.eventColour, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -176,7 +178,7 @@ class _EventSheetState extends State<_EventSheet> {
                   ),
                 IconButton(
                   icon: const Icon(Icons.format_color_reset),
-                  tooltip: 'No colour',
+                  tooltip: l10n.eventNoColour,
                   onPressed: () => setState(() => _color = null),
                 ),
               ],
@@ -191,7 +193,7 @@ class _EventSheetState extends State<_EventSheet> {
                     (_repeat?.describe(
                           Localizations.localeOf(context).languageCode,
                         ) ??
-                        'Does not repeat'),
+                        l10n.repeatNone),
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => unawaited(_pickRepeat()),
@@ -202,7 +204,7 @@ class _EventSheetState extends State<_EventSheet> {
               maxLines: 3,
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Notes'),
+              decoration: InputDecoration(labelText: l10n.eventNotes),
             ),
 
             if (_error != null) ...[
@@ -221,12 +223,12 @@ class _EventSheetState extends State<_EventSheet> {
                 if (widget.event != null)
                   TextButton(
                     onPressed: () => unawaited(_delete()),
-                    child: const Text('Delete'),
+                    child: Text(l10n.delete),
                   ),
                 const Spacer(),
                 FilledButton(
                   onPressed: _saving ? null : () => unawaited(_save()),
-                  child: const Text('Save'),
+                  child: Text(l10n.save),
                 ),
               ],
             ),
@@ -319,7 +321,7 @@ class _EventSheetState extends State<_EventSheet> {
   Future<void> _save() async {
     final title = _title.text.trim();
     if (title.isEmpty) {
-      setState(() => _error = 'An event needs a title.');
+      setState(() => _error = AppLocalizations.of(context).eventNeedsTitle);
       return;
     }
 
@@ -366,14 +368,15 @@ class _EventSheetState extends State<_EventSheet> {
   Future<void> _delete() async {
     final event = widget.event;
     if (event == null) return;
+    final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
     await widget.cubit.deleteEvent(event.id);
     messenger.showSnackBar(
       SnackBar(
-        content: Text('Deleted "${event.title}"'),
+        content: Text(l10n.eventDeletedMessage(event.title)),
         action: SnackBarAction(
-          label: 'Undo',
+          label: l10n.undo,
           onPressed: () => unawaited(widget.cubit.restoreEvent(event.id)),
         ),
       ),
