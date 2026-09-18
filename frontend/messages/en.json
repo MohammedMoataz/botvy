@@ -196,6 +196,7 @@
     "byDay": "By day",
     "byMember": "By member",
     "utcNote": "Days are counted in UTC, because this view spans every member at once.",
+    "stoppedNote": "These figures are a floor, not an exact total. An answer the member stopped part-way, or one the allergen guard blocked, reports no token counts at all — the model returns them only when a reply finishes — so the work those turns did is missing from every number here.",
     "day": "Day",
     "kind": "Kind",
     "model": "Model",

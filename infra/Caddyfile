@@ -29,12 +29,34 @@
 
 	# Everything else is the web app: the marketing pages and the admin portal.
 	handle {
-		reverse_proxy frontend:3000
+		reverse_proxy frontend:3000 {
+			# THE CONTENT SECURITY POLICY SWITCH (E-025).
+			#
+			# `CSP_ENFORCE=on` in .env, then `docker compose up -d caddy`, turns
+			# the policy from `Content-Security-Policy-Report-Only` into
+			# `Content-Security-Policy`. Anything else — including nothing —
+			# reports. That is the one line to flip.
+			#
+			# The policy itself is set by `frontend/middleware.ts` and not here,
+			# because it carries a per-request nonce and Caddy cannot mint one.
+			# Setting a second, nonce-less copy at the edge would not add a
+			# policy: two headers of the same name are *intersected*, so the
+			# edge's copy would forbid the inline bootstrap script the app's
+			# copy allows, and the portal would render as a blank page.
+			#
+			# `header_up` replaces whatever arrived, so a client cannot enforce
+			# — or un-enforce — the policy by sending this header itself.
+			header_up X-Botvy-Csp-Enforce {$CSP_ENFORCE:off}
+		}
 	}
 
 	header {
 		# The edge owns these, so every surface gets them whether or not its own
-		# framework remembered to.
+		# framework remembered to. `Content-Security-Policy` is deliberately not
+		# among them: this block covers `@api` too, and a script-source
+		# directive on a JSON response protects nothing while breaking the
+		# Swagger UI and the GraphQL playground. It belongs to the web app's own
+		# responses — see the switch above.
 		X-Content-Type-Options nosniff
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin

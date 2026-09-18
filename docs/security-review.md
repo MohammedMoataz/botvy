@@ -52,26 +52,97 @@ Set by `helmet` in the API and by Caddy at the edge.
 | `Referrer-Policy` | edge + helmet | `strict-origin-when-cross-origin` |
 | `Server` | edge | removed |
 | `Strict-Transport-Security` | helmet | set by default on HTTPS responses |
-| `Content-Security-Policy` | **off** | `helmet({ contentSecurityPolicy: false })` |
+| `Content-Security-Policy` | web app only | report-only by default; see below |
 
-### Finding — no content security policy · **accepted, with the reason**
+### Finding — no content security policy · **closed, report-only pending one flip**
 
-`contentSecurityPolicy: false` was set in P0 because helmet's default policy
-breaks the Swagger UI and the GraphQL playground, both of which load inline
-script. Those are development surfaces — `/docs` is only mounted when
-`NODE_ENV !== 'production'` — so a production installation is running without a
-CSP for no benefit.
+`contentSecurityPolicy: false` in helmet stays, and that is not the gap: `/api/*`,
+`/graphql` and `/media` are JSON and images, where a script-source directive has
+nothing to act on, and turning it on there restores a broken Swagger UI and
+GraphQL playground while covering no page at all.
 
-The web app is the thing a policy would protect, and it is served by Next.js
-behind Caddy rather than by the API, so the policy belongs on the **edge**
-rather than in helmet. It is not added in this phase: Next's App Router emits
-inline bootstrap script, so a correct policy needs nonce propagation through the
-document, and getting it wrong ships a blank page rather than an error. Recorded
-in `enhancements/` with what it would take.
+The pages are the thing a policy protects, and they come from Next.js. The
+policy now ships with them:
 
-What holds in the meantime: the public page loads **no third-party resource at
-all**, and that is asserted rather than promised — `frontend/e2e/public.spec.ts`
-fails if any request leaves the origin.
+| Directive | Value | Why |
+|---|---|---|
+| `default-src` | `'self'` | |
+| `script-src` | `'self' 'nonce-…' 'strict-dynamic'` | the App Router emits an inline bootstrap script in every document, so it is a nonce or `'unsafe-inline'`, and `'unsafe-inline'` permits the attack. `'strict-dynamic'` lets the bootstrap's own chunks inherit its trust and denies it to an injected same-origin `<script src>`. `'unsafe-eval'` is added under `next dev` only |
+| `style-src` | `'self' 'unsafe-inline'` | **deliberately not nonce'd** — a nonce here would disable the `'unsafe-inline'` beside it, and inline `style` attributes are how React's server render and PrimeReact's overlays position themselves. See below |
+| `img-src` | `'self' data: blob:` | |
+| `font-src` | `'self'` | PrimeIcons ships its own woff |
+| `connect-src` | `'self'` | the API, GraphQL and the socket are same-origin behind the edge; `'self'` covers `wss://` to the same host |
+| `frame-ancestors` | `'none'` | the same statement `X-Frame-Options: DENY` makes, to browsers that read the newer one |
+| `base-uri`, `form-action` | `'self'` | |
+| `object-src` | `'none'` | |
+
+No `upgrade-insecure-requests`: the default installation serves plain HTTP
+behind a tunnel that terminates TLS, and upgrading there asks the browser for a
+scheme the edge does not answer on. No `report-uri`: nothing collects reports,
+so the collector is the browser console and the Playwright case below.
+
+**On `style-src`.** PrimeReact injects `<style>` elements at runtime from five
+places — `Dialog` (and so `ConfirmDialog`), `DataTable`, `VirtualScroller`,
+`Ripple` and `FocusTrap`, all through the `useStyle` hook; `ComponentBase` adds
+four more, but only in unstyled mode, which this portal does not use. All of
+them honour a nonce (`PrimeReactProvider`'s `nonce`, or `PrimeReact.nonce`), so
+nonce-ing them is *possible*. It is not *useful*: a nonce on `style-src` voids
+the `'unsafe-inline'` token in the same directive, and every server-rendered
+`style="…"` attribute in the document then fails. The result would be an
+unstyled portal, which is the quiet CSS-looking breakage this directive is known
+for. `'unsafe-inline'` for styles and a nonce for scripts is the trade.
+
+**Where it comes from.** `frontend/middleware.ts` mints a nonce per request,
+puts the policy on the response *and* on the request it forwards — Next reads
+the nonce back out of that copy, under either header name, and threads it onto
+its own script tags. The edge does not set a policy of its own: two headers of
+the same name are intersected, so a nonce-less copy from Caddy would forbid the
+inline bootstrap the app's copy allows and the portal would render blank.
+
+#### The switch · **report-only today**
+
+It ships as `Content-Security-Policy-Report-Only`. Nothing has been verified
+against a running stack — the engine was unavailable while this was written —
+and a wrong policy on the App Router ships a blank page rather than an error, so
+report-only is where it stays until somebody has watched the console on a real
+one.
+
+Turning it on is one line:
+
+```
+# .env
+CSP_ENFORCE=on
+```
+
+then `docker compose up -d caddy`. The Caddyfile passes it to the web app as
+`X-Botvy-Csp-Enforce` on the proxied request (`header_up`, so a client cannot
+send its own), and the middleware picks the header name from it. It is a request
+header rather than a frontend environment variable because `process.env` in
+Next middleware is inlined at build time, and a rebuild is exactly what an
+operator backing out a bad policy cannot wait for.
+
+Flip `ENFORCED` to `true` at the top of `frontend/e2e/csp.spec.ts` in the same
+change. That is the whole of it on the test side.
+
+#### What is pinned
+
+`frontend/e2e/csp.spec.ts`, against a running stack:
+
+- the web app sends the expected header, the other name is absent, `script-src`
+  carries a nonce and no `'unsafe-inline'`, and the page still renders an `h1`
+  — a wrong policy here produces a blank document, not an error page;
+- the nonce in the header is on at least one `<script>` in the document — a
+  nonce nothing carries blocks everything the moment it is enforced, and
+  report-only says nothing about it;
+- `/health` carries **no** policy in either form, which is the "not the API's"
+  half;
+- `/` and `/login` raise **no** `securitypolicyviolation` events. That is the
+  case that stops the rollout parking in report-only: it is green exactly when
+  flipping the switch is safe.
+
+What also still holds: the public page loads **no third-party resource at all**,
+asserted in `frontend/e2e/public.spec.ts`, which fails if any request leaves the
+origin.
 
 ## 4. Every credential, and what it alone would let somebody do
 

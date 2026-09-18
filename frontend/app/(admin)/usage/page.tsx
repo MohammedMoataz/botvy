@@ -92,6 +92,17 @@ function UsagePage() {
       <div className="page-head">
         <h1>{t('title')}</h1>
         <p className="muted">{t('explain')}</p>
+        {/*
+          The gap, stated where the number is (E-013).
+
+          Ollama reports its token counts in the terminating frame of a stream
+          and nowhere else, so a turn the member stopped — or one the allergen
+          guard cut short — is metered as zero. The honest fix is a field the
+          model server does not have; the cheap one is not presenting a figure
+          as exact when it is a floor. It sits under the explanation rather than
+          beside a column because it is true of every number on the page.
+        */}
+        <p className="muted">{t('stoppedNote')}</p>
       </div>
 
       {problem && <Message severity="error" text={problem} />}
