@@ -41,3 +41,7 @@ oxlint.json
 # Playwright's own output.
 **/test-results/
 **/playwright-report/
+
+# Next regenerates this on every build and its own first line says not to edit
+# it, so formatting it is a diff that comes back.
+**/next-env.d.ts
