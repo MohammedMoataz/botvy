@@ -74,10 +74,23 @@ test('the nonce in the header is the one on the scripts (E-025)', async ({
 
   expect(nonce).toBeTruthy();
 
-  // A nonce nothing carries is a policy that blocks everything the moment it is
-  // enforced — and in report-only nothing says so.
+  /*
+   * A nonce nothing carries is a policy that blocks everything the moment it is
+   * enforced — and in report-only nothing says so.
+   *
+   * Read through the `nonce` **property**, never the attribute. Browsers hide
+   * the value from `getAttribute` and from attribute selectors once the
+   * document is parsed — that is deliberate, so an injected script cannot read
+   * a nonce out of the DOM and reuse it — so `script[nonce="…"]` matches
+   * nothing however correct the page is. This test failed against a stack whose
+   * served HTML carried the nonce on all twelve script tags, which is the worst
+   * kind of red: it would have had somebody debugging a policy that worked.
+   */
   const carried = await page.evaluate(
-    (value) => document.querySelectorAll(`script[nonce="${value}"]`).length,
+    (value) =>
+      [...document.querySelectorAll('script')].filter(
+        (script) => script.nonce === value,
+      ).length,
     nonce,
   );
   expect(carried).toBeGreaterThan(0);
