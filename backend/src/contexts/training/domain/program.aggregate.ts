@@ -189,7 +189,6 @@ export class Program extends AggregateRoot<string> {
 
   edit(
     patch: { title?: string; sport?: string; weeks?: ProgramWeek[] },
-    at: Date = new Date(),
   ): string[] {
     const changed: string[] = [];
     if (patch.title !== undefined) {
@@ -211,7 +210,7 @@ export class Program extends AggregateRoot<string> {
       changed.push('weeks');
     }
     if (changed.length === 0) return changed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     return changed;
   }
 
@@ -234,7 +233,7 @@ export class Program extends AggregateRoot<string> {
       );
     }
     this.appliedStartDate = startDate;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.ProgramApplied',
       'program',
@@ -251,7 +250,7 @@ export class Program extends AggregateRoot<string> {
   /** Stop filling new sessions. Leaves the ones already filled alone. */
   archive(at: Date = new Date()): void {
     this.status = 'archived';
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.ProgramArchived',
       'program',
@@ -261,14 +260,14 @@ export class Program extends AggregateRoot<string> {
   }
 
   /** Make it fillable again, from the date it was originally applied. */
-  activate(at: Date = new Date()): void {
+  activate(): void {
     this.status = 'active';
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.ProgramDeleted',
       'program',
@@ -277,9 +276,9 @@ export class Program extends AggregateRoot<string> {
     );
   }
 
-  restore(at: Date = new Date()): void {
+  restore(): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   get isDeleted(): boolean {

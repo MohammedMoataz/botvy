@@ -14,6 +14,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   Link,
   type LinkState,
@@ -52,7 +53,7 @@ export interface LinkDoc extends Omit<LinkState, 'id'> {
   schemaVersion: number;
 }
 
-const linkMapper: Mapper<Link, LinkDoc> = {
+const linkMapper: Mapper<Link, LinkDoc> = versioned({
   toDomain(doc) {
     return Link.rehydrate({
       id: doc._id,
@@ -100,7 +101,7 @@ const linkMapper: Mapper<Link, LinkDoc> = {
       schemaVersion: link.schemaVersion,
     };
   },
-};
+});
 
 /** Newest first, `_id` as the tie-break, which is what the cursor encodes. */
 const LINK_SORT: SortKey[] = [
@@ -360,7 +361,7 @@ export interface ReadingDoc extends Omit<ReadingState, 'id'> {
   _id: string;
 }
 
-const readingMapper: Mapper<Reading, ReadingDoc> = {
+const readingMapper: Mapper<Reading, ReadingDoc> = versioned({
   toDomain(doc) {
     return Reading.rehydrate({
       id: doc._id,
@@ -403,7 +404,7 @@ const readingMapper: Mapper<Reading, ReadingDoc> = {
       updatedAt: reading.updatedAt,
     };
   },
-};
+});
 
 @Injectable()
 export class MongoReadingRepository extends ReadingRepository {
@@ -497,7 +498,7 @@ export interface SuggestionDoc extends Omit<SuggestionState, 'id'> {
   _id: string;
 }
 
-const suggestionMapper: Mapper<Suggestion, SuggestionDoc> = {
+const suggestionMapper: Mapper<Suggestion, SuggestionDoc> = versioned({
   toDomain(doc) {
     return Suggestion.rehydrate({
       id: doc._id,
@@ -534,7 +535,7 @@ const suggestionMapper: Mapper<Suggestion, SuggestionDoc> = {
       updatedAt: suggestion.updatedAt,
     };
   },
-};
+});
 
 @Injectable()
 export class MongoSuggestionRepository extends SuggestionRepository {

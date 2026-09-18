@@ -85,16 +85,33 @@ export interface SyncChange<Fields = Record<string, unknown>> {
  * - `not_deleted` — a purge of something that is not a tombstone. Erasing a
  *   live row is data loss dressed as housekeeping.
  * - `invalid` — the row itself is refused by a domain rule (an empty title, a
- *   moment in the past). Retrying unchanged will fail again, so the client
- *   surfaces it to the member rather than queueing it.
+ *   moment in the past), or its target is in a state that will never take the
+ *   write. Retrying unchanged will fail again, so the client surfaces it to
+ *   the member rather than queueing it.
  */
 export type RejectionReason =
   'stale' | 'gone' | 'protected' | 'not_deleted' | 'invalid';
+
+/**
+ * Which `invalid` this is, so a client can tell "your row is malformed" from
+ * "the thing you edited is in the bin" and say the right sentence.
+ *
+ * `invalid` is deliberately one verdict — every client already handles it as
+ * "stop re-sending and tell the member" — and the code refines it without
+ * putting a sixth word on the wire that an older client would not know. A
+ * client that does not recognise a code falls back to its ordinary `invalid`
+ * handling, which is still correct, just less specific.
+ *
+ * - `deleted_row` — an `update` pushed onto a tombstone (E-016).
+ */
+export type RejectionCode = 'deleted_row';
 
 export interface Rejection {
   entity: string;
   id: string;
   reason: RejectionReason;
+  /** Refines `reason`. Absent means "no further detail". */
+  code?: RejectionCode;
   server?: unknown;
 }
 
@@ -117,7 +134,9 @@ export function resolveConflict(
   change: Pick<SyncChange, 'op' | 'updatedAt' | 'baseUpdatedAt'>,
   server: { updatedAt: Date; deletedAt?: Date | null } | null,
   now: Date,
-): { accept: true } | { accept: false; reason: RejectionReason } {
+):
+  | { accept: true }
+  | { accept: false; reason: RejectionReason; code?: RejectionCode } {
   if (!server) {
     // A create with no server row is the ordinary offline case: insert it.
     // Anything else is a client editing a row that has been erased.
@@ -135,6 +154,31 @@ export function resolveConflict(
 
   if (change.op === 'purge' && !server.deletedAt) {
     return { accept: false, reason: 'not_deleted' };
+  }
+
+  /*
+   * An `update` onto a tombstone is refused (E-016).
+   *
+   * It used to be accepted: the fields were written onto the tombstone,
+   * `deletedAt` stayed where it was, and the id came back in `accepted`. The
+   * next pull then carried the row as a tombstone — which it must, because on a
+   * delta that is the only way a deletion travels — the phone applied it as an
+   * upsert, and the member's edit was gone with nothing anywhere having said
+   * so. A device only has to be offline across a deletion made somewhere else.
+   *
+   * `invalid` and not `gone`: the contract defines `gone` as "the row is not
+   * there", and a tombstone *is* there — it is recoverable by `restore`, which
+   * is the whole reason a tombstone is not a delete. And never `stale`, which
+   * tells the phone to overwrite and retry against a rule that will never
+   * accept it. `invalid` is already the verdict for `ForeignRowError`, which is
+   * likewise not about the row's contents; `code` carries the difference.
+   *
+   * Only `update`. `restore` and `purge` exist for tombstones, `delete` onto
+   * one is the idempotent retry of a delete that already landed, and a `create`
+   * naming a tombstoned id keeps whatever answer its adapter gives it today.
+   */
+  if (change.op === 'update' && server.deletedAt) {
+    return { accept: false, reason: 'invalid', code: 'deleted_row' };
   }
 
   if (

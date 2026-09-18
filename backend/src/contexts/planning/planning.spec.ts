@@ -477,17 +477,28 @@ describe('deleting a task never touches its status', () => {
     expect(b.tasks.rows.size).toBe(1);
   });
 
-  it('refuses a delete dated before the stored row, rather than rewriting history', async () => {
-    // The optimistic check is what makes this fail, and it is right to: a write
-    // whose `updatedAt` is older than the stored row is a lost update, and
-    // accepting a backdated delete would also let a client move the purge
-    // horizon into the past and have the row erased on the next sweep.
+  it('takes a back-dated delete without a stale write, and keeps the stated moment', async () => {
+    // E-017. `at` says when it happened; `updatedAt` says when the row last
+    // changed here. This spec asserted the opposite until the two were split:
+    // the aggregate wrote the member's clock into `updatedAt`, the optimistic
+    // filter missed, and a well-formed request answered 500.
+    //
+    // `deletedAt` still takes the member's moment, which is what the purge
+    // horizon is measured from — so a back-dated delete is a tombstone already
+    // near its horizon. That is the member's own statement about their day and
+    // no client can make it: nothing on `DELETE /tasks/:id` carries an `at`.
     const id = newId();
     await b.create.handle(MEMBER, { id, title: 'Buy milk' });
+    const created = await b.tasks.findById(MEMBER, id);
+    const backDated = new Date(Date.now() - 40 * 86_400_000);
 
-    await expect(
-      b.remove.handle(MEMBER, id, new Date(Date.now() - 40 * 86_400_000)),
-    ).rejects.toThrow(/stale write/i);
+    await expect(b.remove.handle(MEMBER, id, backDated)).resolves.toBeDefined();
+
+    const task = await b.tasks.findById(MEMBER, id);
+    expect(task?.deletedAt?.getTime()).toBe(backDated.getTime());
+    expect(task?.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      created!.updatedAt.getTime(),
+    );
   });
 
   it('purges tombstones past the horizon in both collections', async () => {
@@ -907,6 +918,33 @@ describe('the label snapshot on tasks', () => {
 
     const after = (await b.tasks.findById(MEMBER, id))!.updatedAt;
     expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime());
+  });
+
+  it('moves updatedAt forward even when the event trails the relay', async () => {
+    /*
+     * The relay is eventual, so `occurredAt` is older than now by however long
+     * the outbox took — and this write has no optimistic filter, so whatever it
+     * puts in `updatedAt` simply lands. Honouring the event's own clock moved
+     * the row *backwards*, behind a cursor a device had already passed, and the
+     * rename reached the server and never reached the phone. Found while
+     * finishing E-017, which is the same rule one layer up.
+     */
+    const labelId = newId();
+    await b.createLabel.handle(MEMBER, { id: labelId, name: 'Work' });
+    const id = newId();
+    await b.create.handle(MEMBER, { id, title: 'A', labelId });
+    const before = (await b.tasks.findById(MEMBER, id))!.updatedAt;
+
+    await b.updateLabel.handle(MEMBER, labelId, { name: 'Deep work' });
+    const stale = {
+      ...labelEvent(b, 'planning.LabelUpdated'),
+      occurredAt: new Date(Date.now() - 60 * 60 * 1000),
+    };
+    await b.snapshots.onUpdated(stale);
+
+    const after = (await b.tasks.findById(MEMBER, id))!.updatedAt;
+    expect(after.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(after.getTime()).toBeGreaterThan(stale.occurredAt.getTime());
   });
 
   it('raises no event per task, however many tasks carry the label', async () => {

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { newId } from '../../../shared/cqrs/ids.js';
 import {
   resolveConflict,
+  type RejectionCode,
   type RejectionReason,
   type SyncChange,
 } from '../../../shared/persistence/ports/sync-change.js';
@@ -86,10 +87,11 @@ function refuse(
   change: SyncChange,
   reason: RejectionReason,
   server: unknown,
+  code?: RejectionCode,
 ): ApplyOutcome {
   return {
     applied: false,
-    rejection: { entity, id: change.id, reason, server },
+    rejection: { entity, id: change.id, reason, code, server },
   };
 }
 
@@ -106,26 +108,6 @@ function serverRow(
 ): unknown {
   return existing ?? null;
 }
-
-/*
- * A note on the one verdict these adapters deliberately do **not** invent.
- *
- * An edit pushed onto a row that is already a tombstone is *accepted* here, the
- * same as it is by Planning's and Meetings' adapters, because `resolveConflict`
- * is the authority on the verdict and it has no clause about `deletedAt` beyond
- * refusing a purge of a live row. This phase drafted an extra `gone` for that
- * case and dropped it: `/sync` is one protocol, and three of eight entities
- * answering a situation differently from the other five is a defect a client
- * author walks into by reasonably assuming uniformity — and `contracts/sync.md`
- * defines `gone` as "the row is not there", where a tombstone *is* there and is
- * recoverable by `restore`.
- *
- * The consequence is real and is written up as `enhancements/E-016`: the edit is
- * accepted onto the tombstone and the next pull overwrites the phone's copy
- * with it, so the member's edit is silently lost. If `gone` is the right answer
- * it is right for every entity, which makes the fix one change to
- * `resolveConflict` and one line in the contract — not one adapter.
- */
 
 // ------------------------------------------------------------------ sessions
 
@@ -216,7 +198,13 @@ export class SessionSyncAdapter implements SyncableEntity {
 
     const verdict = resolveConflict(change, existing, now);
     if (!verdict.accept) {
-      return refuse(this.entity, change, verdict.reason, serverRow(existing));
+      return refuse(
+        this.entity,
+        change,
+        verdict.reason,
+        serverRow(existing),
+        verdict.code,
+      );
     }
 
     try {
@@ -460,7 +448,13 @@ export class ProgramSyncAdapter implements SyncableEntity {
 
     const verdict = resolveConflict(change, existing, now);
     if (!verdict.accept) {
-      return refuse(this.entity, change, verdict.reason, serverRow(existing));
+      return refuse(
+        this.entity,
+        change,
+        verdict.reason,
+        serverRow(existing),
+        verdict.code,
+      );
     }
 
     const fields = change.fields as PushedProgram;
@@ -489,7 +483,7 @@ export class ProgramSyncAdapter implements SyncableEntity {
           if (!existing.isDeleted) existing.tombstone(now);
           break;
         case 'restore':
-          if (existing.isDeleted) existing.restore(now);
+          if (existing.isDeleted) existing.restore();
           break;
         case 'purge':
           existing.assertPurgeable();
@@ -502,7 +496,6 @@ export class ProgramSyncAdapter implements SyncableEntity {
               sport: fields.sport,
               weeks: pushedWeeks(fields.weeks),
             },
-            now,
           );
           applyPushedProgramStatus(existing, fields, now);
       }
@@ -589,7 +582,13 @@ export class WorkoutSyncAdapter implements SyncableEntity {
 
     const verdict = resolveConflict(change, existing, now);
     if (!verdict.accept) {
-      return refuse(this.entity, change, verdict.reason, serverRow(existing));
+      return refuse(
+        this.entity,
+        change,
+        verdict.reason,
+        serverRow(existing),
+        verdict.code,
+      );
     }
 
     const fields = change.fields as PushedWorkout;
@@ -614,7 +613,7 @@ export class WorkoutSyncAdapter implements SyncableEntity {
           if (!existing.isDeleted) existing.tombstone(now);
           break;
         case 'restore':
-          if (existing.isDeleted) existing.restore(now);
+          if (existing.isDeleted) existing.restore();
           break;
         case 'purge':
           existing.assertPurgeable();
@@ -628,7 +627,6 @@ export class WorkoutSyncAdapter implements SyncableEntity {
               exercises: pushedExercises(fields.exercises),
               tags: fields.tags,
             },
-            now,
           );
       }
 

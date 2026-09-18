@@ -81,3 +81,8 @@ import {
   ],
 })
 export class RemindersModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const REMINDERS_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'RemindersPurgeOnDeletedHandler',
+} as const;

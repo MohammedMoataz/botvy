@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   Checkin,
   checkinId,
@@ -87,7 +88,7 @@ export interface RhythmStateDoc extends RhythmStateData {
  * "not yet". So every nullable field is mapped to `null` — cleared, not
  * removed.
  */
-const planMapper: Mapper<DailyPlan, DailyPlanDoc> = {
+const planMapper: Mapper<DailyPlan, DailyPlanDoc> = versioned({
   toDomain(doc) {
     return DailyPlan.rehydrate({
       userId: doc.userId,
@@ -133,9 +134,9 @@ const planMapper: Mapper<DailyPlan, DailyPlanDoc> = {
       schemaVersion: plan.schemaVersion,
     };
   },
-};
+});
 
-const checkinMapper: Mapper<Checkin, CheckinDoc> = {
+const checkinMapper: Mapper<Checkin, CheckinDoc> = versioned({
   toDomain(doc) {
     return Checkin.rehydrate({
       userId: doc.userId,
@@ -166,9 +167,9 @@ const checkinMapper: Mapper<Checkin, CheckinDoc> = {
       schemaVersion: checkin.schemaVersion,
     };
   },
-};
+});
 
-const stateMapper: Mapper<RhythmState, RhythmStateDoc> = {
+const stateMapper: Mapper<RhythmState, RhythmStateDoc> = versioned({
   toDomain(doc) {
     return RhythmState.rehydrate({
       userId: doc.userId,
@@ -197,7 +198,7 @@ const stateMapper: Mapper<RhythmState, RhythmStateDoc> = {
       schemaVersion: state.schemaVersion,
     };
   },
-};
+});
 
 @Injectable()
 export class MongoDailyPlanRepository extends DailyPlanRepository {

@@ -21,6 +21,16 @@ import {
 export const MEETING_ALERTS_JOB = 'notifications.meeting-alerts';
 
 /**
+ * How often this job expects to run, stamped onto its heartbeat row so
+ * `/health` judges its silence by its own cadence rather than by a list of
+ * nightly job names kept in the health module (E-018). `meeting_alerts_reconcile`
+ * triggers once a day at 03:20; a nightly job judged by `ops.staleAfterMinutes`
+ * reports the platform degraded for twenty-three hours out of every
+ * twenty-four, which is exactly what this used to do.
+ */
+export const MEETING_ALERTS_EVERY_MINUTES = 24 * 60;
+
+/**
  * The label of the preparation warning.
  *
  * It cannot collide with a reminder offset's label, and that is a property
@@ -160,19 +170,21 @@ export class ReconcileMeetingAlertsHandler {
         true,
         undefined,
         result.ms,
+        MEETING_ALERTS_EVERY_MINUTES,
       );
       return result;
     } catch (error) {
       // Stamped on the way out either way. A scheduled job that stops arriving
-      // has to be visible: `/health` reports this key stale after fifteen
-      // minutes, and a silent 401 between n8n and the gateway once went
-      // unnoticed for days.
+      // has to be visible: `/health` reports this key stale once it has been
+      // quiet for longer than the cadence the row declares, and a silent 401
+      // between n8n and the gateway once went unnoticed for days.
       result.ms = Date.now() - started;
       await this.heartbeats.stamp(
         MEETING_ALERTS_JOB,
         false,
         (error as Error).message,
         result.ms,
+        MEETING_ALERTS_EVERY_MINUTES,
       );
       throw error;
     }

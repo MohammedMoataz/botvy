@@ -18,7 +18,6 @@ import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { ProfileModule } from '../profile/profile.module.js';
-import { NextPracticeCutoffPort } from './domain/training.ports.js';
 import {
   AthleteProfileRepository,
   ProgramRepository,
@@ -78,7 +77,6 @@ import {
   type SessionDoc,
   type WorkoutDoc,
 } from './infrastructure/mongo-training.repositories.js';
-import { ProfileNextPracticeCutoff } from './infrastructure/training.adapters.js';
 
 /**
  * Training: the athlete's week.
@@ -90,11 +88,12 @@ import { ProfileNextPracticeCutoff } from './infrastructure/training.adapters.js
  *
  * ## Two imported context modules, and each is one binding
  *
- * `ProfileModule` for `ProfileQueryHandler` and `MemberContextPort`,
+ * `ProfileModule` for `MemberContextPort` and `MemberPreferencesPort`,
  * `OperationsModule` for `SettingsService` and the shared Mongoose connection.
  * Nothing under `domain/` or `features/` here imports either: the cut-off comes
- * through `NextPracticeCutoffPort`, bound in this context's own
- * `infrastructure/`, and the zone through the shared `MemberContextPort`. That
+ * through the shared `MemberPreferencesPort` — this context's own
+ * `NextPracticeCutoffPort` until E-020 collapsed five identical adapters into
+ * one — and the zone through the shared `MemberContextPort`. That
  * is the seam constitution IX sanctions, and `no-restricted-imports` refuses it
  * anywhere else — `training` was added to that rule's pattern list in this
  * phase, and the rule was probed by writing a file that should fail and
@@ -159,19 +158,6 @@ import { ProfileNextPracticeCutoff } from './infrastructure/training.adapters.js
       useFactory: (model: Model<WorkoutDoc>, outbox: Model<OutboxInsert>) =>
         new MongoWorkoutRepository(model, outbox),
     },
-
-    /*
-     * The member's own cut-off, from Profile's published read.
-     *
-     * A port rather than `SettingsService.get('defaults.nextPracticeCutoff')`,
-     * which would be the constitution XII bug in as many words: that key seeds
-     * a `user_preferences` field, so reading the registry gives the
-     * *installation* value and the card silently ignores what the member set.
-     * The two agree for anybody who has not changed it, which is exactly what
-     * makes the bug invisible — this is the third time the project has had this
-     * decision in front of it.
-     */
-    { provide: NextPracticeCutoffPort, useClass: ProfileNextPracticeCutoff },
 
     {
       /*
@@ -356,3 +342,18 @@ import { ProfileNextPracticeCutoff } from './infrastructure/training.adapters.js
   ],
 })
 export class TrainingModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const TRAINING_SUBSCRIPTIONS = {
+  'identity.UserRegistered': 'BootstrapAthleteProfileHandler',
+  'identity.UserDeleted': 'TrainingPurgeOnDeletedHandler',
+  // The member's context moved. `timezone` lives on the profile and not in
+  // PREFERENCE_FIELDS, which is why both events are here and not only the second.
+  'profile.ProfileUpdated': 'SessionMaterialiserSaga',
+  'profile.PreferencesChanged': 'SessionMaterialiserSaga',
+  'training.SportsChanged': 'SessionMaterialiserSaga',
+  'training.SlotsChanged': 'SessionMaterialiserSaga',
+  'training.ProgramApplied': 'SessionMaterialiserSaga',
+  // Knowledge says what the member accepted; Training owns the session it fills.
+  'knowledge.SuggestionAccepted': 'ApplySuggestionHandler',
+} as const;

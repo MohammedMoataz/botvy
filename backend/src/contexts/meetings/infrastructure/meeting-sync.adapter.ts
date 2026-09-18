@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../shared/member/member-context.port.js';
 import {
   resolveConflict,
+  type RejectionCode,
   type RejectionReason,
   type SyncChange,
 } from '../../../shared/persistence/ports/sync-change.js';
@@ -57,10 +58,11 @@ export function refuseMeeting(
   change: SyncChange,
   reason: RejectionReason,
   server: unknown,
+  code?: RejectionCode,
 ): ApplyOutcome {
   return {
     applied: false,
-    rejection: { entity, id: change.id, reason, server },
+    rejection: { entity, id: change.id, reason, code, server },
   };
 }
 
@@ -129,6 +131,7 @@ export class MeetingSyncAdapter implements SyncableEntity {
         change,
         verdict.reason,
         serverRow(existing),
+        verdict.code,
       );
     }
 

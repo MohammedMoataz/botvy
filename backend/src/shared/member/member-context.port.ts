@@ -25,6 +25,22 @@
 /** Where the member is, for every "what day is it for them" question. */
 export interface MemberClock {
   timezone: string;
+  /**
+   * What language they read, for the handful of sentences the *server* renders
+   * about a member's own row — today only Planning's `recurrenceText` (E-008).
+   *
+   * Here rather than behind a second port because it comes off the same profile
+   * row on the same call, and a port whose only method returned one string from
+   * a document this one already read would be a round trip bought with a file.
+   * This is the decision the port's own note above asks for: one field, one
+   * reader, named.
+   *
+   * **Optional, and the absence is meaningful.** A member whose profile row the
+   * relay has not written yet has no chosen language, and the rule for that
+   * member is English — so every caller reads it as `locale ?? 'en'` rather
+   * than branching, and a stub that does not answer it is answering correctly.
+   */
+  locale?: string;
 }
 
 /**

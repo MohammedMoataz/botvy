@@ -101,6 +101,7 @@ function tomorrow(zone = CAIRO): string {
  */
 class StubSchedules extends MemberSchedulePort {
   timezone = CAIRO;
+  locale = 'en';
   planTomorrowTime = '21:00';
   endOfDayTime = '22:00';
   morningBriefingTime = '08:00';
@@ -114,6 +115,7 @@ class StubSchedules extends MemberSchedulePort {
       .map((userId) => ({
         userId,
         timezone: this.timezone,
+        locale: this.locale,
         planTomorrowTime: this.planTomorrowTime,
         endOfDayTime: this.endOfDayTime,
         morningBriefingTime: this.morningBriefingTime,

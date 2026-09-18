@@ -31,14 +31,13 @@ export class ActivateProgramHandler {
   async handle(
     userId: string,
     id: string,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date }> {
     const program = await this.programs.findById(userId, id);
     if (!program) throw new ProgramNotFound(id);
 
     if (program.status === 'active') return { updatedAt: program.updatedAt };
 
-    program.activate(at);
+    program.activate();
     await this.uow.run(() => this.programs.save(program));
     return { updatedAt: program.updatedAt };
   }

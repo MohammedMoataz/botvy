@@ -308,7 +308,7 @@ export class TickHandler {
       userId,
       kind: 'coach',
       touch: 'evening_prompt',
-      content: planPromptMessage(plan, schedule.timezone),
+      content: planPromptMessage(plan, schedule.timezone, schedule.locale),
       at: now,
     });
   }
@@ -382,7 +382,12 @@ export class TickHandler {
     await this.transcript.append({
       userId,
       kind: 'coach',
-      content: endOfDayMessage(plan, schedule.timezone, checkinAsked),
+      content: endOfDayMessage(
+        plan,
+        schedule.timezone,
+        checkinAsked,
+        schedule.locale,
+      ),
       // The discriminator says what the member should *do*, so a summary that
       // carries the check-in question is a `checkin_question` — a connected
       // client routing on `end_of_day_summary` would show it as read-only news
@@ -474,7 +479,11 @@ export class TickHandler {
       userId,
       kind: 'coach',
       touch: 'morning_briefing',
-      content: morningBriefingMessage(plan, schedule.timezone),
+      content: morningBriefingMessage(
+        plan,
+        schedule.timezone,
+        schedule.locale,
+      ),
       at: now,
     });
   }

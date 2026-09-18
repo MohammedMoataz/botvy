@@ -51,12 +51,11 @@ export class UpdateProgramHandler {
     userId: string,
     id: string,
     command: UpdateProgramCommand,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date; changed: string[] }> {
     const program = await this.programs.findById(userId, id);
     if (!program) throw new ProgramNotFound(id);
 
-    const changed = program.edit(command, at);
+    const changed = program.edit(command);
     // Nothing moved: no write, so a retrying client cannot walk `updatedAt`
     // forward and make every other device pull a row that says the same thing.
     if (changed.length === 0) {

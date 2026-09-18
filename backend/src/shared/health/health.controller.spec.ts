@@ -53,6 +53,7 @@ describe('GET /health', () => {
       lastOkAt: new Date(Date.now() - 5 * 60_000),
       lastDurationMs: 1,
       lastError: null,
+      everyMinutes: null,
     };
     const report = await controller({
       heartbeats: { listAll: async () => [fresh] },

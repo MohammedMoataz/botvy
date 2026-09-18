@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
 import { wallClockToUtc } from '../../../../shared/time/time.js';
-import { NextPracticeCutoffPort } from '../../domain/training.ports.js';
+import { MemberPreferencesPort } from '../../../../shared/member/member-preferences.port.js';
 import {
   nextPractice,
   type NextPracticeReason,
@@ -67,7 +67,7 @@ export class NextPracticeQueryHandler {
   constructor(
     private readonly sessions: SessionRepository,
     private readonly member: MemberContextPort,
-    private readonly cutoffs: NextPracticeCutoffPort,
+    private readonly preferences: MemberPreferencesPort,
   ) {}
 
   async handle(
@@ -76,7 +76,7 @@ export class NextPracticeQueryHandler {
   ): Promise<NextPracticeView> {
     const [{ timezone }, cutoff] = await Promise.all([
       this.member.clock(userId),
-      this.cutoffs.cutoffFor(userId),
+      this.preferences.get(userId, 'nextPracticeCutoff'),
     ]);
 
     const today = localToday(now, timezone);

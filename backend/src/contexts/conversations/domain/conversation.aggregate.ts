@@ -122,7 +122,7 @@ export class Conversation extends AggregateRoot<string> {
    */
   touch(at: Date): void {
     this.lastMessageAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   /**
@@ -137,7 +137,7 @@ export class Conversation extends AggregateRoot<string> {
     const trimmed = title.trim().slice(0, MAX_TITLE);
     if (trimmed.length === 0 || trimmed === this.title) return false;
     this.title = trimmed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'conversations.ConversationRenamed',
       'conversation',
@@ -156,23 +156,23 @@ export class Conversation extends AggregateRoot<string> {
    * three call sites to remember to turn it into that. The error carries which
    * operation was refused so the message can offer clearing instead.
    */
-  setPinned(pinned: boolean, at: Date): void {
+  setPinned(pinned: boolean): void {
     if (!pinned && this.isProtected) {
       throw new ProtectedConversationError(this.kind, 'unpin');
     }
     if (this.pinned === pinned) return;
     this.pinned = pinned;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   /** Archive or restore. **Archiving `coach` or `planner` is refused.** */
-  setArchived(archived: boolean, at: Date): void {
+  setArchived(archived: boolean): void {
     if (archived && this.isProtected) {
       throw new ProtectedConversationError(this.kind, 'archive');
     }
     if (this.archived === archived) return;
     this.archived = archived;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   /**
@@ -185,7 +185,7 @@ export class Conversation extends AggregateRoot<string> {
     }
     if (this.deletedAt) return;
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'conversations.ConversationDeleted',
       'conversation',
@@ -218,7 +218,7 @@ export class Conversation extends AggregateRoot<string> {
   clearUpTo(seq: number, at: Date): boolean {
     if (!Number.isFinite(seq) || seq <= this.clearedUpToSeq) return false;
     this.clearedUpToSeq = Math.floor(seq);
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'conversations.ConversationCleared',
       'conversation',

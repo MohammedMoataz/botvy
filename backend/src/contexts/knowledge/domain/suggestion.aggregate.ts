@@ -231,11 +231,14 @@ export class Suggestion extends AggregateRoot<string> {
    * the installation: most of them have no suggestion behind them, and that is
    * the normal case rather than an error.
    */
-  recordOutcome(outcome: SuggestionOutcome, at: Date = new Date()): boolean {
+  recordOutcome(outcome: SuggestionOutcome): boolean {
     if (this.status !== 'accepted') return false;
     if (this.outcome === outcome) return false;
     this.outcome = outcome;
-    this.updatedAt = at;
+    // The server's clock: its one caller is an event handler, and an event's
+    // `occurredAt` trails the relay, so honouring it would write `updatedAt`
+    // backwards on a row a device may already have pulled past.
+    this.updatedAt = new Date();
     return true;
   }
 

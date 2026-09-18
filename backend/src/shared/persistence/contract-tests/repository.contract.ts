@@ -166,6 +166,88 @@ export function describeRepositoryContract(adapter: AdapterUnderTest): void {
     }
   });
 
+  /**
+   * E-006, and the reason the check grew a version counter.
+   *
+   * Two writers hold copies of one aggregate and both saves carry the *same*
+   * `updatedAt` — which is not exotic: a handler that loads, mutates and saves
+   * inside one millisecond produces it, and so does any pair of writers on a
+   * clock with millisecond resolution. The timestamp comparison admitted the
+   * second one (`$lte`, not `$lt`) and the first writer's edit was gone with
+   * nothing anywhere having said so.
+   *
+   * The second copy was loaded at the same version as the first, so once the
+   * first save has moved the row on, the second no longer matches.
+   */
+  it(`${adapter.name}: refuses a second writer whose updatedAt is identical`, async () => {
+    const { repository, uow, dispose } = await adapter.make();
+    try {
+      const at = new Date();
+      const widget = Widget.create('w-1', 'user-1', 'first');
+      widget.updatedAt = at;
+      await uow.run(async () => {
+        await repository.save(widget);
+      });
+
+      // Two copies of the row as it stands. The second is built rather than
+      // read back twice, because the in-memory adapter hands out the stored
+      // instance itself — two `findById` calls there are one object, and a
+      // contract that relied on that would assert nothing on this adapter and
+      // something else on Mongo.
+      const one = await repository.findById('user-1', 'w-1');
+      const two = new Widget('w-1', 'user-1', 'loser');
+      two.version = one!.version;
+
+      // The winner writes at the very same instant the loser holds.
+      one!.label = 'winner';
+      one!.updatedAt = at;
+      await uow.run(async () => {
+        await repository.save(one!);
+      });
+
+      two.updatedAt = at;
+      await expect(
+        uow.run(async () => {
+          await repository.save(two);
+        }),
+      ).rejects.toBeInstanceOf(StaleWriteError);
+
+      expect((await repository.findById('user-1', 'w-1'))?.label).toBe('winner');
+    } finally {
+      await dispose?.();
+    }
+  });
+
+  /**
+   * The other half of the same rule: a copy that carries **no** loaded version
+   * is judged on `updatedAt`, exactly as it was before the column existed.
+   * That is what lets the column arrive without a backfill — a row written by
+   * an older build reads back versionless and still saves.
+   */
+  it(`${adapter.name}: a copy with no loaded version still saves`, async () => {
+    const { repository, uow, dispose } = await adapter.make();
+    try {
+      const widget = Widget.create('w-1', 'user-1', 'first');
+      await uow.run(async () => {
+        await repository.save(widget);
+      });
+
+      const versionless = new Widget('w-1', 'user-1', 'from a versionless row');
+      versionless.updatedAt = new Date(widget.updatedAt.getTime() + 1_000);
+      expect(versionless.version).toBeNull();
+
+      await uow.run(async () => {
+        await repository.save(versionless);
+      });
+
+      expect((await repository.findById('user-1', 'w-1'))?.label).toBe(
+        'from a versionless row',
+      );
+    } finally {
+      await dispose?.();
+    }
+  });
+
   it(`${adapter.name}: removes an aggregate`, async () => {
     const { repository, uow, dispose } = await adapter.make();
     try {

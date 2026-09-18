@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import { Label, type LabelState } from '../domain/label.aggregate.js';
 import { LabelRepository } from '../domain/label.repository.js';
 import type { RecurrenceRule } from '../domain/recurrence.js';
@@ -38,7 +39,7 @@ export interface LabelDoc extends Omit<LabelState, 'id'> {
  * job in advance — a field added in P5 gets its `?? default` here and every
  * existing row keeps working.
  */
-const taskMapper: Mapper<Task, TaskDoc> = {
+const taskMapper: Mapper<Task, TaskDoc> = versioned({
   toDomain(doc) {
     return Task.rehydrate({
       id: doc._id,
@@ -86,7 +87,7 @@ const taskMapper: Mapper<Task, TaskDoc> = {
       schemaVersion: task.schemaVersion,
     };
   },
-};
+});
 
 /**
  * Mongo hands back `exdates` as whatever the driver made of the array, and a
@@ -100,7 +101,7 @@ function normaliseRecurrence(
   return { ...recurrence, exdates: recurrence.exdates ?? [] };
 }
 
-const labelMapper: Mapper<Label, LabelDoc> = {
+const labelMapper: Mapper<Label, LabelDoc> = versioned({
   toDomain(doc) {
     return Label.rehydrate({
       id: doc._id,
@@ -143,7 +144,7 @@ const labelMapper: Mapper<Label, LabelDoc> = {
     doc.nameLower = label.nameLower;
     return doc;
   },
-};
+});
 
 @Injectable()
 export class MongoTaskRepository extends TaskRepository {
@@ -213,8 +214,20 @@ export class MongoTaskRepository extends TaskRepository {
     userId: string,
     labelId: string,
     snapshot: LabelSnapshot | null,
-    at: Date,
   ): Promise<number> {
+    /*
+     * The server's own clock, never the event's `occurredAt`.
+     *
+     * This is a bulk write with no optimistic filter, so whatever it puts in
+     * `updatedAt` simply lands — and the relay is eventual, so `occurredAt` can
+     * be older than a task the member edited while the rename was in the
+     * outbox. Writing it would move that row's `updatedAt` *backwards*, behind
+     * a cursor a device has already passed, and the rename would reach the
+     * server and never reach the phone. The same rule as every aggregate's
+     * mutating method, for the same reason: `updatedAt` is the sync cursor and
+     * only the server may move it.
+     */
+    const at = new Date();
     const result = await this.model
       .updateMany(
         { userId, labelId },

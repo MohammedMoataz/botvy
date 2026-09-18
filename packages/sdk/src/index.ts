@@ -72,6 +72,7 @@ export {
   type PendingAlert,
   type PendingPush,
   type PushOp,
+  type RejectionCode,
   type RejectionReason,
   type SyncEntity,
   type SyncOutcome,

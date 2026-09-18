@@ -19,7 +19,7 @@ import {
 } from './features/create-session/create-session.handler.js';
 import { DeleteSessionHandler } from './features/delete-session/delete-session.handler.js';
 import { LogSessionHandler } from './features/log-session/log-session.handler.js';
-import { NextPracticeCutoffPort } from './domain/training.ports.js';
+import { InMemoryMemberPreferences } from '../../shared/member/in-memory-member-preferences.js';
 import { NextPracticeQueryHandler } from './features/next-practice/next-practice.query.js';
 import { PurgeSessionHandler } from './features/purge-session/purge-session.handler.js';
 import { ReopenSessionHandler } from './features/reopen-session/reopen-session.handler.js';
@@ -99,30 +99,12 @@ class StubMemberContext extends MemberContextPort {
   }
 }
 
-/**
- * The member's own next-practice cut-off.
- *
- * A stub for `NextPracticeCutoffPort`, which the real module binds to Profile's
- * published `preferencesFor` read — never to `SettingsService`, because
- * `nextPracticeCutoff` is a `user_preferences` field seeded from
- * `settings.defaults.*` (constitution XII, FR-007). It starts at a value
- * **different** from the registry default on purpose: a stub echoing 21:00 would
- * pass whether the handler asked the member or the installation.
- */
-class StubCutoff extends NextPracticeCutoffPort {
-  cutoff = '18:00';
-
-  async cutoffFor(): Promise<string> {
-    return this.cutoff;
-  }
-}
-
 interface Harness {
   uow: InMemoryUnitOfWork;
   sessions: InMemorySessionRepository;
   profiles: InMemoryAthleteProfileRepository;
   member: StubMemberContext;
-  cutoffs: StubCutoff;
+  cutoffs: InMemoryMemberPreferences;
   create: CreateSessionHandler;
   update: UpdateSessionHandler;
   log: LogSessionHandler;
@@ -145,7 +127,18 @@ function harness(): Harness {
   const sessions = new InMemorySessionRepository(uow);
   const profiles = new InMemoryAthleteProfileRepository(uow);
   const member = new StubMemberContext();
-  const cutoffs = new StubCutoff();
+  /*
+   * The member's own next-practice cut-off, from the shared
+   * `MemberPreferencesPort` the real module binds to Profile — never to
+   * `SettingsService`, because `nextPracticeCutoff` is a `user_preferences`
+   * field seeded from `settings.defaults.*` (constitution XII, FR-007). It
+   * starts at a value **different** from the registry's 21:00 on purpose: a
+   * stub echoing the default would pass whether the handler asked the member or
+   * the installation.
+   */
+  const cutoffs = new InMemoryMemberPreferences({
+    nextPracticeCutoff: '18:00',
+  });
 
   return {
     uow,
@@ -496,6 +489,34 @@ describe('the four statuses and the tombstone', () => {
     expect(h.sessions.rows.has(created.id)).toBe(false);
   });
 
+  it('completes with yesterday’s timestamp without a stale write (E-017)', async () => {
+    /*
+     * "I did that session on Tuesday" is a well-formed thing to say, and
+     * `POST /sessions/:id/complete { at }` is how it is said. It used to be a
+     * 500: the aggregate wrote `at` into `updatedAt` as well as `completedAt`,
+     * the optimistic filter (`updatedAt <= aggregate.updatedAt`) missed, and
+     * the save threw `StaleWriteError`.
+     *
+     * The two are separate now. `completedAt` is the member's statement about
+     * their day; `updatedAt` is the server's record of when the row last
+     * changed here, which is what the optimistic check and the `/sync` cursor
+     * read — a client that could move it backwards could hide its own next
+     * write from every delta pull.
+     */
+    const created = await h.create.handle(MEMBER, command());
+    const before = h.sessions.rows.get(created.id)!.updatedAt;
+    const yesterday = new Date(Date.now() - 86_400_000);
+
+    await expect(
+      h.complete.handle(MEMBER, created.id, yesterday),
+    ).resolves.toBeDefined();
+
+    const row = h.sessions.rows.get(created.id)!;
+    expect(row.status).toBe('completed');
+    expect(row.completedAt?.getTime()).toBe(yesterday.getTime());
+    expect(row.updatedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+  });
+
   it('does not let one member touch another member’s session', async () => {
     const created = await h.create.handle(MEMBER, command());
 
@@ -607,13 +628,13 @@ describe('nextPractice (FR-006, FR-007)', () => {
     const { morning, tomorrow } = await morningDoneAndTomorrow();
     const evening = at(today(), '19:30');
 
-    h.cutoffs.cutoff = REGISTRY_CUTOFF;
+    h.cutoffs.chosen.nextPracticeCutoff = REGISTRY_CUTOFF;
     const beforeCutoff = await h.card.handle(MEMBER, evening);
     expect(beforeCutoff.reason).toBe('today');
     expect(beforeCutoff.isToday).toBe(true);
     expect(beforeCutoff.session?.id).toBe(morning);
 
-    h.cutoffs.cutoff = '18:00';
+    h.cutoffs.chosen.nextPracticeCutoff = '18:00';
     const afterCutoff = await h.card.handle(MEMBER, evening);
     expect(afterCutoff.reason).toBe('after-cutoff');
     expect(afterCutoff.isToday).toBe(false);
@@ -646,7 +667,7 @@ describe('nextPractice (FR-006, FR-007)', () => {
       }),
     );
     const tonight = at(date, '20:00', CAIRO);
-    h.cutoffs.cutoff = REGISTRY_CUTOFF;
+    h.cutoffs.chosen.nextPracticeCutoff = REGISTRY_CUTOFF;
 
     h.member.timezone = CAIRO;
     const asCairo = await h.card.handle(MEMBER, tonight);
@@ -677,7 +698,7 @@ describe('nextPractice (FR-006, FR-007)', () => {
       command({ plannedAt: at(date, '06:00') }),
     );
 
-    h.cutoffs.cutoff = REGISTRY_CUTOFF;
+    h.cutoffs.chosen.nextPracticeCutoff = REGISTRY_CUTOFF;
     const answer = await h.card.handle(MEMBER, at(date, '12:00'));
     expect(answer.session?.id).toBe(created.id);
     expect(answer.session?.isMissed).toBe(true);

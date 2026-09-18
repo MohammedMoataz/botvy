@@ -428,3 +428,8 @@ import {
   ],
 })
 export class SyncModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const SYNC_SUBSCRIPTIONS = {
+  'sync.ChangesApplied': 'NudgeOnChangesHandler',
+} as const;

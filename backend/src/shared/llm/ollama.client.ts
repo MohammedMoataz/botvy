@@ -92,6 +92,24 @@ export class OllamaClient {
       if (typeof frame.message?.content === 'string' && frame.message.content.length > 0) {
         yield frame.message.content;
       }
+      /*
+       * The counts exist **only here**, in the terminating frame (E-013).
+       *
+       * An aborted stream — the member pressed Stop, or the allergen guard
+       * returned early — never reaches it, so a turn that generated four
+       * hundred tokens is metered as zero. That is a property of the interface
+       * and not a mistake in this loop: there is no documented way to
+       * interrogate a cut stream, and the workarounds are all worse than the
+       * gap (a character-count estimate is wrong by a factor that varies with
+       * the language, which would over-meter an Arabic-writing member).
+       *
+       * **What would close it**: a `usage` object on an aborted response, or
+       * per-chunk `prompt_eval_count` / `eval_count` on the frames before the
+       * last. If a future Ollama exposes either, read it into `usage` as each
+       * frame arrives rather than only on `done`, and delete the `usage: null`
+       * note at `TurnRunner.converse`'s abort path. Re-check at every Ollama
+       * bump; the version is pinned in `plan.md`'s dependency table.
+       */
       if (frame.done) {
         usage = {
           model: options.model,

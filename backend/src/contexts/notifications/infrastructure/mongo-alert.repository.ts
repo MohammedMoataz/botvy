@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   Alert,
   type AlertSource,
@@ -18,7 +19,7 @@ export interface AlertDoc extends Omit<AlertState, 'id'> {
   schemaVersion: number;
 }
 
-const mapper: Mapper<Alert, AlertDoc> = {
+const mapper: Mapper<Alert, AlertDoc> = versioned({
   toDomain(doc) {
     return Alert.rehydrate({
       id: String(doc._id),
@@ -64,7 +65,7 @@ const mapper: Mapper<Alert, AlertDoc> = {
       schemaVersion: alert.schemaVersion,
     };
   },
-};
+});
 
 /** A fresh ObjectId as a string, for `Alert.plan`. */
 export function newAlertId(): string {

@@ -154,7 +154,6 @@ export class CalendarEvent extends AggregateRoot<string> {
   edit(
     patch: CalendarEventPatch,
     timezone: string,
-    at: Date = new Date(),
   ): string[] {
     const changed: string[] = [];
 
@@ -204,41 +203,40 @@ export class CalendarEvent extends AggregateRoot<string> {
     }
 
     if (changed.length === 0) return changed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     return changed;
   }
 
   /** "Not this year." The date joins the exception list (FR-011). */
-  skipOccurrence(originalStart: Date, at: Date = new Date()): void {
+  skipOccurrence(originalStart: Date): void {
     this.recurrence = skipInRule(
       this.requireRecurrence('This event does not repeat.'),
       originalStart,
     );
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   /** One occurrence moved, keyed by the rule's own moment (FR-011). */
   moveOccurrence(
     originalStart: Date,
     startAt: Date,
-    at: Date = new Date(),
   ): void {
     this.recurrence = moveInRule(
       this.requireRecurrence('This event does not repeat.'),
       originalStart,
       { startAt },
     );
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
-  restore(at: Date = new Date()): void {
+  restore(): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   get isDeleted(): boolean {

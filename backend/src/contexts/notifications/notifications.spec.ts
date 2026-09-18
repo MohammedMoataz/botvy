@@ -33,7 +33,10 @@ import {
 } from './domain/notification.ports.js';
 import { PendingAlertsQueryHandler } from './features/pending-alerts/pending-alerts.query.js';
 import { PlanAlertsSaga } from './features/plan-alerts-saga/plan-alerts.saga.js';
-import { SweepHandler } from './features/sweep/sweep.handler.js';
+import {
+  SWEEP_EVERY_MINUTES,
+  SweepHandler,
+} from './features/sweep/sweep.handler.js';
 import { InMemoryAlertRepository } from './infrastructure/in-memory-alert.repository.js';
 
 const MEMBER = 'member-1';
@@ -1107,6 +1110,10 @@ describe('the sweep', () => {
       true,
       undefined,
       expect.any(Number),
+      // And it says how often it expects to run, so `/health` judges its
+      // silence by its own pulse rather than by a list of job names kept in
+      // the health module (E-018).
+      SWEEP_EVERY_MINUTES,
     );
   });
 });

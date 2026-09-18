@@ -537,3 +537,12 @@ import {
   ],
 })
 export class ConversationsModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const CONVERSATIONS_SUBSCRIPTIONS = {
+  'identity.UserRegistered': 'BootstrapOnRegisteredHandler',
+  'identity.UserDeleted': 'PurgeOnDeletedHandler',
+  // The member's live sockets close: the handshake authenticates once, so a
+  // ban decided afterwards has to reach the socket some other way.
+  'identity.UserBanned': 'CloseOnBannedHandler',
+} as const;

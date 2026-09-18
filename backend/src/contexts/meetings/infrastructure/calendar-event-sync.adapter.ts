@@ -107,6 +107,7 @@ export class CalendarEventSyncAdapter implements SyncableEntity {
         change,
         verdict.reason,
         serverRow(existing),
+        verdict.code,
       );
     }
 
@@ -191,7 +192,7 @@ export class CalendarEventSyncAdapter implements SyncableEntity {
         if (!existing.isDeleted) existing.tombstone(now);
         break;
       case 'restore':
-        if (existing.isDeleted) existing.restore(now);
+        if (existing.isDeleted) existing.restore();
         break;
       case 'purge':
         existing.assertPurgeable();
@@ -238,7 +239,6 @@ export class CalendarEventSyncAdapter implements SyncableEntity {
            * the clock the pushed rule is validated against.
            */
           timezone,
-          now,
         );
         // No pushed status to copy: an event has none. And no `force` flag,
         // because `CalendarEvent.edit` has no orphan dialog to suppress — it

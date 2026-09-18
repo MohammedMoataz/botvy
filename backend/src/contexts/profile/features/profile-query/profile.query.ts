@@ -64,6 +64,12 @@ export interface PreferencesView {
 export interface MemberScheduleView {
   userId: string;
   timezone: string;
+  /**
+   * The language the member reads, for the sentences the rhythm composes and
+   * stores (E-012). It is on the profile beside the zone, so it falls out of
+   * the read this projection already does rather than costing a second one.
+   */
+  locale: string;
   /** `HH:mm` in the member's own zone. */
   planTomorrowTime: string;
   endOfDayTime: string;
@@ -183,11 +189,12 @@ export class ProfileQueryHandler {
   async schedulesFor(userIds: string[]): Promise<MemberScheduleView[]> {
     if (userIds.length === 0) return [];
 
-    const [profiles, preferences, timezone, planTomorrowTime, endOfDayTime, morningBriefingTime, checkinEnabled] =
+    const [profiles, preferences, timezone, locale, planTomorrowTime, endOfDayTime, morningBriefingTime, checkinEnabled] =
       await Promise.all([
         this.profiles.findMany(userIds),
         this.preferences.findMany(userIds),
         this.settings.get('defaults.timezone'),
+        this.settings.get('defaults.locale'),
         this.settings.get('defaults.planTomorrowTime'),
         this.settings.get('defaults.endOfDayTime'),
         this.settings.get('defaults.morningBriefingTime'),
@@ -208,6 +215,7 @@ export class ProfileQueryHandler {
         // that *are* there would send that member's touches at the
         // installation's default hour instead of the one they chose.
         timezone: profile?.timezone ?? timezone,
+        locale: profile?.locale ?? locale,
         planTomorrowTime: chosen?.planTomorrowTime ?? planTomorrowTime,
         endOfDayTime: chosen?.endOfDayTime ?? endOfDayTime,
         morningBriefingTime: chosen?.morningBriefingTime ?? morningBriefingTime,

@@ -15,7 +15,9 @@ import type { RecurrenceMode } from './recurrence.js';
  *
  * `recurrenceText` is here rather than computed by each caller because three
  * surfaces render "every 2 weeks on Tuesday" and none of them should have to
- * carry an RRULE parser to do it.
+ * carry an RRULE parser to do it. Since E-008 it is rendered in the *member's*
+ * language rather than always in English, which is why the reads below carry a
+ * locale beside the zone.
  */
 export interface TaskView {
   id: string;
@@ -72,6 +74,15 @@ export interface TaskListFilter {
    * the rule without the zone names the wrong day.
    */
   timezone: string;
+  /**
+   * The member's language, for `recurrenceText` (E-008).
+   *
+   * Beside the zone rather than instead of it: the zone decides *which day* the
+   * rule names and the locale decides what that day is called, and reading one
+   * without the other names the right day in the wrong language or the wrong
+   * day in the right one.
+   */
+  locale: string;
   limit: number;
   /** `updatedAt`-and-id cursor from a previous page. */
   cursor?: string;
@@ -102,10 +113,21 @@ export interface LabelView {
  * collection. Without them the next phase binds a port straight to Planning's
  * store, and by the time anyone notices there are two contexts with a key to
  * one collection and no way to change its shape.
+ *
+ * **Those three take no locale, and that is deliberate.** Their callers — the
+ * rhythm's draft, the agenda — read a task's title, priority and moment and
+ * never its `recurrenceText`; the two member-facing reads above are where the
+ * sentence is actually shown. Adding a parameter every caller would pass and
+ * nothing would read is a parameter somebody eventually passes wrongly.
  */
 export interface TaskReadRepository extends ReadRepository {
   page(userId: string, filter: TaskListFilter): Promise<TaskPage>;
-  byId(userId: string, id: string, timezone: string): Promise<TaskView | null>;
+  byId(
+    userId: string,
+    id: string,
+    timezone: string,
+    locale?: string,
+  ): Promise<TaskView | null>;
   labels(userId: string, includeDeleted: boolean): Promise<LabelView[]>;
 
   /** Tasks due within a window. The rhythm's "what does tomorrow hold". */

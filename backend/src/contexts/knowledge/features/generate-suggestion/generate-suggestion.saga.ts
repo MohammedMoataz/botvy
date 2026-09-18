@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
+import { MemberPreferencesPort } from '../../../../shared/member/member-preferences.port.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { localDate } from '../../../../shared/time/time.js';
 import {
-  AiSuggestionsPort,
   KnowledgeTranscriptPort,
   SuggestionDrafterPort,
   type DraftSource,
@@ -84,7 +84,7 @@ export class GenerateSuggestionSaga {
     private readonly links: LinkRepository,
     private readonly readings: ReadingRepository,
     private readonly suggestions: SuggestionRepository,
-    private readonly preference: AiSuggestionsPort,
+    private readonly preferences: MemberPreferencesPort,
     private readonly drafter: SuggestionDrafterPort,
     private readonly transcript: KnowledgeTranscriptPort,
     private readonly member: MemberContextPort,
@@ -127,7 +127,7 @@ export class GenerateSuggestionSaga {
       return { generated: false, reason: 'too_soon' };
     }
 
-    if (!(await this.preference.enabledFor(userId))) {
+    if (!(await this.preferences.get(userId, 'aiSuggestions'))) {
       return { generated: false, reason: 'disabled' };
     }
 

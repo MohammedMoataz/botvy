@@ -53,7 +53,6 @@ export class LabelSnapshotHandler {
         userId,
         payload.labelId!,
         { name: payload.name!, color: payload.color! },
-        event.occurredAt,
       ),
     );
 
@@ -85,7 +84,6 @@ export class LabelSnapshotHandler {
         userId,
         payload.labelId!,
         null,
-        event.occurredAt,
       ),
     );
     this.logger.log(

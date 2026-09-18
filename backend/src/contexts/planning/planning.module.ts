@@ -154,3 +154,12 @@ import { MongoTaskReadRepository } from './infrastructure/mongo-task-read.reposi
   ],
 })
 export class PlanningModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const PLANNING_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'PlanningPurgeOnDeletedHandler',
+  'planning.LabelUpdated': 'LabelSnapshotHandler',
+  'planning.LabelDeleted': 'LabelSnapshotHandler',
+  // The day's unfinished tasks are carried into the plan that was just set.
+  'rhythm.EndOfDaySummarySent': 'RolloverOnEndOfDaySaga',
+} as const;

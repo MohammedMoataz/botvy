@@ -15,8 +15,55 @@ import { newId } from '../../cqrs/ids.js';
 export abstract class AggregateRoot<Id = string> {
   abstract readonly id: Id;
   abstract readonly userId: string;
+  /**
+   * When the row last changed **on the server**, and never a fact about the
+   * member's day.
+   *
+   * It is the optimistic-concurrency column (`MongoRepositoryBase.save`
+   * filters on `updatedAt: { $lte: aggregate.updatedAt }`) and the `/sync`
+   * cursor, so a mutating method assigns it `new Date()` — never the caller's
+   * `at`. An `at` older than the stored row made the filter miss, the save
+   * throw `StaleWriteError` and a perfectly well-formed request answer 500
+   * (E-017); letting a client move it backwards is also letting a client hide
+   * its own next write from every delta pull.
+   *
+   * `at` still exists and still means what it says: it sets the *domain*
+   * timestamp — `completedAt`, `deletedAt`, `lastMessageAt` — and stamps the
+   * event, which is where "the member says it happened on Tuesday" belongs.
+   *
+   * `rehydrate` is the one assignment from stored state, and it is not a
+   * mutation.
+   */
   updatedAt: Date = new Date();
   schemaVersion = 1;
+
+  /**
+   * The row version this copy was **loaded at**, or `null` for a copy that was
+   * never loaded from a store.
+   *
+   * It is the optimistic-concurrency counter E-006 asks for, and it is not a
+   * domain fact: nothing in any aggregate reads it, and no event carries it.
+   * `MongoRepositoryBase.save` matches it and writes `version + 1`, and the
+   * in-memory adapter does the same thing so a handler spec and production
+   * agree — they have silently disagreed before, under a comment claiming they
+   * matched.
+   *
+   * `null` means exactly one thing to both adapters: **judge this write the way
+   * it was judged before there was a version**, on `updatedAt`. Two copies
+   * reach that state and they want the same answer:
+   *
+   *   - a fresh aggregate, whose first save is a create, and
+   *   - a copy read from a row written before the column existed.
+   *
+   * The second is what makes this land with no backfill. A versionless row has
+   * a version the first time anything saves it, so the fallback closes itself
+   * per row, and until it does that row is no worse guarded than it is today.
+   *
+   * `version` is stamped by `versioned()` wrapping a mapper, not by
+   * `rehydrate`, so no aggregate's state interface had to grow an
+   * infrastructure column — see `shared/persistence/ports/mapper.ts`.
+   */
+  version: number | null = null;
 
   #events: DomainEvent[] = [];
 

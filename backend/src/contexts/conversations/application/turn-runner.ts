@@ -464,7 +464,23 @@ export class TurnRunner {
         events.token({ requestId, text: chunk });
       }
     } catch (error) {
-      // An abort is the member pressing Stop, and what arrived is kept.
+      /*
+       * An abort is the member pressing Stop, and what arrived is kept.
+       *
+       * `usage` stays null here, and so it does on the allergen branch above:
+       * Ollama reports `prompt_eval_count` and `eval_count` in the `done` frame
+       * and nowhere else, and a stream that was cut has no `done` frame. So the
+       * tokens this turn really spent are **not counted** against
+       * `chat.dailyQuotaTokens` (E-013), and the admin usage screen says so
+       * rather than presenting its figure as exact. The other limit still
+       * applies in full: `chat.ratePerMin` counts `chat.send` calls, so the
+       * uncounted work is bounded by that rate rather than unbounded.
+       *
+       * The field that would close it is `ChatUsage` built from an aborted
+       * response — see the note at the `frame.done` branch in
+       * `OllamaClient.chat`, which is where such a value would have to be read.
+       * One line here then: `usage = <what the abort reported>`.
+       */
       if (request.signal?.aborted) {
         cancelled = true;
       } else {

@@ -17,6 +17,12 @@ import {
   NewPasswordTooShort,
   NewPasswordUnchanged,
 } from '../change-password/change-password.handler.js';
+import { MemberBootstrapPort } from '../../../../shared/member/member-bootstrap.port.js';
+import { InMemoryAuditAdapter } from '../../../../shared/audit/in-memory-audit.adapter.js';
+import { InMemorySettingsStore } from '../../../../shared/settings/in-memory-settings.store.js';
+import { SettingsService } from '../../../../shared/settings/settings.service.js';
+import { RegisterHandler } from '../register/register.handler.js';
+import { AuthController } from './auth.controller.js';
 import { InvalidCredentials, SignInHandler } from './sign-in.handler.js';
 
 import { InMemoryUnitOfWork } from '../../../../shared/persistence/memory/in-memory-unit-of-work.js';
@@ -374,5 +380,118 @@ describe('change password', () => {
         newPassword: 'a-longer-secret',
       }),
     ).rejects.toBeInstanceOf(CurrentPasswordWrong);
+  });
+});
+
+/**
+ * The readiness flag on the answers that open a session (E-019).
+ *
+ * `POST /auth/register` commits a PostgreSQL row and an outbox entry; the relay
+ * writes `profiles` and `user_preferences` on a later tick, and in between
+ * `PATCH /preferences` is a 404 for an account that otherwise works. The phone's
+ * onboarding is where a human reaches that window, so the answer says whether
+ * the furniture is there yet and the client waits instead of failing.
+ *
+ * Asserted through the **controller**, because that is where it is resolved —
+ * Identity is on PostgreSQL and the two documents are Mongo's, so the answer
+ * arrives through a port that `IdentityModule` cannot import without a
+ * three-module cycle. A spec against the handler would be asserting the wrong
+ * object.
+ */
+describe('the bootstrap readiness flag', () => {
+  let bootstrapped: boolean;
+  let controller: AuthController;
+
+  /** Answers whatever the test last said, so both directions are reachable. */
+  class Switchable extends MemberBootstrapPort {
+    async isBootstrapped(): Promise<boolean> {
+      return bootstrapped;
+    }
+  }
+
+  beforeEach(() => {
+    bootstrapped = false;
+    uow = new InMemoryUnitOfWork();
+    const users = new InMemoryUserRepository(uow);
+    const settings = new SettingsService(
+      new InMemorySettingsStore(),
+      new InMemoryAuditAdapter(),
+    );
+    const signIn = new SignInHandler(
+      uow,
+      users,
+      hasher,
+      new JwtSigner(env),
+      new RefreshHandler(
+        new InMemoryRefreshTokenRepository(),
+        users,
+        new JwtSigner(env),
+        env as never,
+      ),
+      new RegisterDeviceHandler(uow, new InMemoryDeviceRepository(uow)),
+    );
+
+    controller = new AuthController(
+      signIn,
+      // Only register and login are exercised here; the rest of the surface has
+      // its own specs and a stub for each would be eight lines of nothing.
+      undefined as never,
+      new RegisterHandler(uow, users, hasher, settings),
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      undefined as never,
+      new Switchable(),
+    );
+  });
+
+  it('registration answers false while the relay has not written the profile', async () => {
+    const answer = await controller.register({
+      email: 'new@example.test',
+      password: 'a-long-enough-password',
+      passwordConfirm: 'a-long-enough-password',
+    });
+
+    expect(answer.bootstrapped).toBe(false);
+    // The account itself is real and usable; only its Mongo-side furniture is
+    // in flight. A client that read this as a failed registration would be
+    // wrong.
+    expect(answer.userId).toBeTypeOf('string');
+  });
+
+  it('sign-in answers true once the furniture exists', async () => {
+    await controller.register({
+      email: 'new@example.test',
+      password: 'a-long-enough-password',
+      passwordConfirm: 'a-long-enough-password',
+    });
+    bootstrapped = true;
+
+    const answer = await controller.login({
+      email: 'new@example.test',
+      password: 'a-long-enough-password',
+    });
+
+    expect(answer.bootstrapped).toBe(true);
+    // Beside the flag it already carried, not instead of it.
+    expect(answer.mustChangePassword).toBe(false);
+    expect(answer.accessToken).toBeTypeOf('string');
+  });
+
+  it('sign-in answers false for a member signing in inside the window', async () => {
+    await controller.register({
+      email: 'new@example.test',
+      password: 'a-long-enough-password',
+      passwordConfirm: 'a-long-enough-password',
+    });
+
+    const answer = await controller.login({
+      email: 'new@example.test',
+      password: 'a-long-enough-password',
+    });
+
+    expect(answer.bootstrapped).toBe(false);
   });
 });

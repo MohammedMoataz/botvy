@@ -37,9 +37,11 @@ export interface HealthInputs {
   staleAfterMinutes: number;
   /**
    * The window for the **nightly** jobs, which is a different question from the
-   * one `staleAfterMinutes` answers. Which jobs those are is `NIGHTLY_JOBS`
-   * below — read its note, because it used to be a name prefix and the prefix
-   * silently mis-judged the two nightly jobs P5 and P6 added.
+   * one `staleAfterMinutes` answers. Which jobs those are is no longer written
+   * down here: a row says how often its job runs, and one that runs no more
+   * than once a day is judged by this (E-018). It is `backup.staleHours`, an
+   * operator knob, and it stays the number that decides — the row says *which*
+   * window applies, the operator says how wide it is.
    *
    * One window cannot serve both. The relay tick and the rhythm tick run every
    * few minutes, so fifteen minutes of silence from either is a fault; the
@@ -53,52 +55,50 @@ export interface HealthInputs {
   now?: Date;
 }
 
+const A_DAY_IN_MS = 24 * 3_600_000;
+
 /**
- * Jobs whose silence is measured in hours, because they run once a night.
+ * How long this row may be quiet before the job behind it is called stale.
  *
- * ## A set, and no longer a name prefix
+ * ## The cadence comes from the row, not from a list here
  *
- * This was `const NIGHTLY_PREFIX = 'backup.'`, and a prefix is the wrong shape
- * for the same reason CLAUDE.md already records about the settings registry:
- * refusing `ops.*` at the endpoint also froze `ops.staleAfterMinutes`. How
- * often a job runs is not a fact about its name.
+ * It was `const NIGHTLY_PREFIX = 'backup.'`, then a `NIGHTLY_JOBS` set, and
+ * both were the same mistake in different clothes: how often a job runs was
+ * written down in a file that has nothing to do with the job. The prefix cost
+ * something concrete — P5's `notifications.meeting-alerts` and P6's
+ * `training.materialise` begin with neither prefix nor apology, so both were
+ * judged by the fifteen-minute window and both were **permanently stale**, and
+ * a health signal that is always red says as little as one that is always
+ * green. The set fixed the value and left the shape, so the third nightly job
+ * would have cost the same afternoon again.
  *
- * It cost something concrete. P5 added the nightly `notifications.meeting-alerts`
- * and P6 the nightly `training.materialise`; neither begins with `backup.`, so
- * both were judged by the fifteen-minute window and both were therefore
- * **permanently stale** — `/health` answered `degraded` from about twenty
- * minutes after each nightly pass until the next one, and the platform gate's
- * "no stale jobs" check would have failed every day. That is the failure this
- * window exists to prevent, inverted: a health signal that is always red says
- * as little as one that is always green, and what an operator learns from
- * either is to stop reading it.
+ * The job declares it now, when it stamps (E-018). Three consequences of that
+ * are visible here:
  *
- * An explicit set rather than a rule, so adding a nightly job is a visible line
- * in one place — and it fails in the safe direction: a nightly job somebody
- * forgets to list reports stale, which is loud, where a five-minute job wrongly
- * listed here would go quiet for a day unnoticed. Adding a name here should
- * feel like a claim about how often the job runs, because it is one.
- *
- * The fuller fix is for the heartbeat row to carry its own expected cadence,
- * written by whichever job stamps it, so this table disappears. That is a
- * schema change to `ops_heartbeats` plus every stamp site, and it is recorded
- * in `enhancements/` rather than done from inside the phase that added one of
- * these jobs.
+ *   - **A row with no cadence gets the minute window.** That is every row
+ *     written before the column existed, which is why no backfill migration was
+ *     needed, and it is the safe direction: a nightly job nobody taught to
+ *     declare reports stale, which is loud, where a five-minute job wrongly
+ *     called nightly would go quiet for a day unnoticed.
+ *   - **A job that runs no more than once a day is judged by
+ *     `backup.staleHours`.** The operator knob still decides how wide the
+ *     nightly window is; the row only decides that the nightly window is the
+ *     one that applies. A job slower than that knob gets its own cadence, so a
+ *     weekly pass is not permanently stale by arithmetic.
+ *   - **Anything faster gets two turns before it is called stale**, floored at
+ *     `ops.staleAfterMinutes`. One late run is a late run.
  */
-const NIGHTLY_JOBS = new Set([
-  // P11's single nightly run: both stores and the media copy, reported once
-  // through `/internal/backups/report`. The two names below are what P0's pair
-  // of scripts stamped; they are listed so an installation that has not yet
-  // pruned those rows is still judged by the right window, and the migration
-  // that removes them is `20261002000000-one-backup-heartbeat`.
-  'backup',
-  'backup.mongo',
-  'backup.postgres',
-  // P5's: reconciles the rolling window of meeting reminders (03:20).
-  'notifications.meeting-alerts',
-  // P6's: keeps every member's fortnight of training sessions populated (03:40).
-  'training.materialise',
-]);
+function windowFor(
+  everyMinutes: number | null,
+  staleAfterMs: number,
+  nightlyAfterMs: number,
+): number {
+  if (everyMinutes === null) return staleAfterMs;
+  const cadenceMs = everyMinutes * 60_000;
+  return cadenceMs >= A_DAY_IN_MS
+    ? Math.max(nightlyAfterMs, cadenceMs)
+    : Math.max(staleAfterMs, cadenceMs * 2);
+}
 
 /**
  * Turns the probes into a verdict. A pure function so the branch that decides
@@ -126,7 +126,7 @@ export function assessHealth(inputs: HealthInputs): HealthReport {
       stale:
         heartbeat.lastOkAt === null ||
         now.getTime() - heartbeat.lastOkAt.getTime() >
-          (NIGHTLY_JOBS.has(heartbeat.job) ? nightlyAfterMs : staleAfterMs),
+          windowFor(heartbeat.everyMinutes, staleAfterMs, nightlyAfterMs),
     }))
     .sort((a, b) => a.job.localeCompare(b.job));
 

@@ -10,41 +10,41 @@ import { PlanAlertsSaga } from '../../contexts/notifications/features/plan-alert
 import { NotificationsPurgeOnDeletedHandler } from '../../contexts/notifications/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { PlanningPurgeOnDeletedHandler } from '../../contexts/planning/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RemindersPurgeOnDeletedHandler } from '../../contexts/reminders/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { RemindersModule } from '../../contexts/reminders/reminders.module.js';
+import { REMINDERS_SUBSCRIPTIONS, RemindersModule } from '../../contexts/reminders/reminders.module.js';
 import { MeetingsPurgeOnDeletedHandler } from '../../contexts/meetings/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { MeetingsModule } from '../../contexts/meetings/meetings.module.js';
+import { MEETINGS_SUBSCRIPTIONS, MeetingsModule } from '../../contexts/meetings/meetings.module.js';
 import { BootstrapAthleteProfileHandler } from '../../contexts/training/features/bootstrap-athlete-profile/bootstrap-athlete-profile.handler.js';
 import { SessionMaterialiserSaga } from '../../contexts/training/features/materialise/materialise.saga.js';
 import { TrainingPurgeOnDeletedHandler } from '../../contexts/training/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { TrainingModule } from '../../contexts/training/training.module.js';
+import { TRAINING_SUBSCRIPTIONS, TrainingModule } from '../../contexts/training/training.module.js';
 import { ApplySuggestionHandler } from '../../contexts/training/features/apply-suggestion/apply-suggestion.handler.js';
 import { IngestLinkSaga } from '../../contexts/knowledge/features/ingest-link/ingest-link.saga.js';
 import { GenerateSuggestionSaga } from '../../contexts/knowledge/features/generate-suggestion/generate-suggestion.saga.js';
 import { RecordSuggestionOutcomeHandler } from '../../contexts/knowledge/features/accept-suggestion/accept-suggestion.handler.js';
 import { KnowledgePurgeOnDeletedHandler } from '../../contexts/knowledge/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { KnowledgeModule } from '../../contexts/knowledge/knowledge.module.js';
-import { NutritionModule } from '../../contexts/nutrition/nutrition.module.js';
+import { KNOWLEDGE_SUBSCRIPTIONS, KnowledgeModule } from '../../contexts/knowledge/knowledge.module.js';
+import { NUTRITION_SUBSCRIPTIONS, NutritionModule } from '../../contexts/nutrition/nutrition.module.js';
 import { NudgeOnChangesHandler } from '../../contexts/sync/features/nudge-on-changes/nudge-on-changes.handler.js';
 import { ConversationsBootstrapHandler } from '../../contexts/conversations/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { ConversationsPurgeOnDeletedHandler } from '../../contexts/conversations/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { ConversationsModule } from '../../contexts/conversations/conversations.module.js';
+import { CONVERSATIONS_SUBSCRIPTIONS, ConversationsModule } from '../../contexts/conversations/conversations.module.js';
 import { RhythmBootstrapHandler } from '../../contexts/rhythm/features/bootstrap-on-registered/bootstrap-on-registered.handler.js';
 import { RhythmPreferencesChangedHandler } from '../../contexts/rhythm/features/preferences-changed/preferences-changed.handler.js';
 import { NutritionPurgeOnDeletedHandler } from '../../contexts/nutrition/features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RegenerateOnProfileUpdatedHandler } from '../../contexts/nutrition/features/regenerate-on-profile-updated/regenerate-on-profile-updated.handler.js';
 import { MealLineChangedHandler } from '../../contexts/rhythm/features/meal-line-changed/meal-line-changed.handler.js';
 import { RhythmPurgeOnDeletedHandler } from '../../contexts/rhythm/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { RhythmModule } from '../../contexts/rhythm/rhythm.module.js';
+import { RHYTHM_SUBSCRIPTIONS, RhythmModule } from '../../contexts/rhythm/rhythm.module.js';
 import { RolloverOnEndOfDaySaga } from '../../contexts/planning/features/rollover/rollover-on-end-of-day.saga.js';
 import { CloseOnBannedHandler } from '../../contexts/conversations/features/close-on-banned/close-on-banned.handler.js';
 import { RecordUsageHandler } from '../../contexts/operations/features/record-usage/record-usage.handler.js';
 import { OperationsPurgeOnDeletedHandler } from '../../contexts/operations/features/purge-on-deleted/purge-on-deleted.handler.js';
-import { SyncModule } from '../../contexts/sync/sync.module.js';
-import { NotificationsModule } from '../../contexts/notifications/notifications.module.js';
+import { SYNC_SUBSCRIPTIONS, SyncModule } from '../../contexts/sync/sync.module.js';
+import { NOTIFICATIONS_SUBSCRIPTIONS, NotificationsModule } from '../../contexts/notifications/notifications.module.js';
 import { LabelSnapshotHandler } from '../../contexts/planning/features/label-snapshot/label-snapshot.handler.js';
-import { PlanningModule } from '../../contexts/planning/planning.module.js';
-import { OperationsModule } from '../../contexts/operations/operations.module.js';
-import { ProfileModule } from '../../contexts/profile/profile.module.js';
+import { PLANNING_SUBSCRIPTIONS, PlanningModule } from '../../contexts/planning/planning.module.js';
+import { OPERATIONS_SUBSCRIPTIONS, OperationsModule } from '../../contexts/operations/operations.module.js';
+import { PROFILE_SUBSCRIPTIONS, ProfileModule } from '../../contexts/profile/profile.module.js';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
 import type { DomainEvent } from '../cqrs/domain-event.js';
@@ -52,6 +52,7 @@ import { HeartbeatService } from '../health/heartbeat.service.js';
 import { RELAY_LIVENESS } from '../health/healthz.controller.js';
 import { MODEL_NAMES } from '../persistence/mongo/schemas.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { assertDispatchable } from './dispatch-table.js';
 import { IdentityOutboxForwarder } from './identity-outbox-forwarder.js';
 import {
   MongoOutboxStore,
@@ -65,6 +66,15 @@ import { RelayRuntime } from './relay.runtime.js';
 import { HTTP_POST, WebhookFanout, type HttpPost } from './webhook-fanout.js';
 
 export const RELAY_JOB = 'outbox.relay';
+
+/**
+ * The relay stamps on `RELAY_ALIVE_EVERY_MS`, which is half a minute; a minute
+ * is the coarsest honest way to say that in whole minutes (E-018). It changes
+ * no verdict — anything faster than `ops.staleAfterMinutes` is judged by that
+ * window regardless — and it is declared so the row says what it expects
+ * rather than leaving the question to a table somewhere else.
+ */
+export const RELAY_EVERY_MINUTES = 1;
 
 /**
  * `profile.ProfileUpdated` has more than one reaction in this table, and this
@@ -83,6 +93,39 @@ async function profileTimezone(
   await alertPlanning.onProfileUpdated(event);
 }
 const WEBHOOK_TIMEOUT_MS = 10_000;
+
+/**
+ * Every context's claim on the table below, collected from the contexts
+ * themselves (E-005).
+ *
+ * The table stays hand-written, because seeing the whole event topology in one
+ * file is what it is for. What it did not have was a way to fail: a handler
+ * provided in a module and not named in the switch is never called and nothing
+ * complains. So each context declares its subscriptions at the foot of its own
+ * module, this collects them, and `assertDispatchable` refuses to build the
+ * relay if any of them has no case — naming the event and the handler waiting
+ * for it. `app.module.spec.ts` resolves this graph, which makes the gap a red
+ * test rather than a quiet 3am.
+ *
+ * `operations.SettingChanged` is in the table and in no declaration: it
+ * invalidates a `SettingsService` cache and belongs to no context's handler.
+ * The assertion is one-directional on purpose — the table may hold more than
+ * the contexts ask for, never less.
+ */
+const DECLARED_SUBSCRIPTIONS = {
+  profile: PROFILE_SUBSCRIPTIONS,
+  planning: PLANNING_SUBSCRIPTIONS,
+  reminders: REMINDERS_SUBSCRIPTIONS,
+  notifications: NOTIFICATIONS_SUBSCRIPTIONS,
+  conversations: CONVERSATIONS_SUBSCRIPTIONS,
+  rhythm: RHYTHM_SUBSCRIPTIONS,
+  meetings: MEETINGS_SUBSCRIPTIONS,
+  training: TRAINING_SUBSCRIPTIONS,
+  knowledge: KNOWLEDGE_SUBSCRIPTIONS,
+  nutrition: NUTRITION_SUBSCRIPTIONS,
+  operations: OPERATIONS_SUBSCRIPTIONS,
+  sync: SYNC_SUBSCRIPTIONS,
+};
 
 /**
  * The worker's half of the outbox: the change-stream relay, the identity
@@ -211,8 +254,12 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
         nutritionRegenerate: RegenerateOnProfileUpdatedHandler,
         nutritionPurge: NutritionPurgeOnDeletedHandler,
         heartbeats: HeartbeatService,
-      ) =>
-        new OutboxRelay({
+      ) => {
+        // Before anything is wired: a declared subscription with no case below
+        // would be a handler that never runs, and nothing would ever say so.
+        assertDispatchable(DECLARED_SUBSCRIPTIONS);
+
+        return new OutboxRelay({
           store,
           fanout,
           subscriptions: async () =>
@@ -655,8 +702,10 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
                 return;
             }
           },
-          heartbeat: (ok, error) => heartbeats.stamp(RELAY_JOB, ok, error),
-        }),
+          heartbeat: (ok, error) =>
+            heartbeats.stamp(RELAY_JOB, ok, error, undefined, RELAY_EVERY_MINUTES),
+        });
+      },
     },
     {
       provide: IdentityOutboxForwarder,
@@ -682,7 +731,8 @@ const WEBHOOK_TIMEOUT_MS = 10_000;
           relay,
           forwarder,
           closeStore: () => store.close(),
-          heartbeat: (ok, error) => heartbeats.stamp(RELAY_JOB, ok, error),
+          heartbeat: (ok, error) =>
+            heartbeats.stamp(RELAY_JOB, ok, error, undefined, RELAY_EVERY_MINUTES),
         }),
     },
     { provide: RELAY_LIVENESS, useExisting: RelayRuntime },

@@ -23,12 +23,11 @@ export class SkipCalendarEventOccurrenceHandler {
     userId: string,
     id: string,
     originalStart: Date,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date }> {
     const event = await this.events.findById(userId, id);
     if (!event) throw new CalendarEventNotFound(id);
 
-    event.skipOccurrence(originalStart, at);
+    event.skipOccurrence(originalStart);
     await this.uow.run(() => this.events.save(event));
     return { updatedAt: event.updatedAt };
   }

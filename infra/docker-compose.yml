@@ -51,6 +51,10 @@ services:
       # A bare ":80" serves plain HTTP behind the tunnel, which terminates TLS.
       # Set it to a hostname to have Caddy get its own certificate instead.
       CADDY_SITE: ${CADDY_SITE:-:80}
+      # The content security policy is report-only until this says `on`
+      # (E-025). Read by the Caddyfile, which tells the web app which header
+      # name to send; see `frontend/middleware.ts` for the policy itself.
+      CSP_ENFORCE: ${CSP_ENFORCE:-off}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -209,6 +213,10 @@ services:
       # edits from the portal, not a second copy here that they cannot.
       BACKUP_RETENTION_FALLBACK: ${BACKUP_RETENTION_FALLBACK:-14}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+      # The same schedule in minutes, reported with the run so `/health` judges
+      # the backup's silence by its own cadence (E-018). Change it with
+      # BACKUP_CRON or the backup reports a pulse it does not have.
+      BACKUP_EVERY_MINUTES: ${BACKUP_EVERY_MINUTES:-1440}
     volumes:
       # A host directory, so the archives survive `docker compose down -v` and
       # can be pointed at another disk. Everything else this project stores
@@ -228,7 +236,7 @@ services:
         {
           echo 'SHELL=/bin/bash'
           echo 'PATH=/usr/local/bin:/usr/bin:/bin'
-          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_FALLBACK; do
+          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_FALLBACK BACKUP_EVERY_MINUTES; do
             echo "$${name}=$${!name}"
           done
           # Redirected to PID 1's stdout, which is this container's log. cron

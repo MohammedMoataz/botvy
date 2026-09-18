@@ -14,13 +14,12 @@ export class RestoreCalendarEventHandler {
   async handle(
     userId: string,
     id: string,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date }> {
     const event = await this.events.findById(userId, id);
     if (!event) throw new CalendarEventNotFound(id);
     if (!event.isDeleted) return { updatedAt: event.updatedAt };
 
-    event.restore(at);
+    event.restore();
     await this.uow.run(() => this.events.save(event));
     return { updatedAt: event.updatedAt };
   }

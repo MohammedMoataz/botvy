@@ -5,6 +5,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   MealSuggestion,
   suggestionId,
@@ -41,7 +42,7 @@ export interface MealSuggestionDoc extends Omit<MealSuggestionState, 'id'> {
  * back without it, and both aggregates spread and `.map` these arrays without
  * asking. Settled here once rather than in each aggregate.
  */
-const mealMapper: Mapper<Meal, MealDoc> = {
+const mealMapper: Mapper<Meal, MealDoc> = versioned({
   toDomain(doc) {
     return Meal.rehydrate({
       id: doc._id,
@@ -69,9 +70,9 @@ const mealMapper: Mapper<Meal, MealDoc> = {
       schemaVersion: meal.schemaVersion,
     };
   },
-};
+});
 
-const suggestionMapper: Mapper<MealSuggestion, MealSuggestionDoc> = {
+const suggestionMapper: Mapper<MealSuggestion, MealSuggestionDoc> = versioned({
   toDomain(doc) {
     return MealSuggestion.rehydrate({
       id: doc._id,
@@ -103,7 +104,7 @@ const suggestionMapper: Mapper<MealSuggestion, MealSuggestionDoc> = {
       schemaVersion: suggestion.schemaVersion,
     };
   },
-};
+});
 
 /**
  * A chosen meal as the document holds it.

@@ -150,7 +150,7 @@ export class ConversationSyncAdapter implements SyncableEntity {
         // list for chats nobody has written in.
         at: change.updatedAt,
       });
-      applyFlags(created, fields, now);
+      applyFlags(created, fields);
       await this.uow.run(() => this.conversations.save(created));
       return { applied: true, id: created.id };
     }
@@ -161,7 +161,12 @@ export class ConversationSyncAdapter implements SyncableEntity {
 
     const verdict = resolveConflict(change, existing, now);
     if (!verdict.accept) {
-      return this.refuse(change.id, verdict.reason, toWire(existing));
+      return this.refuse(
+        change.id,
+        verdict.reason,
+        toWire(existing),
+        verdict.code,
+      );
     }
 
     switch (change.op) {
@@ -193,7 +198,7 @@ export class ConversationSyncAdapter implements SyncableEntity {
         // the two booleans through `applyFlags`, which is where the protected
         // refusals would otherwise land.
         if (typeof fields.title === 'string') existing.rename(fields.title, now);
-        applyFlags(existing, fields, now);
+        applyFlags(existing, fields);
     }
 
     await this.uow.run(() => this.conversations.save(existing));
@@ -204,10 +209,11 @@ export class ConversationSyncAdapter implements SyncableEntity {
     id: string,
     reason: Rejection['reason'],
     server: unknown,
+    code?: Rejection['code'],
   ): ApplyOutcome {
     return {
       applied: false,
-      rejection: { entity: this.entity, id, reason, server },
+      rejection: { entity: this.entity, id, reason, code, server },
     };
   }
 }
@@ -256,13 +262,12 @@ function protectedRefusal(
 function applyFlags(
   conversation: Conversation,
   fields: PushedConversation,
-  now: Date,
 ): void {
   if (typeof fields.pinned === 'boolean') {
-    conversation.setPinned(fields.pinned, now);
+    conversation.setPinned(fields.pinned);
   }
   if (typeof fields.archived === 'boolean') {
-    conversation.setArchived(fields.archived, now);
+    conversation.setArchived(fields.archived);
   }
 }
 

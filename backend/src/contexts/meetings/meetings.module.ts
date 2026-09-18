@@ -16,7 +16,6 @@ import { ProfileModule } from '../profile/profile.module.js';
 import { SessionsInRangeQueryHandler } from '../training/features/sessions/sessions-in-range.query.js';
 import { TrainingModule } from '../training/training.module.js';
 import {
-  MeetingDefaultsPort,
   TimedTasksPort,
   TrainingSessionsPort,
 } from './domain/meetings.ports.js';
@@ -54,7 +53,6 @@ import {
 } from './infrastructure/mongo-meetings.repositories.js';
 import {
   PlanningTimedTasks,
-  ProfileMeetingDefaults,
   TrainingSessions,
 } from './infrastructure/meetings.adapters.js';
 
@@ -71,12 +69,13 @@ import {
  * ## Three imported context modules, and each is one binding
  *
  * `PlanningModule` for `TasksDueQueryHandler`, `ProfileModule` for
- * `ProfileQueryHandler` and `MemberContextPort`, `OperationsModule` for
+ * `MemberContextPort` and `MemberPreferencesPort`, `OperationsModule` for
  * `SettingsService` and the shared Mongoose connection. Nothing under
  * `domain/` or `features/` here imports any of them: the agenda takes
- * `TimedTasksPort` and `TrainingSessionsPort`, the editor's default length
- * comes through `MeetingDefaultsPort`, and all three are bound in this
- * context's own `infrastructure/`. That is the seam constitution IX sanctions,
+ * `TimedTasksPort` and `TrainingSessionsPort`, both bound in this context's own
+ * `infrastructure/`, and the editor's default length comes through the shared
+ * `MemberPreferencesPort` that E-020 left as the one implementation of "the
+ * member's row, else the installation default". That is the seam constitution IX sanctions,
  * and `no-restricted-imports` refuses it anywhere else — `meetings` was added
  * to that rule's pattern list in this phase, and the rule was probed by writing
  * a file that should fail and watching it do so.
@@ -145,7 +144,6 @@ import {
       useFactory: (sessions: SessionsInRangeQueryHandler) =>
         new TrainingSessions(sessions),
     },
-    { provide: MeetingDefaultsPort, useClass: ProfileMeetingDefaults },
 
     // Every handler takes its dependencies by class token, so Nest builds them
     // without a factory. They are listed rather than glob-imported so a slice
@@ -232,3 +230,8 @@ import {
   ],
 })
 export class MeetingsModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const MEETINGS_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'MeetingsPurgeOnDeletedHandler',
+} as const;

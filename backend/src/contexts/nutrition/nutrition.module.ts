@@ -19,7 +19,6 @@ import { TrainingModule } from '../training/training.module.js';
 import {
   DayTrainingPort,
   MealDrafterPort,
-  MealModePort,
   MemberFoodsPort,
 } from './domain/nutrition.ports.js';
 import {
@@ -50,7 +49,6 @@ import {
   type MealSuggestionDoc,
 } from './infrastructure/mongo-nutrition.repositories.js';
 import {
-  ProfileMealMode,
   ProfileMemberFoods,
   TrainingDayTraining,
 } from './infrastructure/nutrition.adapters.js';
@@ -71,9 +69,11 @@ import {
  * `OperationsModule` for `SettingsService` and the shared Mongoose connection;
  * `ProfileModule` for the member's allergies, their likes and their meal mode;
  * `TrainingModule` for whether they train on the day. Nothing under `domain/`
- * or `features/` imports any of them — the three cross-context facts come
- * through `MemberFoodsPort`, `MealModePort` and `DayTrainingPort`, all bound in
- * this context's own `infrastructure/`. That is the seam constitution IX
+ * or `features/` imports any of them — the allergies and the training day come
+ * through `MemberFoodsPort` and `DayTrainingPort`, bound in this context's own
+ * `infrastructure/`, and the meal mode through the shared
+ * `MemberPreferencesPort`, which E-020 left as the one implementation of "the
+ * member's row, else the installation default". That is the seam constitution IX
  * sanctions, and `no-restricted-imports` refuses it anywhere else: `nutrition`
  * was added to that rule's pattern list in this phase, and the rule was probed
  * by writing a file that should fail and watching it do so.
@@ -134,7 +134,6 @@ import {
     // ---- other contexts' facts -------------------------------------------
     { provide: MemberFoodsPort, useClass: ProfileMemberFoods },
     { provide: DayTrainingPort, useClass: TrainingDayTraining },
-    { provide: MealModePort, useClass: ProfileMealMode },
 
     // Every handler below takes its dependencies by class token, so Nest builds
     // them without a factory. Listed rather than glob-imported so a slice added
@@ -182,3 +181,11 @@ import {
   ],
 })
 export class NutritionModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const NUTRITION_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'NutritionPurgeOnDeletedHandler',
+  // FR-013: a member who declares an allergy at noon must not spend the
+  // afternoon looking at almonds.
+  'profile.ProfileUpdated': 'RegenerateOnProfileUpdatedHandler',
+} as const;

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   resolveConflict,
+  type RejectionCode,
   type RejectionReason,
   type SyncChange,
 } from '../../../shared/persistence/ports/sync-change.js';
@@ -87,7 +88,7 @@ export class MealSyncAdapter implements SyncableEntity {
 
     const verdict = resolveConflict(change, existing, now);
     if (!verdict.accept) {
-      return this.refuse(change, verdict.reason, existing);
+      return this.refuse(change, verdict.reason, existing, verdict.code);
     }
 
     const fields = change.fields as PushedMeal;
@@ -114,7 +115,7 @@ export class MealSyncAdapter implements SyncableEntity {
           if (!existing.isDeleted) existing.tombstone(now);
           break;
         case 'restore':
-          if (existing.isDeleted) existing.restore(now);
+          if (existing.isDeleted) existing.restore();
           break;
         case 'purge':
           existing.assertPurgeable();
@@ -128,7 +129,6 @@ export class MealSyncAdapter implements SyncableEntity {
               ingredients: fields.ingredients,
               tags: fields.tags,
             },
-            now,
           );
       }
 
@@ -160,6 +160,7 @@ export class MealSyncAdapter implements SyncableEntity {
     change: SyncChange,
     reason: RejectionReason,
     existing: Meal | null,
+    code?: RejectionCode,
   ): ApplyOutcome {
     return {
       applied: false,
@@ -167,6 +168,7 @@ export class MealSyncAdapter implements SyncableEntity {
         entity: this.entity,
         id: change.id,
         reason,
+        code,
         server: existing
           ? {
               id: existing.id,

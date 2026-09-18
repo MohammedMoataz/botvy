@@ -174,3 +174,12 @@ import { N8nWorkflowsAdapter } from './infrastructure/n8n-workflows.adapter.js';
   ],
 })
 export class OperationsModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const OPERATIONS_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'OperationsPurgeOnDeletedHandler',
+  'identity.PasswordChanged': 'AdminPasswordFlagHandler',
+  // Without this row the daily allowance sums an empty collection and every
+  // member sits permanently at zero used.
+  'conversations.MessageSent': 'RecordUsageHandler',
+} as const;

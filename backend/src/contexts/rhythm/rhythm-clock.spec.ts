@@ -123,6 +123,7 @@ class Schedules extends MemberSchedulePort {
     this.rows.set(userId, {
       userId,
       timezone: zone,
+      locale: 'en',
       planTomorrowTime: '21:00',
       endOfDayTime: '22:00',
       morningBriefingTime: '08:00',

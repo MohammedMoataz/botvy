@@ -296,7 +296,7 @@ describe('a push against the conflict rule', () => {
     expect(h.sessions.rows.get(SESSION_ID)?.title).toBe('Push day');
   });
 
-  it('accepts an edit onto a tombstoned session without resurrecting it', async () => {
+  it('refuses an edit onto a tombstoned session, and does not resurrect it', async () => {
     const server = await seedSession(h);
     server.tombstone(minutesAgo(2));
     await h.uow.run(() => h.sessions.save(server));
@@ -306,11 +306,8 @@ describe('a push against the conflict rule', () => {
       change({
         id: SESSION_ID,
         op: 'update',
-        // A base that matches, so `resolveConflict` accepts outright: the row
-        // being a tombstone is not one of its clauses, and these adapters do
-        // not add one — `/sync` is a single protocol, and three of eight
-        // entities answering this differently from the other five is a defect a
-        // client author walks into by assuming uniformity.
+        // A base that matches, so every other clause of `resolveConflict`
+        // accepts outright. The tombstone is the only reason this is refused.
         baseUpdatedAt: server.updatedAt,
         updatedAt: new Date(),
         fields: { notes: 'written on a device that had not caught up' },
@@ -318,22 +315,34 @@ describe('a push against the conflict rule', () => {
       new Date(),
     );
 
-    expect(outcome).toEqual({ applied: true, id: SESSION_ID });
     /*
-     * The verdict is the same as Planning's and Meetings'; what this case pins
-     * is the **outcome**, which nothing else in the codebase asserts: the row
-     * stays deleted. An accepted edit must not resurrect a session the member
-     * removed — the notes land, `deletedAt` does not move, and the status is
-     * untouched, so the Deleted view reads exactly as it did.
+     * E-016. This case asserted the opposite until the clause landed: the edit
+     * was written onto the tombstone, acknowledged in `accepted`, and then
+     * erased by the next pull — which carries the row as a tombstone because on
+     * a delta that is the only way a deletion travels. Nothing told anybody.
      *
-     * The edit itself is then lost to the next pull, which overwrites the
-     * phone's copy from the tombstone. That is a real gap and it is written up
-     * as `enhancements/E-016` rather than patched here: if refusing is right it
-     * is right for every entity, which makes it a change to `resolveConflict`
-     * and to the contract, not to one context's three adapters.
+     * `invalid` and never `stale` (which would have the phone overwrite and
+     * retry for ever against a rule that will not accept it), with
+     * `deleted_row` so the member is told their session is in the bin rather
+     * than watching a badge count retries. The server row rides along, so the
+     * client can show the tombstone that won.
+     *
+     * What this pins beyond the verdict is the **outcome**: the notes are not
+     * written, `deletedAt` has not moved, and the status is untouched, so the
+     * Deleted view reads exactly as it did.
      */
+    expect(outcome).toMatchObject({
+      applied: false,
+      rejection: {
+        entity: 'sessions',
+        id: SESSION_ID,
+        reason: 'invalid',
+        code: 'deleted_row',
+      },
+    });
+
     const row = h.sessions.rows.get(SESSION_ID);
-    expect(row?.notes).toBe('written on a device that had not caught up');
+    expect(row?.notes).not.toBe('written on a device that had not caught up');
     expect(row?.deletedAt?.getTime()).toBe(server.deletedAt?.getTime());
     expect(row?.status).toBe('planned');
   });

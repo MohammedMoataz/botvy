@@ -25,6 +25,7 @@ import {
 import { PlanAlertsSaga } from './features/plan-alerts-saga/plan-alerts.saga.js';
 import { InternalReconcileController } from './features/reconcile-meeting-alerts/internal-reconcile.controller.js';
 import {
+  MEETING_ALERTS_EVERY_MINUTES,
   MEETING_ALERTS_JOB,
   PREP_LABEL,
   ReconcileMeetingAlertsHandler,
@@ -764,12 +765,14 @@ describe('the nightly pass', () => {
     expect(result.ms).toBeGreaterThanOrEqual(0);
 
     // A scheduled job that stops arriving has to be visible; `/health` reports
-    // this key stale after fifteen minutes.
+    // this key stale once it has been quiet for longer than the cadence the
+    // stamp declares — which for this pass is a night, not fifteen minutes.
     expect(b.stamp).toHaveBeenCalledWith(
       MEETING_ALERTS_JOB,
       true,
       undefined,
       expect.any(Number),
+      MEETING_ALERTS_EVERY_MINUTES,
     );
   });
 
@@ -816,6 +819,7 @@ describe('the nightly pass', () => {
       true,
       undefined,
       expect.any(Number),
+      MEETING_ALERTS_EVERY_MINUTES,
     );
   });
 
@@ -831,6 +835,7 @@ describe('the nightly pass', () => {
       false,
       'mongo is down',
       expect.any(Number),
+      MEETING_ALERTS_EVERY_MINUTES,
     );
   });
 });

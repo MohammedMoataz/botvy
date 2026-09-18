@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   Conversation,
   type ConversationKind,
@@ -59,7 +60,7 @@ export interface MessageDoc extends Omit<MessageState, 'id'> {
  * value-for-value what `toPersistence` produces here. A field added to the
  * aggregate and to this mapper, and forgotten there, fails that test.
  */
-export const conversationMapper: Mapper<Conversation, ConversationDoc> = {
+export const conversationMapper: Mapper<Conversation, ConversationDoc> = versioned({
   toDomain(doc) {
     return Conversation.rehydrate({
       id: doc._id,
@@ -91,9 +92,9 @@ export const conversationMapper: Mapper<Conversation, ConversationDoc> = {
       schemaVersion: conversation.schemaVersion,
     };
   },
-};
+});
 
-const messageMapper: Mapper<Message, MessageDoc> = {
+const messageMapper: Mapper<Message, MessageDoc> = versioned({
   toDomain(doc) {
     return Message.rehydrate({
       id: String(doc._id),
@@ -159,7 +160,7 @@ const messageMapper: Mapper<Message, MessageDoc> = {
       schemaVersion: message.schemaVersion,
     };
   },
-};
+});
 
 /** A fresh ObjectId as a string, for `Message.write`. */
 export function newMessageId(): string {

@@ -19,6 +19,22 @@ export class HeartbeatDto {
   @IsInt()
   @Min(0)
   durationMs?: number;
+
+  /**
+   * How often the caller expects to run, in minutes (E-018).
+   *
+   * Optional, so a caller written before the column existed still works — the
+   * row then keeps whatever it last declared, and a row that has never
+   * declared anything is judged by `ops.staleAfterMinutes`. Decorated, because
+   * the global pipe runs `whitelist` with `forbidNonWhitelisted`: a property
+   * with no class-validator decorator does not exist, and the endpoint would
+   * answer `400 property everyMinutes should not exist` to the caller doing it
+   * right.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  everyMinutes?: number;
 }
 
 /**
@@ -44,6 +60,7 @@ export class InternalHeartbeatController {
       body.ok,
       body.error || undefined,
       body.durationMs,
+      body.everyMinutes,
     );
     return { job: body.job, ok: body.ok, at: at.toISOString() };
   }

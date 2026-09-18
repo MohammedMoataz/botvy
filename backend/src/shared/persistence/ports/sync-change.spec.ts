@@ -142,6 +142,48 @@ describe('the sync conflict rule', () => {
     expect(verdict).toEqual({ accept: true });
   });
 
+  it('refuses an update onto a tombstone, with a code and never stale', () => {
+    /*
+     * E-016. It used to be accepted — the base matched, so the rule never
+     * looked at `deletedAt` — and the fields landed on the tombstone. The next
+     * pull then carried the row as a tombstone, which on a delta is the only
+     * way a deletion travels, the phone applied it as an upsert, and the
+     * member's edit was gone with `accepted` having said it worked.
+     *
+     * `invalid`, not `gone`: the contract defines `gone` as "the row is not
+     * there", and a tombstone is there and restorable. Not `stale` either,
+     * which would have the phone overwrite and retry for ever against a rule
+     * that will never take the write.
+     */
+    const deletedAt = minutesAgo(30);
+    const verdict = resolveConflict(
+      { op: 'update', updatedAt: minutesAgo(1), baseUpdatedAt: deletedAt },
+      server(deletedAt, deletedAt),
+      NOW,
+    );
+    expect(verdict).toEqual({
+      accept: false,
+      reason: 'invalid',
+      code: 'deleted_row',
+    });
+  });
+
+  it('still lets delete, restore and purge reach a tombstone', () => {
+    // Only `update` changed. `restore` and `purge` exist for tombstones and a
+    // repeated `delete` is the idempotent retry of one that already landed —
+    // refusing any of the three would strand a row in the bin for ever.
+    const deletedAt = minutesAgo(30);
+    for (const op of ['delete', 'restore', 'purge'] as const) {
+      expect(
+        resolveConflict(
+          { op, updatedAt: minutesAgo(1), baseUpdatedAt: deletedAt },
+          server(deletedAt, deletedAt),
+          NOW,
+        ),
+      ).toEqual({ accept: true });
+    }
+  });
+
   it('treats a delete as an ordinary write for conflict purposes', () => {
     // A delete is a write to `deletedAt` and competes like any other. A stale
     // delete losing to a newer edit is correct: the member edited the row on

@@ -175,7 +175,7 @@ export class Reminder extends AggregateRoot<string> {
 
     if (changed.length === 0) return changed;
 
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announce('ReminderRescheduled', at);
     return changed;
   }
@@ -197,7 +197,7 @@ export class Reminder extends AggregateRoot<string> {
     }
     this.snoozedUntil = until;
     this.status = 'active';
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announce('ReminderSnoozed', at);
   }
 
@@ -205,7 +205,7 @@ export class Reminder extends AggregateRoot<string> {
   complete(at: Date = new Date()): void {
     this.status = 'done';
     this.snoozedUntil = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'reminders.ReminderCompleted',
       'reminder',
@@ -218,7 +218,7 @@ export class Reminder extends AggregateRoot<string> {
   cancel(at: Date = new Date()): void {
     this.status = 'cancelled';
     this.snoozedUntil = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'reminders.ReminderCancelled',
       'reminder',
@@ -252,7 +252,7 @@ export class Reminder extends AggregateRoot<string> {
     this.status = 'active';
     this.remindAt = remindAt;
     this.snoozedUntil = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     // `Rescheduled` rather than `Scheduled`: the row existed, and the saga's
     // job is to reconcile this source's alerts rather than plan a first set.
     this.announce('ReminderRescheduled', at);
@@ -261,7 +261,7 @@ export class Reminder extends AggregateRoot<string> {
   /** Off the list, with the status exactly as it was. */
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'reminders.ReminderDeleted',
       'reminder',
@@ -281,7 +281,7 @@ export class Reminder extends AggregateRoot<string> {
    */
   restore(at: Date = new Date()): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announce('ReminderRescheduled', at);
   }
 

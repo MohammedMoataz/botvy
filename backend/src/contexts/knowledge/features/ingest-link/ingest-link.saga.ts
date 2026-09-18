@@ -22,6 +22,14 @@ import { ExpandPlaylistHandler } from '../expand-playlist/expand-playlist.handle
 /** The heartbeat key `/health` and the admin overview report staleness on. */
 export const KNOWLEDGE_INGEST_JOB = 'knowledge.ingest';
 
+/**
+ * The drain's pulse, stamped onto the row (E-018). `knowledge_ingest` triggers
+ * every five minutes — well inside `ops.staleAfterMinutes`, so declaring it
+ * changes no verdict today. It is declared anyway: a row that says what it
+ * expects is the thing that stops the cadence being guessed from the name.
+ */
+export const KNOWLEDGE_INGEST_EVERY_MINUTES = 5;
+
 /** Mints the ids of the documents the pipeline writes. */
 export type ReadingIdFactory = () => string;
 
@@ -233,6 +241,7 @@ export class IngestLinkSaga {
           false,
           `a link had been waiting ${minutes} minutes`,
           result.ms,
+          KNOWLEDGE_INGEST_EVERY_MINUTES,
         );
         this.logger.error(
           `the reading queue was not draining: the oldest link had waited ${minutes} minutes`,
@@ -245,6 +254,7 @@ export class IngestLinkSaga {
         true,
         undefined,
         result.ms,
+        KNOWLEDGE_INGEST_EVERY_MINUTES,
       );
       return result;
     } catch (error) {
@@ -254,6 +264,7 @@ export class IngestLinkSaga {
         false,
         (error as Error).message,
         result.ms,
+        KNOWLEDGE_INGEST_EVERY_MINUTES,
       );
       throw error;
     } finally {

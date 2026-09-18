@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { SettingsService } from '../../../shared/settings/settings.service.js';
 import { TasksDueQueryHandler } from '../../planning/features/tasks-due-query/tasks-due.query.js';
-import { ProfileQueryHandler } from '../../profile/features/profile-query/profile.query.js';
 import { SessionsInRangeQueryHandler } from '../../training/features/sessions/sessions-in-range.query.js';
 import {
-  MeetingDefaultsPort,
   TimedTasksPort,
   TrainingSessionsPort,
   type AgendaSession,
@@ -129,36 +126,3 @@ export class TrainingSessions extends TrainingSessionsPort {
   }
 }
 
-/**
- * The member's own default meeting length, from Profile's published read.
- *
- * `preferencesFor` rather than the preferences collection, and the difference
- * is the whole of constitution IX: a `*.query.ts` handler is Profile's
- * published surface, and a Mongo context reaching for another context's
- * collection — or for its *feature service* — is the violation even in the
- * permitted direction.
- *
- * The fallback is the installation default, for a member whose preferences row
- * the registration bootstrap has not written yet. That window is real: the
- * relay is at-least-once and eventual, so a member can create a meeting in the
- * seconds between registering and their preferences existing. Answering `null`
- * would push a "what now" branch into the create handler for a value the
- * bootstrap is about to write with exactly this number in it.
- */
-@Injectable()
-export class ProfileMeetingDefaults extends MeetingDefaultsPort {
-  constructor(
-    private readonly profiles: ProfileQueryHandler,
-    private readonly settings: SettingsService,
-  ) {
-    super();
-  }
-
-  async durationMinFor(userId: string): Promise<number> {
-    const preferences = await this.profiles.preferencesFor(userId);
-    return (
-      preferences?.meetingDurationMin ??
-      (await this.settings.get('defaults.meetingDurationMin'))
-    );
-  }
-}

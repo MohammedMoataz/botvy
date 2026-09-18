@@ -81,6 +81,7 @@ class StubSchedules extends MemberSchedulePort {
     return userIds.map((userId) => ({
       userId,
       timezone: CAIRO,
+      locale: 'en',
       planTomorrowTime: '21:00',
       endOfDayTime: '22:00',
       morningBriefingTime: '08:00',

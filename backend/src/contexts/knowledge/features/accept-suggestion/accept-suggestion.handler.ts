@@ -151,7 +151,7 @@ export class RecordSuggestionOutcomeHandler {
       sessionId,
     );
     if (!suggestion) return;
-    if (!suggestion.recordOutcome(outcome, event.occurredAt)) return;
+    if (!suggestion.recordOutcome(outcome)) return;
 
     await this.uow.run(() => this.suggestions.save(suggestion));
     this.logger.log(`suggestion ${suggestion.id} was ${outcome}`);

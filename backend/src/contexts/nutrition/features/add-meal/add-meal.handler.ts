@@ -115,12 +115,11 @@ export class UpdateMealHandler {
       ingredients?: string[];
       tags?: string[];
     },
-    at: Date = new Date(),
   ): Promise<{ id: string; changed: string[] }> {
     const meal = await this.meals.findById(userId, id);
     if (!meal) throw new MealNotFound(id);
 
-    const changed = meal.edit(patch, at);
+    const changed = meal.edit(patch);
     if (changed.length === 0) return { id: meal.id, changed };
 
     await this.uow.run(() => this.meals.save(meal));
@@ -164,12 +163,12 @@ export class RestoreMealHandler {
     private readonly meals: MealRepository,
   ) {}
 
-  async handle(userId: string, id: string, at: Date = new Date()): Promise<void> {
+  async handle(userId: string, id: string): Promise<void> {
     const meal = await this.meals.findById(userId, id);
     if (!meal) throw new MealNotFound(id);
     if (!meal.isDeleted) return;
 
-    meal.restore(at);
+    meal.restore();
     await this.uow.run(() => this.meals.save(meal));
   }
 }

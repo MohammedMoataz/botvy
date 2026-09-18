@@ -5,10 +5,10 @@ import {
   type MemberAlertPreferences,
   type MemberClock,
 } from '../../shared/member/member-context.port.js';
+import { InMemoryMemberPreferences } from '../../shared/member/in-memory-member-preferences.js';
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { localDate } from '../../shared/time/time.js';
 import {
-  AiSuggestionsPort,
   KnowledgeTranscriptPort,
   SuggestionDrafterPort,
   type DraftAttempt,
@@ -60,15 +60,6 @@ class FixedMemberContext extends MemberContextPort {
   }
 }
 
-class SwitchablePreference extends AiSuggestionsPort {
-  enabled = true;
-  asked = 0;
-  async enabledFor(): Promise<boolean> {
-    this.asked += 1;
-    return this.enabled;
-  }
-}
-
 class ScriptedDrafter extends SuggestionDrafterPort {
   seen: DraftSource[][] = [];
   answer: DraftAttempt = {
@@ -117,7 +108,18 @@ function harness() {
   const suggestions = new InMemorySuggestionRepository(
     new InnerSuggestionStore(uow),
   );
-  const preference = new SwitchablePreference();
+  /*
+   * The member's own `aiSuggestions`, through the shared
+   * `MemberPreferencesPort` the real module binds to Profile — never
+   * `SettingsService.get('defaults.aiSuggestions')`, which is the constitution
+   * XII bug this port exists to make hard to write. The decisive case is the
+   * *off* one below: `defaults.aiSuggestions` is `true`, so a saga reading the
+   * registry would keep drafting for a member who turned it off, and that is
+   * the assertion that catches it. The on-case cannot tell the two apart for a
+   * boolean whose default is the same value, which is why it is not the one
+   * relied on.
+   */
+  const preference = new InMemoryMemberPreferences({ aiSuggestions: true });
   const drafter = new ScriptedDrafter();
   const transcript = new RecordingTranscript();
 
@@ -268,7 +270,7 @@ describe('proposing a session', () => {
   });
 
   it('runs nothing at all for a member who turned suggestions off', async () => {
-    h.preference.enabled = false;
+    h.preference.chosen.aiSuggestions = false;
 
     const outcome = await h.saga.onSessionScheduled(sessionScheduled());
     expect(outcome).toEqual({ generated: false, reason: 'disabled' });
@@ -295,7 +297,7 @@ describe('proposing a session', () => {
     );
     expect(outcome.reason).toBe('too_soon');
     // Cheaper than the preference read, and checked first for that reason.
-    expect(h.preference.asked).toBe(0);
+    expect(h.preference.reads).toBe(0);
   });
 
   it('invents nothing when the member has saved nothing relevant', async () => {

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import {
   resolveConflict,
+  type RejectionCode,
+  type RejectionReason,
   type SyncChange,
 } from '../../../shared/persistence/ports/sync-change.js';
 import { UnitOfWork } from '../../../shared/persistence/ports/unit-of-work.js';
@@ -36,12 +38,13 @@ import type { RecurrenceRule } from '../domain/recurrence.js';
 function refuse(
   entity: string,
   change: SyncChange,
-  reason: 'stale' | 'gone' | 'not_deleted',
+  reason: RejectionReason,
   server?: unknown,
+  code?: RejectionCode,
 ): ApplyOutcome {
   return {
     applied: false,
-    rejection: { entity, id: change.id, reason, server },
+    rejection: { entity, id: change.id, reason, code, server },
   };
 }
 
@@ -79,8 +82,9 @@ export class LabelSyncAdapter implements SyncableEntity {
       return refuse(
         this.entity,
         change,
-        verdict.reason as 'stale' | 'gone' | 'not_deleted',
+        verdict.reason,
         serverRow(existing),
+        verdict.code,
       );
     }
 
@@ -177,8 +181,9 @@ export class TaskSyncAdapter implements SyncableEntity {
       return refuse(
         this.entity,
         change,
-        verdict.reason as 'stale' | 'gone' | 'not_deleted',
+        verdict.reason,
         serverRow(existing),
+        verdict.code,
       );
     }
 

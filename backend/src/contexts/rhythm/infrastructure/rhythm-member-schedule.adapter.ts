@@ -56,6 +56,7 @@ export class ProfileMemberSchedule extends MemberSchedulePort {
     return schedules.map((schedule) => ({
       userId: schedule.userId,
       timezone: schedule.timezone,
+      locale: schedule.locale,
       planTomorrowTime: schedule.planTomorrowTime,
       endOfDayTime: schedule.endOfDayTime,
       morningBriefingTime: schedule.morningBriefingTime,

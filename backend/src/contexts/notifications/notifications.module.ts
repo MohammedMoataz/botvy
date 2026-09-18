@@ -249,3 +249,51 @@ export const TOMBSTONE_PURGES = Symbol('TOMBSTONE_PURGES');
   ],
 })
 export class NotificationsModule {}
+
+/**
+ * What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`.
+ *
+ * The long one, and deliberately so: an alert's correct instant depends on
+ * facts four other contexts own — what was scheduled, when the member's day
+ * is, whether they are banned and whether they have a phone at all. Every one
+ * of these names is a case in the relay's switch, and a missing row used to be
+ * a handler that simply never ran.
+ */
+export const NOTIFICATIONS_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'NotificationsPurgeOnDeletedHandler',
+  'planning.TaskScheduled': 'PlanAlertsSaga',
+  'planning.TaskRescheduled': 'PlanAlertsSaga',
+  'planning.TaskCompleted': 'PlanAlertsSaga',
+  'planning.TaskCancelled': 'PlanAlertsSaga',
+  'planning.TaskDeleted': 'PlanAlertsSaga',
+  'reminders.ReminderScheduled': 'PlanAlertsSaga',
+  'reminders.ReminderRescheduled': 'PlanAlertsSaga',
+  'reminders.ReminderSnoozed': 'PlanAlertsSaga',
+  'reminders.ReminderCompleted': 'PlanAlertsSaga',
+  'reminders.ReminderCancelled': 'PlanAlertsSaga',
+  'reminders.ReminderDeleted': 'PlanAlertsSaga',
+  'reminders.ReminderPurged': 'PlanAlertsSaga',
+  'profile.ProfileUpdated': 'PlanAlertsSaga',
+  'profile.PreferencesChanged': 'PlanAlertsSaga',
+  'identity.UserBanned': 'PlanAlertsSaga',
+  'identity.UserUnbanned': 'PlanAlertsSaga',
+  'identity.DeviceRegistered': 'PlanAlertsSaga',
+  'identity.DeviceRemoved': 'PlanAlertsSaga',
+  'rhythm.PlanTomorrowPrompted': 'PlanAlertsSaga',
+  'rhythm.MorningBriefingSent': 'PlanAlertsSaga',
+  'rhythm.EndOfDaySummarySent': 'PlanAlertsSaga',
+  'meetings.MeetingScheduled': 'PlanAlertsSaga',
+  'meetings.MeetingChanged': 'PlanAlertsSaga',
+  'meetings.OccurrenceSkipped': 'PlanAlertsSaga',
+  'meetings.OccurrenceMoved': 'PlanAlertsSaga',
+  'meetings.MeetingCompleted': 'PlanAlertsSaga',
+  'meetings.MeetingCancelled': 'PlanAlertsSaga',
+  'meetings.MeetingDeleted': 'PlanAlertsSaga',
+  'training.SessionScheduled': 'PlanAlertsSaga',
+  'training.SessionRescheduled': 'PlanAlertsSaga',
+  'training.SessionCompleted': 'PlanAlertsSaga',
+  'training.SessionCancelled': 'PlanAlertsSaga',
+  'training.SessionSkipped': 'PlanAlertsSaga',
+  'training.SessionDeleted': 'PlanAlertsSaga',
+  'knowledge.SuggestionReady': 'PlanAlertsSaga',
+} as const;

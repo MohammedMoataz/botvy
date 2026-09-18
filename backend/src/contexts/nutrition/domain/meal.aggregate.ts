@@ -119,7 +119,6 @@ export class Meal extends AggregateRoot<string> {
       ingredients?: string[];
       tags?: string[];
     },
-    at: Date = new Date(),
   ): string[] {
     const changed: string[] = [];
     if (patch.name !== undefined) {
@@ -145,18 +144,18 @@ export class Meal extends AggregateRoot<string> {
       changed.push('tags');
     }
     if (changed.length === 0) return changed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     return changed;
   }
 
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
-  restore(at: Date = new Date()): void {
+  restore(): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   get isDeleted(): boolean {

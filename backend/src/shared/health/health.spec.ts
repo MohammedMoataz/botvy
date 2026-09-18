@@ -8,7 +8,12 @@ import { HeartbeatService, type OpsNudge } from './heartbeat.service.js';
 
 const NOW = new Date('2026-09-06T12:00:00.000Z');
 
-function heartbeat(job: string, minutesAgo: number | null, error: string | null = null): Heartbeat {
+function heartbeat(
+  job: string,
+  minutesAgo: number | null,
+  error: string | null = null,
+  everyMinutes: number | null = null,
+): Heartbeat {
   const at = minutesAgo === null ? null : new Date(NOW.getTime() - minutesAgo * 60_000);
   return {
     job,
@@ -16,8 +21,12 @@ function heartbeat(job: string, minutesAgo: number | null, error: string | null 
     lastOkAt: at,
     lastDurationMs: 12,
     lastError: error,
+    everyMinutes,
   };
 }
+
+/** A day, in minutes: what a nightly job stamps onto its own row. */
+const NIGHTLY = 24 * 60;
 
 const healthy = {
   postgres: true,
@@ -46,15 +55,65 @@ describe('assessHealth', () => {
    * that obvious: judged by the fifteen-minute rule, a backup that ran
    * successfully at 03:00 reported the platform degraded from 03:15 onward and
    * failed the gate's "no stale jobs" check every single day.
+   *
+   * The row says it runs nightly now (E-018), rather than the health module
+   * keeping a list of which names are. A job called `anything.at.all` gets the
+   * same answer, which is the whole point: a third nightly job added without
+   * touching this file used to report the platform broken for twenty-three
+   * hours a day.
    */
-  it('measures a nightly backup in hours, not in the minute window', () => {
+  it('measures a job that declares a nightly cadence in hours', () => {
     const report = assessHealth({
       ...healthy,
-      heartbeats: [heartbeat('backup.mongo', 9 * 60), heartbeat('backup.postgres', 9 * 60)],
+      heartbeats: [
+        heartbeat('backup', 9 * 60, null, NIGHTLY),
+        heartbeat('a.job.nobody.listed.anywhere', 9 * 60, null, NIGHTLY),
+      ],
     });
 
     expect(report.jobs.map((job) => job.stale)).toEqual([false, false]);
     expect(report.status).toBe('ok');
+  });
+
+  /**
+   * The fallback, and the reason no backfill migration was needed: a row
+   * written before the column existed has no cadence, and the minute window is
+   * the safe direction — loud, rather than a job quietly excused for a day.
+   */
+  it('judges a row with no declared cadence by the minute window', () => {
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [heartbeat('backup', 9 * 60)],
+    });
+
+    expect(report.jobs[0]?.stale).toBe(true);
+  });
+
+  /**
+   * `backup.staleHours` is an operator knob and it still decides. The row says
+   * *which* window a job is judged by; the operator says how wide the nightly
+   * one is. A cadence that silently overrode a knob would be a knob that had
+   * stopped working without anybody being told.
+   */
+  it('lets the operator widen and narrow the nightly window', () => {
+    const nightly = [heartbeat('backup', 30 * 60, null, NIGHTLY)];
+
+    expect(assessHealth({ ...healthy, heartbeats: nightly, backupStaleHours: 48 }).status).toBe(
+      'ok',
+    );
+    expect(assessHealth({ ...healthy, heartbeats: nightly, backupStaleHours: 24 }).status).toBe(
+      'degraded',
+    );
+  });
+
+  /** A job slower than the nightly window is not stale by arithmetic. */
+  it('gives a weekly job its own cadence rather than the nightly window', () => {
+    const report = assessHealth({
+      ...healthy,
+      heartbeats: [heartbeat('ops.retention', 3 * 24 * 60, null, 7 * 24 * 60)],
+    });
+
+    expect(report.jobs[0]?.stale).toBe(false);
   });
 
   /**
@@ -69,16 +128,18 @@ describe('assessHealth', () => {
    * every day — which is the original defect wearing the opposite sign, and it
    * is what a permanently red signal costs: an operator stops reading it.
    *
-   * The cadence of a job is not a fact about its name. It is a set now, and
-   * this case is what stops the next nightly job being added without a thought
-   * about which window judges it.
+   * The cadence of a job is not a fact about its name. The set that replaced
+   * the prefix was the same mistake one step removed — a third nightly job
+   * added without editing the health module would have cost the same afternoon
+   * again — so the job stamps its own cadence onto its row (E-018) and this
+   * case is what holds the two nightly jobs that found the prefix out.
    */
   it('measures every nightly job in hours, not just the backups', () => {
     const report = assessHealth({
       ...healthy,
       heartbeats: [
-        heartbeat('notifications.meeting-alerts', 9 * 60),
-        heartbeat('training.materialise', 9 * 60),
+        heartbeat('notifications.meeting-alerts', 9 * 60, null, NIGHTLY),
+        heartbeat('training.materialise', 9 * 60, null, NIGHTLY),
       ],
     });
 
@@ -87,12 +148,14 @@ describe('assessHealth', () => {
   });
 
   it('still holds a five-minute job to the minute window', () => {
-    // The other side of the same set: widening the window for a job that runs
+    // The other side of the same rule: widening the window for a job that runs
     // every few minutes would let it go quiet for a day unnoticed, which is
-    // exactly what the fifteen-minute rule is for.
+    // exactly what the fifteen-minute rule is for. `rhythm.tick` declares
+    // nothing and `notifications.sweep` declares five minutes; both are judged
+    // by the operator's window, because it is the wider of the two.
     const report = assessHealth({
       ...healthy,
-      heartbeats: [heartbeat('rhythm.tick', 3 * 60), heartbeat('notifications.sweep', 3 * 60)],
+      heartbeats: [heartbeat('rhythm.tick', 3 * 60), heartbeat('notifications.sweep', 3 * 60, null, 5)],
     });
 
     expect(report.jobs.map((job) => job.stale)).toEqual([true, true]);

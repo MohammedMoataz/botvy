@@ -126,11 +126,17 @@ DURATION_MS=$(( ($(date -u +%s) - STARTED) * 1000 ))
 if [ -n "${FAILURE}" ]; then OK=false; else OK=true; fi
 
 RETENTION="${BACKUP_RETENTION_FALLBACK:-14}"
+# How often this container is scheduled, in minutes, reported so `/health`
+# judges the backup's silence by its own cadence rather than by a list of
+# nightly job names kept in the API (E-018). It travels with `BACKUP_CRON`,
+# which is the thing that actually decides it: an installation that moves to
+# twice a day sets both in compose and nothing else has to be told.
+EVERY_MINUTES="${BACKUP_EVERY_MINUTES:-1440}"
 if [ -n "${BOTVY_API_BASE:-}" ] && [ -n "${INTERNAL_SERVICE_TOKEN:-}" ]; then
   ANSWER="$(curl -fsS -X POST "${BOTVY_API_BASE}/internal/backups/report" \
     -H "X-Service-Token: ${INTERNAL_SERVICE_TOKEN}" \
     -H 'Content-Type: application/json' \
-    -d "{\"ok\":${OK},\"durationMs\":${DURATION_MS},\"error\":\"${FAILURE}\",\"archives\":[${ARCHIVES}]}" \
+    -d "{\"ok\":${OK},\"durationMs\":${DURATION_MS},\"error\":\"${FAILURE}\",\"everyMinutes\":${EVERY_MINUTES},\"archives\":[${ARCHIVES}]}" \
     2>/dev/null || true)"
   # The registry's own value, learned from the call that reported the result.
   # `grep -o` rather than a JSON parser because this image has neither jq nor
