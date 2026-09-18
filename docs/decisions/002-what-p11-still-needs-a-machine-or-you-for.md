@@ -159,6 +159,16 @@ panel fills in within a second — "Healthy", every job named with the time it
 last ran — and the portal suite's first case, which is written to catch exactly
 this, is green.
 
+**The portal polls `/health`, and `/health` is anonymous.** Every open tab asks
+every thirty seconds, and that counts against `limits.anonymousPerMinute` — the
+same bucket as sign-in, registration and the refresh exchange, set to twenty
+because it is the credential-stuffing limit. Two tabs left open on the overview
+spend four of those twenty a minute for as long as they are open. Nothing is
+broken today and nobody has met it outside the test suite, but the shape is
+worth a decision: either the health poll belongs in a bucket of its own, or the
+portal should read it through an authenticated route. It is the reason the CI
+suite met `429`s at all, which is how it came to light.
+
 **One flake is left in that suite and it is not the product.** Under a full run
 the shared administrator account trips the rate limits — `limits.anonymousPerMinute`
 is twenty by design — and a page whose read is refused shows the error boundary.
