@@ -148,15 +148,13 @@ async function up(db) {
   // indexes, because one is the session it was *generated for* and the other
   // the session it *went into* — collapsing them would lose whichever question
   // was asked second.
-  await db
-    .collection('suggestions')
-    .createIndex(
-      { userId: 1, sessionId: 1 },
-      {
-        name: 'suggestions_user_session',
-        partialFilterExpression: { sessionId: { $type: 'string' } },
-      },
-    );
+  await db.collection('suggestions').createIndex(
+    { userId: 1, sessionId: 1 },
+    {
+      name: 'suggestions_user_session',
+      partialFilterExpression: { sessionId: { $type: 'string' } },
+    },
+  );
   await db.collection('suggestions').createIndex(
     { userId: 1, acceptedSessionId: 1 },
     {

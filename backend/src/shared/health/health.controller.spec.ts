@@ -3,7 +3,9 @@ import type { Heartbeat } from '../../contexts/operations/domain/heartbeat.repos
 import { BOTVY_VERSION, HealthController } from './health.controller.js';
 
 /** Every collaborator reduced to the one method the controller calls. */
-function controller(overrides: Partial<Record<string, unknown>> = {}): HealthController {
+function controller(
+  overrides: Partial<Record<string, unknown>> = {},
+): HealthController {
   const deps = {
     prisma: { ping: async () => true },
     mongo: { db: { admin: () => ({ ping: async () => ({ ok: 1 }) }) } },
@@ -39,7 +41,11 @@ describe('GET /health', () => {
 
   it('turns a probe that throws into false rather than a failed request', async () => {
     const report = await controller({
-      prisma: { ping: async () => { throw new Error('connection refused'); } },
+      prisma: {
+        ping: async () => {
+          throw new Error('connection refused');
+        },
+      },
     }).report();
     expect(report.postgres).toBe(false);
     expect(report.mongo).toBe(true);
@@ -53,17 +59,28 @@ describe('GET /health', () => {
       lastOkAt: new Date(Date.now() - 5 * 60_000),
       lastDurationMs: 1,
       lastError: null,
+      everyMinutes: null,
     };
     const report = await controller({
       heartbeats: { listAll: async () => [fresh] },
-      settings: { get: async () => { throw new Error('settings down'); } },
+      settings: {
+        get: async () => {
+          throw new Error('settings down');
+        },
+      },
     }).report();
-    expect(report.jobs).toEqual([expect.objectContaining({ job: 'outbox.relay', stale: false })]);
+    expect(report.jobs).toEqual([
+      expect.objectContaining({ job: 'outbox.relay', stale: false }),
+    ]);
   });
 
   it('still answers when the heartbeat collection cannot be read', async () => {
     const report = await controller({
-      heartbeats: { listAll: async () => { throw new Error('mongo timeout'); } },
+      heartbeats: {
+        listAll: async () => {
+          throw new Error('mongo timeout');
+        },
+      },
     }).report();
     expect(report.jobs).toEqual([]);
   });

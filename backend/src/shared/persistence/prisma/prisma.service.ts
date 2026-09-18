@@ -1,4 +1,8 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 /**
@@ -7,7 +11,10 @@ import { PrismaClient } from '@prisma/client';
  * through a query handler or an event, never through this.
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   async onModuleInit(): Promise<void> {
     // Generation mode builds the application to read its decorators and has
     // no database to reach; connecting would only fail slowly.

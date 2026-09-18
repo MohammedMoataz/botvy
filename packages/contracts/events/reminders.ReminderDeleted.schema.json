@@ -9,8 +9,6 @@
       "format": "uuid"
     }
   },
-  "required": [
-    "reminderId"
-  ],
+  "required": ["reminderId"],
   "additionalProperties": false
 }

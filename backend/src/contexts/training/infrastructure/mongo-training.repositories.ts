@@ -3,11 +3,13 @@ import type { Model } from 'mongoose';
 import type { DomainEvent } from '../../../shared/cqrs/domain-event.js';
 import {
   MongoRepositoryBase,
+  optimisticClause,
   type OutboxInsert,
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import { StaleWriteError } from '../../../shared/persistence/ports/errors.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   AthleteProfile,
   type AthleteProfileState,
@@ -68,29 +70,30 @@ export interface WorkoutDoc extends Omit<WorkoutState, 'id'> {
  * here spreads and `.map`s these arrays without asking. `?? []` is where that
  * is settled, once, rather than in each of the four aggregates.
  */
-const athleteProfileMapper: Mapper<AthleteProfile, AthleteProfileDoc> = {
-  toDomain(doc) {
-    return AthleteProfile.rehydrate({
-      // `_id` is the member's id; the aggregate's `id` getter returns `userId`
-      // for exactly this reason. See the class note on `AthleteProfile`.
-      userId: doc._id,
-      sports: doc.sports ?? [],
-      slots: (doc.slots ?? []).map(normaliseSlot),
-      updatedAt: asDate(doc.updatedAt),
-    });
-  },
-  toPersistence(profile) {
-    return {
-      _id: profile.userId,
-      sports: profile.sports,
-      slots: profile.slots,
-      updatedAt: profile.updatedAt,
-      schemaVersion: profile.schemaVersion,
-    };
-  },
-};
+const athleteProfileMapper: Mapper<AthleteProfile, AthleteProfileDoc> =
+  versioned({
+    toDomain(doc) {
+      return AthleteProfile.rehydrate({
+        // `_id` is the member's id; the aggregate's `id` getter returns `userId`
+        // for exactly this reason. See the class note on `AthleteProfile`.
+        userId: doc._id,
+        sports: doc.sports ?? [],
+        slots: (doc.slots ?? []).map(normaliseSlot),
+        updatedAt: asDate(doc.updatedAt),
+      });
+    },
+    toPersistence(profile) {
+      return {
+        _id: profile.userId,
+        sports: profile.sports,
+        slots: profile.slots,
+        updatedAt: profile.updatedAt,
+        schemaVersion: profile.schemaVersion,
+      };
+    },
+  });
 
-const sessionMapper: Mapper<Session, SessionDoc> = {
+const sessionMapper: Mapper<Session, SessionDoc> = versioned({
   toDomain(doc) {
     return Session.rehydrate({
       id: doc._id,
@@ -136,9 +139,9 @@ const sessionMapper: Mapper<Session, SessionDoc> = {
       schemaVersion: session.schemaVersion,
     };
   },
-};
+});
 
-const programMapper: Mapper<Program, ProgramDoc> = {
+const programMapper: Mapper<Program, ProgramDoc> = versioned({
   toDomain(doc) {
     return Program.rehydrate({
       id: doc._id,
@@ -188,9 +191,9 @@ const programMapper: Mapper<Program, ProgramDoc> = {
       schemaVersion: program.schemaVersion,
     };
   },
-};
+});
 
-const workoutMapper: Mapper<Workout, WorkoutDoc> = {
+const workoutMapper: Mapper<Workout, WorkoutDoc> = versioned({
   toDomain(doc) {
     return Workout.rehydrate({
       id: doc._id,
@@ -218,7 +221,7 @@ const workoutMapper: Mapper<Workout, WorkoutDoc> = {
       schemaVersion: workout.schemaVersion,
     };
   },
-};
+});
 
 function normaliseSlot(slot: TrainingSlot): TrainingSlot {
   return {
@@ -339,18 +342,16 @@ export class MongoAthleteProfileRepository extends AthleteProfileRepository {
     const doc = athleteProfileMapper.toPersistence(profile);
     const events = profile.pullEvents();
 
+    // The base's clause and the base's next version, called rather than copied:
+    // this adapter exists only because `_id` *is* the owner here, so the base's
+    // `{ _id, userId }` filter would match nothing. Every other rule is shared,
+    // and a second copy of the optimistic check is a second place to be wrong.
+    const next = (profile.version ?? 0) + 1;
+
     const result = await this.model
       .updateOne(
-        {
-          _id: profile.userId,
-          // Either the row is new, or the copy we hold is not older than it.
-          // The base's clause, verbatim, and for the base's reason.
-          $or: [
-            { updatedAt: { $lte: profile.updatedAt } },
-            { updatedAt: { $exists: false } },
-          ],
-        },
-        { $set: doc },
+        { _id: profile.userId, ...optimisticClause(profile) },
+        { $set: { ...doc, version: next } },
         { upsert: true, session: session ?? undefined },
       )
       .exec();
@@ -358,6 +359,8 @@ export class MongoAthleteProfileRepository extends AthleteProfileRepository {
     if (result.matchedCount === 0 && result.upsertedCount === 0) {
       throw new StaleWriteError(profile.userId);
     }
+
+    profile.version = next;
 
     await this.#outbox.publish(events);
   }

@@ -33,7 +33,11 @@
   --bs-link-hover-color: var(--botvy-accent, #2563eb);
 
   --panel-surface: var(--botvy-surface, #ffffff);
-  --panel-tint: color-mix(in srgb, var(--botvy-accent, #2563eb) 12%, transparent);
+  --panel-tint: color-mix(
+    in srgb,
+    var(--botvy-accent, #2563eb) 12%,
+    transparent
+  );
 }
 
 /* Bootstrap's own blue, moved onto the product's accent. The button variables
@@ -44,8 +48,16 @@
   --bs-btn-border-color: var(--botvy-accent, #2563eb);
   --bs-btn-color: var(--botvy-accent-text, #ffffff);
   --bs-btn-hover-bg: color-mix(in srgb, var(--botvy-accent, #2563eb) 85%, #000);
-  --bs-btn-hover-border-color: color-mix(in srgb, var(--botvy-accent, #2563eb) 85%, #000);
-  --bs-btn-active-bg: color-mix(in srgb, var(--botvy-accent, #2563eb) 75%, #000);
+  --bs-btn-hover-border-color: color-mix(
+    in srgb,
+    var(--botvy-accent, #2563eb) 85%,
+    #000
+  );
+  --bs-btn-active-bg: color-mix(
+    in srgb,
+    var(--botvy-accent, #2563eb) 75%,
+    #000
+  );
   --bs-btn-disabled-bg: var(--botvy-accent, #2563eb);
   --bs-btn-disabled-border-color: var(--botvy-accent, #2563eb);
 }

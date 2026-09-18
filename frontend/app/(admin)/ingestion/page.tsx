@@ -15,12 +15,7 @@ import { RequireAdmin } from '../require-admin';
 
 /** The six states the pipeline has, as the Owner sees them. */
 type LinkStatus =
-  | 'queued'
-  | 'fetching'
-  | 'extracting'
-  | 'summarising'
-  | 'done'
-  | 'failed';
+  'queued' | 'fetching' | 'extracting' | 'summarising' | 'done' | 'failed';
 
 interface QueueRow {
   id: string;
@@ -229,18 +224,22 @@ function IngestionPage() {
       ) : null}
 
       <section className="panel">
-      <DataTable value={rows} emptyMessage={t('empty')} stripedRows>
-        <Column field="title" header={t('what')} body={(row: QueueRow) => (
-          <div className="stack" style={{ gap: 2 }}>
-            <strong>{row.title ?? row.url}</strong>
-            <span className="muted">{row.url}</span>
-          </div>
-        )} />
-        <Column field="kind" header={t('kind')} />
-        <Column header={t('state')} body={statusTemplate} />
-        <Column header={t('reason')} body={reasonTemplate} />
-        <Column header="" body={actionsTemplate} />
-      </DataTable>
+        <DataTable value={rows} emptyMessage={t('empty')} stripedRows>
+          <Column
+            field="title"
+            header={t('what')}
+            body={(row: QueueRow) => (
+              <div className="stack" style={{ gap: 2 }}>
+                <strong>{row.title ?? row.url}</strong>
+                <span className="muted">{row.url}</span>
+              </div>
+            )}
+          />
+          <Column field="kind" header={t('kind')} />
+          <Column header={t('state')} body={statusTemplate} />
+          <Column header={t('reason')} body={reasonTemplate} />
+          <Column header="" body={actionsTemplate} />
+        </DataTable>
       </section>
     </main>
   );

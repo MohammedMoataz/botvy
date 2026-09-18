@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { SettingsService } from '../../../shared/settings/settings.service.js';
 import { ProfileQueryHandler } from '../../profile/features/profile-query/profile.query.js';
 import { SessionsInRangeQueryHandler } from '../../training/features/sessions/sessions-in-range.query.js';
 import {
   DayTrainingPort,
-  MealModePort,
   MemberFoodsPort,
   type DayTraining,
 } from '../domain/nutrition.ports.js';
@@ -32,7 +30,8 @@ import {
  *
  * There is no settings fallback here and that is deliberate, which makes this
  * the one cross-context adapter in the codebase that does *not* follow the
- * `ProfileNextPracticeCutoff` shape. A member with no profile row yet has
+ * "the member's row, else the installation default" shape `MemberPreferencesPort`
+ * now owns for every member *preference*. A member with no profile row yet has
  * declared no allergies — which is the same answer as a member who has declared
  * none — and there is no installation-wide default for somebody's allergies that
  * would be anything but a guess. `foodsFor` already answers with empty lists for
@@ -89,36 +88,9 @@ export class TrainingDayTraining extends DayTrainingPort {
   async trainingOn(userId: string, date: string): Promise<DayTraining | null> {
     const rows = await this.sessions.everythingOnDate(userId, date);
     const trained = rows.find(
-      (session) => session.status === 'planned' || session.status === 'completed',
+      (session) =>
+        session.status === 'planned' || session.status === 'completed',
     );
     return trained ? { sport: trained.sport, title: trained.title } : null;
-  }
-}
-
-/**
- * Which way this member wants their days chosen.
- *
- * The registry default is the fallback rather than a hard-coded `'llm'`: a
- * member whose preferences row the registration bootstrap has not written yet
- * can plausibly reach a briefing in the seconds between the two, and a
- * hard-coded default is a bug by constitution XII. Unlike the allergen lists
- * above, there *is* an honest installation-wide answer to this question — the
- * operator's own default — which is why this adapter has the fallback and that
- * one does not.
- */
-@Injectable()
-export class ProfileMealMode extends MealModePort {
-  constructor(
-    private readonly profiles: ProfileQueryHandler,
-    private readonly settings: SettingsService,
-  ) {
-    super();
-  }
-
-  async modeFor(userId: string): Promise<'library' | 'llm'> {
-    const preferences = await this.profiles.preferencesFor(userId);
-    return (
-      preferences?.mealMode ?? (await this.settings.get('defaults.mealMode'))
-    );
   }
 }

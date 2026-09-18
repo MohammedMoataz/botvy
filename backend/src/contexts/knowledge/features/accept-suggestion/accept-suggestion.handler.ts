@@ -95,7 +95,11 @@ export class DismissSuggestionHandler {
     private readonly suggestions: SuggestionRepository,
   ) {}
 
-  async handle(userId: string, id: string, at: Date = new Date()): Promise<void> {
+  async handle(
+    userId: string,
+    id: string,
+    at: Date = new Date(),
+  ): Promise<void> {
     const suggestion = await this.suggestions.findById(userId, id);
     if (!suggestion) throw new SuggestionNotFound(id);
 
@@ -151,7 +155,7 @@ export class RecordSuggestionOutcomeHandler {
       sessionId,
     );
     if (!suggestion) return;
-    if (!suggestion.recordOutcome(outcome, event.occurredAt)) return;
+    if (!suggestion.recordOutcome(outcome)) return;
 
     await this.uow.run(() => this.suggestions.save(suggestion));
     this.logger.log(`suggestion ${suggestion.id} was ${outcome}`);

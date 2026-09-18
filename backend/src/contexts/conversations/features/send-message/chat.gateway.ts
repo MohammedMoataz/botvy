@@ -158,8 +158,12 @@ export class ChatGateway {
       conversationId,
       text,
       signal: controller.signal,
-      ...(asString(body?.clientId) ? { clientId: asString(body.clientId)! } : {}),
-      ...(asDate(body?.composedAt) ? { composedAt: asDate(body.composedAt)! } : {}),
+      ...(asString(body?.clientId)
+        ? { clientId: asString(body.clientId)! }
+        : {}),
+      ...(asDate(body?.composedAt)
+        ? { composedAt: asDate(body.composedAt)! }
+        : {}),
     };
 
     void this.turns
@@ -168,7 +172,9 @@ export class ChatGateway {
         // `TurnRunner` already reports through `events.error`; anything
         // reaching here escaped it, and a rejected floating promise would be
         // an unhandled rejection that takes the process down in Node 24.
-        this.logger.error(`turn ${requestId} escaped its own handler: ${error.message}`);
+        this.logger.error(
+          `turn ${requestId} escaped its own handler: ${error.message}`,
+        );
       })
       .finally(() => {
         this.live.delete(key);

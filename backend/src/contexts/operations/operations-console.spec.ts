@@ -148,7 +148,9 @@ describe('the administrative trail (FR-005)', () => {
     record('settings.patch', OWNER, '2026-09-10T11:00:00.000Z', 'setting');
 
     expect(
-      (await handler.list({ first: 10, actor: OWNER })).nodes.map((n) => n.action),
+      (await handler.list({ first: 10, actor: OWNER })).nodes.map(
+        (n) => n.action,
+      ),
     ).toEqual(['settings.patch', 'admin.setRole']);
 
     expect(
@@ -208,7 +210,10 @@ describe('what the model has been asked to do (FR-011)', () => {
   it('counts the last day of the range, which is what an operator means', async () => {
     await call(MEMBER, '2026-09-07T23:30:00.000Z', 10, 5);
 
-    const rows = await handler.between({ from: '2026-09-01', to: '2026-09-07' });
+    const rows = await handler.between({
+      from: '2026-09-01',
+      to: '2026-09-07',
+    });
 
     // `to` is inclusive on the screen and exclusive in the store, and the
     // handler is the one place that turns one into the other. Getting it wrong
@@ -230,14 +235,19 @@ describe('what the model has been asked to do (FR-011)', () => {
     await call('member-2', '2026-09-05T10:00:00.000Z', 200, 25);
     await call(MEMBER, '2026-09-06T09:00:00.000Z', 10, 5, 'intent');
 
-    const whole = await handler.between({ from: '2026-09-01', to: '2026-09-30' });
+    const whole = await handler.between({
+      from: '2026-09-01',
+      to: '2026-09-30',
+    });
     const perMember = await handler.between({
       from: '2026-09-01',
       to: '2026-09-30',
       byMember: true,
     });
 
-    const sum = (rows: Array<{ promptTokens: number; completionTokens: number }>) =>
+    const sum = (
+      rows: Array<{ promptTokens: number; completionTokens: number }>,
+    ) =>
       rows.reduce(
         (total, row) => total + row.promptTokens + row.completionTokens,
         0,
@@ -253,7 +263,10 @@ describe('what the model has been asked to do (FR-011)', () => {
   it('names the member only when asked to group by member', async () => {
     await call(MEMBER, '2026-09-05T09:00:00.000Z', 100, 50);
 
-    const whole = await handler.between({ from: '2026-09-01', to: '2026-09-30' });
+    const whole = await handler.between({
+      from: '2026-09-01',
+      to: '2026-09-30',
+    });
     const perMember = await handler.between({
       from: '2026-09-01',
       to: '2026-09-30',
@@ -268,7 +281,10 @@ describe('what the model has been asked to do (FR-011)', () => {
     await call(MEMBER, '2026-09-05T09:00:00.000Z', 100, 50, 'chat');
     await call(MEMBER, '2026-09-05T09:05:00.000Z', 10, 5, 'intent');
 
-    const rows = await handler.between({ from: '2026-09-05', to: '2026-09-05' });
+    const rows = await handler.between({
+      from: '2026-09-05',
+      to: '2026-09-05',
+    });
 
     expect(rows.map((row) => row.kind).sort()).toEqual(['chat', 'intent']);
   });

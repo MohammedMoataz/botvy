@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   Conversation,
   type ConversationKind,
@@ -59,41 +60,42 @@ export interface MessageDoc extends Omit<MessageState, 'id'> {
  * value-for-value what `toPersistence` produces here. A field added to the
  * aggregate and to this mapper, and forgotten there, fails that test.
  */
-export const conversationMapper: Mapper<Conversation, ConversationDoc> = {
-  toDomain(doc) {
-    return Conversation.rehydrate({
-      id: doc._id,
-      userId: doc.userId,
-      kind: doc.kind,
-      title: doc.title,
-      pinned: doc.pinned ?? false,
-      archived: doc.archived ?? false,
-      clearedUpToSeq: doc.clearedUpToSeq ?? 0,
-      lastMessageAt: doc.lastMessageAt ?? null,
-      createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-      deletedAt: doc.deletedAt ?? null,
-    });
-  },
-  toPersistence(conversation) {
-    return {
-      _id: conversation.id,
-      userId: conversation.userId,
-      kind: conversation.kind,
-      title: conversation.title,
-      pinned: conversation.pinned,
-      archived: conversation.archived,
-      clearedUpToSeq: conversation.clearedUpToSeq,
-      lastMessageAt: conversation.lastMessageAt,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt,
-      deletedAt: conversation.deletedAt,
-      schemaVersion: conversation.schemaVersion,
-    };
-  },
-};
+export const conversationMapper: Mapper<Conversation, ConversationDoc> =
+  versioned({
+    toDomain(doc) {
+      return Conversation.rehydrate({
+        id: doc._id,
+        userId: doc.userId,
+        kind: doc.kind,
+        title: doc.title,
+        pinned: doc.pinned ?? false,
+        archived: doc.archived ?? false,
+        clearedUpToSeq: doc.clearedUpToSeq ?? 0,
+        lastMessageAt: doc.lastMessageAt ?? null,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        deletedAt: doc.deletedAt ?? null,
+      });
+    },
+    toPersistence(conversation) {
+      return {
+        _id: conversation.id,
+        userId: conversation.userId,
+        kind: conversation.kind,
+        title: conversation.title,
+        pinned: conversation.pinned,
+        archived: conversation.archived,
+        clearedUpToSeq: conversation.clearedUpToSeq,
+        lastMessageAt: conversation.lastMessageAt,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        deletedAt: conversation.deletedAt,
+        schemaVersion: conversation.schemaVersion,
+      };
+    },
+  });
 
-const messageMapper: Mapper<Message, MessageDoc> = {
+const messageMapper: Mapper<Message, MessageDoc> = versioned({
   toDomain(doc) {
     return Message.rehydrate({
       id: String(doc._id),
@@ -159,7 +161,7 @@ const messageMapper: Mapper<Message, MessageDoc> = {
       schemaVersion: message.schemaVersion,
     };
   },
-};
+});
 
 /** A fresh ObjectId as a string, for `Message.write`. */
 export function newMessageId(): string {

@@ -27,6 +27,7 @@ import {
   UsersOnly,
 } from '../../../../shared/auth/decorators.js';
 import type { Principal } from '../../../../shared/auth/principal.js';
+import { MemberBootstrapPort } from '../../../../shared/member/member-bootstrap.port.js';
 import { GoogleTokenInvalid } from '../../domain/google-verifier.js';
 import {
   ChangePasswordHandler,
@@ -180,6 +181,36 @@ export class ChangePasswordDto {
 }
 
 /**
+ * A member's Mongo-side furniture, reported on every answer that opens a
+ * session (E-019).
+ *
+ * `POST /auth/register` commits the PostgreSQL row and an outbox entry; the
+ * relay writes `profiles` and `user_preferences` on a later tick. In between,
+ * the account is usable and `PATCH /api/v1/preferences` is a 404 — which is
+ * honest, and which no client was told to expect. The phone's onboarding is
+ * where a human reaches it: a member who taps through fast sets a preference
+ * before the row exists and is shown an error over a default that then stays in
+ * force.
+ *
+ * So the answer carries it. `false` means "signed in, furniture on its way" —
+ * re-read until it is true, or simply retry the read that is still empty. It
+ * follows `mustChangePassword`: a fact about this account the client may need
+ * to act on, reported rather than enforced, because refusing to sign somebody
+ * in over it would leave them with no way to reach the thing that fixes it.
+ *
+ * It is resolved **here** rather than inside `SignInHandler`, and that is not a
+ * preference. Identity is the one context on PostgreSQL and the two documents
+ * are Mongo's, so the answer comes through a port bound in Profile's module —
+ * and `IdentityModule` cannot import `ProfileModule`, because `ProfileModule`
+ * imports `OperationsModule` which imports `IdentityModule`. This controller is
+ * declared by `AppModule`, which imports both and has no such cycle. A
+ * `forwardRef` around a three-module cycle would be the alternative, and it
+ * would buy nothing: the flag is a property of the *response*, not of signing
+ * in.
+ */
+type WithBootstrap<T> = T & { bootstrapped: boolean };
+
+/**
  * The credential surface: register, sign in, refresh, change your password.
  *
  * Sign-in and password change landed together in P0, because the administrator
@@ -204,13 +235,30 @@ export class AuthController {
     private readonly deviceList: DevicesQueryHandler,
     private readonly deleteAccount: DeleteAccountHandler,
     private readonly googleSignIn: GoogleSignInHandler,
+    private readonly bootstrap: MemberBootstrapPort,
   ) {}
+
+  /** Stamps the readiness flag onto anything carrying a `userId`. */
+  private async withBootstrap<T extends { userId: string }>(
+    answer: T,
+  ): Promise<WithBootstrap<T>> {
+    return {
+      ...answer,
+      bootstrapped: await this.bootstrap.isBootstrapped(answer.userId),
+    };
+  }
 
   @Post('register')
   @Public()
-  async register(@Body() body: RegisterDto): Promise<Registered> {
+  async register(
+    @Body() body: RegisterDto,
+  ): Promise<WithBootstrap<Registered>> {
     try {
-      return await this.registerMember.handle(body);
+      // Practically always `false` — the relay has not ticked yet — and read
+      // rather than hard-coded, because "always false" is a thing that stops
+      // being true the day registration is made synchronous and nobody would
+      // find the constant.
+      return await this.withBootstrap(await this.registerMember.handle(body));
     } catch (error) {
       // Each of these is a different thing for a client to show, so each gets
       // its own status rather than one flat 400.
@@ -231,9 +279,9 @@ export class AuthController {
   @Post('login')
   @Public()
   @HttpCode(200)
-  async login(@Body() body: SignInDto): Promise<SignedIn> {
+  async login(@Body() body: SignInDto): Promise<WithBootstrap<SignedIn>> {
     try {
-      return await this.signIn.handle(body);
+      return await this.withBootstrap(await this.signIn.handle(body));
     } catch (error) {
       if (error instanceof InvalidCredentials)
         throw new UnauthorizedException(error.message);
@@ -382,9 +430,11 @@ export class AuthController {
   @Post('google')
   @Public()
   @HttpCode(200)
-  async google(@Body() body: GoogleSignInDto): Promise<SignedIn> {
+  async google(
+    @Body() body: GoogleSignInDto,
+  ): Promise<WithBootstrap<SignedIn>> {
     try {
-      return await this.googleSignIn.handle(body);
+      return await this.withBootstrap(await this.googleSignIn.handle(body));
     } catch (error) {
       if (error instanceof LinkRequired) {
         throw new ConflictException({
@@ -409,12 +459,12 @@ export class AuthController {
   @Post('google/link')
   @Public()
   @HttpCode(200)
-  async googleLink(@Body() body: GoogleLinkDto): Promise<SignedIn> {
+  async googleLink(
+    @Body() body: GoogleLinkDto,
+  ): Promise<WithBootstrap<SignedIn>> {
     try {
-      return await this.googleSignIn.link(
-        body.idToken,
-        body.password,
-        body.device,
+      return await this.withBootstrap(
+        await this.googleSignIn.link(body.idToken, body.password, body.device),
       );
     } catch (error) {
       if (

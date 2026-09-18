@@ -13,7 +13,11 @@ import {
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
-import { localDate, localHhMm, wallClockToUtc } from '../../shared/time/time.js';
+import {
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../shared/time/time.js';
 import { CalendarEventRuleError } from './domain/calendar-event.aggregate.js';
 import { MeetingRuleError } from './domain/meeting.aggregate.js';
 import type { MeetingRecurrence } from './domain/recurrence-expander.js';
@@ -37,7 +41,7 @@ import { PurgeCalendarEventHandler } from './features/purge-event/purge-event.ha
 import { PurgeMeetingHandler } from './features/purge-meeting/purge-meeting.handler.js';
 import { MeetingsPurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-deleted.handler.js';
 import { RestoreCalendarEventHandler } from './features/restore-event/restore-event.handler.js';
-import { MeetingDefaultsPort } from './domain/meetings.ports.js';
+import { InMemoryMemberPreferences } from '../../shared/member/in-memory-member-preferences.js';
 import { RestoreMeetingHandler } from './features/restore-meeting/restore-meeting.handler.js';
 import { SkipCalendarEventOccurrenceHandler } from './features/skip-event-occurrence/skip-event-occurrence.handler.js';
 import { SkipMeetingOccurrenceHandler } from './features/skip-occurrence/skip-occurrence.handler.js';
@@ -123,37 +127,12 @@ class StubMemberContext extends MemberContextPort {
   }
 }
 
-/**
- * The member's own default meeting length.
- *
- * A stub for `MeetingDefaultsPort`, which is bound in the real module to
- * Profile's published `preferencesFor` read. It is a *port* and not the
- * settings registry because `meetingDurationMin` is a member preference seeded
- * from `settings.defaults.*` (constitution XII) — reading the installation
- * value instead means the editor silently ignores what the member set, and the
- * two agree for anybody who has not changed it, which is exactly what would
- * have made that bug invisible.
- *
- * So the stub answers a number *different* from the registry default on
- * purpose. A stub echoing 30 would pass whether the handler asked the member or
- * the installation.
- */
-class StubMeetingDefaults extends MeetingDefaultsPort {
-  constructor(private readonly minutes = 45) {
-    super();
-  }
-
-  async durationMinFor(_userId: string): Promise<number> {
-    return this.minutes;
-  }
-}
-
 interface Bench {
   uow: InMemoryUnitOfWork;
   meetings: InMemoryMeetingRepository;
   events: InMemoryCalendarEventRepository;
   settings: SettingsService;
-  defaults: StubMeetingDefaults;
+  defaults: InMemoryMemberPreferences;
   create: CreateMeetingHandler;
   update: UpdateMeetingHandler;
   skip: SkipMeetingOccurrenceHandler;
@@ -182,7 +161,15 @@ function bench(): Bench {
     new InMemoryAuditAdapter(),
   );
   const member = new StubMemberContext();
-  const defaults = new StubMeetingDefaults();
+  /*
+   * 45, and deliberately *not* 30, the `defaults.meetingDurationMin` the
+   * registry holds. `meetingDurationMin` is a member preference seeded from
+   * `settings.defaults.*` (constitution XII), and reading the installation
+   * value instead means the editor silently ignores what the member set — a
+   * bug invisible to a spec whose stub echoes the default, because the two
+   * agree for anybody who has not changed it.
+   */
+  const defaults = new InMemoryMemberPreferences({ meetingDurationMin: 45 });
 
   return {
     uow,
@@ -595,7 +582,8 @@ describe('one occurrence of a series', () => {
     );
     expect(occurrences).toHaveLength(6);
     expect(
-      occurrences.find((o) => o.originalStart.getTime() === weekTwo.getTime())
+      occurrences
+        .find((o) => o.originalStart.getTime() === weekTwo.getTime())
         ?.startAt.getTime(),
     ).toBe(moved.getTime());
   });
@@ -609,7 +597,12 @@ describe('one occurrence of a series', () => {
       MeetingRuleError,
     );
     await expect(
-      b.move.handle(MEMBER, body.id, start, new Date(start.getTime() + 3_600_000)),
+      b.move.handle(
+        MEMBER,
+        body.id,
+        start,
+        new Date(start.getTime() + 3_600_000),
+      ),
     ).rejects.toThrow(MeetingRuleError);
   });
 
@@ -772,7 +765,10 @@ describe('a personal event', () => {
     await expect(
       b.createEvent.handle(
         MEMBER,
-        eventBody({ startAt: start, endAt: new Date(start.getTime() - 60_000) }),
+        eventBody({
+          startAt: start,
+          endAt: new Date(start.getTime() - 60_000),
+        }),
       ),
     ).rejects.toThrow(CalendarEventRuleError);
 
@@ -840,7 +836,8 @@ describe('a personal event', () => {
     );
     expect(occurrences).toHaveLength(4);
     expect(
-      occurrences.find((o) => o.originalStart.getTime() === weekTwo.getTime())
+      occurrences
+        .find((o) => o.originalStart.getTime() === weekTwo.getTime())
         ?.startAt.getTime(),
     ).toBe(moved.getTime());
   });

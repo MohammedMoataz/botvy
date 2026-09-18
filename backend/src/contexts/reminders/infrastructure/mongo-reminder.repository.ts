@@ -14,6 +14,7 @@ import {
 } from '../../../shared/persistence/keyset-cursor.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import { Reminder, type ReminderState } from '../domain/reminder.aggregate.js';
 import {
   ReminderRepository,
@@ -28,7 +29,7 @@ export interface ReminderDoc extends Omit<ReminderState, 'id'> {
   schemaVersion: number;
 }
 
-const mapper: Mapper<Reminder, ReminderDoc> = {
+const mapper: Mapper<Reminder, ReminderDoc> = versioned({
   toDomain(doc) {
     return Reminder.rehydrate({
       id: doc._id,
@@ -60,7 +61,7 @@ const mapper: Mapper<Reminder, ReminderDoc> = {
       schemaVersion: reminder.schemaVersion,
     };
   },
-};
+});
 
 @Injectable()
 export class MongoReminderRepository extends ReminderRepository {

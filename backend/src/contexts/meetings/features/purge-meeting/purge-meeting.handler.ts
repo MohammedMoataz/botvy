@@ -47,7 +47,10 @@ export class PurgeMeetingHandler {
    */
   async purgeTombstones(before: Date, userId?: string): Promise<number> {
     return this.uow.run(async () => {
-      const meetings = await this.meetings.purgeTombstonesBefore(before, userId);
+      const meetings = await this.meetings.purgeTombstonesBefore(
+        before,
+        userId,
+      );
       const events = await this.events.purgeTombstonesBefore(before, userId);
       return meetings + events;
     });

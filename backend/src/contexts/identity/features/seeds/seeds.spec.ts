@@ -266,17 +266,18 @@ describe('the identity bootstrap on a database with no schema', () => {
 
   function bootstrapWith(env: Record<string, unknown>) {
     const unit = new InMemoryUnitOfWork();
-    const admin = new AdminSeedService(
-      unit,
-      noSchema as never,
-      fakeHasher,
-    );
+    const admin = new AdminSeedService(unit, noSchema as never, fakeHasher);
     const credentials = new AdminCredentialsQueryHandler(
       noSchema as never,
-      { ADMIN_EMAIL: env.ADMIN_EMAIL, ADMIN_PASSWORD: env.ADMIN_PASSWORD } as never,
+      {
+        ADMIN_EMAIL: env.ADMIN_EMAIL,
+        ADMIN_PASSWORD: env.ADMIN_PASSWORD,
+      } as never,
       fakeHasher,
     );
-    const clients = new ServiceClientSeedService(new InMemoryServiceClientRepository());
+    const clients = new ServiceClientSeedService(
+      new InMemoryServiceClientRepository(),
+    );
     return new IdentityBootstrap(
       { BOTVY_ROLE: 'backend', ...env } as never,
       admin,
@@ -328,7 +329,11 @@ describe('the identity bootstrap on a database with no schema', () => {
         INTERNAL_SERVICE_TOKEN: 'service-token',
       } as never,
       new AdminSeedService(unit, refused as never, fakeHasher),
-      new AdminCredentialsQueryHandler(refused as never, {} as never, fakeHasher),
+      new AdminCredentialsQueryHandler(
+        refused as never,
+        {} as never,
+        fakeHasher,
+      ),
       new ServiceClientSeedService(new InMemoryServiceClientRepository()),
     );
 

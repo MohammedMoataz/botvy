@@ -49,7 +49,8 @@ import { loadEnvFiles } from './env.mjs';
 loadEnvFiles();
 
 const API =
-  process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 /*
  * `INTERNAL_SERVICE_TOKEN`, which is the name **`.env` uses** — and getting this
  * wrong is not hypothetical.
@@ -76,7 +77,9 @@ const BERLIN = 'Europe/Berlin';
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 const skip = (name, why) => {
   results.push({ name, ok: true, detail: `skipped: ${why}`, skipped: true });
@@ -336,7 +339,10 @@ async function main() {
       prepMinutes: 15,
       prepNotes: 'read the notes',
       reminderOffsets: [30],
-      recurrence: { dtstart: anchor.toISOString(), rrule: 'FREQ=WEEKLY;COUNT=6' },
+      recurrence: {
+        dtstart: anchor.toISOString(),
+        rrule: 'FREQ=WEEKLY;COUNT=6',
+      },
     },
   });
   record(
@@ -477,7 +483,10 @@ async function main() {
    */
   const change = nextOffsetChange(BERLIN);
   if (!change) {
-    skip('a series keeps its wall time across a clock change', 'no transition found');
+    skip(
+      'a series keeps its wall time across a clock change',
+      'no transition found',
+    );
   } else {
     const dstStart = addLocalDays(change, -7);
     const dstAnchor = wall(dstStart, '18:00', BERLIN);
@@ -625,9 +634,8 @@ async function main() {
     'an unpinned meeting follows the member, keeping its wall time (FR-014)',
     floatingBefore.length > 0 &&
       JSON.stringify(floatingBefore) !== JSON.stringify(floatingAfter) &&
-      new Set(
-        floatingAfter.map((start) => localHhMm(new Date(start), BERLIN)),
-      ).size === 1 &&
+      new Set(floatingAfter.map((start) => localHhMm(new Date(start), BERLIN)))
+        .size === 1 &&
       localHhMm(new Date(floatingAfter[0]), BERLIN) === '17:00',
     `moved=${JSON.stringify(floatingBefore) !== JSON.stringify(floatingAfter)} local=${
       floatingAfter[0] ? localHhMm(new Date(floatingAfter[0]), BERLIN) : 'none'
@@ -660,7 +668,9 @@ async function main() {
   /*
    * ---- 6. cancelling, completing and restoring -------------------------
    */
-  const cancelled = await rest('POST', `/meetings/${pinnedId}/cancel`, { token });
+  const cancelled = await rest('POST', `/meetings/${pinnedId}/cancel`, {
+    token,
+  });
   const cleared = await eventually(async () => {
     const alerts = await meetingAlerts();
     const mine = alerts.filter((alert) => alert.source?.id === pinnedId);
@@ -679,12 +689,15 @@ async function main() {
   );
   record(
     'deleting leaves the status untouched, so the Deleted view can show it',
-    deleted.status < 400 && Boolean(tombstone?.deletedAt) &&
+    deleted.status < 400 &&
+      Boolean(tombstone?.deletedAt) &&
       tombstone?.status === 'scheduled',
     `deletedAt=${Boolean(tombstone?.deletedAt)} status=${tombstone?.status}`,
   );
 
-  const purgeLive = await rest('DELETE', `/meetings/${seriesId}/purge`, { token });
+  const purgeLive = await rest('DELETE', `/meetings/${seriesId}/purge`, {
+    token,
+  });
   record(
     'purging a live row is refused',
     purgeLive.status === 409 || purgeLive.status === 400,
@@ -726,7 +739,11 @@ async function main() {
       pass.ok ? JSON.stringify(pass.body) : pass.error,
     );
 
-    const health = await (await fetch(`${API}/health`)).json().catch(() => null);
+    const health = await (
+      await fetch(`${API}/health`)
+    )
+      .json()
+      .catch(() => null);
     /*
      * The rows are `{ job, lastRunAt, lastOkAt, lastError, stale }` — the key
      * is `job`, not `name`. Worth stating, because reading the wrong key gives
@@ -800,7 +817,8 @@ async function main() {
   const busy = days.filter((day) => day.busy);
   record(
     'the month overview marks the days that hold something (FR-009)',
-    busy.length > 0 && busy.every((day) => day.total > 0) &&
+    busy.length > 0 &&
+      busy.every((day) => day.total > 0) &&
       days.some((day) => !day.busy),
     `busy=${busy.length}/${days.length}`,
   );
@@ -882,8 +900,18 @@ async function main() {
   const tomorrow = addLocalDays(today, 1);
 
   const touchMeetings = [
-    { kind: 'morning', day: today, title: 'Gate call today', when: 'the morning briefing' },
-    { kind: 'plan', day: tomorrow, title: 'Gate call tomorrow', when: 'the evening proposal' },
+    {
+      kind: 'morning',
+      day: today,
+      title: 'Gate call today',
+      when: 'the morning briefing',
+    },
+    {
+      kind: 'plan',
+      day: tomorrow,
+      title: 'Gate call tomorrow',
+      when: 'the evening proposal',
+    },
   ];
 
   for (const meeting of touchMeetings) {
@@ -908,7 +936,16 @@ async function main() {
    * claims the date unconditionally — so this check does not depend on what
    * time of day the gate happens to run. It is service-only, hence `internal`.
    */
-  const meAnswer = await graphql(`query { me { id } }`, token);
+  const meAnswer = await graphql(
+    `
+      query {
+        me {
+          id
+        }
+      }
+    `,
+    token,
+  );
   const userId = meAnswer.data?.me?.id;
 
   /*
@@ -943,13 +980,26 @@ async function main() {
       JSON.stringify({ userId, kind: meeting.kind }),
     );
     if (!forced.ok) {
-      skip(`${meeting.when} names the day's meetings`, `prompt: ${forced.error}`);
+      skip(
+        `${meeting.when} names the day's meetings`,
+        `prompt: ${forced.error}`,
+      );
       continue;
     }
 
     let lastError = null;
     const named = await eventually(async () => {
-      const answer = await graphql(`query { conversations { id kind } }`, token);
+      const answer = await graphql(
+        `
+          query {
+            conversations {
+              id
+              kind
+            }
+          }
+        `,
+        token,
+      );
       const coach = (answer.data?.conversations ?? []).find(
         (row) => row.kind === 'coach',
       );

@@ -61,7 +61,9 @@ function SettingsPage() {
       setEntries(rows);
       setDrafts(Object.fromEntries(rows.map((row) => [row.key, row.value])));
     } catch (error) {
-      setProblems({ '': error instanceof Error ? error.message : String(error) });
+      setProblems({
+        '': error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -102,7 +104,10 @@ function SettingsPage() {
 
       {problems[''] && <Message severity="error" text={problems['']} />}
 
-      <span className="p-input-icon-left" style={{ maxWidth: 360, width: '100%' }}>
+      <span
+        className="p-input-icon-left"
+        style={{ maxWidth: 360, width: '100%' }}
+      >
         <i className="pi pi-search" aria-hidden="true" />
         <InputText
           value={filter}
@@ -120,58 +125,69 @@ function SettingsPage() {
           scroll for half a minute to reach `settings.*` — the filter above helps
           when you know the name and not when you are reading. */}
       <div className="settings-grid">
-      {shown.map((entry) => (
-        <section className="panel" key={entry.key}>
-          <div className="row" style={{ gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <h2 style={{ margin: 0, fontSize: '1rem' }}>{entry.key}</h2>
-            {entry.readOnly && <Tag severity="info" value={t('systemWritten')} />}
-          </div>
+        {shown.map((entry) => (
+          <section className="panel" key={entry.key}>
+            <div
+              className="row"
+              style={{ gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}
+            >
+              <h2 style={{ margin: 0, fontSize: '1rem' }}>{entry.key}</h2>
+              {entry.readOnly && (
+                <Tag severity="info" value={t('systemWritten')} />
+              )}
+            </div>
 
-          <p className="muted">{entry.description}</p>
+            <p className="muted">{entry.description}</p>
 
-          {/*
+            {/*
             FR-007: a key the system writes is readable and has no control at
             all — not a disabled one. A disabled input invites somebody to work
             out how to enable it; a value with a sentence beside it says what is
             true, which is that this number is the system's own record.
           */}
-          {entry.readOnly ? (
-            <p>
-              <code>{JSON.stringify(entry.value)}</code>
+            {entry.readOnly ? (
+              <p>
+                <code>{JSON.stringify(entry.value)}</code>
+              </p>
+            ) : (
+              <div
+                className="row"
+                style={{ gap: 12, alignItems: 'center', flexWrap: 'wrap' }}
+              >
+                <Control
+                  control={entry.control}
+                  value={drafts[entry.key]}
+                  onChange={(next) =>
+                    setDrafts((current) => ({ ...current, [entry.key]: next }))
+                  }
+                  label={entry.key}
+                />
+                <Button
+                  label={t('save')}
+                  size="small"
+                  loading={saving === entry.key}
+                  disabled={
+                    saving !== null ||
+                    JSON.stringify(drafts[entry.key]) ===
+                      JSON.stringify(entry.value)
+                  }
+                  onClick={() => void save(entry)}
+                />
+                {saved === entry.key && (
+                  <span className="muted">{t('saved')}</span>
+                )}
+              </div>
+            )}
+
+            <p className="muted" style={{ marginTop: 8 }}>
+              {t('default', { value: JSON.stringify(entry.default) })}
             </p>
-          ) : (
-            <div className="row" style={{ gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <Control
-                control={entry.control}
-                value={drafts[entry.key]}
-                onChange={(next) =>
-                  setDrafts((current) => ({ ...current, [entry.key]: next }))
-                }
-                label={entry.key}
-              />
-              <Button
-                label={t('save')}
-                size="small"
-                loading={saving === entry.key}
-                disabled={
-                  saving !== null ||
-                  JSON.stringify(drafts[entry.key]) === JSON.stringify(entry.value)
-                }
-                onClick={() => void save(entry)}
-              />
-              {saved === entry.key && <span className="muted">{t('saved')}</span>}
-            </div>
-          )}
 
-          <p className="muted" style={{ marginTop: 8 }}>
-            {t('default', { value: JSON.stringify(entry.default) })}
-          </p>
-
-          {problems[entry.key] && (
-            <Message severity="error" text={problems[entry.key]} />
-          )}
-        </section>
-      ))}
+            {problems[entry.key] && (
+              <Message severity="error" text={problems[entry.key]} />
+            )}
+          </section>
+        ))}
       </div>
     </main>
   );
@@ -217,10 +233,12 @@ function Control({
         <Dropdown
           value={value}
           aria-label={label}
-          options={('options' in control ? control.options : []).map((option) => ({
-            label: option,
-            value: option,
-          }))}
+          options={('options' in control ? control.options : []).map(
+            (option) => ({
+              label: option,
+              value: option,
+            }),
+          )}
           onChange={(event) => onChange(event.value)}
         />
       );

@@ -7,7 +7,9 @@
  * after two hours is a health signal for someone to look at, not a number to
  * retune.
  */
-export const BACKOFF_LADDER_MS = [60_000, 300_000, 1_800_000, 7_200_000] as const;
+export const BACKOFF_LADDER_MS = [
+  60_000, 300_000, 1_800_000, 7_200_000,
+] as const;
 
 export interface NextAttempt {
   /** When to try again, or null when the delivery is parked. */
@@ -19,7 +21,10 @@ export interface NextAttempt {
  * Given how many attempts have already failed, when the next one happens.
  * `attempts` is the count *including* the one that just failed.
  */
-export function nextAttemptAfter(attempts: number, now: Date = new Date()): NextAttempt {
+export function nextAttemptAfter(
+  attempts: number,
+  now: Date = new Date(),
+): NextAttempt {
   const index = attempts - 1;
   if (index < 0) return { at: now, parked: false };
 

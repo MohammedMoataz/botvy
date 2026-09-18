@@ -227,7 +227,10 @@ export async function signOut(
 }
 
 /** Whether a promise settled successfully inside the grace period. */
-async function bounded(work: Promise<unknown>, graceMs: number): Promise<boolean> {
+async function bounded(
+  work: Promise<unknown>,
+  graceMs: number,
+): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<false>((resolve) => {
     timer = setTimeout(() => resolve(false), graceMs);

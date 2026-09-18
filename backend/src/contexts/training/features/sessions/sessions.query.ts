@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
 import type { Exercise } from '../../domain/set-entry.js';
-import type {
-  Session,
-  SessionStatus,
-} from '../../domain/session.aggregate.js';
+import type { Session, SessionStatus } from '../../domain/session.aggregate.js';
 import { SessionRepository } from '../../domain/training.repositories.js';
 
 /**

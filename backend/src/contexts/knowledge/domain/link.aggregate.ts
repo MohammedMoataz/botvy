@@ -12,12 +12,7 @@ import type { LinkKind } from './url-kind.js';
  * nothing. `spec.md`'s own glossary records the translation.
  */
 export type LinkStatus =
-  | 'queued'
-  | 'fetching'
-  | 'extracting'
-  | 'summarising'
-  | 'done'
-  | 'failed';
+  'queued' | 'fetching' | 'extracting' | 'summarising' | 'done' | 'failed';
 
 /** The three states that mean "somebody is holding this right now". */
 const IN_FLIGHT: ReadonlySet<LinkStatus> = new Set([
@@ -63,10 +58,7 @@ export interface LinkState {
 export class LinkRuleError extends Error {
   constructor(
     readonly code:
-      | 'bad_transition'
-      | 'attempts_exhausted'
-      | 'not_deleted'
-      | 'not_failed',
+      'bad_transition' | 'attempts_exhausted' | 'not_deleted' | 'not_failed',
     message: string,
   ) {
     super(message);

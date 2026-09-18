@@ -2,7 +2,10 @@ import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { GraphQLSchemaBuilderModule, GraphQLSchemaFactory } from '@nestjs/graphql';
+import {
+  GraphQLSchemaBuilderModule,
+  GraphQLSchemaFactory,
+} from '@nestjs/graphql';
 import { lexicographicSortSchema, printSchema } from 'graphql';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
@@ -74,7 +77,10 @@ async function bootstrap(): Promise<void> {
         .setTitle('Botvy')
         .setVersion('2.0.0')
         .addBearerAuth()
-        .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Service-Token' }, 'service-token')
+        .addApiKey(
+          { type: 'apiKey', in: 'header', name: 'X-Service-Token' },
+          'service-token',
+        )
         .build(),
     );
     SwaggerModule.setup('docs', app, document);
@@ -115,19 +121,26 @@ async function generateContracts(): Promise<void> {
   // Errors and warnings only — quiet enough for CI, but not silent. Nest exits
   // the process itself when a module fails to initialise, so `logger: false`
   // here turns a real failure into an exit code with no explanation at all.
-  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn'] });
+  const app = await NestFactory.create(AppModule, {
+    logger: ['error', 'warn'],
+  });
   const document = SwaggerModule.createDocument(
     app,
     new DocumentBuilder()
       .setTitle('Botvy')
-      .setDescription('Commands are REST; reads are GraphQL; the live connection is a socket.')
+      .setDescription(
+        'Commands are REST; reads are GraphQL; the live connection is a socket.',
+      )
       .setVersion('2.0.0')
       .addBearerAuth()
       // Machine routes carry a header, not a bearer token. Declaring only the
       // bearer scheme left the two /internal operations published as though
       // anyone could call them, and the contracts package is what the other
       // three surfaces generate their clients from.
-      .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Service-Token' }, 'service-token')
+      .addApiKey(
+        { type: 'apiKey', in: 'header', name: 'X-Service-Token' },
+        'service-token',
+      )
       .build(),
   );
 

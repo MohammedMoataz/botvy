@@ -25,6 +25,7 @@ import {
   InMemoryPreferencesRepository,
   InMemoryProfileRepository,
 } from './infrastructure/in-memory-profile.repositories.js';
+import { ProfileMemberPreferences } from './infrastructure/profile-member-context.adapter.js';
 
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 
@@ -455,7 +456,10 @@ describe('profile query', () => {
     query = new ProfileQueryHandler(
       profiles,
       preferences,
-      new SettingsService(new InMemorySettingsStore(), new InMemoryAuditAdapter()),
+      new SettingsService(
+        new InMemorySettingsStore(),
+        new InMemoryAuditAdapter(),
+      ),
     );
     await new BootstrapOnRegisteredHandler(
       uow,
@@ -591,5 +595,70 @@ describe('purge on deleted', () => {
     await handler.handle(deleted('user-1'));
 
     expect(await profiles.find('user-2')).not.toBeNull();
+  });
+});
+
+/**
+ * The one copy of "the member's row, else the installation default" (E-020).
+ *
+ * Five contexts each had their own four-line adapter and their own copy of this
+ * fallback; the logic is here now and nowhere else, which makes this the only
+ * place it can be got wrong. Both directions are pinned, because a fallback
+ * that never yields to the member's own value is the invisible failure — the
+ * two agree for everybody who has not changed the setting.
+ */
+describe('member preferences port', () => {
+  let preferences: InMemoryPreferencesRepository;
+  let settings: SettingsService;
+  let port: ProfileMemberPreferences;
+
+  beforeEach(() => {
+    uow = new InMemoryUnitOfWork();
+    preferences = new InMemoryPreferencesRepository(uow);
+    settings = new SettingsService(
+      new InMemorySettingsStore(),
+      new InMemoryAuditAdapter(),
+    );
+    port = new ProfileMemberPreferences(preferences, settings);
+  });
+
+  it('answers the installation default for a member mid-bootstrap', async () => {
+    // No row at all: the relay has not delivered `identity.UserRegistered` yet.
+    // The honest answer is the value the bootstrap is about to write, not null
+    // and not a throw.
+    expect(await port.get('nobody', 'meetingDurationMin')).toBe(
+      await settings.get('defaults.meetingDurationMin'),
+    );
+    expect(await port.get('nobody', 'mealMode')).toBe('llm');
+  });
+
+  it("prefers the member's own value over the registry", async () => {
+    const handler = new BootstrapOnRegisteredHandler(
+      uow,
+      new InMemoryProfileRepository(uow),
+      preferences,
+      settings,
+    );
+    await handler.handle(registered('user-1'));
+
+    await uow.run(async () => {
+      const row = await preferences.find('user-1');
+      row!.patch({ meetingDurationMin: 45, mealMode: 'library' });
+      await preferences.save(row!);
+    });
+
+    expect(await port.get('user-1', 'meetingDurationMin')).toBe(45);
+    expect(await port.get('user-1', 'mealMode')).toBe('library');
+    // Not the registry's, which is the whole point: the two agree for every
+    // member who has not chosen, so an assertion against the default would
+    // pass whichever source the port had read.
+    expect(await port.get('user-1', 'meetingDurationMin')).not.toBe(
+      await settings.get('defaults.meetingDurationMin'),
+    );
+  });
+
+  it('follows an operator who moves the default, for a member with no row', async () => {
+    await settings.set('defaults.nextPracticeCutoff', '19:30', OWNER);
+    expect(await port.get('nobody', 'nextPracticeCutoff')).toBe('19:30');
   });
 });

@@ -21,14 +21,52 @@ export interface OutboxInsert {
 }
 
 /**
+ * The optimistic clause every Mongo save is filtered on, in one place because
+ * the athlete-profile adapter hand-rolls its save (its `_id` *is* the owner, so
+ * the base's `{ _id, userId }` filter would match nothing) and must judge a
+ * write exactly the way the base does.
+ *
+ * Two cases, and the second is what makes the version column land with no
+ * migration:
+ *
+ * 1. **The copy carries a loaded version.** Match that exact version. A write
+ *    that landed between the load and this one moved it on, so this save is
+ *    refused — *including the same-millisecond case*, which is the lost update
+ *    E-006 is about: `updatedAt: { $lte: … }` admits an equal timestamp and the
+ *    second writer silently wins.
+ * 2. **The copy carries none** (`version === null`): a fresh aggregate whose
+ *    first save is a create, or a copy read from a row written before this
+ *    column existed. Judged on `updatedAt`, exactly as it is judged today.
+ *    A versionless row gets a version the first time anything saves it, so
+ *    case 2 closes itself per row and nothing has to be backfilled.
+ *
+ * Deliberately **not** `$lt` in case 2 — that would make a same-millisecond
+ * save fail rather than merge, which E-006 names as a different and noisier
+ * bug. The version is what removes the ambiguity; the timestamp keeps the
+ * behaviour it has until a row has one.
+ */
+export function optimisticClause(
+  aggregate: Pick<AggregateRoot, 'version' | 'updatedAt'>,
+): Record<string, unknown> {
+  if (aggregate.version !== null) return { version: aggregate.version };
+  return {
+    $or: [
+      { updatedAt: { $lte: aggregate.updatedAt } },
+      { updatedAt: { $exists: false } },
+    ],
+  };
+}
+
+/**
  * The Mongo half of the repository port. Two things make it worth having a base
  * at all rather than writing each adapter by hand:
  *
  * 1. **The outbox is written in the same session as the document.** Publishing
  *    to the event bus after `save()` returns loses the event if the process
  *    dies in between, and the change is already committed by then.
- * 2. **The optimistic check.** A save whose `updatedAt` is older than the stored
- *    row is a lost update; the filter refuses it rather than overwriting.
+ * 2. **The optimistic check.** The filter refuses a write that would overwrite
+ *    a row the copy in hand is not the latest version of, rather than
+ *    silently winning — see `optimisticClause`.
  */
 export abstract class MongoRepositoryBase<
   T extends AggregateRoot,
@@ -99,6 +137,15 @@ export abstract class MongoRepositoryBase<
      * hits the `_id` primary key — which is caught below and reported as a
      * refusal the member's client can act on rather than a 500.
      */
+    /*
+     * The version the row will carry after this write. `$set` rather than
+     * `$inc` so the in-memory adapter can compute the same number from the
+     * same inputs — two adapters that disagree about a write's outcome is how
+     * a handler passes its spec and misbehaves against a real database.
+     */
+    const next = (aggregate.version ?? 0) + 1;
+    set.version = next;
+
     let result;
     try {
       result = await this.model
@@ -106,11 +153,7 @@ export abstract class MongoRepositoryBase<
           {
             _id: aggregate.id,
             userId: aggregate.userId,
-            // Either the row is new, or the copy we hold is not older than it.
-            $or: [
-              { updatedAt: { $lte: aggregate.updatedAt } },
-              { updatedAt: { $exists: false } },
-            ],
+            ...optimisticClause(aggregate),
           } as Record<string, unknown>,
           update,
           { upsert: true, session: session ?? undefined },
@@ -135,6 +178,11 @@ export abstract class MongoRepositoryBase<
     if (result.matchedCount === 0 && result.upsertedCount === 0) {
       throw new StaleWriteError(String(aggregate.id));
     }
+
+    // The row now carries this version, so a handler that saves the same copy
+    // twice in one unit of work matches on the second pass instead of being
+    // refused for a write it made itself.
+    aggregate.version = next;
 
     await this.appendToOutbox(events);
   }

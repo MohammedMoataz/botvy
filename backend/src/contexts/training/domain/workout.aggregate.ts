@@ -88,9 +88,7 @@ export class Workout extends AggregateRoot<string> {
     return new Workout(state);
   }
 
-  static create(
-    state: Omit<WorkoutState, 'updatedAt' | 'deletedAt'>,
-  ): Workout {
+  static create(state: Omit<WorkoutState, 'updatedAt' | 'deletedAt'>): Workout {
     return new Workout({
       ...state,
       name: requireName(state.name),
@@ -102,15 +100,12 @@ export class Workout extends AggregateRoot<string> {
     });
   }
 
-  edit(
-    patch: {
-      name?: string;
-      sport?: string;
-      exercises?: Exercise[];
-      tags?: string[];
-    },
-    at: Date = new Date(),
-  ): string[] {
+  edit(patch: {
+    name?: string;
+    sport?: string;
+    exercises?: Exercise[];
+    tags?: string[];
+  }): string[] {
     const changed: string[] = [];
     if (patch.name !== undefined) {
       const name = requireName(patch.name);
@@ -135,18 +130,18 @@ export class Workout extends AggregateRoot<string> {
       changed.push('tags');
     }
     if (changed.length === 0) return changed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     return changed;
   }
 
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
-  restore(at: Date = new Date()): void {
+  restore(): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   get isDeleted(): boolean {

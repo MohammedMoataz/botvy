@@ -28,6 +28,7 @@ import { TaskRepository } from '../domain/task.repository.js';
 import {
   TASK_SORT_KEYS,
   taskPredicateFor,
+  withDueSort,
 } from './mongo-task-read.repository.js';
 
 /**
@@ -102,8 +103,9 @@ export class InMemoryTaskRepository extends TaskRepository {
     userId: string,
     labelId: string,
     snapshot: LabelSnapshot | null,
-    at: Date,
   ): Promise<number> {
+    // The server's clock, matching the Mongo adapter — see the comment there.
+    const at = new Date();
     let touched = 0;
     for (const row of this.rows.values()) {
       if (row.userId !== userId || row.labelId !== labelId) continue;
@@ -305,13 +307,17 @@ export class InMemoryTaskReadRepository implements TaskReadRepository {
       (row) => row.userId === userId && matchesPredicate(row, predicate),
     );
 
+    // `sortDocOf`, not `docOf`: a view may order on a key the row does not
+    // store — the label view's `dueSort` is `$ifNull` on the Mongo side and
+    // `withDueSort` here, from one constant, so the two cannot drift apart
+    // without failing `task-ordering.spec.ts`.
     const sorted = matches.sort((a, b) =>
-      compareRows(keys, docOf(a), a.id, docOf(b), b.id),
+      compareRows(keys, sortDocOf(a), a.id, sortDocOf(b), b.id),
     );
 
     const position = filter.cursor ? decodeCursor(filter.cursor) : null;
     const paged = position
-      ? sorted.filter((row) => isAfter(keys, position, docOf(row), row.id))
+      ? sorted.filter((row) => isAfter(keys, position, sortDocOf(row), row.id))
       : sorted;
 
     const hasMore = paged.length > filter.limit;
@@ -319,10 +325,10 @@ export class InMemoryTaskReadRepository implements TaskReadRepository {
     const last = page.at(-1);
 
     return {
-      nodes: page.map((row) => viewOf(row, filter.timezone)),
+      nodes: page.map((row) => viewOf(row, filter.timezone, filter.locale)),
       nextCursor:
         hasMore && last
-          ? encodeCursor(positionOf(keys, docOf(last), last.id))
+          ? encodeCursor(positionOf(keys, sortDocOf(last), last.id))
           : null,
     };
   }
@@ -331,10 +337,11 @@ export class InMemoryTaskReadRepository implements TaskReadRepository {
     userId: string,
     id: string,
     timezone: string,
+    locale = 'en',
   ): Promise<TaskView | null> {
     const row = this.taskStore.rows.get(id);
     if (!row || row.userId !== userId) return null;
-    return viewOf(row, timezone);
+    return viewOf(row, timezone, locale);
   }
 
   async labels(userId: string, includeDeleted: boolean): Promise<LabelView[]> {
@@ -439,6 +446,11 @@ function docOf(row: TaskState): Record<string, unknown> {
   return row as unknown as Record<string, unknown>;
 }
 
+/** The row as the *sort* sees it: its own fields plus every computed key. */
+function sortDocOf(row: TaskState): Record<string, unknown> {
+  return withDueSort(docOf(row));
+}
+
 /**
  * The Mongo predicate objects, evaluated in memory.
  *
@@ -502,7 +514,7 @@ function compare(a: unknown, b: unknown): number {
       : 0;
 }
 
-function viewOf(row: TaskState, timezone: string): TaskView {
+function viewOf(row: TaskState, timezone: string, locale = 'en'): TaskView {
   const rule = row.recurrence
     ? Recurrence.parse(row.recurrence, timezone)
     : null;
@@ -519,7 +531,9 @@ function viewOf(row: TaskState, timezone: string): TaskView {
     completedAt: row.completedAt,
     repeats: row.recurrence !== null,
     recurrenceMode: row.recurrence?.mode ?? null,
-    recurrenceText: rule ? rule.humanText() : (row.recurrence?.rrule ?? null),
+    recurrenceText: rule
+      ? rule.humanText(locale)
+      : (row.recurrence?.rrule ?? null),
     estimatedMinutes: row.estimatedMinutes,
     deferCount: row.deferCount,
     source: row.source,

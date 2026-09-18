@@ -19,7 +19,11 @@ export function signMediaUrl(target: string, secret: string): string {
   return createHmac('sha256', secret).update(target).digest('hex');
 }
 
-export function verifyMediaUrl(target: string, signature: string, secret: string): boolean {
+export function verifyMediaUrl(
+  target: string,
+  signature: string,
+  secret: string,
+): boolean {
   const expected = signMediaUrl(target, secret);
   const a = Buffer.from(expected, 'utf8');
   const b = Buffer.from(signature, 'utf8');
@@ -27,12 +31,16 @@ export function verifyMediaUrl(target: string, signature: string, secret: string
 }
 
 /** The relative markdown src for an image, or null when signing is disabled. */
-export function mediaPath(target: string, secret: string | undefined): string | null {
+export function mediaPath(
+  target: string,
+  secret: string | undefined,
+): string | null {
   if (!secret) return null;
   return `/media?url=${encodeURIComponent(target)}&sig=${signMediaUrl(target, secret)}`;
 }
 
-export type SsrfVerdict = { allowed: true } | { allowed: false; reason: string };
+export type SsrfVerdict =
+  { allowed: true } | { allowed: false; reason: string };
 
 /**
  * What the proxy is allowed to fetch.
@@ -57,7 +65,11 @@ export function checkTarget(rawUrl: string): SsrfVerdict {
 
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
 
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal')) {
+  if (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.internal')
+  ) {
     return { allowed: false, reason: 'refused a local name' };
   }
 
@@ -120,11 +132,16 @@ export async function checkResolvedTarget(
 
   const offender = addresses.find((entry) => isPrivateAddress(entry.address));
   return offender
-    ? { allowed: false, reason: `refused a name pointing at ${offender.address}` }
+    ? {
+        allowed: false,
+        reason: `refused a name pointing at ${offender.address}`,
+      }
     : { allowed: true };
 }
 
-async function defaultLookup(host: string): Promise<Array<{ address: string }>> {
+async function defaultLookup(
+  host: string,
+): Promise<Array<{ address: string }>> {
   const { lookup } = await import('node:dns/promises');
   // Every address, not the first: a name with one public and one private
   // address would otherwise pass whenever the resolver happened to order the
@@ -137,14 +154,16 @@ export function isPrivateAddress(address: string): boolean {
     const v6 = address.toLowerCase();
     if (v6 === '::1' || v6 === '::') return true;
     // Unique-local and link-local.
-    if (v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80')) return true;
+    if (v6.startsWith('fc') || v6.startsWith('fd') || v6.startsWith('fe80'))
+      return true;
     // IPv4 written inside an IPv6 address still names an IPv4 host.
     const mapped = /::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v6);
     return mapped ? isPrivateAddress(mapped[1]!) : false;
   }
 
   const parts = address.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) return false;
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part)))
+    return false;
   const [a, b] = parts as [number, number, number, number];
 
   if (a === 10 || a === 127 || a === 0) return true;

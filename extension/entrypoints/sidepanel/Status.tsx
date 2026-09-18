@@ -10,7 +10,11 @@ import type { PanelStore } from '../../lib/store';
  * need the member — **blocked** and **offline** — say so in a colour rather than
  * in a footnote.
  */
-export const Status = observer(function Status({ store }: { store: PanelStore }) {
+export const Status = observer(function Status({
+  store,
+}: {
+  store: PanelStore;
+}) {
   const state = store.syncState;
   const tone =
     state === 'blocked'

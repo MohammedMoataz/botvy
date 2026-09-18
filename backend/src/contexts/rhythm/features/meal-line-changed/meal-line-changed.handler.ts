@@ -92,7 +92,7 @@ export class MealLineChangedHandler {
     if (!plan) return 'no-plan';
 
     const half = halfFrom(event, payload);
-    if (!plan.setMealLine(half.line, half.reason, event.occurredAt)) {
+    if (!plan.setMealLine(half.line, half.reason)) {
       return 'unchanged';
     }
 

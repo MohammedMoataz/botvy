@@ -238,7 +238,9 @@ export class LinkSyncAdapter implements SyncableEntity {
     const today = localDate(now, timezone);
     const midnight =
       wallClockToUtc(`${today}T00:00`, timezone) ??
-      new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
 
     const saved = await this.links.countAddedSince(userId, midnight);
     return saved >= limit ? `the daily limit of ${limit} is reached` : null;

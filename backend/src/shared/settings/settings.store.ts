@@ -17,5 +17,9 @@ export interface StoredSetting {
 export abstract class SettingsStore {
   abstract get(key: string): Promise<StoredSetting | null>;
   abstract getMany(keys: string[]): Promise<StoredSetting[]>;
-  abstract set(key: string, value: unknown, updatedBy: string | null): Promise<StoredSetting>;
+  abstract set(
+    key: string,
+    value: unknown,
+    updatedBy: string | null,
+  ): Promise<StoredSetting>;
 }

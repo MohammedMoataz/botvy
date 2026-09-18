@@ -115,7 +115,8 @@ function localDate(at) {
  * this file is run by hand months apart.
  */
 function expectedTimes(now) {
-  const plus = (minutes) => wallClock(new Date(now.getTime() + minutes * 60_000));
+  const plus = (minutes) =>
+    wallClock(new Date(now.getTime() + minutes * 60_000));
   const tomorrow = localDate(new Date(now.getTime() + 86_400_000));
   return {
     IN_TWO_HOURS: plus(120),
@@ -136,7 +137,10 @@ async function loadPrompt() {
 }
 
 async function loadCases() {
-  const raw = await readFile(join(HERE, 'fixtures', 'intent-cases.json'), 'utf8');
+  const raw = await readFile(
+    join(HERE, 'fixtures', 'intent-cases.json'),
+    'utf8',
+  );
   return JSON.parse(raw);
 }
 
@@ -241,7 +245,9 @@ async function extract({ prompt, schema, model, numCtx, text, now }) {
    */
   if (intent.args?.when) {
     const namesATime =
-      intent.name === 'set_slots' ? mentionsAClock(text) : mentionsAMoment(text);
+      intent.name === 'set_slots'
+        ? mentionsAClock(text)
+        : mentionsAMoment(text);
     if (!namesATime) delete intent.args.when;
   }
 
@@ -289,7 +295,9 @@ function grade(expected, actual, times) {
   }
 
   if (expected.listKind && actual.args?.listKind !== expected.listKind) {
-    problems.push(`listKind=${actual.args?.listKind} want ${expected.listKind}`);
+    problems.push(
+      `listKind=${actual.args?.listKind} want ${expected.listKind}`,
+    );
   }
   if (expected.metric && actual.args?.metric !== expected.metric) {
     problems.push(`metric=${actual.args?.metric} want ${expected.metric}`);
@@ -317,13 +325,9 @@ async function settings() {
 }
 
 async function main() {
-  const [prompt, cases, schema, { model, numCtx }, helpers] = await Promise.all([
-    loadPrompt(),
-    loadCases(),
-    loadSchema(),
-    settings(),
-    loadTimeHelpers(),
-  ]);
+  const [prompt, cases, schema, { model, numCtx }, helpers] = await Promise.all(
+    [loadPrompt(), loadCases(), loadSchema(), settings(), loadTimeHelpers()],
+  );
   ({
     resolveRelativePhrase,
     preferSoonestDay,
@@ -417,9 +421,13 @@ async function main() {
   const timesOk = silentTimeErrors === 0;
   const latencyOk = p95 < 5_000;
 
-  console.log(`SC-002 hit rate     ${hitRateOk ? 'PASS' : 'FAIL'} (need ${Math.ceil(cases.length * 0.9)})`);
+  console.log(
+    `SC-002 hit rate     ${hitRateOk ? 'PASS' : 'FAIL'} (need ${Math.ceil(cases.length * 0.9)})`,
+  );
   console.log(`SC-002 silent times ${timesOk ? 'PASS' : 'FAIL'}`);
-  console.log(`extraction < 5 s    ${latencyOk ? 'PASS' : 'FAIL'} (p95 ${p95} ms)`);
+  console.log(
+    `extraction < 5 s    ${latencyOk ? 'PASS' : 'FAIL'} (p95 ${p95} ms)`,
+  );
 
   process.exit(hitRateOk && timesOk && latencyOk ? 0 : 1);
 }

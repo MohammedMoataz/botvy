@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   CalendarEvent,
   type CalendarEventState,
@@ -54,7 +55,7 @@ const WINDOW_SLACK_MS = 86_400_000;
  * that job in advance — a field added in a later phase gets its default here
  * and every existing row keeps working.
  */
-const meetingMapper: Mapper<Meeting, MeetingDoc> = {
+const meetingMapper: Mapper<Meeting, MeetingDoc> = versioned({
   toDomain(doc) {
     return Meeting.rehydrate({
       id: doc._id,
@@ -104,9 +105,9 @@ const meetingMapper: Mapper<Meeting, MeetingDoc> = {
       schemaVersion: meeting.schemaVersion,
     };
   },
-};
+});
 
-const calendarEventMapper: Mapper<CalendarEvent, CalendarEventDoc> = {
+const calendarEventMapper: Mapper<CalendarEvent, CalendarEventDoc> = versioned({
   toDomain(doc) {
     return CalendarEvent.rehydrate({
       id: doc._id,
@@ -142,7 +143,7 @@ const calendarEventMapper: Mapper<CalendarEvent, CalendarEventDoc> = {
       schemaVersion: event.schemaVersion,
     };
   },
-};
+});
 
 /**
  * The stored repeat, settled into the shape the expander assumes.

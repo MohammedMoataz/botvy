@@ -121,7 +121,10 @@ describe('starting a chat', () => {
 
   it('creates a free chat with the id the client minted', async () => {
     const id = newId();
-    const conversation = await b.create.handle(MEMBER, { id, title: 'Recipes' });
+    const conversation = await b.create.handle(MEMBER, {
+      id,
+      title: 'Recipes',
+    });
 
     expect(conversation.id).toBe(id);
     expect(conversation.kind).toBe('free');
@@ -269,9 +272,7 @@ describe('a conversation that is not yours', () => {
   for (const [what, act] of cases) {
     it(`refuses to ${what} another member's chat, as forbidden`, async () => {
       const theirs = await seed(b, 'free', INTRUDER);
-      const error = await act(b, theirs.id).catch(
-        (thrown: unknown) => thrown,
-      );
+      const error = await act(b, theirs.id).catch((thrown: unknown) => thrown);
 
       expect(error).toBeInstanceOf(ConversationForbidden);
       // Nothing about the conversation, not even its id, is in the message.

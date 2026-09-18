@@ -1,4 +1,6 @@
-# A content security policy the App Router can live with
+# E-025 — A content security policy the App Router can live with
+
+**Area**: security · **Status**: done (report-only) · **Found**: P11
 
 ## What it is
 
@@ -60,3 +62,20 @@ tags. That means:
 Half a day, most of it in step 2, and it should be done in a phase that has a
 running stack in front of it — a policy verified only by reading it is exactly
 the kind of check this repository keeps learning not to trust.
+
+## How it landed
+
+On the edge, as this file argues, with the nonce minted in `frontend/middleware.ts`
+and threaded onto Next's own bootstrap tags — measured on a real `next start`:
+twelve script tags, none without it. `style-src` keeps `'unsafe-inline'`
+deliberately: five PrimeReact modules inject a `<style>` at runtime and a nonce
+in that directive would void the `'unsafe-inline'` beside it and ship an
+unstyled portal.
+
+**It ships report-only**, which is this file's own step 3 and a deliberate stop.
+`CSP_ENFORCE=on` plus a recreate of the edge enforces it; the switch is a
+request header the edge sets, so it needs no rebuild. Step 4's Playwright case
+is written and asserts the current state, with one constant to flip — but it has
+not been run against a stack, and neither has a real browser console been
+watched on `/` and `/login`. Until both happen, enforcing it is the change this
+file warns renders a blank page rather than an error.

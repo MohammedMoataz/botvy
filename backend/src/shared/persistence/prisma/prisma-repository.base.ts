@@ -4,7 +4,10 @@ import type { Mapper } from '../ports/mapper.js';
 import { Repository } from '../ports/repository.js';
 import { StaleWriteError } from '../ports/errors.js';
 import type { PrismaService, PrismaTransaction } from './prisma.service.js';
-import { PrismaUnitOfWork, toIdentityOutboxRow } from './prisma-unit-of-work.js';
+import {
+  PrismaUnitOfWork,
+  toIdentityOutboxRow,
+} from './prisma-unit-of-work.js';
 
 /**
  * The minimum a Prisma model delegate has to offer for the base to drive it.
@@ -28,7 +31,10 @@ export interface PrismaDelegate<Row> {
  * write to Mongo would be at-most-once — a crash between the two loses the
  * event and leaves nothing to say it was owed.
  */
-export abstract class PrismaRepositoryBase<T extends AggregateRoot, Row> extends Repository<T> {
+export abstract class PrismaRepositoryBase<
+  T extends AggregateRoot,
+  Row,
+> extends Repository<T> {
   protected abstract readonly mapper: Mapper<T, Row>;
 
   constructor(protected readonly prisma: PrismaService) {
@@ -36,7 +42,9 @@ export abstract class PrismaRepositoryBase<T extends AggregateRoot, Row> extends
   }
 
   /** The delegate for this aggregate's table, off whichever client is in force. */
-  protected abstract delegate(client: PrismaTransaction | PrismaService): PrismaDelegate<Row>;
+  protected abstract delegate(
+    client: PrismaTransaction | PrismaService,
+  ): PrismaDelegate<Row>;
 
   /** The transaction client if we are inside one, otherwise the base client. */
   protected client(): PrismaTransaction | PrismaService {
@@ -44,7 +52,9 @@ export abstract class PrismaRepositoryBase<T extends AggregateRoot, Row> extends
   }
 
   async findById(userId: string, id: string): Promise<T | null> {
-    const row = await this.delegate(this.client()).findFirst({ where: { id, userId } });
+    const row = await this.delegate(this.client()).findFirst({
+      where: { id, userId },
+    });
     return row ? this.mapper.toDomain(row) : null;
   }
 
@@ -88,8 +98,11 @@ export abstract class PrismaRepositoryBase<T extends AggregateRoot, Row> extends
     events: DomainEvent[],
   ): Promise<void> {
     if (events.length === 0) return;
-    const outbox = (client as unknown as { identityOutbox: { createMany(args: unknown): Promise<unknown> } })
-      .identityOutbox;
+    const outbox = (
+      client as unknown as {
+        identityOutbox: { createMany(args: unknown): Promise<unknown> };
+      }
+    ).identityOutbox;
     await outbox.createMany({ data: events.map(toIdentityOutboxRow) });
   }
 }

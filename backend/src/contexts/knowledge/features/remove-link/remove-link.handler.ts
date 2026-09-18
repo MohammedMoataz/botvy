@@ -86,7 +86,11 @@ export class RestoreLinkHandler {
     private readonly links: LinkRepository,
   ) {}
 
-  async handle(userId: string, id: string, at: Date = new Date()): Promise<void> {
+  async handle(
+    userId: string,
+    id: string,
+    at: Date = new Date(),
+  ): Promise<void> {
     const link = await this.links.findById(userId, id);
     if (!link) throw new LinkNotFound(id);
     if (!link.isDeleted) return;

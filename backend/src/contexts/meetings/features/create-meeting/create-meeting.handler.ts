@@ -2,15 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { isUuid } from '../../../../shared/cqrs/ids.js';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
-import {
-  Meeting,
-  type MeetingSource,
-} from '../../domain/meeting.aggregate.js';
+import { Meeting, type MeetingSource } from '../../domain/meeting.aggregate.js';
 import type {
   MeetingLocation,
   MeetingRecurrence,
 } from '../../domain/recurrence-expander.js';
-import { MeetingDefaultsPort } from '../../domain/meetings.ports.js';
+import { MemberPreferencesPort } from '../../../../shared/member/member-preferences.port.js';
 import { MeetingRepository } from '../../domain/meetings.repositories.js';
 
 export class InvalidMeetingId extends Error {
@@ -116,18 +113,20 @@ export function leadTimeMinutes(lead: string): number | null {
  * answers with the member's stored preference and falls back to the registry
  * for a member whose profile row has not been written yet.
  *
- * `defaults.meetingDurationMin` reaches it through `MeetingDefaultsPort`,
- * which is bound in this context's own `infrastructure/` to Profile's
- * published `preferencesFor` read and falls back to the registry for a member
- * whose preferences row the bootstrap has not written yet.
+ * `defaults.meetingDurationMin` reaches it through `MemberPreferencesPort`,
+ * which answers with the member's stored preference and falls back to the
+ * registry for a member whose preferences row the bootstrap has not written
+ * yet. That was this context's own `MeetingDefaultsPort` until E-020 collapsed
+ * five identical adapters — and their five copies of the fallback — into one;
+ * the field is still named at the call site, which is the property the separate
+ * ports had and the only one worth keeping.
  *
  * It was the settings registry directly for one draft of this handler, which
  * would have been a quiet constitution XII violation: `meetingDurationMin` is a
  * `user_preferences` field seeded from `settings.defaults.*`, so reading the
  * installation value means the editor silently ignores what the member set.
  * The two agree for anybody who has not changed it, which is exactly what makes
- * the bug invisible — and the port's own comment says why it is a third port
- * rather than a fourth field on the shared scheduling one.
+ * the bug invisible.
  */
 @Injectable()
 export class CreateMeetingHandler {
@@ -135,7 +134,7 @@ export class CreateMeetingHandler {
     private readonly uow: UnitOfWork,
     private readonly meetings: MeetingRepository,
     private readonly member: MemberContextPort,
-    private readonly defaults: MeetingDefaultsPort,
+    private readonly preferences: MemberPreferencesPort,
   ) {}
 
   async handle(
@@ -157,7 +156,8 @@ export class CreateMeetingHandler {
     const { timezone } = await this.member.clock(userId);
 
     const durationMin =
-      command.durationMin ?? (await this.defaults.durationMinFor(userId));
+      command.durationMin ??
+      (await this.preferences.get(userId, 'meetingDurationMin'));
 
     const reminderOffsets =
       command.reminderOffsets ?? (await this.defaultOffsets(userId));

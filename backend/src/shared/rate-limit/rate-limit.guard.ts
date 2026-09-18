@@ -110,7 +110,12 @@ export class RateLimitGuard implements CanActivate {
       return true;
     }
 
-    const verdict = this.limiter.take(bucket.name, bucket.key, limit, WINDOW_MS);
+    const verdict = this.limiter.take(
+      bucket.name,
+      bucket.key,
+      limit,
+      WINDOW_MS,
+    );
     if (verdict.allowed) return true;
 
     const seconds = Math.max(Math.ceil(verdict.retryAfterMs / 1000), 1);
@@ -154,7 +159,11 @@ export class RateLimitGuard implements CanActivate {
     }
 
     return graphql
-      ? { name: 'graphql', key: principal.id, setting: 'limits.graphqlPerMinute' }
+      ? {
+          name: 'graphql',
+          key: principal.id,
+          setting: 'limits.graphqlPerMinute',
+        }
       : { name: 'rest', key: principal.id, setting: 'limits.restPerMinute' };
   }
 }

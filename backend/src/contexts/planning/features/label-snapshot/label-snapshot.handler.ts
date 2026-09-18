@@ -49,12 +49,10 @@ export class LabelSnapshotHandler {
     if (!userId || !payload.labelId || !payload.name || !payload.color) return;
 
     const touched = await this.uow.run(() =>
-      this.tasks.refreshLabelSnapshots(
-        userId,
-        payload.labelId!,
-        { name: payload.name!, color: payload.color! },
-        event.occurredAt,
-      ),
+      this.tasks.refreshLabelSnapshots(userId, payload.labelId!, {
+        name: payload.name!,
+        color: payload.color!,
+      }),
     );
 
     // Logged even at zero, because zero is the interesting number: a reorder
@@ -81,12 +79,7 @@ export class LabelSnapshotHandler {
     if (!userId || !payload.labelId) return;
 
     const touched = await this.uow.run(() =>
-      this.tasks.refreshLabelSnapshots(
-        userId,
-        payload.labelId!,
-        null,
-        event.occurredAt,
-      ),
+      this.tasks.refreshLabelSnapshots(userId, payload.labelId!, null),
     );
     this.logger.log(
       `label ${payload.labelId} deleted: cleared from ${touched} task(s)`,

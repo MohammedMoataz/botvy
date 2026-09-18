@@ -159,7 +159,12 @@ async function main() {
     }
     // The chrome is identical across all ten, so a summary that mentions it is
     // the extractor failing rather than that one page being unusual.
-    for (const noise of ['newsletter', 'unsubscribe', 'cookies', 'All rights reserved']) {
+    for (const noise of [
+      'newsletter',
+      'unsubscribe',
+      'cookies',
+      'All rights reserved',
+    ]) {
       if (content.text.toLowerCase().includes(noise.toLowerCase())) {
         failures.push(
           `${fixture.slug}: the extracted text contains "${noise}", so the chrome came through`,
@@ -181,14 +186,22 @@ async function main() {
 
   // ---- SC-004, which needs a person ---------------------------------------
   console.log('\n' + '='.repeat(72));
-  console.log('SC-004 — the faithfulness review. Read each summary against the');
+  console.log(
+    'SC-004 — the faithfulness review. Read each summary against the',
+  );
   console.log('article it came from and record how many of the ten you judge');
-  console.log('faithful. Eight of ten is the bar. "Faithful" means: it says what');
-  console.log('the source says, keeps the author\u2019s position, and adds nothing.');
+  console.log(
+    'faithful. Eight of ten is the bar. "Faithful" means: it says what',
+  );
+  console.log(
+    'the source says, keeps the author\u2019s position, and adds nothing.',
+  );
   console.log('='.repeat(72));
 
   for (const review of reviews) {
-    console.log(`\n--- ${review.slug} (${review.words} words, ${review.ms} ms) ---`);
+    console.log(
+      `\n--- ${review.slug} (${review.words} words, ${review.ms} ms) ---`,
+    );
     console.log(`article : ${review.title}`);
     console.log(`extracted: ${review.chars} characters`);
     console.log(`must mention: ${review.mustMention.join('; ')}`);
@@ -220,7 +233,9 @@ async function main() {
     for (const failure of failures) console.log(`  ${failure}`);
     process.exit(1);
   }
-  console.log('\nSC-006: every summary is within the limit and names its source.');
+  console.log(
+    '\nSC-006: every summary is within the limit and names its source.',
+  );
 }
 
 await main().catch((error) => {

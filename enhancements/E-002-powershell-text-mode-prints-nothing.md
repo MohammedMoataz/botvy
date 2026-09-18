@@ -1,6 +1,6 @@
 # E-002 — `check-prerequisites.ps1` text mode prints nothing
 
-**Area**: tooling · **Status**: open · **Found**: P2, while adding the bash halves
+**Area**: tooling · **Status**: done · **Found**: P2, while adding the bash halves
 
 ## What
 
@@ -37,3 +37,7 @@ Drop the `| Out-Null` and let the function's output through, or capture it and
 print it. One line in each of two files. The decision to make first is whether
 this repository is willing to hold local edits to spec-kit's generated scripts —
 see E-003, which has the same question at its centre.
+
+## How it landed
+
+Fixed by filtering the function's output by type: dropping `| Out-Null` alone lets the boolean through too, so text mode printed `[FAIL]`/`False` pairs. `--json` was hashed before and after and is byte-identical in all three modes. The local edit is marked in both scripts, because spec-kit may regenerate them.

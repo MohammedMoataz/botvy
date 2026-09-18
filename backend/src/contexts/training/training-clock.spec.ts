@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, localHhMm, wallClockToUtc } from '../../shared/time/time.js';
+import {
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../shared/time/time.js';
 import type { TrainingSlot } from './domain/athlete-profile.aggregate.js';
 import { nextPractice } from './domain/next-practice.js';
 import { Session } from './domain/session.aggregate.js';
@@ -149,7 +153,10 @@ describe('slotOccurrencesWithin', () => {
      */
     const change = nextOffsetChange(CAIRO);
     if (!change) {
-      expect(change, 'Africa/Cairo no longer changes its clocks').not.toBeNull();
+      expect(
+        change,
+        'Africa/Cairo no longer changes its clocks',
+      ).not.toBeNull();
       return;
     }
 

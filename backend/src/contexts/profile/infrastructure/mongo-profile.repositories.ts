@@ -6,6 +6,7 @@ import {
 } from '../../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../../shared/persistence/mongo/mongo-unit-of-work.js';
 import type { Mapper } from '../../../shared/persistence/ports/mapper.js';
+import { versioned } from '../../../shared/persistence/ports/mapper.js';
 import {
   Preferences,
   type PreferencesState,
@@ -26,7 +27,7 @@ export interface PreferencesDoc extends PreferencesState {
   schemaVersion: number;
 }
 
-const profileMapper: Mapper<Profile, ProfileDoc> = {
+const profileMapper: Mapper<Profile, ProfileDoc> = versioned({
   toDomain(doc) {
     return Profile.rehydrate({
       userId: doc.userId,
@@ -63,9 +64,9 @@ const profileMapper: Mapper<Profile, ProfileDoc> = {
       schemaVersion: profile.schemaVersion,
     };
   },
-};
+});
 
-const preferencesMapper: Mapper<Preferences, PreferencesDoc> = {
+const preferencesMapper: Mapper<Preferences, PreferencesDoc> = versioned({
   toDomain(doc) {
     return Preferences.rehydrate({
       userId: doc.userId,
@@ -104,7 +105,7 @@ const preferencesMapper: Mapper<Preferences, PreferencesDoc> = {
       schemaVersion: preferences.schemaVersion,
     };
   },
-};
+});
 
 /**
  * Both repositories delegate to `MongoRepositoryBase`, which is what puts the

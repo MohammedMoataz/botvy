@@ -38,7 +38,9 @@ import { loadEnvFiles } from './env.mjs';
 
 loadEnvFiles();
 
-const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+const API =
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 const SERVICE_TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? '';
 
 /** How long the relay is given. Generous: it is a change stream, so eventual. */
@@ -47,7 +49,9 @@ const RELAY_TIMEOUT_MS = 45_000;
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 
 async function rest(method, path, { token, body, headers } = {}) {
@@ -155,7 +159,11 @@ async function main() {
   }
 
   const signedIn = await rest('POST', '/auth/login', {
-    body: { email, password, device: { installId, kind: 'android', name: 'P2 gate phone' } },
+    body: {
+      email,
+      password,
+      device: { installId, kind: 'android', name: 'P2 gate phone' },
+    },
   });
   if (signedIn.status !== 200) {
     record('the member can sign in', false, `status=${signedIn.status}`);
@@ -164,7 +172,8 @@ async function main() {
   const token = signedIn.body.accessToken;
   record('a member registers and signs in', true, email);
 
-  const sync = (body) => rest('POST', '/sync', { token, body: { installId, ...body } });
+  const sync = (body) =>
+    rest('POST', '/sync', { token, body: { installId, ...body } });
 
   // ------------------------------------------------------- 1. a task round trip
   const labelId = randomUUID();
@@ -191,11 +200,17 @@ async function main() {
     `label=${label.status} task=${task.status}`,
   );
 
-  const first = await sync({ since: null, entities: ['labels', 'tasks', 'reminders'] });
+  const first = await sync({
+    since: null,
+    entities: ['labels', 'tasks', 'reminders'],
+  });
   const pulled = first.body?.pull?.tasks ?? [];
   record(
     'the task comes back from /sync with its label snapshot',
-    first.status === 200 && pulled.some((row) => row.id === taskId && row.label?.name === 'Gate Work'),
+    first.status === 200 &&
+      pulled.some(
+        (row) => row.id === taskId && row.label?.name === 'Gate Work',
+      ),
     first.status === 200
       ? `full=${first.body.full} tasks=${pulled.length}`
       : JSON.stringify(first.body),
@@ -207,17 +222,24 @@ async function main() {
   // a handler reacting to `planning.LabelUpdated` through the outbox and the
   // change-stream relay — so this is the one check that the relay is delivering
   // Planning's own events, not just Identity's.
-  await rest('PATCH', `/labels/${labelId}`, { token, body: { name: 'Gate Deep Work' } });
+  await rest('PATCH', `/labels/${labelId}`, {
+    token,
+    body: { name: 'Gate Deep Work' },
+  });
 
   const refreshed = await eventually(async () => {
     const answer = await sync({ since: null, entities: ['tasks'] });
-    const row = (answer.body?.pull?.tasks ?? []).find((each) => each.id === taskId);
+    const row = (answer.body?.pull?.tasks ?? []).find(
+      (each) => each.id === taskId,
+    );
     return row?.label?.name === 'Gate Deep Work' ? row : null;
   });
   record(
     'renaming a label reaches the tasks that carry it, through the relay',
     Boolean(refreshed),
-    refreshed ? 'snapshot refreshed' : `still stale after ${RELAY_TIMEOUT_MS / 1000}s`,
+    refreshed
+      ? 'snapshot refreshed'
+      : `still stale after ${RELAY_TIMEOUT_MS / 1000}s`,
   );
 
   // ------------------------------- 3. the partial unique index, for real
@@ -242,7 +264,10 @@ async function main() {
   // missing and null as one value and the *second* tombstone would collide with
   // the first — which is why this deletes twice.
   const freed = randomUUID();
-  await rest('POST', '/labels', { token, body: { id: freed, name: 'Gate Temp', color: '#f59e0b' } });
+  await rest('POST', '/labels', {
+    token,
+    body: { id: freed, name: 'Gate Temp', color: '#f59e0b' },
+  });
   await rest('DELETE', `/labels/${freed}`, { token });
 
   const reused = randomUUID();
@@ -272,13 +297,23 @@ async function main() {
       dueAt: iso(dtstart),
       allDay: false,
       priority: 2,
-      recurrence: { dtstart: iso(dtstart), rrule: 'FREQ=WEEKLY', mode: 'schedule', exdates: [] },
+      recurrence: {
+        dtstart: iso(dtstart),
+        rrule: 'FREQ=WEEKLY',
+        mode: 'schedule',
+        exdates: [],
+      },
     },
   });
-  const completed = await rest('POST', `/tasks/${repeatId}/complete`, { token, body: {} });
+  const completed = await rest('POST', `/tasks/${repeatId}/complete`, {
+    token,
+    body: {},
+  });
 
   const afterComplete = await sync({ since: null, entities: ['tasks'] });
-  const repeating = (afterComplete.body?.pull?.tasks ?? []).filter((row) => row.id === repeatId);
+  const repeating = (afterComplete.body?.pull?.tasks ?? []).filter(
+    (row) => row.id === repeatId,
+  );
   const advancedTo = completed.body?.recurrenceAdvancedTo;
   record(
     'completing a repeating task advances it on the same row',
@@ -291,12 +326,17 @@ async function main() {
 
   // --------------------------- 6. deleting never touches the status
   const doneId = randomUUID();
-  await rest('POST', '/tasks', { token, body: { id: doneId, title: 'Gate done' } });
+  await rest('POST', '/tasks', {
+    token,
+    body: { id: doneId, title: 'Gate done' },
+  });
   await rest('POST', `/tasks/${doneId}/complete`, { token, body: {} });
   await rest('DELETE', `/tasks/${doneId}`, { token });
 
   const withTombstones = await sync({ since: null, entities: ['tasks'] });
-  const tombstone = (withTombstones.body?.pull?.tasks ?? []).find((row) => row.id === doneId);
+  const tombstone = (withTombstones.body?.pull?.tasks ?? []).find(
+    (row) => row.id === doneId,
+  );
   record(
     'deleting a completed task leaves it completed',
     tombstone?.status === 'completed' && tombstone?.deletedAt !== null,
@@ -322,26 +362,39 @@ async function main() {
   const rejection = (stalePush.body?.rejections ?? [])[0];
   record(
     'a stale push is refused and the server row comes back with it',
-    rejection?.reason === 'stale' && rejection?.entity === 'tasks' && Boolean(rejection?.server),
-    rejection ? `reason=${rejection.reason} server=${rejection.server ? 'present' : 'missing'}` : 'no rejection',
+    rejection?.reason === 'stale' &&
+      rejection?.entity === 'tasks' &&
+      Boolean(rejection?.server),
+    rejection
+      ? `reason=${rejection.reason} server=${rejection.server ? 'present' : 'missing'}`
+      : 'no rejection',
   );
 
   // --------------------------- 8. the alert pipeline, and the claim
   const reminderId = randomUUID();
   await rest('POST', '/reminders', {
     token,
-    body: { id: reminderId, title: 'Gate reminder', remindAt: iso(inMinutes(2)), leadTimes: ['0m'] },
+    body: {
+      id: reminderId,
+      title: 'Gate reminder',
+      remindAt: iso(inMinutes(2)),
+      leadTimes: ['0m'],
+    },
   });
 
   const planned = await eventually(async () => {
     const answer = await sync({ since: null, entities: ['reminders'] });
     const alarms = answer.body?.pendingAlerts ?? [];
-    return alarms.some((alarm) => alarm.source?.id === reminderId) ? alarms : null;
+    return alarms.some((alarm) => alarm.source?.id === reminderId)
+      ? alarms
+      : null;
   });
   record(
     'the alert saga plans from a real event, and /sync hands the alarm to the phone',
     Boolean(planned),
-    planned ? `pendingAlerts=${planned.length}` : `nothing after ${RELAY_TIMEOUT_MS / 1000}s`,
+    planned
+      ? `pendingAlerts=${planned.length}`
+      : `nothing after ${RELAY_TIMEOUT_MS / 1000}s`,
   );
 
   if (SERVICE_TOKEN) {
@@ -377,7 +430,11 @@ async function main() {
     token,
     body: { password },
   });
-  record('the member can delete their own account', deleted.status === 200, `status=${deleted.status}`);
+  record(
+    'the member can delete their own account',
+    deleted.status === 200,
+    `status=${deleted.status}`,
+  );
 
   if (deleted.status === 200) {
     /*
@@ -402,7 +459,9 @@ async function main() {
     // And the member's own rows are gone, which the worker logs as four purge
     // handlers running. Checked through a fresh sign-in being refused, since
     // there is no account left to sign in as.
-    const signInAgain = await rest('POST', '/auth/login', { body: { email, password } });
+    const signInAgain = await rest('POST', '/auth/login', {
+      body: { email, password },
+    });
     record(
       'the account itself is gone',
       signInAgain.status === 401,
@@ -416,9 +475,12 @@ await main().catch((error) => {
 });
 
 const failed = results.filter((r) => !r.ok);
-console.log(`\n${results.length - failed.length}/${results.length} checks passed against ${API}`);
+console.log(
+  `\n${results.length - failed.length}/${results.length} checks passed against ${API}`,
+);
 if (failed.length > 0) {
   console.log('\nfailed:');
-  for (const f of failed) console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+  for (const f of failed)
+    console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
 }
 process.exit(failed.length === 0 ? 0 : 1);

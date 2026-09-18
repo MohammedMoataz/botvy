@@ -1,6 +1,6 @@
 # E-004 — The cross-context lint rule enumerates every context
 
-**Area**: build · **Status**: open · **Found**: P2, adding `planning`
+**Area**: build · **Status**: done · **Found**: P2, adding `planning`
 
 ## What
 
@@ -71,3 +71,7 @@ requires — a file that should fail was written, `pnpm lint` was run, the
 "Constitution IX" message appeared anchored on it, and the file was deleted. The
 probe is the part that makes the fix real, and it is also the part that makes
 the enumeration expensive enough to be worth replacing.
+
+## How it landed
+
+`infra/gen-lint-contexts.mjs` builds the group from the directory listing; `pnpm lint:contexts` checks the committed file and runs in CI. The committed set and the generated one were already identical — only the order differed. Probed both ways: a cross-context import and a driver import raised Constitution IX, a slice importing its own context's `domain/` did not.

@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { DomainEvent } from '../cqrs/domain-event.js';
 import { OutboxRelay, type RelayStore } from './outbox-relay.js';
-import { WebhookFanout, type HttpPost, type WebhookSubscription } from './webhook-fanout.js';
+import {
+  WebhookFanout,
+  type HttpPost,
+  type WebhookSubscription,
+} from './webhook-fanout.js';
 
 function event(id: string, name = 'operations.Pinged'): DomainEvent {
   return {
@@ -21,7 +25,11 @@ class FakeRelayStore implements RelayStore {
   pending: DomainEvent[] = [];
   streamed: Array<{ event: DomainEvent; token: unknown }> = [];
   delivered: string[] = [];
-  failed: Array<{ eventId: string; error: string; nextAttemptAt: Date | null }> = [];
+  failed: Array<{
+    eventId: string;
+    error: string;
+    nextAttemptAt: Date | null;
+  }> = [];
   savedTokens: unknown[] = [];
   resumeToken: unknown = null;
   /** How many attempts each event has already burned, as a real store records. */
@@ -54,17 +62,27 @@ class FakeRelayStore implements RelayStore {
   async saveResumeToken(token: unknown): Promise<void> {
     this.savedTokens.push(token);
   }
-  async *watch(resumeToken: unknown): AsyncGenerator<{ event: DomainEvent; token: unknown }> {
+  async *watch(
+    resumeToken: unknown,
+  ): AsyncGenerator<{ event: DomainEvent; token: unknown }> {
     this.resumeToken = resumeToken;
     for (const item of this.streamed) yield item;
   }
 }
 
 const subscriptions: WebhookSubscription[] = [
-  { event: 'operations.Pinged', url: 'http://n8n:5678/webhook/botvy/pinged', enabled: true },
+  {
+    event: 'operations.Pinged',
+    url: 'http://n8n:5678/webhook/botvy/pinged',
+    enabled: true,
+  },
 ];
 
-function relayWith(store: FakeRelayStore, post: HttpPost, published: DomainEvent[] = []) {
+function relayWith(
+  store: FakeRelayStore,
+  post: HttpPost,
+  published: DomainEvent[] = [],
+) {
   const beats: Array<{ ok: boolean; error?: string }> = [];
   const relay = new OutboxRelay({
     store,
@@ -217,7 +235,8 @@ describe('outbox relay', () => {
     const { relay } = relayWith(store, refusing);
     const failing = event('e1');
 
-    for (let attempt = 0; attempt < 5; attempt += 1) await relay.deliver(failing);
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      await relay.deliver(failing);
 
     const gaps = store.failed.map((entry) =>
       entry.nextAttemptAt === null

@@ -195,24 +195,6 @@ export abstract class SuggestionDrafterPort {
 // ------------------------------------------------------- other contexts' facts
 
 /**
- * Whether this member wants suggestions at all (FR-011, SC-003).
- *
- * A `user_preferences` field, so it is reached through a port bound to
- * Profile's published read and **never** through
- * `SettingsService.get('defaults.aiSuggestions')`. The two agree for every
- * member who has not changed it, which is exactly what would make reading the
- * registry an invisible bug — and it is the fourth time this project has had
- * that decision in front of it, after the lead times, the meeting duration and
- * the practice cut-off.
- *
- * Never null: a member mid-bootstrap gets the installation default, which is the
- * value their preferences row is about to be written with.
- */
-export abstract class AiSuggestionsPort {
-  abstract enabledFor(userId: string): Promise<boolean>;
-}
-
-/**
  * Saying something in the member's coach chat.
  *
  * Used once, and only for the case the constitution names: a suggestion draft

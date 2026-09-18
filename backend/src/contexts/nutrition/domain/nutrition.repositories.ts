@@ -25,7 +25,10 @@ export abstract class MealRepository extends SyncableRepository<Meal> {
    */
   abstract listFor(userId: string, kind?: MealKind): Promise<Meal[]>;
 
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }
@@ -39,7 +42,10 @@ export abstract class MealSuggestionRepository extends Repository<MealSuggestion
    * construction — and the day this collection is keyed differently, that
    * caller keeps working and reads the wrong row.
    */
-  abstract forDate(userId: string, date: string): Promise<MealSuggestion | null>;
+  abstract forDate(
+    userId: string,
+    date: string,
+  ): Promise<MealSuggestion | null>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }

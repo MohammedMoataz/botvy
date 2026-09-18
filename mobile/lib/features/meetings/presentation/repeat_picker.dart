@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/l10n/app_localizations.dart';
 import '../../../core/recurrence/rule_words.dart';
 
 /// The repeat picker, in the member's own words (FR-004).
@@ -67,22 +68,30 @@ class _RepeatPickerState extends State<_RepeatPicker> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final lang = Localizations.localeOf(context).languageCode;
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Repeat', style: theme.textTheme.titleLarge),
+            Text(l10n.repeatTitle, style: theme.textTheme.titleLarge),
             const SizedBox(height: 12),
 
             SegmentedButton<RepeatFreq>(
-              segments: const [
-                ButtonSegment(value: RepeatFreq.daily, label: Text('Daily')),
-                ButtonSegment(value: RepeatFreq.weekly, label: Text('Weekly')),
+              segments: [
+                ButtonSegment(
+                  value: RepeatFreq.daily,
+                  label: Text(l10n.repeatDaily),
+                ),
+                ButtonSegment(
+                  value: RepeatFreq.weekly,
+                  label: Text(l10n.repeatWeekly),
+                ),
                 ButtonSegment(
                   value: RepeatFreq.monthly,
-                  label: Text('Monthly'),
+                  label: Text(l10n.repeatMonthly),
                 ),
               ],
               selected: {_spec.freq},
@@ -93,7 +102,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('Every'),
+                Text(l10n.repeatEvery),
                 const SizedBox(width: 12),
                 DropdownButton<int>(
                   value: _spec.interval,
@@ -106,11 +115,13 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // The noun alone, agreeing with the number in the dropdown
+                // beside it — `يوم` for one and `يومين` for two, which is the
+                // difference a plural-only label cannot say.
                 Text(switch (_spec.freq) {
-                  RepeatFreq.daily => _spec.interval == 1 ? 'day' : 'days',
-                  RepeatFreq.weekly => _spec.interval == 1 ? 'week' : 'weeks',
-                  RepeatFreq.monthly =>
-                    _spec.interval == 1 ? 'month' : 'months',
+                  RepeatFreq.daily => l10n.repeatDayUnit(_spec.interval),
+                  RepeatFreq.weekly => l10n.repeatWeekUnit(_spec.interval),
+                  RepeatFreq.monthly => l10n.repeatMonthUnit(_spec.interval),
                 }),
               ],
             ),
@@ -122,12 +133,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                 children: [
                   for (var day = DateTime.monday; day <= DateTime.sunday; day++)
                     FilterChip(
-                      label: Text(
-                        weekdayName(
-                          day,
-                          Localizations.localeOf(context).languageCode,
-                        ),
-                      ),
+                      label: Text(weekdayName(day, lang)),
                       selected: _spec.byDays.contains(day),
                       onSelected: (on) => setState(() {
                         final days = {..._spec.byDays};
@@ -159,11 +165,11 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                 segments: [
                   ButtonSegment(
                     value: MonthlyMode.dayOfMonth,
-                    label: Text('On the ${_ordinal(widget.startAt.day)}'),
+                    label: Text(l10n.repeatOnDayOfMonth(widget.startAt.day)),
                   ),
-                  const ButtonSegment(
+                  ButtonSegment(
                     value: MonthlyMode.lastDay,
-                    label: Text('Last day'),
+                    label: Text(l10n.repeatLastDay),
                   ),
                 ],
                 selected: {_spec.monthly},
@@ -177,26 +183,31 @@ class _RepeatPickerState extends State<_RepeatPicker> {
               const SizedBox(height: 6),
               Text(
                 _spec.monthly == MonthlyMode.lastDay
-                    ? 'The 28th or 29th in February.'
+                    ? l10n.repeatLastDayInFebruary
                     : widget.startAt.day > 28
-                          ? 'Months without a ${_ordinal(widget.startAt.day)} '
-                                'are skipped.'
-                          : 'The same date every month.',
+                          ? l10n.repeatSkipsShortMonths(widget.startAt.day)
+                          : l10n.repeatSameDateEveryMonth,
                 style: theme.textTheme.bodySmall,
               ),
             ],
 
             const Divider(height: 32),
-            Text('Ends', style: theme.textTheme.titleMedium),
+            Text(l10n.repeatEnds, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             SegmentedButton<RepeatEnd>(
-              segments: const [
-                ButtonSegment(value: RepeatEnd.never, label: Text('Never')),
+              segments: [
+                ButtonSegment(
+                  value: RepeatEnd.never,
+                  label: Text(l10n.repeatEndNever),
+                ),
                 ButtonSegment(
                   value: RepeatEnd.afterCount,
-                  label: Text('After'),
+                  label: Text(l10n.repeatEndAfter),
                 ),
-                ButtonSegment(value: RepeatEnd.onDate, label: Text('On date')),
+                ButtonSegment(
+                  value: RepeatEnd.onDate,
+                  label: Text(l10n.repeatEndOnDate),
+                ),
               ],
               selected: {_spec.end},
               onSelectionChanged: (choice) {
@@ -235,7 +246,10 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text('times'),
+                  // The caveat in E-015: a counted noun, not a fixed plural.
+                  // The digits are in the field, so this is the word alone and
+                  // `arabicCounted` still chooses which of the four it is.
+                  Text(l10n.repeatTimesUnit(_spec.count ?? 1)),
                 ],
               ),
             ],
@@ -246,7 +260,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                 icon: const Icon(Icons.event),
                 label: Text(
                   _spec.until == null
-                      ? 'Choose the last date'
+                      ? l10n.repeatChooseLastDate
                       : _dateText(_spec.until!),
                 ),
                 onPressed: () => unawaited(_pickUntil()),
@@ -256,7 +270,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
             const Divider(height: 32),
             // The confirmation line: the rule in words, before it is saved.
             Text(
-              _spec.describe(Localizations.localeOf(context).languageCode),
+              _spec.describe(lang),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.primary,
               ),
@@ -270,13 +284,13 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                 // -cased by both expanders.
                 TextButton(
                   onPressed: () => Navigator.of(context).pop<RepeatSpec?>(null),
-                  child: const Text('Does not repeat'),
+                  child: Text(l10n.repeatNone),
                 ),
                 const Spacer(),
                 FilledButton(
                   onPressed: () =>
                       Navigator.of(context).pop<RepeatSpec?>(_spec),
-                  child: const Text('Set repeat'),
+                  child: Text(l10n.repeatSet),
                 ),
               ],
             ),
@@ -306,13 +320,3 @@ class _RepeatPickerState extends State<_RepeatPicker> {
 String _dateText(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}'
     '-${date.day.toString().padLeft(2, '0')}';
-
-String _ordinal(int day) {
-  if (day >= 11 && day <= 13) return '${day}th';
-  return switch (day % 10) {
-    1 => '${day}st',
-    2 => '${day}nd',
-    3 => '${day}rd',
-    _ => '${day}th',
-  };
-}

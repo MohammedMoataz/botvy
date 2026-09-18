@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   resolveConflict,
+  type RejectionCode,
   type RejectionReason,
   type SyncChange,
 } from '../../../shared/persistence/ports/sync-change.js';
@@ -87,7 +88,7 @@ export class MealSyncAdapter implements SyncableEntity {
 
     const verdict = resolveConflict(change, existing, now);
     if (!verdict.accept) {
-      return this.refuse(change, verdict.reason, existing);
+      return this.refuse(change, verdict.reason, existing, verdict.code);
     }
 
     const fields = change.fields as PushedMeal;
@@ -114,22 +115,19 @@ export class MealSyncAdapter implements SyncableEntity {
           if (!existing.isDeleted) existing.tombstone(now);
           break;
         case 'restore':
-          if (existing.isDeleted) existing.restore(now);
+          if (existing.isDeleted) existing.restore();
           break;
         case 'purge':
           existing.assertPurgeable();
           await this.uow.run(() => this.meals.remove(existing));
           return { applied: true, id: existing.id };
         default:
-          existing.edit(
-            {
-              name: fields.name,
-              kind: fields.kind,
-              ingredients: fields.ingredients,
-              tags: fields.tags,
-            },
-            now,
-          );
+          existing.edit({
+            name: fields.name,
+            kind: fields.kind,
+            ingredients: fields.ingredients,
+            tags: fields.tags,
+          });
       }
 
       await this.uow.run(() => this.meals.save(existing));
@@ -160,6 +158,7 @@ export class MealSyncAdapter implements SyncableEntity {
     change: SyncChange,
     reason: RejectionReason,
     existing: Meal | null,
+    code?: RejectionCode,
   ): ApplyOutcome {
     return {
       applied: false,
@@ -167,6 +166,7 @@ export class MealSyncAdapter implements SyncableEntity {
         entity: this.entity,
         id: change.id,
         reason,
+        code,
         server: existing
           ? {
               id: existing.id,

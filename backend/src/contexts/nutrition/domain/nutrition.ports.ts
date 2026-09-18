@@ -105,25 +105,8 @@ export interface DayTraining {
  * about rather than an absence it has to guess at.
  */
 export abstract class DayTrainingPort {
-  abstract trainingOn(userId: string, date: string): Promise<DayTraining | null>;
-}
-
-/**
- * Which way this member wants their days chosen (FR-004).
- *
- * `preferences.mealMode`, through Profile's published read, with the
- * installation default behind it for a member whose bootstrap row does not
- * exist yet — the fourth adapter of this exact shape, after
- * `defaults.leadTimes`, `defaults.meetingDurationMin` and
- * `defaults.nextPracticeCutoff`. The constitution prices the third copy as the
- * one that moves to `shared/`, and the argument against moving it is written
- * out in `ProfileNextPracticeCutoff`: what would move is not four lines of
- * logic but a widened shared port.
- *
- * A member preference is never read from the settings registry directly. They
- * agree for every member who has not changed it, which is exactly what makes
- * that bug invisible.
- */
-export abstract class MealModePort {
-  abstract modeFor(userId: string): Promise<'library' | 'llm'>;
+  abstract trainingOn(
+    userId: string,
+    date: string,
+  ): Promise<DayTraining | null>;
 }

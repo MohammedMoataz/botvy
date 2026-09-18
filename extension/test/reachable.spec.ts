@@ -47,7 +47,10 @@ describe('a member who has never signed in', () => {
     // The signed-out branch is everything after the `: (` of the
     // `store.isAuthenticated ? (…) : (…)` ternary.
     const split = app.indexOf('store.isAuthenticated ?');
-    expect(split, 'App.tsx no longer branches on isAuthenticated').toBeGreaterThan(-1);
+    expect(
+      split,
+      'App.tsx no longer branches on isAuthenticated',
+    ).toBeGreaterThan(-1);
     const signedOut = app.slice(app.indexOf(') : (', split));
 
     expect(

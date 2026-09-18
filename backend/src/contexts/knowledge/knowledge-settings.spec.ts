@@ -112,7 +112,9 @@ function harness() {
     new InMemorySettingsStore(),
     new InMemoryAuditAdapter(),
   );
-  const heartbeats = { stamp: async () => undefined } as unknown as HeartbeatService;
+  const heartbeats = {
+    stamp: async () => undefined,
+  } as unknown as HeartbeatService;
 
   return {
     uow,

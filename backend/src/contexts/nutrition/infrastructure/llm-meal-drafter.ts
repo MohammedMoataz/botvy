@@ -3,10 +3,7 @@ import { OllamaClient } from '../../../shared/llm/ollama.client.js';
 import { SettingsService } from '../../../shared/settings/settings.service.js';
 import { renderPrompt } from '../../../shared/templates/prompt-files.js';
 import type { MealKind } from '../domain/meal.aggregate.js';
-import {
-  MealDrafterPort,
-  type MealDraft,
-} from '../domain/nutrition.ports.js';
+import { MealDrafterPort, type MealDraft } from '../domain/nutrition.ports.js';
 
 /**
  * The grammar for a day's meals.
@@ -138,7 +135,9 @@ export class LlmMealDrafter extends MealDrafterPort {
     );
 
     if (!decoded || !Array.isArray(decoded.meals)) {
-      this.logger.debug('the meal draft did not decode; the day is unavailable');
+      this.logger.debug(
+        'the meal draft did not decode; the day is unavailable',
+      );
       return null;
     }
 
@@ -170,7 +169,11 @@ function asName(value: unknown): string {
   if (typeof value !== 'string') return '';
   // Trailing punctuation trimmed: the names are joined with commas into one
   // line, and a full stop in the middle of it reads as the sentence ending.
-  return value.trim().replace(/[.;,]+$/, '').slice(0, MAX_MEAL_NAME).trim();
+  return value
+    .trim()
+    .replace(/[.;,]+$/, '')
+    .slice(0, MAX_MEAL_NAME)
+    .trim();
 }
 
 /**
@@ -183,7 +186,8 @@ function asName(value: unknown): string {
  * the model proposes is a member's library row.
  */
 function asKind(value: unknown): MealKind {
-  return typeof value === 'string' && DRAFTABLE_KINDS.includes(value as MealKind)
+  return typeof value === 'string' &&
+    DRAFTABLE_KINDS.includes(value as MealKind)
     ? (value as MealKind)
     : 'snack';
 }

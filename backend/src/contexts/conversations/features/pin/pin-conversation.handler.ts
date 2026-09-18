@@ -46,7 +46,7 @@ export class PinConversationHandler {
       );
       // Throws before anything is written, so a refused unpin leaves no trace
       // and the transaction has nothing to roll back.
-      conversation.setPinned(pinned, at);
+      conversation.setPinned(pinned);
       await this.conversations.save(conversation);
       return conversation;
     });

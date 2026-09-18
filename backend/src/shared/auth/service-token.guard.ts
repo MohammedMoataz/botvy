@@ -32,10 +32,10 @@ export class ServiceTokenGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     if (this.reflector) {
-      const requiredKind = this.reflector.getAllAndOverride<string | undefined>(REQUIRED_KIND, [
-        context.getHandler(),
-        context.getClass(),
-      ]);
+      const requiredKind = this.reflector.getAllAndOverride<string | undefined>(
+        REQUIRED_KIND,
+        [context.getHandler(), context.getClass()],
+      );
       if (requiredKind !== 'service') return true;
     }
 
@@ -48,7 +48,9 @@ export class ServiceTokenGuard implements CanActivate {
     // A JWT is three dot-separated base64 segments. Refusing it here, by shape,
     // means a member token never even reaches the hash comparison.
     if (looksLikeJwt(presented)) {
-      throw new ForbiddenException('a member token cannot authenticate a machine endpoint');
+      throw new ForbiddenException(
+        'a member token cannot authenticate a machine endpoint',
+      );
     }
 
     const client = await this.clients.verifyToken(hashToken(presented));
@@ -97,7 +99,10 @@ function readServiceToken(request: {
   if (typeof direct === 'string' && direct.length > 0) return direct;
 
   const authorization = headers.authorization;
-  if (typeof authorization === 'string' && authorization.startsWith('Bearer ')) {
+  if (
+    typeof authorization === 'string' &&
+    authorization.startsWith('Bearer ')
+  ) {
     const value = authorization.slice('Bearer '.length).trim();
     return value.length > 0 ? value : null;
   }

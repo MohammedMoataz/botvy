@@ -53,6 +53,7 @@ class StubSchedule extends MemberSchedulePort {
     return userIds.map((userId) => ({
       userId,
       timezone: this.timezone as string,
+      locale: 'en',
       planTomorrowTime: '21:00',
       endOfDayTime: '22:00',
       morningBriefingTime: '07:00',
@@ -289,10 +290,7 @@ describe('plans over a range', () => {
   it('is inclusive at both ends', async () => {
     const views = await b.planRange.handle(MEMBER, daysBack(2), daysBack(1));
 
-    expect(views.map((view) => view.date)).toEqual([
-      daysBack(2),
-      daysBack(1),
-    ]);
+    expect(views.map((view) => view.date)).toEqual([daysBack(2), daysBack(1)]);
   });
 
   it('returns a single day when both ends are the same date', async () => {

@@ -52,26 +52,97 @@ Set by `helmet` in the API and by Caddy at the edge.
 | `Referrer-Policy` | edge + helmet | `strict-origin-when-cross-origin` |
 | `Server` | edge | removed |
 | `Strict-Transport-Security` | helmet | set by default on HTTPS responses |
-| `Content-Security-Policy` | **off** | `helmet({ contentSecurityPolicy: false })` |
+| `Content-Security-Policy` | web app only | report-only by default; see below |
 
-### Finding — no content security policy · **accepted, with the reason**
+### Finding — no content security policy · **closed, report-only pending one flip**
 
-`contentSecurityPolicy: false` was set in P0 because helmet's default policy
-breaks the Swagger UI and the GraphQL playground, both of which load inline
-script. Those are development surfaces — `/docs` is only mounted when
-`NODE_ENV !== 'production'` — so a production installation is running without a
-CSP for no benefit.
+`contentSecurityPolicy: false` in helmet stays, and that is not the gap: `/api/*`,
+`/graphql` and `/media` are JSON and images, where a script-source directive has
+nothing to act on, and turning it on there restores a broken Swagger UI and
+GraphQL playground while covering no page at all.
 
-The web app is the thing a policy would protect, and it is served by Next.js
-behind Caddy rather than by the API, so the policy belongs on the **edge**
-rather than in helmet. It is not added in this phase: Next's App Router emits
-inline bootstrap script, so a correct policy needs nonce propagation through the
-document, and getting it wrong ships a blank page rather than an error. Recorded
-in `enhancements/` with what it would take.
+The pages are the thing a policy protects, and they come from Next.js. The
+policy now ships with them:
 
-What holds in the meantime: the public page loads **no third-party resource at
-all**, and that is asserted rather than promised — `frontend/e2e/public.spec.ts`
-fails if any request leaves the origin.
+| Directive | Value | Why |
+|---|---|---|
+| `default-src` | `'self'` | |
+| `script-src` | `'self' 'nonce-…' 'strict-dynamic'` | the App Router emits an inline bootstrap script in every document, so it is a nonce or `'unsafe-inline'`, and `'unsafe-inline'` permits the attack. `'strict-dynamic'` lets the bootstrap's own chunks inherit its trust and denies it to an injected same-origin `<script src>`. `'unsafe-eval'` is added under `next dev` only |
+| `style-src` | `'self' 'unsafe-inline'` | **deliberately not nonce'd** — a nonce here would disable the `'unsafe-inline'` beside it, and inline `style` attributes are how React's server render and PrimeReact's overlays position themselves. See below |
+| `img-src` | `'self' data: blob:` | |
+| `font-src` | `'self'` | PrimeIcons ships its own woff |
+| `connect-src` | `'self'` | the API, GraphQL and the socket are same-origin behind the edge; `'self'` covers `wss://` to the same host |
+| `frame-ancestors` | `'none'` | the same statement `X-Frame-Options: DENY` makes, to browsers that read the newer one |
+| `base-uri`, `form-action` | `'self'` | |
+| `object-src` | `'none'` | |
+
+No `upgrade-insecure-requests`: the default installation serves plain HTTP
+behind a tunnel that terminates TLS, and upgrading there asks the browser for a
+scheme the edge does not answer on. No `report-uri`: nothing collects reports,
+so the collector is the browser console and the Playwright case below.
+
+**On `style-src`.** PrimeReact injects `<style>` elements at runtime from five
+places — `Dialog` (and so `ConfirmDialog`), `DataTable`, `VirtualScroller`,
+`Ripple` and `FocusTrap`, all through the `useStyle` hook; `ComponentBase` adds
+four more, but only in unstyled mode, which this portal does not use. All of
+them honour a nonce (`PrimeReactProvider`'s `nonce`, or `PrimeReact.nonce`), so
+nonce-ing them is *possible*. It is not *useful*: a nonce on `style-src` voids
+the `'unsafe-inline'` token in the same directive, and every server-rendered
+`style="…"` attribute in the document then fails. The result would be an
+unstyled portal, which is the quiet CSS-looking breakage this directive is known
+for. `'unsafe-inline'` for styles and a nonce for scripts is the trade.
+
+**Where it comes from.** `frontend/middleware.ts` mints a nonce per request,
+puts the policy on the response *and* on the request it forwards — Next reads
+the nonce back out of that copy, under either header name, and threads it onto
+its own script tags. The edge does not set a policy of its own: two headers of
+the same name are intersected, so a nonce-less copy from Caddy would forbid the
+inline bootstrap the app's copy allows and the portal would render blank.
+
+#### The switch · **report-only today**
+
+It ships as `Content-Security-Policy-Report-Only`. Nothing has been verified
+against a running stack — the engine was unavailable while this was written —
+and a wrong policy on the App Router ships a blank page rather than an error, so
+report-only is where it stays until somebody has watched the console on a real
+one.
+
+Turning it on is one line:
+
+```
+# .env
+CSP_ENFORCE=on
+```
+
+then `docker compose up -d caddy`. The Caddyfile passes it to the web app as
+`X-Botvy-Csp-Enforce` on the proxied request (`header_up`, so a client cannot
+send its own), and the middleware picks the header name from it. It is a request
+header rather than a frontend environment variable because `process.env` in
+Next middleware is inlined at build time, and a rebuild is exactly what an
+operator backing out a bad policy cannot wait for.
+
+Flip `ENFORCED` to `true` at the top of `frontend/e2e/csp.spec.ts` in the same
+change. That is the whole of it on the test side.
+
+#### What is pinned
+
+`frontend/e2e/csp.spec.ts`, against a running stack:
+
+- the web app sends the expected header, the other name is absent, `script-src`
+  carries a nonce and no `'unsafe-inline'`, and the page still renders an `h1`
+  — a wrong policy here produces a blank document, not an error page;
+- the nonce in the header is on at least one `<script>` in the document — a
+  nonce nothing carries blocks everything the moment it is enforced, and
+  report-only says nothing about it;
+- `/health` carries **no** policy in either form, which is the "not the API's"
+  half;
+- `/` and `/login` raise **no** `securitypolicyviolation` events. That is the
+  case that stops the rollout parking in report-only: it is green exactly when
+  flipping the switch is safe.
+
+What also still holds: the public page loads **no third-party resource at all**,
+asserted in `frontend/e2e/public.spec.ts`, which fails if any request leaves the
+origin.
 
 ## 4. Every credential, and what it alone would let somebody do
 
@@ -215,15 +286,76 @@ by anything; `password`, `refreshToken`, `accessToken`, `serviceToken`,
 planted in a seeded conversation before the sample began — which is how member
 *content* is searched for rather than guessed at.
 
-> **Not yet run.** The sample needs a day of logs from a running stack, and the
-> engine was unavailable while this phase was written. The grep set and the
-> planted-sentence method are settled; the run and its findings belong here.
+**Run on 18 September 2026**, against every container the compose project has,
+with the sentence *"the brass kettle on the third shelf whistles at dawn"*
+written into a task's title and notes and a conversation's title by a member
+registered for the purpose, before the sample window opened. The pass is
+`node infra/scan-logs.mjs --since <window> --canary "<sentence>"`, and it asks
+compose for the service list rather than carrying one — the first version named
+the blueprint's `edge` and `api`, which compose calls `caddy` and `backend`, so
+it reported cleanly on four containers and silently skipped the two loudest.
+
+### Finding — MongoDB's slow-query log printed member content · **fixed**
+
+Six hits, all in the `mongo` container, none anywhere else: the canary in a task
+title and its notes, and a member's email address inside an outbox payload.
+Every one came from the same line — `"msg":"Slow query"`, log id 51803 — which
+prints the **command document** of any operation over `slowms`, and on this
+host's disk an ordinary task write takes 400 ms.
+
+So a member's own words were in a log, and the log is the one place this phase
+promises they will not be.
+
+MongoDB Community cannot redact log contents — `redactClientLogData` is an
+Enterprise parameter — so the fix is the threshold: `mongod` now runs with
+`--quiet --slowms 30000`. Re-run afterwards with a fresh canary planted the same
+way: **0 hits across every container**, with the canary present in the corpus,
+which is what makes the zero mean something.
+
+**The residual, stated rather than implied:** an operation slower than thirty
+seconds still logs its command, and that command may carry member content. It is
+on the Owner's own host, readable by whoever can already read the volume, and it
+cannot be redacted without Enterprise. If that becomes unacceptable the answer is
+a log driver that filters, not a higher number.
+
+`gate-logs/T1112-scrub-*.log` holds both runs — the finding and the clean pass.
+The three allow rules in `infra/scan-logs.allow.txt` are the gate's own
+`@example.test` accounts, `alice`/`bob` seeds, and systemd unit names in build
+output (`getty@tty1.service`); each is a shape that cannot hide a real address.
 
 ## 9. Dependencies
 
 `pnpm audit` on every workspace, recorded per release rather than once.
 
-> **Not yet run** — same blocker as §8.
+**Run on 18 September 2026: 24 advisories, of which 9 were runtime and are
+closed.** The runtime ones were all transitive — `multer` (four, through
+`@nestjs/platform-express`), `qs` (two), `uuid`, `js-yaml` and `deepmerge-ts` —
+and `pnpm.overrides` in the root package now pins each to its patched range.
+The backend suite (1690), both typecheck projects, the build and
+`infra/verify-esm.mjs` are green on the pinned tree, which is the evidence that
+the pins are not a paper fix.
+
+### Accepted, with reasons
+
+**The dev toolchain: `vitest`, `vite`, `esbuild`, `@vitest/mocker`.** None of
+them is in either image — they are test and build tooling, and the critical one
+(arbitrary file read through the Vitest UI server) needs a UI server this
+repository never starts. Pinning `vite` to the patched range was *tried* and
+broke vitest outright (`__vite_ssr_exportName__ is not defined`, every suite
+red), because vitest 4 carries its own vite. So the decision is explicit: they
+stay as the tool ships them, and they are re-checked at each vitest major rather
+than forced.
+
+**`lodash`, two advisories.** The patched range the advisory names is `>=4.18.0`
+and that version does not exist for the package the warning is about — the
+affected copies are `4.17.23`, pulled by `@graphql-codegen/plugin-helpers`, a
+development dependency. Nothing in this repository imports lodash directly
+(grepped across `backend/`, `frontend/`, `extension/` and `packages/`), and
+`_.template` — the code-injection path — is not reachable from anything we call.
+`migrate-mongo` carries `4.18.1`, which is past the range.
+
+Re-check both lists at the next release; an advisory that has been accepted once
+is not accepted for ever.
 
 ## 10. The default administrator password
 

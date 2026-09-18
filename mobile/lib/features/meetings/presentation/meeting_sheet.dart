@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart' show decodeStringList;
 import '../../../core/notifications/local_notifications.dart'
@@ -165,12 +166,13 @@ class _MeetingSheetState extends State<_MeetingSheet> {
   /// The member's profile zone first, because that is the clock every other
   /// time in the app is resolved against; the handset's only as a fallback for
   /// a member whose profile has not synced yet.
-  String get _pinZone =>
-      widget.cubit.state.timezone ?? _deviceZone ?? 'this device';
+  String _pinZone(AppLocalizations l10n) =>
+      widget.cubit.state.timezone ?? _deviceZone ?? l10n.meetingThisDevice;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -178,7 +180,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.meeting == null ? 'New meeting' : 'Meeting',
+              widget.meeting == null ? l10n.meetingNew : l10n.meetingEdit,
               style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
@@ -187,7 +189,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               controller: _title,
               autofocus: widget.meeting == null,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: InputDecoration(labelText: l10n.meetingName),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -195,7 +197,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               maxLines: 3,
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'Description'),
+              decoration: InputDecoration(labelText: l10n.meetingDescription),
             ),
 
             const SizedBox(height: 16),
@@ -222,18 +224,18 @@ class _MeetingSheetState extends State<_MeetingSheet> {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Text('Length'),
+                Text(l10n.meetingLength),
                 const SizedBox(width: 12),
                 DropdownButton<int>(
                   value: _durationLengths.contains(_durationMin)
                       ? _durationMin
                       : null,
-                  hint: Text('$_durationMin min'),
+                  hint: Text(l10n.meetingMinutes(_durationMin)),
                   items: [
                     for (final minutes in _durationLengths)
                       DropdownMenuItem(
                         value: minutes,
-                        child: Text(_lengthText(minutes)),
+                        child: Text(_lengthText(l10n, minutes)),
                       ),
                   ],
                   onChanged: (minutes) => setState(
@@ -244,13 +246,22 @@ class _MeetingSheetState extends State<_MeetingSheet> {
             ),
 
             const Divider(height: 32),
-            Text('Where', style: theme.textTheme.titleMedium),
+            Text(l10n.meetingWhere, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             SegmentedButton<_Where>(
-              segments: const [
-                ButtonSegment(value: _Where.online, label: Text('Link')),
-                ButtonSegment(value: _Where.place, label: Text('Address')),
-                ButtonSegment(value: _Where.both, label: Text('Both')),
+              segments: [
+                ButtonSegment(
+                  value: _Where.online,
+                  label: Text(l10n.meetingLink),
+                ),
+                ButtonSegment(
+                  value: _Where.place,
+                  label: Text(l10n.meetingAddress),
+                ),
+                ButtonSegment(
+                  value: _Where.both,
+                  label: Text(l10n.meetingBoth),
+                ),
               ],
               selected: {_where},
               onSelectionChanged: (choice) =>
@@ -261,8 +272,8 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               TextField(
                 controller: _link,
                 keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'Joining link',
+                decoration: InputDecoration(
+                  labelText: l10n.meetingJoiningLink,
                   hintText: 'https://…',
                 ),
               ),
@@ -272,16 +283,16 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               TextField(
                 controller: _address,
                 textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(labelText: 'Address'),
+                decoration: InputDecoration(labelText: l10n.meetingAddress),
               ),
             ],
 
             const Divider(height: 32),
-            Text('Preparation', style: theme.textTheme.titleMedium),
+            Text(l10n.meetingPreparation, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Text('Time needed'),
+                Text(l10n.meetingTimeNeeded),
                 const SizedBox(width: 12),
                 DropdownButton<int>(
                   value: _prepLengths.contains(_prepMinutes)
@@ -291,7 +302,11 @@ class _MeetingSheetState extends State<_MeetingSheet> {
                     for (final minutes in _prepLengths)
                       DropdownMenuItem(
                         value: minutes,
-                        child: Text(minutes == 0 ? 'None' : '$minutes min'),
+                        child: Text(
+                          minutes == 0
+                              ? l10n.meetingPrepNone
+                              : l10n.meetingMinutes(minutes),
+                        ),
                       ),
                   ],
                   onChanged: (minutes) =>
@@ -304,18 +319,20 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               maxLines: 3,
               minLines: 1,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'What to prepare'),
+              decoration: InputDecoration(
+                labelText: l10n.meetingWhatToPrepare,
+              ),
             ),
 
             const Divider(height: 32),
-            Text('Remind me', style: theme.textTheme.titleMedium),
+            Text(l10n.meetingRemindMe, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,
               children: [
                 for (final minutes in _offsetChoices)
                   FilterChip(
-                    label: Text(_offsetText(minutes)),
+                    label: Text(_offsetText(l10n, minutes)),
                     selected: _offsets.contains(minutes),
                     onSelected: (on) => setState(() {
                       if (on) {
@@ -332,7 +349,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.repeat),
-              title: Text(_repeatText()),
+              title: Text(_repeatText(l10n)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => unawaited(_pickRepeat()),
             ),
@@ -340,7 +357,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'This repeat was set elsewhere and is kept as it is.',
+                  l10n.repeatSetElsewhere,
                   style: theme.textTheme.bodySmall,
                 ),
               ),
@@ -353,11 +370,11 @@ class _MeetingSheetState extends State<_MeetingSheet> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _lockTimezone != null,
-              title: Text("Keep this on $_pinZone's clock"),
+              title: Text(l10n.meetingPinToClock(_pinZone(l10n))),
               subtitle: Text(
                 _lockTimezone == null
-                    ? 'Moves with you when you travel.'
-                    : 'Stays at this local time in $_lockTimezone.',
+                    ? l10n.meetingPinOff
+                    : l10n.meetingPinOn(_lockTimezone!),
               ),
               onChanged: (on) => setState(() {
                 final zone = widget.cubit.state.timezone ?? _deviceZone;
@@ -383,12 +400,12 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(l10n.dismiss),
                 ),
                 const Spacer(),
                 FilledButton(
                   onPressed: _saving ? null : () => unawaited(_save()),
-                  child: const Text('Save'),
+                  child: Text(l10n.save),
                 ),
               ],
             ),
@@ -398,11 +415,11 @@ class _MeetingSheetState extends State<_MeetingSheet> {
     );
   }
 
-  String _repeatText() {
+  String _repeatText(AppLocalizations l10n) {
     if (_rawRule != null) return _rawRule!;
     final repeat = _repeat;
     return repeat == null
-        ? 'Does not repeat'
+        ? l10n.repeatNone
         : repeat.describe(Localizations.localeOf(context).languageCode);
   }
 
@@ -470,11 +487,12 @@ class _MeetingSheetState extends State<_MeetingSheet> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
     final title = _title.text.trim();
     final location = _location();
 
     if (title.isEmpty) {
-      setState(() => _error = 'A meeting needs a name.');
+      setState(() => _error = l10n.meetingNeedsName);
       return;
     }
     // FR-001, checked here rather than only on the server: the two failure
@@ -483,7 +501,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
     // the row. The server refuses it too — as `invalid`, three seconds later,
     // with no screen still open to say so.
     if (location.isEmpty) {
-      setState(() => _error = 'A meeting needs a link or an address.');
+      setState(() => _error = l10n.meetingNeedsWhere);
       return;
     }
 
@@ -555,33 +573,31 @@ class _MeetingSheetState extends State<_MeetingSheet> {
   /// named, because "one or more occurrences" is not something anybody can
   /// answer.
   Future<bool> _confirmDiscard(List<DateTime> orphans) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Discard moved occurrences?'),
+        title: Text(l10n.meetingDiscardTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'This repeat no longer includes '
-              '${orphans.length == 1 ? 'a date' : '${orphans.length} dates'} '
-              'you had moved:',
-            ),
+            Text(l10n.meetingDiscardBody(orphans.length)),
             const SizedBox(height: 8),
             for (final moment in orphans.take(5))
               Text('· ${_dateText(moment.toLocal())}'),
-            if (orphans.length > 5) Text('· and ${orphans.length - 5} more'),
+            if (orphans.length > 5)
+              Text('· ${l10n.meetingAndMore(orphans.length - 5)}'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Keep the old repeat'),
+            child: Text(l10n.meetingKeepOldRepeat),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Discard and save'),
+            child: Text(l10n.meetingDiscardAndSave),
           ),
         ],
       ),
@@ -608,15 +624,16 @@ const List<int> _prepLengths = [0, 5, 10, 15, 30, 45, 60, 120];
 /// quiet hours may never move.
 const List<int> _offsetChoices = [1440, 60, 30, 10, 0];
 
-String _offsetText(int minutes) => switch (minutes) {
-  0 => 'At the time',
-  1440 => '1 day before',
-  60 => '1 hour before',
-  _ => '$minutes min before',
+String _offsetText(AppLocalizations l10n, int minutes) => switch (minutes) {
+  0 => l10n.meetingAlertAtTime,
+  1440 => l10n.meetingAlertDayBefore,
+  60 => l10n.meetingAlertHourBefore,
+  _ => l10n.meetingAlertMinutesBefore(minutes),
 };
 
-String _lengthText(int minutes) =>
-    minutes < 60 ? '$minutes min' : '${minutes ~/ 60} h';
+String _lengthText(AppLocalizations l10n, int minutes) => minutes < 60
+    ? l10n.meetingMinutes(minutes)
+    : l10n.meetingHours(minutes ~/ 60);
 
 String _dateText(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}'

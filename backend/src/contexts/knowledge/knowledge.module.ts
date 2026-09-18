@@ -9,6 +9,7 @@ import { HeartbeatService } from '../../shared/health/heartbeat.service.js';
 import { LlmModule } from '../../shared/llm/llm.module.js';
 import { OllamaClient } from '../../shared/llm/ollama.client.js';
 import { MemberContextPort } from '../../shared/member/member-context.port.js';
+import { MemberPreferencesPort } from '../../shared/member/member-preferences.port.js';
 import { OutboxModule } from '../../shared/outbox/outbox.module.js';
 import type { OutboxInsert } from '../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../shared/persistence/mongo/mongo-unit-of-work.js';
@@ -24,7 +25,6 @@ import { ConversationsModule } from '../conversations/conversations.module.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { ProfileModule } from '../profile/profile.module.js';
 import {
-  AiSuggestionsPort,
   CONTENT_EXTRACTORS,
   ContentExtractor,
   KnowledgeTranscriptPort,
@@ -61,10 +61,7 @@ import {
 import { RetryLinkHandler } from './features/retry-link/retry-link.handler.js';
 import { SuggestionsQueryHandler } from './features/suggestions/suggestions.query.js';
 import { HttpSourceFetcher } from './infrastructure/http-source-fetcher.js';
-import {
-  ConversationsKnowledgeTranscript,
-  ProfileAiSuggestions,
-} from './infrastructure/knowledge.adapters.js';
+import { ConversationsKnowledgeTranscript } from './infrastructure/knowledge.adapters.js';
 import { LlmSuggestionDrafter } from './infrastructure/llm-suggestion-drafter.js';
 import { LlmSummariser } from './infrastructure/llm-summariser.js';
 import {
@@ -96,8 +93,11 @@ import {
  * Mongoose connection; `ProfileModule` for the member's zone and their
  * `aiSuggestions` preference; `ConversationsModule` for the coach message that
  * is the plain-reply fallback. Nothing under `domain/` or `features/` here
- * imports any of them: the preference comes through `AiSuggestionsPort` and the
- * chat through `KnowledgeTranscriptPort`, both bound in this context's own
+ * imports any of them: the preference comes through the shared
+ * `MemberPreferencesPort` — this context's own `AiSuggestionsPort` until E-020
+ * collapsed five identical adapters, and their five copies of the "row else
+ * installation default" fallback, into one — and the chat through
+ * `KnowledgeTranscriptPort`, bound in this context's own
  * `infrastructure/`. That is the seam constitution IX sanctions, and
  * `no-restricted-imports` refuses it anywhere else — `knowledge` was added to
  * that rule's pattern list in this phase, and the rule was probed by writing a
@@ -134,7 +134,10 @@ import {
   providers: [
     {
       provide: LinkRepository,
-      inject: [getModelToken(MODEL_NAMES.link), getModelToken(MODEL_NAMES.outbox)],
+      inject: [
+        getModelToken(MODEL_NAMES.link),
+        getModelToken(MODEL_NAMES.outbox),
+      ],
       useFactory: (model: Model<LinkDoc>, outbox: Model<OutboxInsert>) =>
         new MongoLinkRepository(model, outbox),
     },
@@ -167,7 +170,10 @@ import {
     // `UnknownDependenciesException` at boot that no typecheck sees, which is
     // the class of defect `app.module.spec.ts` exists to turn red.
     { provide: HttpSourceFetcher, useFactory: () => new HttpSourceFetcher() },
-    { provide: YoutubeSourceFetcher, useFactory: () => new YoutubeSourceFetcher() },
+    {
+      provide: YoutubeSourceFetcher,
+      useFactory: () => new YoutubeSourceFetcher(),
+    },
     ReadabilityExtractor,
     YoutubeExtractor,
     {
@@ -196,8 +202,10 @@ import {
     },
 
     // ---- other contexts' facts -------------------------------------------
-    { provide: AiSuggestionsPort, useClass: ProfileAiSuggestions },
-    { provide: KnowledgeTranscriptPort, useClass: ConversationsKnowledgeTranscript },
+    {
+      provide: KnowledgeTranscriptPort,
+      useClass: ConversationsKnowledgeTranscript,
+    },
 
     // ---- ids --------------------------------------------------------------
     //
@@ -264,7 +272,7 @@ import {
         LinkRepository,
         ReadingRepository,
         SuggestionRepository,
-        AiSuggestionsPort,
+        MemberPreferencesPort,
         SuggestionDrafterPort,
         KnowledgeTranscriptPort,
         MemberContextPort,
@@ -275,7 +283,7 @@ import {
         links: LinkRepository,
         readings: ReadingRepository,
         suggestions: SuggestionRepository,
-        preference: AiSuggestionsPort,
+        preferences: MemberPreferencesPort,
         drafter: SuggestionDrafterPort,
         transcript: KnowledgeTranscriptPort,
         member: MemberContextPort,
@@ -286,7 +294,7 @@ import {
           links,
           readings,
           suggestions,
-          preference,
+          preferences,
           drafter,
           transcript,
           member,
@@ -366,3 +374,16 @@ import {
   ],
 })
 export class KnowledgeModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const KNOWLEDGE_SUBSCRIPTIONS = {
+  'identity.UserDeleted': 'KnowledgePurgeOnDeletedHandler',
+  'knowledge.LinkAdded': 'IngestLinkSaga',
+  'knowledge.LinkStateChanged': 'IngestLinkSaga',
+  // Only the scheduling, never the reschedule: a rescheduled session has
+  // already been through this, including the fill an accepted draft performs.
+  'training.SessionScheduled': 'GenerateSuggestionSaga',
+  'training.SessionCompleted': 'RecordSuggestionOutcomeHandler',
+  'training.SessionCancelled': 'RecordSuggestionOutcomeHandler',
+  'training.SessionSkipped': 'RecordSuggestionOutcomeHandler',
+} as const;

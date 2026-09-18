@@ -68,5 +68,7 @@ function nextDay(date: string): string {
     number,
     number,
   ];
-  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  return new Date(Date.UTC(year, month - 1, day + 1))
+    .toISOString()
+    .slice(0, 10);
 }

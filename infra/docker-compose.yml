@@ -51,6 +51,10 @@ services:
       # A bare ":80" serves plain HTTP behind the tunnel, which terminates TLS.
       # Set it to a hostname to have Caddy get its own certificate instead.
       CADDY_SITE: ${CADDY_SITE:-:80}
+      # The content security policy is report-only until this says `on`
+      # (E-025). Read by the Caddyfile, which tells the web app which header
+      # name to send; see `frontend/middleware.ts` for the policy itself.
+      CSP_ENFORCE: ${CSP_ENFORCE:-off}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -93,7 +97,13 @@ services:
       mongo:
         condition: service_healthy
     healthcheck:
-      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -122,7 +132,13 @@ services:
     healthcheck:
       # Marking the worker healthy on process start would hide a dead relay,
       # which is the one thing this container exists to run.
-      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8081/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8081/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 15s
       timeout: 5s
       retries: 8
@@ -158,7 +174,8 @@ services:
       - pg_data:/var/lib/postgresql/data
       - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-botvy}']
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-botvy}']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -169,7 +186,25 @@ services:
     restart: unless-stopped
     # A replica set of one. Not optional: transactions and change streams both
     # need one, and the outbox needs both.
-    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    # `--quiet` and a high `slowms`, because MongoDB's slow-query log prints the
+    # *command document* — so an ordinary task write on a slow disk put the
+    # member's title, their notes and their email address into the container
+    # log, which P11's scrubbing pass found on its first run against a live
+    # stack. Community has no log redaction (`redactClientLogData` is an
+    # Enterprise parameter), so raising the threshold is the knob that exists:
+    # nothing ordinary logs, and what remains is an operation slower than thirty
+    # seconds, on a host only the Owner can read. Recorded in
+    # `docs/security-review.md` with that residual stated rather than implied.
+    command:
+      [
+        'mongod',
+        '--replSet',
+        'rs0',
+        '--bind_ip_all',
+        '--quiet',
+        '--slowms',
+        '30000',
+      ]
     volumes:
       - mongo_data:/data/db
       - ./mongo/init-replica.sh:/scripts/init-replica.sh:ro
@@ -209,6 +244,10 @@ services:
       # edits from the portal, not a second copy here that they cannot.
       BACKUP_RETENTION_FALLBACK: ${BACKUP_RETENTION_FALLBACK:-14}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+      # The same schedule in minutes, reported with the run so `/health` judges
+      # the backup's silence by its own cadence (E-018). Change it with
+      # BACKUP_CRON or the backup reports a pulse it does not have.
+      BACKUP_EVERY_MINUTES: ${BACKUP_EVERY_MINUTES:-1440}
     volumes:
       # A host directory, so the archives survive `docker compose down -v` and
       # can be pointed at another disk. Everything else this project stores
@@ -228,7 +267,7 @@ services:
         {
           echo 'SHELL=/bin/bash'
           echo 'PATH=/usr/local/bin:/usr/bin:/bin'
-          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_FALLBACK; do
+          for name in MONGO_URL DATABASE_URL BOTVY_API_BASE INTERNAL_SERVICE_TOKEN BACKUP_RETENTION_FALLBACK BACKUP_EVERY_MINUTES; do
             echo "$${name}=$${!name}"
           done
           # Redirected to PID 1's stdout, which is this container's log. cron
@@ -344,7 +383,8 @@ services:
     # profile, so demanding it here would make the verification gate — which
     # reads `config` to count published ports — fail on every host that does not
     # use a tunnel. cloudflared refuses an empty token loudly enough.
-    command: ['tunnel', '--no-autoupdate', 'run', '--token', '${TUNNEL_TOKEN:-}']
+    command:
+      ['tunnel', '--no-autoupdate', 'run', '--token', '${TUNNEL_TOKEN:-}']
     depends_on:
       caddy:
         condition: service_started

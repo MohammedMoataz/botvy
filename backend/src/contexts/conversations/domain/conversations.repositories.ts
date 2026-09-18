@@ -1,6 +1,9 @@
 import { Repository } from '../../../shared/persistence/ports/repository.js';
 import { SyncableRepository } from '../../../shared/persistence/ports/syncable-repository.js';
-import type { Conversation, ConversationKind } from './conversation.aggregate.js';
+import type {
+  Conversation,
+  ConversationKind,
+} from './conversation.aggregate.js';
 import type { Message } from './message.aggregate.js';
 
 /**
@@ -40,7 +43,10 @@ export abstract class MessageRepository extends Repository<Message> {
    * not be sent". Its own method rather than a filter on `afterSeq` because a
    * replay check must not depend on where the caller's cursor happens to be.
    */
-  abstract byClientId(userId: string, clientId: string): Promise<Message | null>;
+  abstract byClientId(
+    userId: string,
+    clientId: string,
+  ): Promise<Message | null>;
 
   /** The phone's pull: everything after a sequence number, oldest first. */
   abstract afterSeq(

@@ -44,12 +44,14 @@ export class PrismaUnitOfWork extends UnitOfWork {
 
     let commitCallbacks: Array<() => Promise<void>> = [];
 
-    const result = await this.prisma.$transaction(async (tx: PrismaTransaction) => {
-      const scope: TransactionScope = { tx, commitCallbacks: [] };
-      const value = await PrismaUnitOfWork.storage.run(scope, work);
-      commitCallbacks = scope.commitCallbacks;
-      return value;
-    });
+    const result = await this.prisma.$transaction(
+      async (tx: PrismaTransaction) => {
+        const scope: TransactionScope = { tx, commitCallbacks: [] };
+        const value = await PrismaUnitOfWork.storage.run(scope, work);
+        commitCallbacks = scope.commitCallbacks;
+        return value;
+      },
+    );
 
     for (const callback of commitCallbacks) await callback();
     return result as R;
@@ -58,7 +60,9 @@ export class PrismaUnitOfWork extends UnitOfWork {
   onCommit(callback: () => Promise<void>): void {
     const scope = PrismaUnitOfWork.storage.getStore();
     if (!scope) {
-      throw new Error('onCommit called outside a unit of work; there is no commit to hang it on.');
+      throw new Error(
+        'onCommit called outside a unit of work; there is no commit to hang it on.',
+      );
     }
     scope.commitCallbacks.push(callback);
   }

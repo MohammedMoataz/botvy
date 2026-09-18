@@ -11,7 +11,9 @@ async function up(db) {
   // The relay's two queries: find one event by id, and find what is undelivered
   // oldest-first. The unique index on eventId is what makes the forwarder's
   // at-least-once hop from PostgreSQL collapse to a single row.
-  await db.collection('outbox').createIndex({ eventId: 1 }, { unique: true, name: 'outbox_event_id' });
+  await db
+    .collection('outbox')
+    .createIndex({ eventId: 1 }, { unique: true, name: 'outbox_event_id' });
   await db
     .collection('outbox')
     .createIndex({ deliveredAt: 1, occurredAt: 1 }, { name: 'outbox_pending' });
@@ -28,20 +30,30 @@ async function up(db) {
     },
   );
 
-  await db.collection('audit_log').createIndex({ at: -1 }, { name: 'audit_recent' });
-  await db.collection('audit_log').createIndex({ 'actor.id': 1, at: -1 }, { name: 'audit_by_actor' });
+  await db
+    .collection('audit_log')
+    .createIndex({ at: -1 }, { name: 'audit_recent' });
+  await db
+    .collection('audit_log')
+    .createIndex({ 'actor.id': 1, at: -1 }, { name: 'audit_by_actor' });
 
   // Retention for replayed commands is this index, not a timer in code: a
   // replay older than a day is a new request.
   await db
     .collection('idempotency_keys')
-    .createIndex({ createdAt: 1 }, { name: 'idempotency_ttl', expireAfterSeconds: 24 * 60 * 60 });
+    .createIndex(
+      { createdAt: 1 },
+      { name: 'idempotency_ttl', expireAfterSeconds: 24 * 60 * 60 },
+    );
 
   // The demonstration slice. Unique per member and client id, which is what
   // makes a retried create a no-op rather than a second row.
   await db
     .collection('pings')
-    .createIndex({ userId: 1, clientId: 1 }, { unique: true, name: 'pings_user_client' });
+    .createIndex(
+      { userId: 1, clientId: 1 },
+      { unique: true, name: 'pings_user_client' },
+    );
 }
 
 /** @param {import('mongodb').Db} db */

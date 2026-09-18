@@ -210,7 +210,11 @@ export function expandOccurrences(
   const items: Occurrence[] = [];
   const ruleDates = rule
     ? rule
-        .between(toFloating(scanFrom, timezone), toFloating(scanTo, timezone), true)
+        .between(
+          toFloating(scanFrom, timezone),
+          toFloating(scanTo, timezone),
+          true,
+        )
         .map((floating: Date) => fromFloating(floating, timezone))
         .filter((instant: Date | null): instant is Date => instant !== null)
     : [item.startAt];
@@ -252,7 +256,10 @@ function orphansIntoWindow(
   for (const override of item.recurrence?.overrides ?? []) {
     if (seen.has(key(override.originalStart))) continue;
     const startAt = override.startAt ?? override.originalStart;
-    if (startAt.getTime() < from.getTime() || startAt.getTime() > to.getTime()) {
+    if (
+      startAt.getTime() < from.getTime() ||
+      startAt.getTime() > to.getTime()
+    ) {
       continue;
     }
     // An excluded rule date whose override moved it here: the move wins, which
@@ -415,10 +422,7 @@ export function isReadableRule(
 }
 
 /** "every 2 weeks on Tuesday", for a confirmation line. English; see Planning. */
-export function humanRule(
-  recurrence: MeetingRecurrence,
-  zone: string,
-): string {
+export function humanRule(recurrence: MeetingRecurrence, zone: string): string {
   const rule = parseRule(recurrence, zone);
   if (!rule) return recurrence.rrule;
   try {
@@ -495,7 +499,9 @@ function withinWindow(items: Occurrence[], from: Date, to: Date): Occurrence[] {
 function overridesByKey(
   overrides: OccurrenceOverride[],
 ): Map<number, OccurrenceOverride> {
-  return new Map(overrides.map((override) => [key(override.originalStart), override]));
+  return new Map(
+    overrides.map((override) => [key(override.originalStart), override]),
+  );
 }
 
 /**

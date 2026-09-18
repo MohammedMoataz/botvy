@@ -33,7 +33,10 @@ import {
 } from './domain/notification.ports.js';
 import { PendingAlertsQueryHandler } from './features/pending-alerts/pending-alerts.query.js';
 import { PlanAlertsSaga } from './features/plan-alerts-saga/plan-alerts.saga.js';
-import { SweepHandler } from './features/sweep/sweep.handler.js';
+import {
+  SWEEP_EVERY_MINUTES,
+  SweepHandler,
+} from './features/sweep/sweep.handler.js';
 import { InMemoryAlertRepository } from './infrastructure/in-memory-alert.repository.js';
 
 const MEMBER = 'member-1';
@@ -634,7 +637,9 @@ describe('a rhythm touch is one alert the member asked for', () => {
     await b.saga.onRhythmTouch(touch);
     await b.saga.onRhythmTouch(touch);
 
-    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(1);
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(
+      1,
+    );
   });
 
   it('keeps the three touches apart, and apart from other days', async () => {
@@ -653,7 +658,9 @@ describe('a rhythm touch is one alert the member asked for', () => {
       event('rhythm.MorningBriefingSent', { date: '2026-09-13', taskIds: [] }),
     );
 
-    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(4);
+    expect(await b.alerts.pendingForMember(MEMBER, new Date(0))).toHaveLength(
+      4,
+    );
   });
 
   it('ignores an event with no date rather than planning a nameless alert', async () => {
@@ -682,15 +689,17 @@ describe('a rhythm touch is one alert the member asked for', () => {
         checkinAsked: false,
       }),
     );
-    const before = (await b.alerts.pendingForMember(MEMBER, new Date(0)))[0]!
-      .notifyAt.getTime();
+    const before = (
+      await b.alerts.pendingForMember(MEMBER, new Date(0))
+    )[0]!.notifyAt.getTime();
 
     await b.saga.onProfileUpdated(
       event('profile.ProfileUpdated', { changed: ['timezone'] }),
     );
 
-    const after = (await b.alerts.pendingForMember(MEMBER, new Date(0)))[0]!
-      .notifyAt.getTime();
+    const after = (
+      await b.alerts.pendingForMember(MEMBER, new Date(0))
+    )[0]!.notifyAt.getTime();
     expect(after).toBe(before);
   });
 });
@@ -1107,6 +1116,10 @@ describe('the sweep', () => {
       true,
       undefined,
       expect.any(Number),
+      // And it says how often it expects to run, so `/health` judges its
+      // silence by its own pulse rather than by a list of job names kept in
+      // the health module (E-018).
+      SWEEP_EVERY_MINUTES,
     );
   });
 });

@@ -39,7 +39,8 @@ describe('what a capture becomes', () => {
   });
 
   it('cuts a long selection at a word', () => {
-    const long = 'alpha bravo charlie delta echo foxtrot golf hotel india '.repeat(4);
+    const long =
+      'alpha bravo charlie delta echo foxtrot golf hotel india '.repeat(4);
     const title = captureTitle(long);
 
     expect(title.length).toBeLessThanOrEqual(MAX_TITLE);
@@ -107,7 +108,10 @@ describe('how long a cached profile is trusted', () => {
 
   it('refreshes one over a day old', () => {
     expect(
-      profileIsStale({ ...fresh, fetchedAt: Date.now() - PROFILE_MAX_AGE_MS - 1 }),
+      profileIsStale({
+        ...fresh,
+        fetchedAt: Date.now() - PROFILE_MAX_AGE_MS - 1,
+      }),
     ).toBe(true);
   });
 
@@ -187,7 +191,9 @@ describe('refreshing from two contexts at once', () => {
 
 describe('signing out', () => {
   beforeEach(() => {
-    vi.stubGlobal('chrome', { storage: fakeStorage({ [KEYS.tokens]: PAIR('1') }) });
+    vi.stubGlobal('chrome', {
+      storage: fakeStorage({ [KEYS.tokens]: PAIR('1') }),
+    });
   });
 
   it('revokes, then forgets the device, then clears — in that order', async () => {

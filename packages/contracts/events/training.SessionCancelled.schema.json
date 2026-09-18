@@ -10,9 +10,6 @@
     },
     "at": {}
   },
-  "required": [
-    "sessionId",
-    "at"
-  ],
+  "required": ["sessionId", "at"],
   "additionalProperties": false
 }

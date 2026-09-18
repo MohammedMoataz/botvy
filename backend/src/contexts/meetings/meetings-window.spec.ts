@@ -112,9 +112,7 @@ describe('MeetingRepository.forWindow', () => {
     // 09:30 to 11:00, asked about from 10:00. The one-day slack on the lower
     // bound is what loads it; without it the member reads as free during a
     // meeting they are sitting in.
-    await save(
-      meeting('running', { startAt: at('09:30'), durationMin: 90 }),
-    );
+    await save(meeting('running', { startAt: at('09:30'), durationMin: 90 }));
 
     const found = await meetings.forWindow(MEMBER, at('10:00'), at('12:00'));
     expect(found.map((row) => row.id)).toEqual(['running']);

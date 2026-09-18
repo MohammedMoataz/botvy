@@ -102,7 +102,10 @@ export abstract class SessionRepository extends SyncableRepository<Session> {
     limit: number,
   ): Promise<Session[]>;
 
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }
@@ -125,7 +128,10 @@ export abstract class ProgramRepository extends SyncableRepository<Program> {
    */
   abstract activeFor(userId: string): Promise<Program | null>;
 
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }
@@ -133,7 +139,10 @@ export abstract class ProgramRepository extends SyncableRepository<Program> {
 export abstract class WorkoutRepository extends SyncableRepository<Workout> {
   abstract listFor(userId: string, sport?: string): Promise<Workout[]>;
 
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }

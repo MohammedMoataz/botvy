@@ -27,7 +27,9 @@ const hhmm = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'a wall-clock time as HH:mm');
 
-const leadTime = z.string().regex(/^\d+[mhd]$/, 'a lead time like "30m", "1h" or "1d"');
+const leadTime = z
+  .string()
+  .regex(/^\d+[mhd]$/, 'a lead time like "30m", "1h" or "1d"');
 
 const hexColour = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'a colour as #rrggbb');
 
@@ -56,14 +58,18 @@ export const SETTINGS_REGISTRY = {
   // changing one moves the starting point for everyone who joins next, and
   // never overwrites a member who has already chosen.
   'defaults.timezone': define({
-    schema: z.string().refine(isValidTimezone, 'an IANA zone such as Africa/Cairo'),
+    schema: z
+      .string()
+      .refine(isValidTimezone, 'an IANA zone such as Africa/Cairo'),
     default: 'Africa/Cairo',
-    description: 'Time zone a new member starts with, until they set their own.',
+    description:
+      'Time zone a new member starts with, until they set their own.',
   }),
   'defaults.planTomorrowTime': define({
     schema: hhmm,
     default: '21:00',
-    description: 'When the evening plan prompt asks a member what tomorrow looks like.',
+    description:
+      'When the evening plan prompt asks a member what tomorrow looks like.',
   }),
   'defaults.endOfDayTime': define({
     schema: hhmm,
@@ -101,17 +107,20 @@ export const SETTINGS_REGISTRY = {
   'defaults.checkinEnabled': define({
     schema: z.boolean(),
     default: true,
-    description: 'Whether the end-of-day touch also asks the member how the day went.',
+    description:
+      'Whether the end-of-day touch also asks the member how the day went.',
   }),
   'defaults.locale': define({
     schema: z.enum(['en', 'ar']),
     default: 'en',
-    description: 'Language a new member starts in when registration does not say.',
+    description:
+      'Language a new member starts in when registration does not say.',
   }),
   'defaults.meetingDurationMin': define({
     schema: z.number().int().min(5).max(480),
     default: 30,
-    description: 'Length the meeting editor offers before the member changes it.',
+    description:
+      'Length the meeting editor offers before the member changes it.',
   }),
   'defaults.mealMode': define({
     schema: z.enum(['llm', 'library']),
@@ -122,7 +131,8 @@ export const SETTINGS_REGISTRY = {
   'defaults.aiSuggestions': define({
     schema: z.boolean(),
     default: true,
-    description: 'Whether saved links may produce training suggestions for a new member.',
+    description:
+      'Whether saved links may produce training suggestions for a new member.',
   }),
 
   // ---- Reminders, notifications, rhythm -----------------------------------
@@ -140,7 +150,8 @@ export const SETTINGS_REGISTRY = {
   'notifications.expiryHours': define({
     schema: z.number().int().min(1).max(168),
     default: 24,
-    description: 'After this long an unsent alert is expired rather than delivered late.',
+    description:
+      'After this long an unsent alert is expired rather than delivered late.',
   }),
   'meetings.alertWindowDays': define({
     schema: z.number().int().min(1).max(90),
@@ -194,7 +205,8 @@ export const SETTINGS_REGISTRY = {
   'chat.dailyQuotaTokens': define({
     schema: z.number().int().min(0),
     default: 120_000,
-    description: "A member's daily model allowance, counted over their own local day.",
+    description:
+      "A member's daily model allowance, counted over their own local day.",
   }),
 
   // ---- The local model ----------------------------------------------------
@@ -224,7 +236,8 @@ export const SETTINGS_REGISTRY = {
   'knowledge.maxAttempts': define({
     schema: z.number().int().min(1).max(10),
     default: 3,
-    description: 'Attempts before a link is left failed for the member to retry.',
+    description:
+      'Attempts before a link is left failed for the member to retry.',
   }),
   'knowledge.maxChars': define({
     schema: z.number().int().min(1000).max(1_000_000),
@@ -244,7 +257,8 @@ export const SETTINGS_REGISTRY = {
   'knowledge.concurrency': define({
     schema: z.number().int().min(1).max(8),
     default: 1,
-    description: 'Links ingested at once. The local model is the bottleneck, not the fetch.',
+    description:
+      'Links ingested at once. The local model is the bottleneck, not the fetch.',
   }),
   'knowledge.stuckAfterMinutes': define({
     schema: z.number().int().min(5).max(1440),
@@ -473,7 +487,8 @@ export const SETTINGS_REGISTRY = {
       '#a855f7',
       '#ec4899',
     ],
-    description: 'Colours the label picker offers before a member chooses their own.',
+    description:
+      'Colours the label picker offers before a member chooses their own.',
   }),
 
   // ---- Written by the system, shown but never edited ----------------------
@@ -499,11 +514,8 @@ export const SETTINGS_REGISTRY = {
 
 export type SettingKey = keyof typeof SETTINGS_REGISTRY;
 
-export type SettingValue<K extends SettingKey> = (typeof SETTINGS_REGISTRY)[K] extends SettingDefinition<
-  infer T
->
-  ? T
-  : never;
+export type SettingValue<K extends SettingKey> =
+  (typeof SETTINGS_REGISTRY)[K] extends SettingDefinition<infer T> ? T : never;
 
 export const SETTING_KEYS = Object.keys(SETTINGS_REGISTRY) as SettingKey[];
 

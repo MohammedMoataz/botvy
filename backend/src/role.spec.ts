@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ROLES, UnknownRoleError, resolveRole, runsRelay, servesHttpEdge } from './role.js';
+import {
+  ROLES,
+  UnknownRoleError,
+  resolveRole,
+  runsRelay,
+  servesHttpEdge,
+} from './role.js';
 
 describe('role switch', () => {
   it('knows exactly two roles', () => {

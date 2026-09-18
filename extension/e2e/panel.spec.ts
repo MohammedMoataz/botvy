@@ -57,12 +57,9 @@ async function signIn(
 
   // The address first: it is a per-browser setting, and on a fresh profile it
   // is whatever the build defaulted to rather than this member's Botvy.
-  await page.evaluate(
-    async (gateway) => {
-      await chrome.storage.local.set({ 'botvy.gateway': gateway });
-    },
-    GATEWAY as string,
-  );
+  await page.evaluate(async (gateway) => {
+    await chrome.storage.local.set({ 'botvy.gateway': gateway });
+  }, GATEWAY as string);
   await page.reload();
 
   await page.getByLabel(/email/i).fill(EMAIL as string);
@@ -73,10 +70,9 @@ async function signIn(
   // changes with no request behind it is a client that threw before sending,
   // and one with a 401 behind it is a wrong password.
   const [answer] = await Promise.all([
-    page.waitForResponse(
-      (response) => response.url().includes('/auth/login'),
-      { timeout: 20_000 },
-    ),
+    page.waitForResponse((response) => response.url().includes('/auth/login'), {
+      timeout: 20_000,
+    }),
     page.getByRole('button', { name: 'Sign in', exact: true }).click(),
   ]);
   expect(answer.status()).toBe(200);

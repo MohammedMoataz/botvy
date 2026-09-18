@@ -124,6 +124,7 @@ describe('member schedules', () => {
       {
         userId: 'brand-new',
         timezone: 'Africa/Cairo',
+        locale: 'en',
         planTomorrowTime: '21:00',
         endOfDayTime: '22:00',
         morningBriefingTime: '08:00',
@@ -158,6 +159,7 @@ describe('member schedules', () => {
     expect(schedule).toEqual({
       userId: 'half',
       timezone: 'America/New_York',
+      locale: 'en',
       planTomorrowTime: '21:00',
       endOfDayTime: '22:00',
       morningBriefingTime: '08:00',

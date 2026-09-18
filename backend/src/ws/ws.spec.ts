@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { NudgeService, OPS_ROOM, roomForUser, type SocketBroadcaster } from './nudge.service.js';
+import {
+  NudgeService,
+  OPS_ROOM,
+  roomForUser,
+  type SocketBroadcaster,
+} from './nudge.service.js';
 import { DateScalar, DateTimeScalar } from '../graphql/scalars.js';
 
 function recordingServer() {
@@ -25,7 +30,11 @@ describe('nudges', () => {
     nudge.emit('user-1', 'sync.nudge', { entities: ['tasks'] });
 
     expect(sent).toEqual([
-      { room: roomForUser('user-1'), event: 'sync.nudge', payload: { entities: ['tasks'] } },
+      {
+        room: roomForUser('user-1'),
+        event: 'sync.nudge',
+        payload: { entities: ['tasks'] },
+      },
     ]);
   });
 
@@ -119,7 +128,11 @@ describe('closing a member’s sockets', () => {
     nudge.disconnect('user-1', 'banned');
 
     expect(sent).toEqual([
-      { room: roomForUser('user-1'), event: 'auth.revoked', payload: { code: 'banned' } },
+      {
+        room: roomForUser('user-1'),
+        event: 'auth.revoked',
+        payload: { code: 'banned' },
+      },
     ]);
     // `true` closes the underlying connection rather than just leaving the
     // rooms, which is what makes the client reconnect-and-fail rather than sit

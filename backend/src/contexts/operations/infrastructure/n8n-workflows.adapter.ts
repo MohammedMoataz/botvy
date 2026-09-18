@@ -43,7 +43,10 @@ export class N8nWorkflowsAdapter extends WorkflowsPort {
   }
 
   async list(): Promise<WorkflowSummary[]> {
-    const workflows = await this.call<{ data?: unknown[] }>('GET', '/workflows');
+    const workflows = await this.call<{ data?: unknown[] }>(
+      'GET',
+      '/workflows',
+    );
     const rows = Array.isArray(workflows.data) ? workflows.data : [];
 
     /*
@@ -59,7 +62,10 @@ export class N8nWorkflowsAdapter extends WorkflowsPort {
       '/executions?limit=100',
     ).catch(() => ({ data: [] as unknown[] }));
 
-    const lastRun = new Map<string, { at: string | null; status: string | null }>();
+    const lastRun = new Map<
+      string,
+      { at: string | null; status: string | null }
+    >();
     for (const raw of Array.isArray(executions.data) ? executions.data : []) {
       const execution = raw as {
         workflowId?: unknown;
@@ -69,13 +75,18 @@ export class N8nWorkflowsAdapter extends WorkflowsPort {
       const id = String(execution.workflowId ?? '');
       if (!id || lastRun.has(id)) continue;
       lastRun.set(id, {
-        at: typeof execution.startedAt === 'string' ? execution.startedAt : null,
+        at:
+          typeof execution.startedAt === 'string' ? execution.startedAt : null,
         status: typeof execution.status === 'string' ? execution.status : null,
       });
     }
 
     return rows.map((raw) => {
-      const workflow = raw as { id?: unknown; name?: unknown; active?: unknown };
+      const workflow = raw as {
+        id?: unknown;
+        name?: unknown;
+        active?: unknown;
+      };
       const id = String(workflow.id ?? '');
       const run = lastRun.get(id);
       return {
@@ -126,13 +137,21 @@ export class N8nWorkflowsAdapter extends WorkflowsPort {
 
     const response = await this.fetchImpl(
       `${this.env.N8N_URL.replace(/\/$/, '')}/webhook/${path}`,
-      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' },
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      },
     ).catch((error: unknown) => {
-      throw new AutomationUnreachable(String((error as Error)?.message ?? error));
+      throw new AutomationUnreachable(
+        String((error as Error)?.message ?? error),
+      );
     });
 
     if (!response.ok) {
-      throw new AutomationUnreachable(`the workflow answered ${response.status}`);
+      throw new AutomationUnreachable(
+        `the workflow answered ${response.status}`,
+      );
     }
     return { executionId: null };
   }
@@ -148,11 +167,15 @@ export class N8nWorkflowsAdapter extends WorkflowsPort {
         'content-type': 'application/json',
       },
     }).catch((error: unknown) => {
-      throw new AutomationUnreachable(String((error as Error)?.message ?? error));
+      throw new AutomationUnreachable(
+        String((error as Error)?.message ?? error),
+      );
     });
 
     if (!response.ok) {
-      throw new AutomationUnreachable(`${method} ${path} answered ${response.status}`);
+      throw new AutomationUnreachable(
+        `${method} ${path} answered ${response.status}`,
+      );
     }
 
     return (await response.json()) as T;

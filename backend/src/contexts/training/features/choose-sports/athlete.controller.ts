@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Put,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Put } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {

@@ -13,10 +13,6 @@
       "type": "string"
     }
   },
-  "required": [
-    "sessionId",
-    "at",
-    "sport"
-  ],
+  "required": ["sessionId", "at", "sport"],
   "additionalProperties": false
 }

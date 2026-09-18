@@ -4,7 +4,11 @@ import { HeartbeatService } from '../../shared/health/heartbeat.service.js';
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
-import { localDate, localHhMm, wallClockToUtc } from '../../shared/time/time.js';
+import {
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../shared/time/time.js';
 import { nextDate } from './domain/adherence.js';
 import type {
   PlanMeeting,
@@ -123,6 +127,7 @@ class Schedules extends MemberSchedulePort {
     this.rows.set(userId, {
       userId,
       timezone: zone,
+      locale: 'en',
       planTomorrowTime: '21:00',
       endOfDayTime: '22:00',
       morningBriefingTime: '08:00',
@@ -193,7 +198,11 @@ interface Bench {
   settings: SettingsService;
   tick: TickHandler;
   /** Registers a member with a rhythm row and a schedule. */
-  join(userId: string, zone: string, overrides?: Partial<MemberSchedule>): Promise<void>;
+  join(
+    userId: string,
+    zone: string,
+    overrides?: Partial<MemberSchedule>,
+  ): Promise<void>;
   /** The touches this member has been sent, in order. */
   touchesFor(userId: string): (TouchMessageKind | undefined)[];
 }
@@ -331,11 +340,22 @@ describe('each member’s own local time, and nobody else’s', () => {
     await b.join('m', CAIRO);
 
     // A five-minute pulse across the evening: eight passes, one summary.
-    for (const minute of ['22:00', '22:05', '22:10', '22:15', '22:20', '22:25', '22:30', '22:35']) {
+    for (const minute of [
+      '22:00',
+      '22:05',
+      '22:10',
+      '22:15',
+      '22:20',
+      '22:25',
+      '22:30',
+      '22:35',
+    ]) {
       await b.tick.handle(at(minute, CAIRO));
     }
 
-    const summaries = b.touchesFor('m').filter((touch) => touch === 'checkin_question');
+    const summaries = b
+      .touchesFor('m')
+      .filter((touch) => touch === 'checkin_question');
     expect(summaries).toHaveLength(1);
   });
 

@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
-import type {
-  Meeting,
-  MeetingStatus,
-} from '../../domain/meeting.aggregate.js';
+import type { Meeting, MeetingStatus } from '../../domain/meeting.aggregate.js';
 import { MeetingRepository } from '../../domain/meetings.repositories.js';
 import {
   humanRule,

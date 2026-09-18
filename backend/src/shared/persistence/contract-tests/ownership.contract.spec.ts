@@ -55,7 +55,10 @@ class Thing extends AggregateRoot<string> {
  * accepted.
  */
 class Store {
-  private readonly rows = new Map<string, { userId: string; updatedAt: Date }>();
+  private readonly rows = new Map<
+    string,
+    { userId: string; updatedAt: Date }
+  >();
 
   save(aggregate: Thing): void {
     const existing = this.rows.get(aggregate.id);
@@ -65,7 +68,10 @@ class Store {
       // key refuses it. Mongo answers 11000; this is what that becomes.
       throw new ForeignRowError(aggregate.id);
     }
-    if (existing && existing.updatedAt.getTime() > aggregate.updatedAt.getTime()) {
+    if (
+      existing &&
+      existing.updatedAt.getTime() > aggregate.updatedAt.getTime()
+    ) {
       throw new StaleWriteError(aggregate.id);
     }
 

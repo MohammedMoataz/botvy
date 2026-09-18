@@ -112,15 +112,30 @@ describe('recognising a URL', () => {
     ['https://example.com/X', 'https://example.com/X', 'article', null],
 
     // --- the fragment and the query ------------------------------------
-    ['https://example.com/x#section-2', 'https://example.com/x', 'article', null],
+    [
+      'https://example.com/x#section-2',
+      'https://example.com/x',
+      'article',
+      null,
+    ],
     [
       'https://example.com/x?utm_source=news&id=4',
       'https://example.com/x?id=4',
       'article',
       null,
     ],
-    ['https://example.com/x?fbclid=abc', 'https://example.com/x', 'article', null],
-    ['https://example.com/x?ref=friend', 'https://example.com/x', 'article', null],
+    [
+      'https://example.com/x?fbclid=abc',
+      'https://example.com/x',
+      'article',
+      null,
+    ],
+    [
+      'https://example.com/x?ref=friend',
+      'https://example.com/x',
+      'article',
+      null,
+    ],
     [
       'https://example.com/x?b=2&a=1',
       'https://example.com/x?a=1&b=2',
@@ -210,7 +225,12 @@ describe('recognising a URL', () => {
       null,
     ],
     // A watch URL with no id at all: not a video.
-    ['https://www.youtube.com/watch', 'https://youtube.com/watch', 'article', null],
+    [
+      'https://www.youtube.com/watch',
+      'https://youtube.com/watch',
+      'article',
+      null,
+    ],
 
     // --- other hosts that look like YouTube ------------------------------
     [
@@ -219,12 +239,7 @@ describe('recognising a URL', () => {
       'article',
       null,
     ],
-    [
-      'https://vimeo.com/123456',
-      'https://vimeo.com/123456',
-      'article',
-      null,
-    ],
+    ['https://vimeo.com/123456', 'https://vimeo.com/123456', 'article', null],
   ];
 
   it.each(cases)('%s', (input, url, kind, externalId) => {
@@ -240,9 +255,9 @@ describe('recognising a URL', () => {
     // `javascript:` would be refused by the scheme check before anything else
     // ever sees it, which matters because the URL is handed to a client.
     expect(() => normaliseLink('javascript:alert(1)')).toThrow(LinkUrlError);
-    expect(() => normaliseLink(`https://example.com/${'x'.repeat(3000)}`)).toThrow(
-      LinkUrlError,
-    );
+    expect(() =>
+      normaliseLink(`https://example.com/${'x'.repeat(3000)}`),
+    ).toThrow(LinkUrlError);
   });
 
   it('collapses two spellings of one article onto one URL', () => {
@@ -297,7 +312,10 @@ describe('saving a link', () => {
   });
 
   it('answers the entry they already have, and creates nothing', async () => {
-    await h.add.handle(MEMBER, { id: LINK_A, url: 'https://example.com/piece' });
+    await h.add.handle(MEMBER, {
+      id: LINK_A,
+      url: 'https://example.com/piece',
+    });
     h.uow.events.length = 0;
 
     const second = await h.add.handle(MEMBER, {
@@ -313,7 +331,10 @@ describe('saving a link', () => {
   it('lets another member save the same URL', async () => {
     // The uniqueness is per member, which is what `(userId, normalizedUrl)`
     // says and what a shared index without the `userId` would not.
-    await h.add.handle(MEMBER, { id: LINK_A, url: 'https://example.com/piece' });
+    await h.add.handle(MEMBER, {
+      id: LINK_A,
+      url: 'https://example.com/piece',
+    });
     const theirs = await h.add.handle(OTHER, {
       id: LINK_B,
       url: 'https://example.com/piece',
@@ -381,7 +402,10 @@ describe('retrying and removing', () => {
 
   beforeEach(async () => {
     h = harness();
-    await h.add.handle(MEMBER, { id: LINK_A, url: 'https://example.com/piece' });
+    await h.add.handle(MEMBER, {
+      id: LINK_A,
+      url: 'https://example.com/piece',
+    });
     h.uow.events.length = 0;
   });
 

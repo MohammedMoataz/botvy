@@ -28,6 +28,12 @@ import {
 /** The heartbeat key `/health` and the admin overview report staleness on. */
 export const TRAINING_MATERIALISE_JOB = 'training.materialise';
 
+/**
+ * Once a night, stamped onto the row so `/health` measures this job's silence
+ * in hours (E-018). `training_materialise` triggers at 03:40.
+ */
+export const TRAINING_MATERIALISE_EVERY_MINUTES = 24 * 60;
+
 /** Mints the ids the program's exercises get as they are copied onto a session. */
 export type ExerciseIdFactory = () => string;
 
@@ -239,19 +245,21 @@ export class SessionMaterialiserSaga {
         true,
         undefined,
         result.ms,
+        TRAINING_MATERIALISE_EVERY_MINUTES,
       );
       return result;
     } catch (error) {
       // Stamped on the way out either way. A scheduled job that stops arriving
-      // has to be visible: `/health` reports this key stale after fifteen
-      // minutes, and a silent 401 between n8n and the gateway once went
-      // unnoticed for days.
+      // has to be visible: `/health` reports this key stale once it has been
+      // quiet for longer than the cadence the row declares, and a silent 401
+      // between n8n and the gateway once went unnoticed for days.
       result.ms = Date.now() - started;
       await this.heartbeats.stamp(
         TRAINING_MATERIALISE_JOB,
         false,
         (error as Error).message,
         result.ms,
+        TRAINING_MATERIALISE_EVERY_MINUTES,
       );
       throw error;
     }

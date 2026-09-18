@@ -18,6 +18,19 @@ import { SettingsService } from '../../../../shared/settings/settings.service.js
 /** The name the nightly run stamps. One job, because it is one run. */
 export const BACKUP_JOB = 'backup';
 
+/**
+ * What the row is stamped with when the report does not say (E-018).
+ *
+ * The container declares its own cadence and that is what wins; this covers the
+ * backup image that predates the field. It is not a second copy of the schedule
+ * so much as a floor under the one failure this whole change exists to stop: an
+ * undeclared row is judged by `ops.staleAfterMinutes`, which for a job that
+ * runs at 03:00 means `/health` reports the platform degraded for the rest of
+ * every day — the defect, restored, by the fallback that is safe for every
+ * other job.
+ */
+export const BACKUP_EVERY_MINUTES = 24 * 60;
+
 export class BackupArchiveDto {
   @IsString()
   @MaxLength(200)
@@ -68,6 +81,25 @@ export class BackupReportDto {
   @ValidateNested({ each: true })
   @Type(() => BackupArchiveDto)
   archives?: BackupArchiveDto[];
+
+  /**
+   * How often the container is scheduled to run, in minutes (E-018).
+   *
+   * The container owns this rather than the API, because `BACKUP_CRON` in
+   * compose is what actually decides it: an installation that backs up twice a
+   * day says so once, in the place that makes it true, rather than in two
+   * places one of which nobody can edit.
+   *
+   * Optional, so a backup image older than this column still reports
+   * successfully — it falls back to `BACKUP_EVERY_MINUTES` above rather than to
+   * the minute window, for the reason given there. Decorated because the global
+   * pipe runs `forbidNonWhitelisted` — an undecorated property is a 400 for the
+   * whole report, which would turn a good backup into a missing one.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  everyMinutes?: number;
 }
 
 /**
@@ -124,9 +156,16 @@ export class InternalBackupsController {
     // Treated as a failure here rather than trusted, because the alternative is
     // a green heartbeat standing in for an empty directory.
     const ok = body.ok && archives.length > 0;
-    const error = body.ok && !ok ? 'reported success with no archives' : body.error;
+    const error =
+      body.ok && !ok ? 'reported success with no archives' : body.error;
 
-    await this.heartbeats.stamp(BACKUP_JOB, ok, error || undefined, body.durationMs);
+    await this.heartbeats.stamp(
+      BACKUP_JOB,
+      ok,
+      error || undefined,
+      body.durationMs,
+      body.everyMinutes ?? BACKUP_EVERY_MINUTES,
+    );
 
     if (ok) {
       await this.settings.setSystem('ops.lastBackupAt', at.toISOString());

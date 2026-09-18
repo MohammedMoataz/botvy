@@ -55,7 +55,8 @@ import { loadEnvFiles } from './env.mjs';
 loadEnvFiles();
 
 const API =
-  process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 const SERVICE_TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? '';
 const CAIRO = 'Africa/Cairo';
 const RELAY_TIMEOUT_MS = 45_000;
@@ -75,7 +76,9 @@ const NUTRITION_WORDS =
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 const skip = (name, why) => {
   results.push({ name, ok: true, detail: `skipped: ${why}`, skipped: true });
@@ -328,7 +331,11 @@ async function main() {
 
   const replayed = await rest('POST', '/meals', {
     token,
-    body: { id: mealIds.lunch, name: 'grilled chicken and rice', kind: 'lunch' },
+    body: {
+      id: mealIds.lunch,
+      name: 'grilled chicken and rice',
+      kind: 'lunch',
+    },
   });
   record(
     'a repeated id is the add that already happened, not a duplicate',
@@ -360,7 +367,11 @@ async function main() {
           op: 'create',
           id: pushedId,
           updatedAt: new Date().toISOString(),
-          data: { name: 'koshari', kind: 'any', ingredients: ['rice', 'lentils'] },
+          data: {
+            name: 'koshari',
+            kind: 'any',
+            ingredients: ['rice', 'lentils'],
+          },
         },
       ],
     },
@@ -383,7 +394,9 @@ async function main() {
   );
   record(
     'the day is built from the member’s own meals and nothing else (SC-002)',
-    day.status === 200 && names.length > 0 && names.every((name) => mine.has(name)),
+    day.status === 200 &&
+      names.length > 0 &&
+      names.every((name) => mine.has(name)),
     `line=${day.body?.line}`,
   );
 
@@ -547,16 +560,23 @@ async function main() {
       body: { password },
     });
   } else {
-    skip('a library that is entirely allergens is withheld with a code (FR-014)', 'no second member');
+    skip(
+      'a library that is entirely allergens is withheld with a code (FR-014)',
+      'no second member',
+    );
   }
 
   /*
    * ---- 7. a past day is settled (FR-011) ----------------------------------
    */
-  const past = await rest('POST', '/nutrition/today/meals/0/replace?date=2020-01-01', {
-    token,
-    body: { mealId: pushedId },
-  });
+  const past = await rest(
+    'POST',
+    '/nutrition/today/meals/0/replace?date=2020-01-01',
+    {
+      token,
+      body: { mealId: pushedId },
+    },
+  );
   record(
     'a past day cannot be rewritten (FR-011)',
     past.status === 409,

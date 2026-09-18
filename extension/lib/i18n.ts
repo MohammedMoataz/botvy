@@ -51,6 +51,10 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'meetings.where': 'Give a link or an address — at least one.',
     'meetings.join': 'Join',
     'meetings.moved': 'Moved',
+    // E-014. Not an error the member caused and not one they can fix here, so
+    // it says where it *can* be seen rather than apologising.
+    'meetings.unreadable':
+      'This panel cannot read how this repeats, so its dates are not shown. Open it in the Botvy app.',
     'meetings.addSubmit': 'Add meeting',
     'meetings.failed': 'That meeting did not reach the server. Try again.',
     'sync.state.in-step': 'In step',
@@ -98,8 +102,7 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'login.failed': 'تعذّر تسجيل الدخول. تأكد من إمكانية الوصول إلى بوتفي.',
     'login.welcome': 'تم تسجيل الدخول بصفة {name}.',
     'login.signOut': 'تسجيل الخروج',
-    'login.gatewayHint':
-      'عنوان بوتفي الخاص بك. اضبطه قبل تسجيل الدخول.',
+    'login.gatewayHint': 'عنوان بوتفي الخاص بك. اضبطه قبل تسجيل الدخول.',
     'tasks.today': 'اليوم',
     'tasks.empty': 'لا شيء مستحق اليوم.',
     'tasks.waiting': 'في انتظار منطقتك الزمنية…',
@@ -123,6 +126,8 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'meetings.where': 'أدخل رابطًا أو عنوانًا — واحدًا على الأقل.',
     'meetings.join': 'انضم',
     'meetings.moved': 'مُنقول',
+    'meetings.unreadable':
+      'لا يستطيع هذا اللوح قراءة طريقة تكرار هذا الاجتماع، لذا لا تُعرض مواعيده. افتحه في تطبيق بوتفي.',
     'meetings.addSubmit': 'إضافة اجتماع',
     'meetings.failed': 'لم يصل هذا الاجتماع إلى الخادم. حاول مرة أخرى.',
     'sync.state.in-step': 'محدَّث',

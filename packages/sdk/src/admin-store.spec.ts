@@ -17,7 +17,10 @@ function member(id: string, over: Partial<MemberSummary> = {}): MemberSummary {
 }
 
 /** A client that answers the members query and whatever the act asks for. */
-function fakeClient(act: () => Promise<unknown>, members: MemberSummary[]): BotvyClient {
+function fakeClient(
+  act: () => Promise<unknown>,
+  members: MemberSummary[],
+): BotvyClient {
   return {
     async query() {
       return { users: { nodes: members, endCursor: null } };
@@ -55,13 +58,18 @@ describe('AdminStore, acting on one member', () => {
     // demote them, which is the opposite of what the refusal means.
     const store = new AdminStore(
       fakeClient(
-        () => Promise.reject(new ApiError(409, null, 'this is the only administrator')),
+        () =>
+          Promise.reject(
+            new ApiError(409, null, 'this is the only administrator'),
+          ),
         [member('a', { role: 'admin' })],
       ),
     );
     await store.search({});
 
-    await expect(store.setRole('a', 'user')).rejects.toThrow('only administrator');
+    await expect(store.setRole('a', 'user')).rejects.toThrow(
+      'only administrator',
+    );
 
     expect(store.members.map((row) => row.id)).toEqual(['a']);
     expect(store.members[0]?.role).toBe('admin');

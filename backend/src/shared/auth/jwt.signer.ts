@@ -17,7 +17,9 @@ import type { AccessTokenClaims } from './jwt.verifier.js';
  */
 @Injectable()
 export class JwtSigner {
-  constructor(private readonly env: Pick<Env, 'JWT_ACCESS_SECRET' | 'JWT_ACCESS_TTL'>) {}
+  constructor(
+    private readonly env: Pick<Env, 'JWT_ACCESS_SECRET' | 'JWT_ACCESS_TTL'>,
+  ) {}
 
   sign(claims: AccessTokenClaims): { accessToken: string; expiresIn: string } {
     const expiresIn = this.env.JWT_ACCESS_TTL;

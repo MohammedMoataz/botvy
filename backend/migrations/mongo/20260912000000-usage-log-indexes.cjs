@@ -69,7 +69,10 @@ async function up(db) {
   // for reasons nobody can reconstruct.
   await db
     .collection('usage_log')
-    .createIndex({ eventId: 1 }, { unique: true, name: 'usage_log_event_unique' });
+    .createIndex(
+      { eventId: 1 },
+      { unique: true, name: 'usage_log_event_unique' },
+    );
 
   // ------------------------------------------------------- the window query
   //
@@ -84,7 +87,10 @@ async function up(db) {
   // query is a bounded range, not a sort.
   await db
     .collection('usage_log')
-    .createIndex({ userId: 1, createdAt: 1 }, { name: 'usage_log_user_created' });
+    .createIndex(
+      { userId: 1, createdAt: 1 },
+      { name: 'usage_log_user_created' },
+    );
 
   // ----------------------------------------------------------- ⚠ THE TTL
   //

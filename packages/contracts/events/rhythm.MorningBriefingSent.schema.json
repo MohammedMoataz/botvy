@@ -15,9 +15,6 @@
       }
     }
   },
-  "required": [
-    "date",
-    "taskIds"
-  ],
+  "required": ["date", "taskIds"],
   "additionalProperties": false
 }

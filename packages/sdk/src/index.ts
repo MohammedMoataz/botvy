@@ -72,6 +72,7 @@ export {
   type PendingAlert,
   type PendingPush,
   type PushOp,
+  type RejectionCode,
   type RejectionReason,
   type SyncEntity,
   type SyncOutcome,
@@ -81,16 +82,17 @@ export {
   type SyncTable,
   type SyncedRow,
 } from './sync-store.js';
+export { addDays, dayWindow, todayIn, within, type DayWindow } from './day.js';
 export {
-  addDays,
-  dayWindow,
-  todayIn,
-  within,
-  type DayWindow,
-} from './day.js';
+  compareTasksIn,
+  localDay,
+  matchesTaskView,
+  taskView,
+  taskViewDay,
+  type TaskViewDay,
+} from './taskViews.js';
 export {
   TasksStore,
-  localDay,
   type CompleteTaskAck,
   type CreateTaskAck,
   type LabelSnapshot,
@@ -118,6 +120,7 @@ export {
   type NewMeeting,
 } from './meetings-store.js';
 export {
+  canExpandRule,
   expandOccurrences,
   wallClockToUtc,
   type MeetingLocation,

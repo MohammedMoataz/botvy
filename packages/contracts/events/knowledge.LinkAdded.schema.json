@@ -13,10 +13,6 @@
     },
     "kind": {}
   },
-  "required": [
-    "linkId",
-    "url",
-    "kind"
-  ],
+  "required": ["linkId", "url", "kind"],
   "additionalProperties": false
 }

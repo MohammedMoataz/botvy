@@ -143,10 +143,7 @@ export class MeetingOccurrencesQueryHandler {
    * what instants that day's midnights name — resolving them in one place is
    * what keeps a member in Cairo from being told the server's day.
    */
-  async onDate(
-    userId: string,
-    date: string,
-  ): Promise<MeetingOccurrenceView[]> {
+  async onDate(userId: string, date: string): Promise<MeetingOccurrenceView[]> {
     const { timezone } = await this.member.clock(userId);
     const from = wallClockToUtc(`${date}T00:00`, timezone);
     const to = wallClockToUtc(`${nextDay(date)}T00:00`, timezone);

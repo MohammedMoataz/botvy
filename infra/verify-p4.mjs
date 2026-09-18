@@ -55,7 +55,9 @@ import { loadEnvFiles } from './env.mjs';
 
 loadEnvFiles();
 
-const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+const API =
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 
 /** The socket needs a client. Loaded lazily so the gate still runs without it. */
 async function socketFactory() {
@@ -70,7 +72,9 @@ async function socketFactory() {
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 const skip = (name, why) => {
   results.push({ name, ok: true, detail: `skipped: ${why}`, skipped: true });
@@ -99,7 +103,10 @@ async function rest(method, path, { token, body } = {}) {
 async function graphql(query, token, variables) {
   const response = await fetch(`${API}/graphql`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({ query, variables }),
   });
   return response.json();
@@ -189,7 +196,10 @@ function connect(io, token, installId) {
       transports: ['websocket'],
       reconnection: false,
     });
-    const timer = setTimeout(() => reject(new Error('socket did not connect')), 15_000);
+    const timer = setTimeout(
+      () => reject(new Error('socket did not connect')),
+      15_000,
+    );
     socket.on('connect', () => {
       clearTimeout(timer);
       resolve(socket);
@@ -311,15 +321,17 @@ async function main() {
    * registered".
    */
   let chatsError = null;
-  const conversations = await eventually(async () => {
-    const answer = await graphql(
-      '{ conversations { id kind title pinned } }',
-      token,
-    );
-    if (answer?.errors) chatsError = JSON.stringify(answer.errors).slice(0, 200);
-    const rows = answer?.data?.conversations ?? [];
-    return rows.length >= 2 ? rows : null;
-  }) ?? [];
+  const conversations =
+    (await eventually(async () => {
+      const answer = await graphql(
+        '{ conversations { id kind title pinned } }',
+        token,
+      );
+      if (answer?.errors)
+        chatsError = JSON.stringify(answer.errors).slice(0, 200);
+      const rows = answer?.data?.conversations ?? [];
+      return rows.length >= 2 ? rows : null;
+    })) ?? [];
   const coach = conversations.find((row) => row.kind === 'coach');
   const planner = conversations.find((row) => row.kind === 'planner');
   record(
@@ -360,18 +372,30 @@ async function main() {
 
   const socket = await connect(io, token, installId).catch((error) => error);
   if (socket instanceof Error) {
-    record('a socket connects with the token in the handshake', false, socket.message);
+    record(
+      'a socket connects with the token in the handshake',
+      false,
+      socket.message,
+    );
     return;
   }
-  record('a socket connects with the token in the handshake', true, `id=${socket.id}`);
+  record(
+    'a socket connects with the token in the handshake',
+    true,
+    `id=${socket.id}`,
+  );
 
-  const foreign = await turn(socket, {
-    requestId: randomUUID(),
-    conversationId: randomUUID(),
-    clientId: randomUUID(),
-    text: 'hello',
-    composedAt: new Date().toISOString(),
-  }, { timeoutMs: 20_000 });
+  const foreign = await turn(
+    socket,
+    {
+      requestId: randomUUID(),
+      conversationId: randomUUID(),
+      clientId: randomUUID(),
+      text: 'hello',
+      composedAt: new Date().toISOString(),
+    },
+    { timeoutMs: 20_000 },
+  );
   record(
     'a conversation that is not theirs answers forbidden, never not_found',
     foreign.error?.code === 'forbidden',
@@ -387,10 +411,19 @@ async function main() {
   const hasModel = await modelReachable();
 
   if (!hasModel) {
-    skip('a planner instruction becomes a reminder at the member’s own time', 'no model on this host');
-    skip('the confirmation arrives as tokens, not a bare chat.done', 'no model on this host');
+    skip(
+      'a planner instruction becomes a reminder at the member’s own time',
+      'no model on this host',
+    );
+    skip(
+      'the confirmation arrives as tokens, not a bare chat.done',
+      'no model on this host',
+    );
     skip('a turn streams an answer and stores it', 'no model on this host');
-    skip('cancel stops the stream and keeps the partial', 'no model on this host');
+    skip(
+      'cancel stops the stream and keeps the partial',
+      'no model on this host',
+    );
     skip('the usage loop closes', 'no model on this host');
     skip('a pasted instruction executes nothing', 'no model on this host');
   } else {
@@ -531,14 +564,16 @@ async function main() {
     // answered a number rather than throwing.
     record(
       'the usage loop closes',
-      Boolean(asked.done?.usage?.promptTokens || asked.done?.usage?.completionTokens),
+      Boolean(
+        asked.done?.usage?.promptTokens || asked.done?.usage?.completionTokens,
+      ),
       `usage=${JSON.stringify(asked.done?.usage ?? null)}`,
     );
 
     // ---- 12. injection -------------------------------------------------
-    const remindersBefore = (
-      await graphql('{ reminders(view: upcoming) { nodes { id } } }', token)
-    )?.data?.reminders?.nodes?.length ?? 0;
+    const remindersBefore =
+      (await graphql('{ reminders(view: upcoming) { nodes { id } } }', token))
+        ?.data?.reminders?.nodes?.length ?? 0;
 
     await turn(socket, {
       requestId: randomUUID(),
@@ -550,9 +585,9 @@ async function main() {
       composedAt: new Date().toISOString(),
     });
 
-    const remindersAfter = (
-      await graphql('{ reminders(view: upcoming) { nodes { id } } }', token)
-    )?.data?.reminders?.nodes?.length ?? 0;
+    const remindersAfter =
+      (await graphql('{ reminders(view: upcoming) { nodes { id } } }', token))
+        ?.data?.reminders?.nodes?.length ?? 0;
     record(
       'a pasted instruction executes nothing',
       remindersAfter >= remindersBefore,
@@ -563,23 +598,34 @@ async function main() {
   // ---- 7. two sockets, distinct sequence numbers -----------------------
   const second = await connect(io, token, secondInstall).catch(() => null);
   if (!second) {
-    skip('two sockets of one member take distinct increasing seq values', 'the second socket did not connect');
+    skip(
+      'two sockets of one member take distinct increasing seq values',
+      'the second socket did not connect',
+    );
   } else {
     const [a, b] = await Promise.all([
-      turn(socket, {
-        requestId: randomUUID(),
-        conversationId: coach.id,
-        clientId: randomUUID(),
-        text: 'one',
-        composedAt: new Date().toISOString(),
-      }, { timeoutMs: 60_000 }),
-      turn(second, {
-        requestId: randomUUID(),
-        conversationId: planner.id,
-        clientId: randomUUID(),
-        text: 'two',
-        composedAt: new Date().toISOString(),
-      }, { timeoutMs: 60_000 }),
+      turn(
+        socket,
+        {
+          requestId: randomUUID(),
+          conversationId: coach.id,
+          clientId: randomUUID(),
+          text: 'one',
+          composedAt: new Date().toISOString(),
+        },
+        { timeoutMs: 60_000 },
+      ),
+      turn(
+        second,
+        {
+          requestId: randomUUID(),
+          conversationId: planner.id,
+          clientId: randomUUID(),
+          text: 'two',
+          composedAt: new Date().toISOString(),
+        },
+        { timeoutMs: 60_000 },
+      ),
     ]);
     const seqA = a.accepted?.userSeq;
     const seqB = b.accepted?.userSeq;
@@ -592,7 +638,9 @@ async function main() {
   }
 
   // ---- 10. clearing, across devices and across a catch-up --------------
-  const cleared = await rest('POST', `/conversations/${coach.id}/clear`, { token });
+  const cleared = await rest('POST', `/conversations/${coach.id}/clear`, {
+    token,
+  });
   record(
     'the coach chat can be cleared even though it cannot be deleted',
     cleared.status === 200,
@@ -612,7 +660,12 @@ async function main() {
 
   const pulled = await rest('POST', '/sync', {
     token,
-    body: { installId, since: null, lastSeq: 0, entities: ['conversations', 'messages'] },
+    body: {
+      installId,
+      since: null,
+      lastSeq: 0,
+      entities: ['conversations', 'messages'],
+    },
   });
   /*
    * Scoped to the **cleared** conversation, which the first version of this
@@ -647,7 +700,11 @@ async function main() {
     token,
     body: { password },
   });
-  record('the member can delete their own account', gone.status === 200, `status=${gone.status}`);
+  record(
+    'the member can delete their own account',
+    gone.status === 200,
+    `status=${gone.status}`,
+  );
 }
 
 await main().catch((error) => {
@@ -662,6 +719,7 @@ console.log(
 );
 if (failed.length > 0) {
   console.log('\nfailed:');
-  for (const f of failed) console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+  for (const f of failed)
+    console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
 }
 process.exit(failed.length === 0 ? 0 : 1);

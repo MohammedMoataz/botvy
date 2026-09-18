@@ -16,7 +16,9 @@ function reportWith(jobs: HealthReport['jobs']): HealthReport {
 }
 
 /** Just enough of `AdminStore` to answer `health()`. */
-function fakeAdmin(answers: Array<HealthReport | Error>): AdminStore & { calls: number } {
+function fakeAdmin(
+  answers: Array<HealthReport | Error>,
+): AdminStore & { calls: number } {
   let calls = 0;
   return {
     get calls() {
@@ -76,7 +78,8 @@ describe('HealthStore', () => {
     // which is half of what the screen reports.
     const socket = fakeSocket();
     const setInterval_ = vi.fn(
-      (_fn: () => void, _ms?: number) => 1 as unknown as ReturnType<typeof setInterval>,
+      (_fn: () => void, _ms?: number) =>
+        1 as unknown as ReturnType<typeof setInterval>,
     );
     const store = new HealthStore(fakeAdmin([reportWith([])]), {
       socket: socket.client as never,
@@ -95,11 +98,21 @@ describe('HealthStore', () => {
     const socket = fakeSocket();
     const store = new HealthStore(
       fakeAdmin([
-        reportWith([{ job: 'rhythm.tick', lastOkAt: null, lastError: 'boom', stale: true }]),
+        reportWith([
+          {
+            job: 'rhythm.tick',
+            lastOkAt: null,
+            lastError: 'boom',
+            stale: true,
+          },
+        ]),
       ]),
       {
         socket: socket.client as never,
-        setInterval: (() => 1 as unknown as ReturnType<typeof setInterval>) as unknown as typeof setInterval,
+        setInterval: (() =>
+          1 as unknown as ReturnType<
+            typeof setInterval
+          >) as unknown as typeof setInterval,
         clearInterval: (() => undefined) as unknown as typeof clearInterval,
       },
     );
@@ -133,7 +146,10 @@ describe('HealthStore', () => {
       ]),
       {
         socket: socket.client as never,
-        setInterval: (() => 1 as unknown as ReturnType<typeof setInterval>) as unknown as typeof setInterval,
+        setInterval: (() =>
+          1 as unknown as ReturnType<
+            typeof setInterval
+          >) as unknown as typeof setInterval,
         clearInterval: (() => undefined) as unknown as typeof clearInterval,
       },
     );
@@ -144,7 +160,11 @@ describe('HealthStore', () => {
     // The server sends `lastOkAt: null` on a failure and keeps the stored value;
     // writing the null through would blank the one field somebody debugging is
     // looking for.
-    socket.push('ops.heartbeat', { job: 'outbox.relay', ok: false, lastOkAt: null });
+    socket.push('ops.heartbeat', {
+      job: 'outbox.relay',
+      ok: false,
+      lastOkAt: null,
+    });
 
     expect(store.report?.jobs[0]?.lastOkAt).toBe('2026-09-11T09:00:00.000Z');
     expect(store.report?.jobs[0]?.lastError).toBe('failed');
@@ -154,7 +174,10 @@ describe('HealthStore', () => {
     const good = reportWith([]);
     const admin = fakeAdmin([good, new Error('the gateway is down')]);
     const store = new HealthStore(admin, {
-      setInterval: (() => 1 as unknown as ReturnType<typeof setInterval>) as unknown as typeof setInterval,
+      setInterval: (() =>
+        1 as unknown as ReturnType<
+          typeof setInterval
+        >) as unknown as typeof setInterval,
       clearInterval: (() => undefined) as unknown as typeof clearInterval,
     });
 
@@ -170,7 +193,9 @@ describe('HealthStore', () => {
   it('a read that lands after stop() does not write', async () => {
     // Annotated through a holder: assigned only inside the executor, TypeScript
     // narrows a plain `let` to `null` and the call below becomes uncallable.
-    const gate: { release: ((report: HealthReport) => void) | null } = { release: null };
+    const gate: { release: ((report: HealthReport) => void) | null } = {
+      release: null,
+    };
     const admin = {
       health: () =>
         new Promise<HealthReport>((resolve) => {
@@ -179,7 +204,10 @@ describe('HealthStore', () => {
     } as unknown as AdminStore;
 
     const store = new HealthStore(admin, {
-      setInterval: (() => 1 as unknown as ReturnType<typeof setInterval>) as unknown as typeof setInterval,
+      setInterval: (() =>
+        1 as unknown as ReturnType<
+          typeof setInterval
+        >) as unknown as typeof setInterval,
       clearInterval: (() => undefined) as unknown as typeof clearInterval,
     });
 

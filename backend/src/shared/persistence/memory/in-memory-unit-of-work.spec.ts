@@ -40,7 +40,9 @@ describe('the in-memory unit of work', () => {
     // This is the shape of the defect, reproduced: a handler calls `save` with
     // no `run` around it. Against PostgreSQL it would succeed twice over and
     // look fine; here it says what is wrong with it.
-    await expect(users.save(member('user-1'))).rejects.toThrow(/outside a unit of work/);
+    await expect(users.save(member('user-1'))).rejects.toThrow(
+      /outside a unit of work/,
+    );
   });
 
   it('rolls the row and its events back together', async () => {
@@ -67,7 +69,9 @@ describe('the in-memory unit of work', () => {
     await uow.run(() => users.save(member('user-1')));
 
     expect([...users.byId.keys()]).toEqual(['user-1']);
-    expect(users.events.map((event) => event.name)).toEqual(['identity.UserRegistered']);
+    expect(users.events.map((event) => event.name)).toEqual([
+      'identity.UserRegistered',
+    ]);
     expect(uow.rolledBack).toBe(false);
   });
 

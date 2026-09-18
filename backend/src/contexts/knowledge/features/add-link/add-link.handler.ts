@@ -142,7 +142,9 @@ export class AddLinkHandler {
     const today = localDate(at, timezone);
     const midnight =
       wallClockToUtc(`${today}T00:00`, timezone) ??
-      new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()));
+      new Date(
+        Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
+      );
 
     const saved = await this.links.countAddedSince(userId, midnight);
     if (saved >= limit) throw new DailyLinkQuotaReached(limit);

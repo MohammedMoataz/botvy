@@ -120,7 +120,7 @@ export class Label extends AggregateRoot<string> {
 
     if (changed.length === 0) return changed;
 
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     // Raised for a reorder too, which changes no snapshot. The handler compares
     // before writing and does nothing, and that costs one query — cheaper than
     // a second event name whose only difference is which fields moved.
@@ -140,7 +140,7 @@ export class Label extends AggregateRoot<string> {
    */
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'planning.LabelDeleted',
       'label',
@@ -151,7 +151,7 @@ export class Label extends AggregateRoot<string> {
 
   restore(at: Date = new Date()): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'planning.LabelUpdated',
       'label',

@@ -63,7 +63,8 @@ function at(hhmm: string, dayOffset = 0): Date {
   let date = localDate(new Date(), CAIRO);
   for (let index = 0; index < dayOffset; index += 1) date = nextDate(date);
   const instant = wallClockToUtc(`${date}T${hhmm}`, CAIRO);
-  if (!instant) throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
+  if (!instant)
+    throw new Error(`could not resolve ${date}T${hhmm} in ${CAIRO}`);
   return instant;
 }
 
@@ -81,6 +82,7 @@ class StubSchedules extends MemberSchedulePort {
     return userIds.map((userId) => ({
       userId,
       timezone: CAIRO,
+      locale: 'en',
       planTomorrowTime: '21:00',
       endOfDayTime: '22:00',
       morningBriefingTime: '08:00',

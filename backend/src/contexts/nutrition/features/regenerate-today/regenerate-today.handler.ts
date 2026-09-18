@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
 import { localDate } from '../../../../shared/time/time.js';
 import type { WithheldReason } from '../../domain/meal-suggestion.aggregate.js';
-import { MealModePort } from '../../domain/nutrition.ports.js';
+import { MemberPreferencesPort } from '../../../../shared/member/member-preferences.port.js';
 import { MealSuggestionRepository } from '../../domain/nutrition.repositories.js';
 import { BuildMealLineHandler } from '../build-meal-line/build-meal-line.handler.js';
 
@@ -58,7 +58,7 @@ export class RegenerateTodayHandler {
   constructor(
     private readonly build: BuildMealLineHandler,
     private readonly suggestions: MealSuggestionRepository,
-    private readonly mode: MealModePort,
+    private readonly preferences: MemberPreferencesPort,
     private readonly member: MemberContextPort,
   ) {}
 
@@ -141,7 +141,7 @@ export class RegenerateTodayHandler {
     at: Date,
     causeEventId: string | null = null,
   ): Promise<MealHalf> {
-    const mode = await this.mode.modeFor(userId);
+    const mode = await this.preferences.get(userId, 'mealMode');
     const built = await this.build.handle(userId, date, mode, at, causeEventId);
     return { date, line: built.line, reason: built.reason, rebuilt: true };
   }

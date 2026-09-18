@@ -35,11 +35,6 @@
       ]
     }
   },
-  "required": [
-    "date",
-    "taskIds",
-    "trainingSessionId",
-    "mealLine"
-  ],
+  "required": ["date", "taskIds", "trainingSessionId", "mealLine"],
   "additionalProperties": false
 }

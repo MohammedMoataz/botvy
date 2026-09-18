@@ -11,7 +11,9 @@ import {
   PreferencesSchema,
   ProfileSchema,
 } from '../../shared/persistence/mongo/schemas.js';
+import { MemberBootstrapPort } from '../../shared/member/member-bootstrap.port.js';
 import { MemberContextPort } from '../../shared/member/member-context.port.js';
+import { MemberPreferencesPort } from '../../shared/member/member-preferences.port.js';
 import { OutboxModule } from '../../shared/outbox/outbox.module.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
 import { OperationsModule } from '../operations/operations.module.js';
@@ -26,7 +28,11 @@ import { PurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-dele
 import { UpdatePreferencesHandler } from './features/update-preferences/update-preferences.handler.js';
 import { UpdateProfileHandler } from './features/update-profile/update-profile.handler.js';
 import { FilesystemPhotoStore } from './infrastructure/filesystem-photo.store.js';
-import { ProfileMemberContext } from './infrastructure/profile-member-context.adapter.js';
+import {
+  ProfileMemberBootstrap,
+  ProfileMemberContext,
+  ProfileMemberPreferences,
+} from './infrastructure/profile-member-context.adapter.js';
 import {
   MongoPreferencesRepository,
   MongoProfileRepository,
@@ -104,16 +110,39 @@ import {
     ProfileQueryHandler,
     PurgeOnDeletedHandler,
     {
+      // The one implementation of "the member's row, else the installation
+      // default" (E-020). Five contexts had their own copy of those four lines
+      // and its fallback; they ask this by field name now.
+      provide: MemberPreferencesPort,
+      inject: [PreferencesRepository, SettingsService],
+      useFactory: (
+        preferences: PreferencesRepository,
+        settings: SettingsService,
+      ) => new ProfileMemberPreferences(preferences, settings),
+    },
+    {
       // Profile owns the facts; the port lives in `shared/` so that Planning,
       // Reminders and Notifications can ask the scheduling questions without
       // any of them importing this context. See `member-context.port.ts`.
       provide: MemberContextPort,
-      inject: [ProfileRepository, PreferencesRepository, SettingsService],
+      inject: [ProfileRepository, MemberPreferencesPort, SettingsService],
+      useFactory: (
+        profiles: ProfileRepository,
+        preferences: MemberPreferencesPort,
+        settings: SettingsService,
+      ) => new ProfileMemberContext(profiles, preferences, settings),
+    },
+    {
+      // "Has the relay written this member's furniture yet" (E-019). Identity's
+      // auth responses carry the answer so a first-run client waits instead of
+      // meeting a 404 it cannot act on; the token is in `shared/` and the
+      // binding here, because Profile owns the two documents.
+      provide: MemberBootstrapPort,
+      inject: [ProfileRepository, PreferencesRepository],
       useFactory: (
         profiles: ProfileRepository,
         preferences: PreferencesRepository,
-        settings: SettingsService,
-      ) => new ProfileMemberContext(profiles, preferences, settings),
+      ) => new ProfileMemberBootstrap(profiles, preferences),
     },
     MongoUnitOfWork,
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
@@ -128,6 +157,21 @@ import {
     BootstrapOnRegisteredHandler,
     PurgeOnDeletedHandler,
     MemberContextPort,
+    MemberPreferencesPort,
+    MemberBootstrapPort,
   ],
 })
 export class ProfileModule {}
+
+/**
+ * What this context asks the outbox relay for (E-005).
+ *
+ * Declared here, beside the handlers themselves, and asserted against the
+ * dispatch table in `shared/outbox/dispatch-table.ts` while the relay is built
+ * — a name with no case in that switch fails the boot instead of being
+ * silently never delivered, which is how every account once got no profile.
+ */
+export const PROFILE_SUBSCRIPTIONS = {
+  'identity.UserRegistered': 'BootstrapOnRegisteredHandler',
+  'identity.UserDeleted': 'PurgeOnDeletedHandler',
+} as const;

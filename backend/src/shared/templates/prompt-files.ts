@@ -99,7 +99,10 @@ function directory(): string {
   // broke. `prompts` is tested before `ai/prompts` at every hop, so the image —
   // which has the first and not the second — never walks past its own copy.
   for (let hop = 0; hop < 8; hop += 1) {
-    for (const candidate of [join(dir, 'prompts'), join(dir, 'ai', 'prompts')]) {
+    for (const candidate of [
+      join(dir, 'prompts'),
+      join(dir, 'ai', 'prompts'),
+    ]) {
       if (existsSync(candidate)) {
         promptsDir = candidate;
         return candidate;

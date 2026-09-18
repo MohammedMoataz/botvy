@@ -11,16 +11,12 @@ export class RestoreWorkoutHandler {
     private readonly workouts: WorkoutRepository,
   ) {}
 
-  async handle(
-    userId: string,
-    id: string,
-    at: Date = new Date(),
-  ): Promise<{ updatedAt: Date }> {
+  async handle(userId: string, id: string): Promise<{ updatedAt: Date }> {
     const workout = await this.workouts.findById(userId, id);
     if (!workout) throw new WorkoutNotFound(id);
     if (!workout.isDeleted) return { updatedAt: workout.updatedAt };
 
-    workout.restore(at);
+    workout.restore();
     await this.uow.run(() => this.workouts.save(workout));
     return { updatedAt: workout.updatedAt };
   }

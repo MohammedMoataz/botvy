@@ -26,7 +26,8 @@ const MEMBER = 'member-1';
  * room and the spec would still pass.
  */
 class RecordingSockets {
-  readonly frames: Array<{ room: string; event: string; payload: unknown }> = [];
+  readonly frames: Array<{ room: string; event: string; payload: unknown }> =
+    [];
   /** Rooms whose sockets were closed, for `close-on-banned`. */
   readonly closed: string[] = [];
 
@@ -101,8 +102,13 @@ function bench(): Bench {
     seq,
     sockets,
     bootstrap: new ConversationsBootstrapHandler(uow, conversations),
-    append: new AppendMessageHandler(uow, conversations, messages, seq, nudges, () =>
-      messages.nextId(),
+    append: new AppendMessageHandler(
+      uow,
+      conversations,
+      messages,
+      seq,
+      nudges,
+      () => messages.nextId(),
     ),
     questions,
     // The fourth collection this context owns. The purge was missing it, so a
@@ -272,9 +278,9 @@ describe('appending a message', () => {
     expect(transcript.map((message) => message.content)).toEqual([
       'How did today go?',
     ]);
-    expect(
-      b.messages.events.map((raised) => raised.name),
-    ).toEqual(['conversations.MessageSent']);
+    expect(b.messages.events.map((raised) => raised.name)).toEqual([
+      'conversations.MessageSent',
+    ]);
   });
 
   it('returns null without throwing when the member has no chat of that kind', async () => {
@@ -349,9 +355,7 @@ describe('when the account goes away', () => {
   });
 
   it('removes the chats, the messages and the counter', async () => {
-    expect(await b.purge.handle(event('identity.UserDeleted'))).toBe(
-      'purged',
-    );
+    expect(await b.purge.handle(event('identity.UserDeleted'))).toBe('purged');
 
     expect(b.conversations.rows.size).toBe(0);
     expect(b.messages.rows.size).toBe(0);
@@ -417,7 +421,11 @@ describe('when access is withdrawn', () => {
     await b.closeOnBanned.handle(event('identity.UserBanned'));
 
     expect(b.sockets.frames).toEqual([
-      { room: `user:${MEMBER}`, event: 'auth.revoked', payload: { code: 'banned' } },
+      {
+        room: `user:${MEMBER}`,
+        event: 'auth.revoked',
+        payload: { code: 'banned' },
+      },
     ]);
     expect(b.sockets.closed).toEqual([`user:${MEMBER}`]);
   });

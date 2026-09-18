@@ -49,7 +49,9 @@ export class AdminWorkflowsController {
 
   @Get()
   async list(): Promise<{ workflows: WorkflowSummary[] }> {
-    return this.translate(async () => ({ workflows: await this.workflows.list() }));
+    return this.translate(async () => ({
+      workflows: await this.workflows.list(),
+    }));
   }
 
   @Post(':id/activate')

@@ -1,6 +1,6 @@
 # E-007 — Undated tasks sort first in the by-label view
 
-**Area**: product · **Status**: open · **Found**: P2, fixing the pagination cursor
+**Area**: product · **Status**: done · **Found**: P2, fixing the pagination cursor
 
 ## What
 
@@ -43,3 +43,7 @@ Either:
 The first is better: it keeps the derived value derived. Worth doing when
 somebody looks at the by-label screen and decides what they want at the top,
 which is a design question rather than a technical one.
+
+## How it landed
+
+The aggregation route. `dueSort = dueAt ?? 9999-12-31` as a computed sort key, matched in the in-memory comparator, and the keyset cursor encodes the computed value. Within each status a task with a deadline now sorts above one without; that ordering was the design question and the answer is recorded in `docs/decisions/001`.

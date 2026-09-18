@@ -21,10 +21,16 @@ const colorVars = (theme, indent) =>
 
 const staticVars = [
   `  --botvy-font-family: ${t.font.family.map((f) => (f.includes(' ') ? `"${f}"` : f)).join(', ')};`,
-  ...Object.entries(t.font.size).map(([k, v]) => `  --botvy-font-size-${kebab(k)}: ${v}px;`),
-  ...Object.entries(t.font.weight).map(([k, v]) => `  --botvy-font-weight-${kebab(k)}: ${v};`),
+  ...Object.entries(t.font.size).map(
+    ([k, v]) => `  --botvy-font-size-${kebab(k)}: ${v}px;`,
+  ),
+  ...Object.entries(t.font.weight).map(
+    ([k, v]) => `  --botvy-font-weight-${kebab(k)}: ${v};`,
+  ),
   `  --botvy-line-height: ${t.font.lineHeight};`,
-  ...Object.entries(t.radius).map(([k, v]) => `  --botvy-radius-${kebab(k)}: ${v}px;`),
+  ...Object.entries(t.radius).map(
+    ([k, v]) => `  --botvy-radius-${kebab(k)}: ${v}px;`,
+  ),
 ].join('\n');
 
 // Three-state theming: bare :root is light, the media query covers the
@@ -61,10 +67,16 @@ const dartColors = Object.entries(t.color)
   .join('\n');
 
 const dartScale = [
-  ...Object.entries(t.font.size).map(([k, v]) => `  static const double fontSize${pascal(k)} = ${v};`),
-  ...Object.entries(t.font.weight).map(([k, v]) => `  static const int fontWeight${pascal(k)} = ${v};`),
+  ...Object.entries(t.font.size).map(
+    ([k, v]) => `  static const double fontSize${pascal(k)} = ${v};`,
+  ),
+  ...Object.entries(t.font.weight).map(
+    ([k, v]) => `  static const int fontWeight${pascal(k)} = ${v};`,
+  ),
   `  static const double lineHeight = ${t.font.lineHeight};`,
-  ...Object.entries(t.radius).map(([k, v]) => `  static const double radius${pascal(k)} = ${v};`),
+  ...Object.entries(t.radius).map(
+    ([k, v]) => `  static const double radius${pascal(k)} = ${v};`,
+  ),
 ].join('\n');
 
 // fontFamily is deliberately absent: the CSS stack is a fallback chain, which
@@ -89,4 +101,6 @@ const dist = join(here, 'dist');
 mkdirSync(dist, { recursive: true });
 writeFileSync(join(dist, 'tokens.css'), css);
 writeFileSync(join(dist, 'tokens.dart'), dart);
-console.log(`tokens: wrote ${join('dist', 'tokens.css')} and ${join('dist', 'tokens.dart')}`);
+console.log(
+  `tokens: wrote ${join('dist', 'tokens.css')} and ${join('dist', 'tokens.dart')}`,
+);

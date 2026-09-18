@@ -50,7 +50,10 @@ async function up(db) {
 
   await db
     .collection('audit_log')
-    .createIndex({ 'target.type': 1, _id: -1 }, { name: 'audit_by_target_type' });
+    .createIndex(
+      { 'target.type': 1, _id: -1 },
+      { name: 'audit_by_target_type' },
+    );
 
   // No third index for the unfiltered page: the automatic `_id_` serves a
   // descending scan by being walked backwards, and MongoDB refuses any other

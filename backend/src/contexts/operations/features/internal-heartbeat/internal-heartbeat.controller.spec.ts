@@ -32,7 +32,9 @@ describe('POST /internal/ops/heartbeat', () => {
 
     expect(answer).toMatchObject({ job: 'backup.mongo', ok: true });
     // An empty error is "no error", not the string "".
-    expect(stamped).toEqual([['backup.mongo', true, undefined, undefined]]);
+    expect(stamped).toEqual([
+      ['backup.mongo', true, undefined, undefined, undefined],
+    ]);
   });
 
   it('records a failure with its message', async () => {
@@ -51,7 +53,34 @@ describe('POST /internal/ops/heartbeat', () => {
       }),
     );
     expect(stamped).toEqual([
-      ['backup.postgres', false, 'pg_dump: refused', undefined],
+      ['backup.postgres', false, 'pg_dump: refused', undefined, undefined],
+    ]);
+  });
+
+  /**
+   * The cadence a job declares about itself (E-018), through the pipe that
+   * would have refused it.
+   *
+   * `whitelist` with `forbidNonWhitelisted` means a property carrying no
+   * class-validator decorator **does not exist**: an undecorated `everyMinutes`
+   * answers `400 property everyMinutes should not exist` to the one caller
+   * doing it right, which is how the settings registry's only write path came
+   * to refuse the only field it takes.
+   */
+  it('takes a declared cadence and passes it to the stamp', async () => {
+    const stamped: unknown[] = [];
+    const controller = new InternalHeartbeatController({
+      stamp: async (...args: unknown[]) => {
+        stamped.push(args);
+      },
+    } as never);
+
+    await controller.stamp(
+      await asBody({ job: 'ops.retention', ok: true, everyMinutes: 1440 }),
+    );
+
+    expect(stamped).toEqual([
+      ['ops.retention', true, undefined, undefined, 1440],
     ]);
   });
 

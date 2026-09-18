@@ -31,7 +31,9 @@ import { loadEnvFiles } from './env.mjs';
 
 loadEnvFiles();
 
-const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+const API =
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'admin';
 
@@ -49,7 +51,9 @@ const RELAY_TIMEOUT_MS = 45_000;
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 
 async function rest(method, path, { token, body } = {}) {
@@ -81,7 +85,11 @@ async function graphql(document, { token, variables } = {}) {
     body: JSON.stringify({ query: document, variables }),
   });
   const payload = await response.json().catch(() => null);
-  return { status: response.status, data: payload?.data ?? null, errors: payload?.errors ?? null };
+  return {
+    status: response.status,
+    data: payload?.data ?? null,
+    errors: payload?.errors ?? null,
+  };
 }
 
 /** Polls until `check` returns truthy, or gives up. The relay is eventual. */
@@ -101,8 +109,16 @@ async function main() {
   const email = `gate-${randomUUID().slice(0, 8)}@example.test`;
   const password = 'a-long-enough-password';
   const changed = 'a-different-long-password';
-  const phone = { installId: randomUUID(), kind: 'android', name: 'Gate phone' };
-  const tablet = { installId: randomUUID(), kind: 'android', name: 'Gate tablet' };
+  const phone = {
+    installId: randomUUID(),
+    kind: 'android',
+    name: 'Gate phone',
+  };
+  const tablet = {
+    installId: randomUUID(),
+    kind: 'android',
+    name: 'Gate tablet',
+  };
 
   // ---------------------------------------------------------------- 1. register
   const registered = await rest('POST', '/auth/register', {
@@ -131,7 +147,9 @@ async function main() {
   });
   record(
     'two devices each open their own session',
-    first.status === 200 && second.status === 200 && first.body?.deviceId !== second.body?.deviceId,
+    first.status === 200 &&
+      second.status === 200 &&
+      first.body?.deviceId !== second.body?.deviceId,
     `phone=${first.body?.deviceId ?? first.status} tablet=${second.body?.deviceId ?? second.status}`,
   );
   if (first.status !== 200 || second.status !== 200) return;
@@ -169,9 +187,12 @@ async function main() {
   );
 
   // ------------------------------------------------------ 4. the read edge
-  const devices = await graphql('query Gate { myDevices { id kind hasPush } }', {
-    token: phoneToken,
-  });
+  const devices = await graphql(
+    'query Gate { myDevices { id kind hasPush } }',
+    {
+      token: phoneToken,
+    },
+  );
   record(
     'the member sees both of their devices',
     devices.data?.myDevices?.length === 2,
@@ -189,7 +210,11 @@ async function main() {
   const admin = await rest('POST', '/auth/login', {
     body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
-  record('the seeded administrator can sign in', admin.status === 200, `status=${admin.status}`);
+  record(
+    'the seeded administrator can sign in',
+    admin.status === 200,
+    `status=${admin.status}`,
+  );
 
   if (admin.status === 200) {
     const users = await graphql(
@@ -200,7 +225,9 @@ async function main() {
     record(
       'the member appears in the Users query with their devices',
       found?.email === email && found?.deviceCount === 2,
-      found ? `role=${found.role} status=${found.status} devices=${found.deviceCount}` : JSON.stringify(users.errors),
+      found
+        ? `role=${found.role} status=${found.status} devices=${found.deviceCount}`
+        : JSON.stringify(users.errors),
     );
 
     // A member's own reads must be scoped to them, whoever asks.
@@ -235,7 +262,9 @@ async function main() {
   // The whole point of the flow. A password change that left the other device
   // working would mean a member who changed it because somebody else had it
   // leaving that somebody signed in for another thirty days.
-  const refused = await rest('POST', '/auth/refresh', { body: { refreshToken: tabletRefresh } });
+  const refused = await rest('POST', '/auth/refresh', {
+    body: { refreshToken: tabletRefresh },
+  });
   record(
     'the second device is signed out on its next request',
     refused.status === 401,
@@ -251,7 +280,11 @@ async function main() {
       token: signedIn.body.accessToken,
       body: { password: changed },
     });
-    record('the member can delete their own account', deleted.status === 200, `status=${deleted.status}`);
+    record(
+      'the member can delete their own account',
+      deleted.status === 200,
+      `status=${deleted.status}`,
+    );
 
     // The purge is the other half of the relay, and the only one whose failure
     // leaves files on a volume that nothing will ever find again.
@@ -289,6 +322,7 @@ console.log(
 );
 if (failed.length > 0) {
   console.log('\nfailed:');
-  for (const f of failed) console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
+  for (const f of failed)
+    console.log(`  ${f.name}${f.detail ? ` — ${f.detail}` : ''}`);
 }
 process.exit(failed.length === 0 ? 0 : 1);

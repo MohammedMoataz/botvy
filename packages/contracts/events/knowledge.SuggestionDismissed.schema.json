@@ -18,9 +18,6 @@
       ]
     }
   },
-  "required": [
-    "suggestionId",
-    "sessionId"
-  ],
+  "required": ["suggestionId", "sessionId"],
   "additionalProperties": false
 }

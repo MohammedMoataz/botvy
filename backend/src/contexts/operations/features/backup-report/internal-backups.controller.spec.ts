@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  BACKUP_EVERY_MINUTES,
   BACKUP_JOB,
   InternalBackupsController,
   type BackupReportDto,
@@ -8,13 +9,31 @@ import type { HeartbeatService } from '../../../../shared/health/heartbeat.servi
 import type { SettingsService } from '../../../../shared/settings/settings.service.js';
 
 function build(retentionDays = 14) {
-  const stamped: Array<{ job: string; ok: boolean; error?: string }> = [];
+  const stamped: Array<{
+    job: string;
+    ok: boolean;
+    error?: string;
+    everyMinutes?: number;
+  }> = [];
   const written: Array<{ key: string; value: unknown }> = [];
 
   const heartbeats = {
-    stamp: vi.fn(async (job: string, ok: boolean, error?: string) => {
-      stamped.push({ job, ok, ...(error === undefined ? {} : { error }) });
-    }),
+    stamp: vi.fn(
+      async (
+        job: string,
+        ok: boolean,
+        error?: string,
+        _durationMs?: number,
+        everyMinutes?: number,
+      ) => {
+        stamped.push({
+          job,
+          ok,
+          ...(error === undefined ? {} : { error }),
+          ...(everyMinutes === undefined ? {} : { everyMinutes }),
+        });
+      },
+    ),
   } as unknown as HeartbeatService;
 
   const settings = {
@@ -38,12 +57,30 @@ const report = (over: Partial<BackupReportDto> = {}): BackupReportDto => ({
 });
 
 describe('the nightly backup reporting in', () => {
+  /**
+   * The container owns its own cadence, because `BACKUP_CRON` is what actually
+   * decides it — an installation that backs up twice a day says so once
+   * (E-018). The fallback above covers a backup image that predates the field,
+   * and it is a nightly one rather than the minute window on purpose: an
+   * undeclared backup row would report the platform degraded for the rest of
+   * every day, which is the defect this whole change removes.
+   */
+  it('stamps the cadence the container reported, over the fallback', async () => {
+    const { controller, stamped } = build();
+
+    await controller.report(report({ everyMinutes: 720 }));
+
+    expect(stamped[0]?.everyMinutes).toBe(720);
+  });
+
   it('stamps the heartbeat and records when the last good one was', async () => {
     const { controller, stamped, written } = build();
 
     const answer = await controller.report(report());
 
-    expect(stamped).toEqual([{ job: BACKUP_JOB, ok: true }]);
+    expect(stamped).toEqual([
+      { job: BACKUP_JOB, ok: true, everyMinutes: BACKUP_EVERY_MINUTES },
+    ]);
     expect(written.map((entry) => entry.key)).toEqual(['ops.lastBackupAt']);
     expect(answer.ok).toBe(true);
     // Parsed back, because the key's schema is a string and a portal reading it
@@ -67,7 +104,12 @@ describe('the nightly backup reporting in', () => {
     );
 
     expect(stamped).toEqual([
-      { job: BACKUP_JOB, ok: false, error: 'mongodump failed' },
+      {
+        job: BACKUP_JOB,
+        ok: false,
+        error: 'mongodump failed',
+        everyMinutes: BACKUP_EVERY_MINUTES,
+      },
     ]);
     expect(written).toEqual([]);
     expect(answer.ok).toBe(false);

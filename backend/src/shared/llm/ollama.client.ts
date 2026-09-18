@@ -82,16 +82,42 @@ export class OllamaClient {
     });
 
     if (!response.ok || !response.body) {
-      throw new Error(`Ollama refused the chat request: HTTP ${response.status}`);
+      throw new Error(
+        `Ollama refused the chat request: HTTP ${response.status}`,
+      );
     }
 
     let usage: ChatUsage | null = null;
-    for await (const line of readLines(response.body, options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS)) {
+    for await (const line of readLines(
+      response.body,
+      options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS,
+    )) {
       const frame = parseFrame(line);
       if (!frame) continue;
-      if (typeof frame.message?.content === 'string' && frame.message.content.length > 0) {
+      if (
+        typeof frame.message?.content === 'string' &&
+        frame.message.content.length > 0
+      ) {
         yield frame.message.content;
       }
+      /*
+       * The counts exist **only here**, in the terminating frame (E-013).
+       *
+       * An aborted stream — the member pressed Stop, or the allergen guard
+       * returned early — never reaches it, so a turn that generated four
+       * hundred tokens is metered as zero. That is a property of the interface
+       * and not a mistake in this loop: there is no documented way to
+       * interrogate a cut stream, and the workarounds are all worse than the
+       * gap (a character-count estimate is wrong by a factor that varies with
+       * the language, which would over-meter an Arabic-writing member).
+       *
+       * **What would close it**: a `usage` object on an aborted response, or
+       * per-chunk `prompt_eval_count` / `eval_count` on the frames before the
+       * last. If a future Ollama exposes either, read it into `usage` as each
+       * frame arrives rather than only on `done`, and delete the `usage: null`
+       * note at `TurnRunner.converse`'s abort path. Re-check at every Ollama
+       * bump; the version is pinned in `plan.md`'s dependency table.
+       */
       if (frame.done) {
         usage = {
           model: options.model,
@@ -131,12 +157,16 @@ export class OllamaClient {
       });
 
       if (!response.ok) return null;
-      const body = (await response.json()) as { message?: { content?: string } };
+      const body = (await response.json()) as {
+        message?: { content?: string };
+      };
       const content = body.message?.content;
       if (!content) return null;
       return JSON.parse(content) as T;
     } catch (error) {
-      this.logger.warn(`extraction produced nothing usable: ${(error as Error).message}`);
+      this.logger.warn(
+        `extraction produced nothing usable: ${(error as Error).message}`,
+      );
       return null;
     }
   }
@@ -197,7 +227,10 @@ async function withIdleTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
     return await Promise.race([
       promise,
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`model produced nothing for ${ms}ms`)), ms);
+        timer = setTimeout(
+          () => reject(new Error(`model produced nothing for ${ms}ms`)),
+          ms,
+        );
       }),
     ]);
   } finally {

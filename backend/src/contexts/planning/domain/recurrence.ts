@@ -1,5 +1,6 @@
 import rrule from 'rrule';
 import type { RRule as RRuleClass } from 'rrule';
+import { ruleWords, type RuleParts } from '../../../shared/i18n/rule-words.js';
 import {
   localDate,
   localHhMm,
@@ -335,18 +336,83 @@ export class Recurrence {
   }
 
   /**
-   * "every 2 weeks on Tuesday", for a confirmation line.
+   * "every 2 weeks on Tuesday" — or "كل أسبوعين يوم الثلاثاء" (E-008).
    *
-   * English only, and deliberately not localised here: `rrule`'s own
-   * translation needs a gettext table per language, and the client already
-   * holds the strings for its locale. The server sends the rule; the phone
-   * renders it in Arabic when that is what the member reads.
+   * The words come from `shared/i18n/rule-words.ts`, a port of the phone's own
+   * renderer, and not from `rrule.toText()`: that is English unless handed a
+   * gettext table per language and `rrule` ships no Arabic one, so an
+   * Arabic-reading member had the one sentence on a task row read back to them
+   * in a language they did not choose.
+   *
+   * `toText()` is still the fallback, for a rule shaped in a way the shared
+   * words cannot say — a yearly rule, an ordinal weekday, several month days.
+   * An English sentence for a rule neither picker can write is honest; invented
+   * Arabic for one would not be, and reads as broken to a native speaker, which
+   * is worse than English.
+   *
+   * ## Why the parts are read off `origOptions`
+   *
+   * `options` is the *normalised* rule: a weekly rule with no `BYDAY` comes
+   * back carrying `dtstart`'s weekday, so rendering from it would turn "every
+   * week" into "every week on Tue" for every member who never chose a day.
+   * `origOptions` holds what the rule actually said, which is what the member
+   * chose and what the phone renders from.
    */
-  humanText(): string {
+  humanText(locale = 'en'): string {
+    const parts = this.words();
+    const said = parts ? ruleWords(parts, locale) : null;
+    if (said) return said;
     try {
       return this.rule.toText();
     } catch {
       return this.spec.rrule;
     }
   }
+
+  /** The rule as `rule-words` wants it, or null for a shape it cannot say. */
+  private words(): RuleParts | null {
+    const freq = ((): RuleParts['freq'] | null => {
+      switch (this.rule.options.freq) {
+        case RRule.DAILY:
+          return 'daily';
+        case RRule.WEEKLY:
+          return 'weekly';
+        case RRule.MONTHLY:
+          return 'monthly';
+        default:
+          return null;
+      }
+    })();
+    if (!freq) return null;
+
+    const original = this.rule.origOptions;
+    // `byweekday` arrives as a number, a `Weekday`, or an array of either. A
+    // `Weekday` carrying an ordinal — `2MO`, "the second Monday" — is not a
+    // plain weekday and is refused rather than flattened to Monday.
+    const weekdays: number[] = [];
+    for (const day of asArray(original.byweekday)) {
+      if (typeof day === 'number') weekdays.push(day);
+      else if (day && typeof day === 'object' && 'weekday' in day) {
+        if ((day as { n?: number }).n) return null;
+        weekdays.push((day as { weekday: number }).weekday);
+      } else return null;
+    }
+
+    return {
+      freq,
+      interval: this.rule.options.interval || 1,
+      byWeekday: weekdays,
+      byMonthDay: asArray(original.bymonthday).filter(
+        (day): day is number => typeof day === 'number',
+      ),
+      count: this.rule.options.count ?? null,
+      until: this.rule.options.until ?? null,
+    };
+  }
+}
+
+/** One, several or none, as a list. `rrule` accepts all three spellings. */
+function asArray<T>(value: T | T[] | null | undefined): T[] {
+  if (value === null || value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
 }

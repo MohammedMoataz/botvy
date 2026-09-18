@@ -24,26 +24,39 @@ const startedAt = Date.now();
 // that still has it installed. Defaulting to port 80 here sent both scripts
 // at whatever already answers there - v1's own edge, on this machine - and a
 // /health that answers is indistinguishable from the right /health answering.
-const API = process.env.BOTVY_API_BASE ?? `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
+const API =
+  process.env.BOTVY_API_BASE ??
+  `http://127.0.0.1:${process.env.EDGE_PORT ?? '80'}`;
 
 const results = [];
 const record = (name, ok, detail) => {
   results.push({ name, ok, detail });
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`);
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ` — ${detail}` : ''}`,
+  );
 };
 
 async function compose(...args) {
-  return run('docker', ['compose', ...envFileArgs(), '-f', 'infra/docker-compose.yml', ...args], {
-    maxBuffer: 32 * 1024 * 1024,
-  });
+  return run(
+    'docker',
+    ['compose', ...envFileArgs(), '-f', 'infra/docker-compose.yml', ...args],
+    {
+      maxBuffer: 32 * 1024 * 1024,
+    },
+  );
 }
 
 /** 1. Every container up, and every one with a healthcheck reporting healthy. */
 async function checkContainers() {
   try {
     const { stdout } = await compose('ps', '--format', 'json');
-    const services = stdout.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
-    if (services.length === 0) return record('containers running', false, 'nothing is up');
+    const services = stdout
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    if (services.length === 0)
+      return record('containers running', false, 'nothing is up');
 
     const unwell = services.filter(
       (s) => s.State !== 'running' || (s.Health && s.Health !== 'healthy'),
@@ -84,10 +97,16 @@ async function checkSinglePublicPort() {
     record(
       'exactly one public port',
       publishes.length === 1,
-      publishes.length === 1 ? publishes[0] : `found ${publishes.length}: ${publishes.join(', ') || 'none'}`,
+      publishes.length === 1
+        ? publishes[0]
+        : `found ${publishes.length}: ${publishes.join(', ') || 'none'}`,
     );
   } catch (error) {
-    record('exactly one public port', false, error.stderr?.trim() || error.message);
+    record(
+      'exactly one public port',
+      false,
+      error.stderr?.trim() || error.message,
+    );
   }
 }
 
@@ -107,7 +126,9 @@ async function checkHealth() {
     record(
       'no stale jobs',
       stale.length === 0,
-      stale.length === 0 ? `${(report.jobs ?? []).length} jobs fresh` : stale.map((j) => j.job).join(', '),
+      stale.length === 0
+        ? `${(report.jobs ?? []).length} jobs fresh`
+        : stale.map((j) => j.job).join(', '),
     );
   } catch (error) {
     record('health reports both stores', false, error.message);
@@ -117,13 +138,19 @@ async function checkHealth() {
 /** 4. The claim that is only ever true if you actually re-run it. */
 async function checkBootstrapIsRepeatable() {
   try {
-    const { stdout } = await run('node', ['infra/bootstrap.mjs'], { maxBuffer: 16 * 1024 * 1024 });
+    const { stdout } = await run('node', ['infra/bootstrap.mjs'], {
+      maxBuffer: 16 * 1024 * 1024,
+    });
     // The script counts what it changed and prints the number. Reading the log
     // for a word instead - which this used to do - meant a step that reworded
     // its success line would silently turn the check off.
     const reported = /changes=(\d+)/.exec(stdout);
     if (!reported) {
-      return record('bootstrap is safe to run again', false, 'the run printed no changes= count');
+      return record(
+        'bootstrap is safe to run again',
+        false,
+        'the run printed no changes= count',
+      );
     }
     const changed = Number(reported[1]);
     record(
@@ -140,7 +167,9 @@ async function checkBootstrapIsRepeatable() {
     // line naming the cause was the only line dropped. It hid a 401 between
     // this script and n8n, which is precisely the failure the heartbeats exist
     // to make visible.
-    const detail = [error.stderr?.trim(), error.stdout?.trim()].filter(Boolean).join(String.fromCharCode(10));
+    const detail = [error.stderr?.trim(), error.stdout?.trim()]
+      .filter(Boolean)
+      .join(String.fromCharCode(10));
     record('bootstrap is safe to run again', false, detail || error.message);
   }
 }
@@ -154,7 +183,9 @@ const elapsedSeconds = Math.round((Date.now() - startedAt) / 1000);
 const failures = results.filter((result) => !result.ok);
 
 console.log('');
-console.log(`${results.length - failures.length}/${results.length} checks passed in ${elapsedSeconds}s`);
+console.log(
+  `${results.length - failures.length}/${results.length} checks passed in ${elapsedSeconds}s`,
+);
 // SC-001 measures the whole bring-up, of which this is the tail. Printed so the
 // number in the phase report is recorded rather than remembered.
 console.log(`elapsed since verify began: ${elapsedSeconds}s`);

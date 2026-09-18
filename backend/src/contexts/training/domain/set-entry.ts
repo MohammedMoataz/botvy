@@ -141,9 +141,9 @@ export function plannedSet(target: Partial<SetEntry>): SetEntry {
 export function isLogged(set: SetEntry): boolean {
   return (
     set.done ||
-    set.actualReps !== null && set.actualReps !== undefined ||
-    set.actualWeightKg !== null && set.actualWeightKg !== undefined ||
-    set.actualDurationSec !== null && set.actualDurationSec !== undefined ||
-    set.actualDistanceM !== null && set.actualDistanceM !== undefined
+    (set.actualReps !== null && set.actualReps !== undefined) ||
+    (set.actualWeightKg !== null && set.actualWeightKg !== undefined) ||
+    (set.actualDurationSec !== null && set.actualDurationSec !== undefined) ||
+    (set.actualDistanceM !== null && set.actualDistanceM !== undefined)
   );
 }

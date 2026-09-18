@@ -204,7 +204,10 @@ export class Session extends AggregateRoot<string> {
         changed.push('sport');
       }
     }
-    if (patch.plannedAt !== undefined && patch.plannedAt.getTime() !== this.plannedAt.getTime()) {
+    if (
+      patch.plannedAt !== undefined &&
+      patch.plannedAt.getTime() !== this.plannedAt.getTime()
+    ) {
       this.plannedAt = patch.plannedAt;
       changed.push('plannedAt');
     }
@@ -235,7 +238,7 @@ export class Session extends AggregateRoot<string> {
     }
 
     if (changed.length === 0) return changed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     if (changed.some((field) => ALERT_FIELDS.has(field))) {
       this.raise(
         'training.SessionRescheduled',
@@ -277,7 +280,7 @@ export class Session extends AggregateRoot<string> {
       );
     }
     exercise.sets = sets.map((set) => ({ ...set }));
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.SessionLogged',
       'session',
@@ -290,7 +293,7 @@ export class Session extends AggregateRoot<string> {
   complete(at: Date = new Date()): void {
     this.status = 'completed';
     this.completedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.SessionCompleted',
       'session',
@@ -303,7 +306,7 @@ export class Session extends AggregateRoot<string> {
   cancel(at: Date = new Date()): void {
     this.status = 'cancelled';
     this.completedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.SessionCancelled',
       'session',
@@ -323,7 +326,7 @@ export class Session extends AggregateRoot<string> {
   skip(at: Date = new Date()): void {
     this.status = 'skipped';
     this.completedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.SessionSkipped',
       'session',
@@ -336,7 +339,7 @@ export class Session extends AggregateRoot<string> {
   reopen(at: Date = new Date()): void {
     this.status = 'planned';
     this.completedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announceScheduled(at);
   }
 
@@ -349,7 +352,7 @@ export class Session extends AggregateRoot<string> {
    */
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.SessionDeleted',
       'session',
@@ -360,7 +363,7 @@ export class Session extends AggregateRoot<string> {
 
   restore(at: Date = new Date()): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announceScheduled(at);
   }
 
@@ -440,13 +443,8 @@ export class Session extends AggregateRoot<string> {
     this.programId = filling.programId;
     this.weekIndex = filling.weekIndex;
     this.exercises = validatedExercises(filling.exercises);
-    this.updatedAt = at;
-    this.raise(
-      'training.SessionRescheduled',
-      'session',
-      this.alertFacts(),
-      at,
-    );
+    this.updatedAt = new Date();
+    this.raise('training.SessionRescheduled', 'session', this.alertFacts(), at);
   }
 
   /**
@@ -486,15 +484,11 @@ export class Session extends AggregateRoot<string> {
     this.programId = null;
     this.weekIndex = null;
     this.exercises = validatedExercises(filling.exercises);
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise('training.SessionRescheduled', 'session', this.alertFacts(), at);
   }
 
-  applyWorkout(
-    exercises: Exercise[],
-    nextId: () => string,
-    at: Date = new Date(),
-  ): void {
+  applyWorkout(exercises: Exercise[], nextId: () => string): void {
     this.exercises = validatedExercises(
       exercises.map((exercise) => ({
         ...exercise,
@@ -503,7 +497,7 @@ export class Session extends AggregateRoot<string> {
         mediaRefs: exercise.mediaRefs.map((ref) => ({ ...ref })),
       })),
     );
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   /**
@@ -562,12 +556,7 @@ export class Session extends AggregateRoot<string> {
   }
 
   private announceScheduled(at: Date): void {
-    this.raise(
-      'training.SessionScheduled',
-      'session',
-      this.alertFacts(),
-      at,
-    );
+    this.raise('training.SessionScheduled', 'session', this.alertFacts(), at);
   }
 
   /**
@@ -675,7 +664,10 @@ function validatedExercises(exercises: Exercise[]): Exercise[] {
   });
 }
 
-function truncate(value: string | null | undefined, max: number): string | null {
+function truncate(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.slice(0, max);
   return trimmed === '' ? null : trimmed;

@@ -30,7 +30,6 @@ export abstract class TaskRepository extends SyncableRepository<Task> {
     userId: string,
     labelId: string,
     snapshot: LabelSnapshot | null,
-    at: Date,
   ): Promise<number>;
 
   /**

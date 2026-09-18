@@ -6,6 +6,7 @@ import {
   type MemberAlertPreferences,
   type MemberClock,
 } from '../../shared/member/member-context.port.js';
+import { InMemoryMemberPreferences } from '../../shared/member/in-memory-member-preferences.js';
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
 import { InMemorySettingsStore } from '../../shared/settings/in-memory-settings.store.js';
 import { SettingsService } from '../../shared/settings/settings.service.js';
@@ -13,7 +14,6 @@ import { Meal, type MealKind } from './domain/meal.aggregate.js';
 import {
   DayTrainingPort,
   MealDrafterPort,
-  MealModePort,
   MemberFoodsPort,
   type DayTraining,
   type MealDraft,
@@ -89,13 +89,6 @@ class StubTraining extends DayTrainingPort {
   }
 }
 
-class StubMode extends MealModePort {
-  mode: 'library' | 'llm' = 'llm';
-  async modeFor(): Promise<'library' | 'llm'> {
-    return this.mode;
-  }
-}
-
 class StubMember extends MemberContextPort {
   async clock(): Promise<MemberClock> {
     return { timezone: CAIRO };
@@ -123,7 +116,15 @@ function harness() {
   const drafter = new SpyDrafter();
   const foods = new StubFoods();
   const training = new StubTraining();
-  const mode = new StubMode();
+  /*
+   * The member's own `mealMode`, through the shared `MemberPreferencesPort` the
+   * real module binds to Profile — never `defaults.mealMode` from the registry,
+   * which is the constitution XII bug. The decisive case is the `'library'` one
+   * below: the registry default is `'llm'`, so a handler reading the
+   * installation value would draft from the model for a member who asked for
+   * their own saved meals.
+   */
+  const mode = new InMemoryMemberPreferences({ mealMode: 'llm' });
 
   const build = new BuildMealLineHandler(
     uow,
@@ -283,7 +284,11 @@ describe('the member’s own meals (SC-002)', () => {
 
   it('withholds the whole day when every meal they own names an allergen', async () => {
     const other = 'member-3';
-    await b.add.handle(other, { id: newId(), name: 'almond cake', kind: 'any' });
+    await b.add.handle(other, {
+      id: newId(),
+      name: 'almond cake',
+      kind: 'any',
+    });
     b.foods.allergies = ['nuts'];
 
     const built = await b.build.handle(other, '2026-09-11', 'library');
@@ -403,7 +408,7 @@ describe('meals drawn from the model', () => {
 describe('the day a member can change (FR-010, FR-011)', () => {
   beforeEach(async () => {
     await library(['lunch', 'grilled chicken'], ['dinner', 'lentil soup']);
-    b.mode.mode = 'library';
+    b.mode.chosen.mealMode = 'library';
   });
 
   it('chooses the day the first time it is asked for and not again', async () => {
@@ -418,9 +423,9 @@ describe('the day a member can change (FR-010, FR-011)', () => {
   });
 
   it('refuses to rebuild a day that has already happened', async () => {
-    await expect(b.days.regenerate(MEMBER, '2020-01-01')).rejects.toBeInstanceOf(
-      PastDayIsSettled,
-    );
+    await expect(
+      b.days.regenerate(MEMBER, '2020-01-01'),
+    ).rejects.toBeInstanceOf(PastDayIsSettled);
   });
 
   it('answers an unasked past day with nothing rather than inventing one', async () => {
@@ -470,7 +475,7 @@ describe('the day a member can change (FR-010, FR-011)', () => {
 
   it('turns a withheld day into one with a meal on it', async () => {
     const today = await b.days.todayFor(MEMBER);
-    b.mode.mode = 'llm';
+    b.mode.chosen.mealMode = 'llm';
     b.drafter.answers = [null];
     await b.days.regenerate(MEMBER, today);
     expect((await b.suggestions.forDate(MEMBER, today))?.isWithheld).toBe(true);
@@ -499,7 +504,7 @@ describe('a profile that changes (FR-013)', () => {
 
   beforeEach(async () => {
     await library(['lunch', 'grilled chicken'], ['dinner', 'lentil soup']);
-    b.mode.mode = 'library';
+    b.mode.chosen.mealMode = 'library';
   });
 
   it('ignores a change that is not about food', async () => {
@@ -524,7 +529,7 @@ describe('a profile that changes (FR-013)', () => {
    * their card would see change for no reason they could see.
    */
   it('costs nothing on a redelivery of the same event', async () => {
-    b.mode.mode = 'llm';
+    b.mode.chosen.mealMode = 'llm';
     b.drafter.answers = [
       draft(['lunch', 'grilled fish']),
       draft(['lunch', 'something else entirely']),
@@ -537,7 +542,7 @@ describe('a profile that changes (FR-013)', () => {
   });
 
   it('rebuilds again for a genuinely new event', async () => {
-    b.mode.mode = 'llm';
+    b.mode.chosen.mealMode = 'llm';
     b.drafter.answers = [draft(['lunch', 'fish']), draft(['lunch', 'chicken'])];
 
     expect(await b.onProfile.handle(event(['allergies']))).toBe('regenerated');

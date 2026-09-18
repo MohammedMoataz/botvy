@@ -43,12 +43,19 @@ export class JwtVerifier {
    * stale, warn the client in time to refresh, and close the socket if it does
    * not. A connection that outlives its token is an unauthenticated one.
    */
-  verifyWithExpiry(token: string): { principal: Principal; expiresAt: Date | null } {
+  verifyWithExpiry(token: string): {
+    principal: Principal;
+    expiresAt: Date | null;
+  } {
     try {
-      const claims = jwt.verify(token, this.env.JWT_ACCESS_SECRET) as AccessTokenClaims;
+      const claims = jwt.verify(
+        token,
+        this.env.JWT_ACCESS_SECRET,
+      ) as AccessTokenClaims;
       return {
         principal: this.toPrincipal(claims),
-        expiresAt: typeof claims.exp === 'number' ? new Date(claims.exp * 1000) : null,
+        expiresAt:
+          typeof claims.exp === 'number' ? new Date(claims.exp * 1000) : null,
       };
     } catch (error) {
       if ((error as Error).name === 'TokenExpiredError') {
@@ -61,7 +68,8 @@ export class JwtVerifier {
   }
 
   toPrincipal(claims: AccessTokenClaims): Principal {
-    if (!claims?.sub) throw new TokenInvalidError('access token carries no subject');
+    if (!claims?.sub)
+      throw new TokenInvalidError('access token carries no subject');
     return {
       kind: 'user',
       id: claims.sub,

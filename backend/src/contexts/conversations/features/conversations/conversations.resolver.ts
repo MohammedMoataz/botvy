@@ -224,7 +224,6 @@ export class ConversationsResolver {
     return rows as unknown as QuickQuestionType[];
   }
 
-
   @Query(() => [ConversationType], { name: 'conversations' })
   async list(
     @CurrentPrincipal() principal: Principal,

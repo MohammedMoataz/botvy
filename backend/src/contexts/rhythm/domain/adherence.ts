@@ -60,9 +60,7 @@ export function currentStreak(
   checkins: CheckinRecord[],
   today: string,
 ): number {
-  const byDate = new Map(
-    checkins.map((entry) => [entry.date, entry.adhered]),
-  );
+  const byDate = new Map(checkins.map((entry) => [entry.date, entry.adhered]));
 
   /*
    * Start at today only when today carries a real verdict.
@@ -82,7 +80,9 @@ export function currentStreak(
    */
   const verdictToday = byDate.get(today);
   let cursor =
-    verdictToday === true || verdictToday === false ? today : previousDate(today);
+    verdictToday === true || verdictToday === false
+      ? today
+      : previousDate(today);
   let streak = 0;
   while (byDate.get(cursor) === true) {
     streak += 1;
@@ -143,9 +143,7 @@ export function weekAdherence(
   today: string,
   days = 7,
 ): (boolean | null)[] {
-  const byDate = new Map(
-    checkins.map((entry) => [entry.date, entry.adhered]),
-  );
+  const byDate = new Map(checkins.map((entry) => [entry.date, entry.adhered]));
   const dates: string[] = [];
   let cursor = today;
   for (let index = 0; index < days; index += 1) {

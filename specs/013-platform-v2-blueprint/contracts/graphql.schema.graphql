@@ -4,63 +4,203 @@ committed reference). Queries only: every mutation is a REST command.
 Auth: JWT (user) unless marked @admin. All queries are scoped to the caller.
 Cursor pagination uses opaque `after` strings derived from `_id`/`seq`.
 """
-
 scalar DateTime
-scalar Date          # YYYY-MM-DD in the member's zone
+scalar Date # YYYY-MM-DD in the member's zone
 scalar JSON
 
 # ---------- Identity / Profile ----------
 
-type User { id: ID!, email: String!, displayName: String, role: Role!, status: UserStatus!, createdAt: DateTime!, lastLoginAt: DateTime, deviceCount: Int! }   # deviceCount resolved for @admin only
-enum Role { user admin }
-enum UserStatus { active banned }
+type User {
+  id: ID!
+  email: String!
+  displayName: String
+  role: Role!
+  status: UserStatus!
+  createdAt: DateTime!
+  lastLoginAt: DateTime
+  deviceCount: Int!
+} # deviceCount resolved for @admin only
+enum Role {
+  user
+  admin
+}
+enum UserStatus {
+  active
+  banned
+}
 
-type Device { id: ID!, installId: String!, kind: DeviceKind!, name: String, hasPush: Boolean!, lastSeenAt: DateTime }
-enum DeviceKind { android ios chrome_extension web }
+type Device {
+  id: ID!
+  installId: String!
+  kind: DeviceKind!
+  name: String
+  hasPush: Boolean!
+  lastSeenAt: DateTime
+}
+enum DeviceKind {
+  android
+  ios
+  chrome_extension
+  web
+}
 
-type BodyMetric { at: DateTime!, weightKg: Float, heightCm: Float, note: String }
+type BodyMetric {
+  at: DateTime!
+  weightKg: Float
+  heightCm: Float
+  note: String
+}
 type Profile {
-  userId: ID!, displayName: String, photoUrl: String, timezone: String!, locale: String!
-  goal: String, experience: String, heightCm: Float
-  latestWeightKg: Float, bmi: Float            # computed in code
+  userId: ID!
+  displayName: String
+  photoUrl: String
+  timezone: String!
+  locale: String!
+  goal: String
+  experience: String
+  heightCm: Float
+  latestWeightKg: Float
+  bmi: Float # computed in code
   bodyMetrics(last: Int = 30): [BodyMetric!]!
-  symptoms: [String!]!, likedFoods: [String!]!, dislikedFoods: [String!]!, allergies: [String!]!
+  symptoms: [String!]!
+  likedFoods: [String!]!
+  dislikedFoods: [String!]!
+  allergies: [String!]!
 }
-type QuietHours { from: String!, to: String! }
+type QuietHours {
+  from: String!
+  to: String!
+}
 type Preferences {
-  planTomorrowTime: String!, endOfDayTime: String!, morningBriefingTime: String!, nextPracticeCutoff: String!
-  defaultLeadTimes: [String!]!, mealMode: MealMode!, aiSuggestions: Boolean!
-  quietHours: QuietHours, weekStartsOn: Int!, checkinEnabled: Boolean!
+  planTomorrowTime: String!
+  endOfDayTime: String!
+  morningBriefingTime: String!
+  nextPracticeCutoff: String!
+  defaultLeadTimes: [String!]!
+  mealMode: MealMode!
+  aiSuggestions: Boolean!
+  quietHours: QuietHours
+  weekStartsOn: Int!
+  checkinEnabled: Boolean!
 }
-enum MealMode { llm library }
+enum MealMode {
+  llm
+  library
+}
 
 # ---------- Planning ----------
 
-type Label { id: ID!, name: String!, color: String!, sortOrder: Int!, openCount: Int! }
-type LabelRef { id: ID, name: String, color: String }
-enum TaskStatus { open completed cancelled }
-type Recurrence { dtstart: DateTime!, rrule: String!, mode: RecurrenceMode, exdates: [DateTime!]!, humanText: String! }
-enum RecurrenceMode { schedule completion }
-type Task {
-  id: ID!, title: String!, notes: String, dueAt: DateTime, allDay: Boolean!, priority: Int!
-  label: LabelRef, status: TaskStatus!, completedAt: DateTime, recurrence: Recurrence
-  estimatedMinutes: Int, deferCount: Int!, source: String!, updatedAt: DateTime!, deletedAt: DateTime
+type Label {
+  id: ID!
+  name: String!
+  color: String!
+  sortOrder: Int!
+  openCount: Int!
 }
-enum TaskView { today upcoming overdue completed deleted all }
-input TaskFilter { view: TaskView, labelId: ID, priority: Int, from: DateTime, to: DateTime, search: String }
-type TaskConnection { nodes: [Task!]!, endCursor: String, hasNextPage: Boolean! }
+type LabelRef {
+  id: ID
+  name: String
+  color: String
+}
+enum TaskStatus {
+  open
+  completed
+  cancelled
+}
+type Recurrence {
+  dtstart: DateTime!
+  rrule: String!
+  mode: RecurrenceMode
+  exdates: [DateTime!]!
+  humanText: String!
+}
+enum RecurrenceMode {
+  schedule
+  completion
+}
+type Task {
+  id: ID!
+  title: String!
+  notes: String
+  dueAt: DateTime
+  allDay: Boolean!
+  priority: Int!
+  label: LabelRef
+  status: TaskStatus!
+  completedAt: DateTime
+  recurrence: Recurrence
+  estimatedMinutes: Int
+  deferCount: Int!
+  source: String!
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+enum TaskView {
+  today
+  upcoming
+  overdue
+  completed
+  deleted
+  all
+}
+input TaskFilter {
+  view: TaskView
+  labelId: ID
+  priority: Int
+  from: DateTime
+  to: DateTime
+  search: String
+}
+type TaskConnection {
+  nodes: [Task!]!
+  endCursor: String
+  hasNextPage: Boolean!
+}
 
 # ---------- Reminders ----------
 
-enum ReminderStatus { active done cancelled }
-enum ReminderState { upcoming overdue completed cancelled }    # derived
-type Reminder { id: ID!, title: String!, remindAt: DateTime!, leadTimes: [String!]!, status: ReminderStatus!, state: ReminderState!, snoozedUntil: DateTime, updatedAt: DateTime!, deletedAt: DateTime }
-enum ReminderView { active deleted all }
+enum ReminderStatus {
+  active
+  done
+  cancelled
+}
+enum ReminderState {
+  upcoming
+  overdue
+  completed
+  cancelled
+} # derived
+type Reminder {
+  id: ID!
+  title: String!
+  remindAt: DateTime!
+  leadTimes: [String!]!
+  status: ReminderStatus!
+  state: ReminderState!
+  snoozedUntil: DateTime
+  updatedAt: DateTime!
+  deletedAt: DateTime
+}
+enum ReminderView {
+  active
+  deleted
+  all
+}
 
 # ---------- Daily Rhythm ----------
 
-enum PlanStatus { draft confirmed skipped }
-type PlanTask { id: ID!, title: String!, priority: Int!, dueAt: DateTime, status: TaskStatus! }
+enum PlanStatus {
+  draft
+  confirmed
+  skipped
+}
+type PlanTask {
+  id: ID!
+  title: String!
+  priority: Int!
+  dueAt: DateTime
+  status: TaskStatus!
+}
 # `status` was listed here and is NOT served, and the reason is worth keeping:
 # a daily plan's `training` is a **snapshot** of what the day was going to hold,
 # written the night before, and a status copied into it goes stale the moment
@@ -68,38 +208,121 @@ type PlanTask { id: ID!, title: String!, priority: Int!, dueAt: DateTime, status
 # which the client reads by `sessionId` — and P6's Today row deliberately
 # watches the sessions table rather than this snapshot for exactly that reason
 # (see `specs/020-training/plan.md` § Mobile).
-type PlanTraining { sessionId: ID!, title: String!, sport: String!, startAt: DateTime! }
-type DailyPlan {
-  date: Date!, status: PlanStatus!, autoConfirmed: Boolean!, tasks: [PlanTask!]!, training: PlanTraining
-  workoutLine: String, mealLine: String, promptedAt: DateTime, confirmedAt: DateTime, summarisedAt: DateTime, briefedAt: DateTime
+type PlanTraining {
+  sessionId: ID!
+  title: String!
+  sport: String!
+  startAt: DateTime!
 }
-type Checkin { date: Date!, mood: Int, adhered: Boolean, note: String }
-type Streak { current: Int!, best: Int!, lastAdheredDate: Date, weekAdherence: [Boolean]! }
+type DailyPlan {
+  date: Date!
+  status: PlanStatus!
+  autoConfirmed: Boolean!
+  tasks: [PlanTask!]!
+  training: PlanTraining
+  workoutLine: String
+  mealLine: String
+  promptedAt: DateTime
+  confirmedAt: DateTime
+  summarisedAt: DateTime
+  briefedAt: DateTime
+}
+type Checkin {
+  date: Date!
+  mood: Int
+  adhered: Boolean
+  note: String
+}
+type Streak {
+  current: Int!
+  best: Int!
+  lastAdheredDate: Date
+  weekAdherence: [Boolean]!
+}
 
 # ---------- Training ----------
 
-type Slot { id: ID!, weekday: Int!, start: String!, durationMin: Int!, sport: String!, location: String }
-type AthleteProfile { sports: [String!]!, slots: [Slot!]! }
-enum SessionStatus { planned completed cancelled skipped }
-type SetEntry { targetReps: Int, targetWeightKg: Float, targetDurationSec: Int, targetDistanceM: Int, actualReps: Int, actualWeightKg: Float, actualDurationSec: Int, actualDistanceM: Int, done: Boolean! }
-type MediaRef { type: String!, url: String!, caption: String }
-type Exercise { id: ID!, name: String!, notes: String, sets: [SetEntry!]!, mediaRefs: [MediaRef!]! }
+type Slot {
+  id: ID!
+  weekday: Int!
+  start: String!
+  durationMin: Int!
+  sport: String!
+  location: String
+}
+type AthleteProfile {
+  sports: [String!]!
+  slots: [Slot!]!
+}
+enum SessionStatus {
+  planned
+  completed
+  cancelled
+  skipped
+}
+type SetEntry {
+  targetReps: Int
+  targetWeightKg: Float
+  targetDurationSec: Int
+  targetDistanceM: Int
+  actualReps: Int
+  actualWeightKg: Float
+  actualDurationSec: Int
+  actualDistanceM: Int
+  done: Boolean!
+}
+type MediaRef {
+  type: String!
+  url: String!
+  caption: String
+}
+type Exercise {
+  id: ID!
+  name: String!
+  notes: String
+  sets: [SetEntry!]!
+  mediaRefs: [MediaRef!]!
+}
 # `isMissed` is P6's addition and is **derived at render, never stored**: a
 # `planned` session whose moment has passed with nothing logged (FR-018). Storing
 # it would mean a sweep rewriting rows the member never touched, and then
 # un-writing them when they log it late. The card, the week view and Today all
 # read this one field, so they cannot disagree.
 type Session {
-  id: ID!, plannedAt: DateTime!, durationMin: Int!, sport: String!, title: String!, focus: String
-  programId: ID, weekIndex: Int, suggestionId: ID, exercises: [Exercise!]!, status: SessionStatus!, completedAt: DateTime, notes: String
+  id: ID!
+  plannedAt: DateTime!
+  durationMin: Int!
+  sport: String!
+  title: String!
+  focus: String
+  programId: ID
+  weekIndex: Int
+  suggestionId: ID
+  exercises: [Exercise!]!
+  status: SessionStatus!
+  completedAt: DateTime
+  notes: String
 }
 # `isToday` is derived from `reason`, never stored — two fields, one truth.
 # `after-cutoff` means "this is a future session", which is also the honest
 # answer when today simply holds nothing; the alternative was a fourth code
 # every client would have to handle to say the same sentence.
-type NextPractice { session: Session, isToday: Boolean!, reason: String! }   # reason: 'today' | 'after-cutoff' | 'none-scheduled'
-type ProgramSessionTemplate { templateId: ID!, weekday: Int, title: String!, focus: String, exercises: [Exercise!]! }
-type ProgramWeek { index: Int!, sessions: [ProgramSessionTemplate!]! }
+type NextPractice {
+  session: Session
+  isToday: Boolean!
+  reason: String!
+} # reason: 'today' | 'after-cutoff' | 'none-scheduled'
+type ProgramSessionTemplate {
+  templateId: ID!
+  weekday: Int
+  title: String!
+  focus: String
+  exercises: [Exercise!]!
+}
+type ProgramWeek {
+  index: Int!
+  sessions: [ProgramSessionTemplate!]!
+}
 # `sourceLinks` was typed `[Link!]!` and is served as **`sourceLinkIds: [ID!]!`**.
 # `Link` is Knowledge's type and does not exist until P7, and a Training
 # `features/` file declaring it is what the constitution-IX lint rule refuses —
@@ -111,25 +334,83 @@ type ProgramWeek { index: Int!, sessions: [ProgramSessionTemplate!]! }
 # which means computing a week index long after the apply, which needs the date
 # the apply left behind.
 type Program {
-  id: ID!, title: String!, sport: String!, source: String!, sourceLinkIds: [ID!]!
-  weeks: [ProgramWeek!]!, status: String!, appliedStartDate: Date
+  id: ID!
+  title: String!
+  sport: String!
+  source: String!
+  sourceLinkIds: [ID!]!
+  weeks: [ProgramWeek!]!
+  status: String!
+  appliedStartDate: Date
 }
-type Workout { id: ID!, name: String!, sport: String!, exercises: [Exercise!]!, tags: [String!]! }
+type Workout {
+  id: ID!
+  name: String!
+  sport: String!
+  exercises: [Exercise!]!
+  tags: [String!]!
+}
 
 # ---------- Knowledge ----------
 
-enum LinkKind { article website video playlist }
-enum LinkStatus { queued fetching extracting summarising done failed }
+enum LinkKind {
+  article
+  website
+  video
+  playlist
+}
+enum LinkStatus {
+  queued
+  fetching
+  extracting
+  summarising
+  done
+  failed
+}
 # `media` is `[SourceMedia!]!`, whose `url` is the **proxied** path and is
 # nullable — null means this installation has no signing secret, and a client
 # renders no picture rather than falling back to the source’s own address.
 # `lengthChars` and `hadTranscript` are P7’s additions: SC-006 wants "is this
 # worth my time" answerable on one screen, and a video with no captions has to
 # say so rather than leaving the member to notice.
-type SourceMedia { type: String!, url: String, caption: String }
-type KnowledgeDoc { title: String, author: String, publishedAt: DateTime, summary: String!, keyPoints: [String!]!, media: [SourceMedia!]!, durationSec: Int, lengthChars: Int!, hadTranscript: Boolean, readAt: DateTime! }
-type Link { id: ID!, url: String!, kind: LinkKind!, title: String, tags: [String!]!, status: LinkStatus!, failReason: String, attempts: Int!, parentId: ID, skippedCount: Int, children: [Link!]!, doc: KnowledgeDoc, addedAt: DateTime!, processedAt: DateTime }
-enum SuggestionStatus { pending accepted dismissed }
+type SourceMedia {
+  type: String!
+  url: String
+  caption: String
+}
+type KnowledgeDoc {
+  title: String
+  author: String
+  publishedAt: DateTime
+  summary: String!
+  keyPoints: [String!]!
+  media: [SourceMedia!]!
+  durationSec: Int
+  lengthChars: Int!
+  hadTranscript: Boolean
+  readAt: DateTime!
+}
+type Link {
+  id: ID!
+  url: String!
+  kind: LinkKind!
+  title: String
+  tags: [String!]!
+  status: LinkStatus!
+  failReason: String
+  attempts: Int!
+  parentId: ID
+  skippedCount: Int
+  children: [Link!]!
+  doc: KnowledgeDoc
+  addedAt: DateTime!
+  processedAt: DateTime
+}
+enum SuggestionStatus {
+  pending
+  accepted
+  dismissed
+}
 # `exercises` is `[SuggestedExercise!]!` as served, not `[Exercise!]!`.
 #
 # `Exercise` is Training’s type, and a `features/` file in Knowledge declaring
@@ -137,46 +418,157 @@ enum SuggestionStatus { pending accepted dismissed }
 # made to `Program.sourceLinks`, in the other direction. The shapes differ
 # anyway: a suggestion has targets and can never have actuals, because it is a
 # proposal about a session that has not happened.
-type SuggestedSet { targetReps: Int, targetWeightKg: Float, targetDurationSec: Int, targetDistanceM: Int }
-type SuggestedExercise { name: String!, notes: String, sets: [SuggestedSet!]! }
-type SuggestionDraft { title: String!, focus: String, exercises: [SuggestedExercise!]! }
+type SuggestedSet {
+  targetReps: Int
+  targetWeightKg: Float
+  targetDurationSec: Int
+  targetDistanceM: Int
+}
+type SuggestedExercise {
+  name: String!
+  notes: String
+  sets: [SuggestedSet!]!
+}
+type SuggestionDraft {
+  title: String!
+  focus: String
+  exercises: [SuggestedExercise!]!
+}
 # `sources` is `[SuggestionSource!]!` as served, not `sourceLinks: [Link!]!`.
 # The card wants a title and a link out; serving the whole `Link` would carry
 # the document into a list read. A source the member has since deleted simply
 # drops out — the rationale still names it, which is the honest outcome.
-type SuggestionSource { id: ID!, url: String!, title: String }
-type Suggestion { id: ID!, forDate: Date!, sport: String!, draft: SuggestionDraft!, sources: [SuggestionSource!]!, rationale: String!, status: SuggestionStatus!, sessionId: ID, acceptedSessionId: ID, outcome: String, createdAt: DateTime! }
+type SuggestionSource {
+  id: ID!
+  url: String!
+  title: String
+}
+type Suggestion {
+  id: ID!
+  forDate: Date!
+  sport: String!
+  draft: SuggestionDraft!
+  sources: [SuggestionSource!]!
+  rationale: String!
+  status: SuggestionStatus!
+  sessionId: ID
+  acceptedSessionId: ID
+  outcome: String
+  createdAt: DateTime!
+}
 
 # ---------- Nutrition ----------
 
-type Meal { id: ID!, name: String!, kind: String!, ingredients: [String!]!, tags: [String!]! }
-type MealSuggestion { date: Date!, mode: MealMode!, meals: [MealItem!]!, line: String, withheld: Boolean!, withheldReason: String }
-type MealItem { kind: String!, name: String! }
+type Meal {
+  id: ID!
+  name: String!
+  kind: String!
+  ingredients: [String!]!
+  tags: [String!]!
+}
+type MealSuggestion {
+  date: Date!
+  mode: MealMode!
+  meals: [MealItem!]!
+  line: String
+  withheld: Boolean!
+  withheldReason: String
+}
+type MealItem {
+  kind: String!
+  name: String!
+}
 
 # ---------- Conversations ----------
 
-enum ConversationKind { coach planner free }
-type Conversation { id: ID!, kind: ConversationKind!, title: String!, pinned: Boolean!, archived: Boolean!, clearedUpToSeq: Int!, lastMessageAt: DateTime, unread: Int! }
-enum MessageRole { user assistant system }
-type Message { seq: Int!, conversationId: ID!, role: MessageRole!, content: String!, clientId: String, composedAt: DateTime, intent: JSON, createdAt: DateTime! }
-type MessageConnection { nodes: [Message!]!, endCursor: String, hasNextPage: Boolean! }
-type QuickQuestion { id: ID!, scope: ConversationKind!, text: String!, mood: String!, isMine: Boolean! }
+enum ConversationKind {
+  coach
+  planner
+  free
+}
+type Conversation {
+  id: ID!
+  kind: ConversationKind!
+  title: String!
+  pinned: Boolean!
+  archived: Boolean!
+  clearedUpToSeq: Int!
+  lastMessageAt: DateTime
+  unread: Int!
+}
+enum MessageRole {
+  user
+  assistant
+  system
+}
+type Message {
+  seq: Int!
+  conversationId: ID!
+  role: MessageRole!
+  content: String!
+  clientId: String
+  composedAt: DateTime
+  intent: JSON
+  createdAt: DateTime!
+}
+type MessageConnection {
+  nodes: [Message!]!
+  endCursor: String
+  hasNextPage: Boolean!
+}
+type QuickQuestion {
+  id: ID!
+  scope: ConversationKind!
+  text: String!
+  mood: String!
+  isMine: Boolean!
+}
 
 # ---------- Meetings & Calendar ----------
 
-type Location { onlineLink: String, address: String }
+type Location {
+  onlineLink: String
+  address: String
+}
 # `location` is served: an override may move where a meeting is as well as when, and
 # the day view has to show the room that changed.
 # `cancelled` is NOT served, and will not be. A skipped occurrence is an exdate — a
 # skip has nothing left to say about the occurrence, and an override kept alive to
 # describe an absence would give the expander two places to look for one fact. Kept
 # on this line to record the decision rather than to promise the field.
-type Override { originalStart: DateTime!, startAt: DateTime, durationMin: Int, title: String, location: Location, cancelled: Boolean }
-type MeetingRecurrence { dtstart: DateTime!, rrule: String!, humanText: String!, exdates: [DateTime!]!, overrides: [Override!]! }
-enum MeetingStatus { scheduled completed cancelled }
+type Override {
+  originalStart: DateTime!
+  startAt: DateTime
+  durationMin: Int
+  title: String
+  location: Location
+  cancelled: Boolean
+}
+type MeetingRecurrence {
+  dtstart: DateTime!
+  rrule: String!
+  humanText: String!
+  exdates: [DateTime!]!
+  overrides: [Override!]!
+}
+enum MeetingStatus {
+  scheduled
+  completed
+  cancelled
+}
 type Meeting {
-  id: ID!, title: String!, description: String, startAt: DateTime!, durationMin: Int!, allDay: Boolean!
-  location: Location!, prepNotes: String, prepMinutes: Int!, reminderOffsets: [Int!]!, recurrence: MeetingRecurrence, status: MeetingStatus!
+  id: ID!
+  title: String!
+  description: String
+  startAt: DateTime!
+  durationMin: Int!
+  allDay: Boolean!
+  location: Location!
+  prepNotes: String
+  prepMinutes: Int!
+  reminderOffsets: [Int!]!
+  recurrence: MeetingRecurrence
+  status: MeetingStatus!
   # null follows the member; a named zone pins the series to that place's clock (FR-007)
   lockTimezone: String
   nextOccurrence: DateTime
@@ -184,8 +576,16 @@ type Meeting {
 # One expanded occurrence. `originalStart` is the moment the rule produced and is
 # the key a skip or a move addresses; `startAt` is where it actually sits.
 type MeetingOccurrence {
-  meetingId: ID!, title: String!, originalStart: DateTime!, startAt: DateTime!, endAt: DateTime!
-  durationMin: Int!, location: Location!, prepMinutes: Int!, reminderOffsets: [Int!]!, moved: Boolean!
+  meetingId: ID!
+  title: String!
+  originalStart: DateTime!
+  startAt: DateTime!
+  endAt: DateTime!
+  durationMin: Int!
+  location: Location!
+  prepMinutes: Int!
+  reminderOffsets: [Int!]!
+  moved: Boolean!
 }
 # `startAt`/`endAt` are the series' own, not an occurrence's — an agenda row already
 # carries the occurrence, and this is the thing the member opens.
@@ -196,8 +596,23 @@ type MeetingOccurrence {
 # a type nothing references is dropped from the generated schema outright — a
 # contract promising a type no client can name is the same failure as a query
 # handler with no resolver.
-type CalendarEvent { id: ID!, title: String!, notes: String, startAt: DateTime!, endAt: DateTime!, allDay: Boolean!, color: String, recurrence: MeetingRecurrence }
-enum AgendaKind { meeting prep task session event }
+type CalendarEvent {
+  id: ID!
+  title: String!
+  notes: String
+  startAt: DateTime!
+  endAt: DateTime!
+  allDay: Boolean!
+  color: String
+  recurrence: MeetingRecurrence
+}
+enum AgendaKind {
+  meeting
+  prep
+  task
+  session
+  event
+}
 # `endAt` is null for a `task` row and only for that: a timed task has a moment and
 # no length, and inventing an end would draw a block the member never asked for.
 # `allDay` marks a whole-day personal event — still grouped into its day, because a
@@ -216,11 +631,30 @@ enum AgendaKind { meeting prep task session event }
 # regardless, so the agenda renders completely from the row alone; a nested object
 # only saves a client that wants the detail a second round trip.
 type AgendaItem {
-  kind: AgendaKind!, id: ID!, occurrenceAt: DateTime!, endAt: DateTime, title: String!, subtitle: String
-  color: String, allDay: Boolean!, meeting: Meeting, event: CalendarEvent, task: Task, session: Session
+  kind: AgendaKind!
+  id: ID!
+  occurrenceAt: DateTime!
+  endAt: DateTime
+  title: String!
+  subtitle: String
+  color: String
+  allDay: Boolean!
+  meeting: Meeting
+  event: CalendarEvent
+  task: Task
+  session: Session
 }
-type AgendaDay { date: Date!, items: [AgendaItem!]! }
-type AgendaKindCounts { meeting: Int!, prep: Int!, task: Int!, session: Int!, event: Int! }
+type AgendaDay {
+  date: Date!
+  items: [AgendaItem!]!
+}
+type AgendaKindCounts {
+  meeting: Int!
+  prep: Int!
+  task: Int!
+  session: Int!
+  event: Int!
+}
 # A day is busy when it holds at least one item of any kind (FR-009). That threshold
 # is the requirement and not a tuneable: raise it and a member taps an unmarked day
 # to find a meeting on it, at which point the marker is worse than none.
@@ -228,21 +662,95 @@ type AgendaKindCounts { meeting: Int!, prep: Int!, task: Int!, session: Int!, ev
 # JSON would leave every client guessing the key names.
 # One row per day of the month, empty days included: a grid has to know the 14th is
 # empty in order to leave it unmarked. `agenda` omits empty days instead.
-type MonthDay { date: Date!, total: Int!, busy: Boolean!, byKind: AgendaKindCounts! }
+type MonthDay {
+  date: Date!
+  total: Int!
+  busy: Boolean!
+  byKind: AgendaKindCounts!
+}
 
 # ---------- Operations / Admin ----------
 
-type JobStatus { job: String!, lastRunAt: DateTime, lastOkAt: DateTime, lastError: String, stale: Boolean! }
-type Health { status: String!, postgres: Boolean!, mongo: Boolean!, ollama: Boolean!, pushConfigured: Boolean!, defaultAdminPassword: Boolean!, jobs: [JobStatus!]! }
-type Setting { key: String!, value: JSON!, default: JSON!, schema: JSON!, readOnly: Boolean!, description: String!, updatedAt: DateTime, updatedBy: String }
-                                             # `schema` is the registry's zod shape as JSON — the admin form renders its control from it
-type Stats { users: Int!, activeToday: Int!, devices: Int!, tasksOpen: Int!, remindersActive: Int!, messages24h: Int!, tokens24h: Int!, ingestionQueued: Int!, ingestionFailed: Int! }
-type Workflow { id: ID!, name: String!, active: Boolean!, lastRunAt: DateTime, webhookPath: String }
-type UsageRow { day: Date!, kind: String!, model: String!, promptTokens: Int!, completionTokens: Int!, calls: Int!, userId: ID }   # userId non-null only when grouped per member
-type AuditEntry { id: ID!, at: DateTime!, actorType: String!, actorId: ID!, actorLabel: String!, action: String!, targetType: String!, targetId: ID, meta: JSON }
-type AuditConnection { nodes: [AuditEntry!]!, endCursor: String, hasNextPage: Boolean! }
-type UserConnection { nodes: [User!]!, endCursor: String, hasNextPage: Boolean! }
-type LinkConnection { nodes: [Link!]!, endCursor: String, hasNextPage: Boolean! }
+type JobStatus {
+  job: String!
+  lastRunAt: DateTime
+  lastOkAt: DateTime
+  lastError: String
+  stale: Boolean!
+}
+type Health {
+  status: String!
+  postgres: Boolean!
+  mongo: Boolean!
+  ollama: Boolean!
+  pushConfigured: Boolean!
+  defaultAdminPassword: Boolean!
+  jobs: [JobStatus!]!
+}
+type Setting {
+  key: String!
+  value: JSON!
+  default: JSON!
+  schema: JSON!
+  readOnly: Boolean!
+  description: String!
+  updatedAt: DateTime
+  updatedBy: String
+}
+# `schema` is the registry's zod shape as JSON — the admin form renders its control from it
+type Stats {
+  users: Int!
+  activeToday: Int!
+  devices: Int!
+  tasksOpen: Int!
+  remindersActive: Int!
+  messages24h: Int!
+  tokens24h: Int!
+  ingestionQueued: Int!
+  ingestionFailed: Int!
+}
+type Workflow {
+  id: ID!
+  name: String!
+  active: Boolean!
+  lastRunAt: DateTime
+  webhookPath: String
+}
+type UsageRow {
+  day: Date!
+  kind: String!
+  model: String!
+  promptTokens: Int!
+  completionTokens: Int!
+  calls: Int!
+  userId: ID
+} # userId non-null only when grouped per member
+type AuditEntry {
+  id: ID!
+  at: DateTime!
+  actorType: String!
+  actorId: ID!
+  actorLabel: String!
+  action: String!
+  targetType: String!
+  targetId: ID
+  meta: JSON
+}
+type AuditConnection {
+  nodes: [AuditEntry!]!
+  endCursor: String
+  hasNextPage: Boolean!
+}
+type UserConnection {
+  nodes: [User!]!
+  endCursor: String
+  hasNextPage: Boolean!
+}
+type LinkConnection {
+  nodes: [Link!]!
+  endCursor: String
+  hasNextPage: Boolean!
+}
 
 # ---------- Root ----------
 
@@ -262,7 +770,7 @@ type Query {
   reminders(view: ReminderView = active): [Reminder!]!
 
   # daily rhythm
-  todayPlan(date: Date): DailyPlan!             # defaults to today in the member's zone
+  todayPlan(date: Date): DailyPlan! # defaults to today in the member's zone
   tomorrowDraft: DailyPlan!
   plans(from: Date!, to: Date!): [DailyPlan!]!
   checkins(from: Date!, to: Date!): [Checkin!]!
@@ -278,7 +786,12 @@ type Query {
   workouts(sport: String): [Workout!]!
 
   # knowledge
-  links(status: LinkStatus, kind: LinkKind, first: Int = 50, after: String): LinkConnection!
+  links(
+    status: LinkStatus
+    kind: LinkKind
+    first: Int = 50
+    after: String
+  ): LinkConnection!
   link(id: ID!): Link
   suggestions(status: SuggestionStatus = pending): [Suggestion!]!
 
@@ -288,24 +801,46 @@ type Query {
 
   # conversations
   conversations(includeArchived: Boolean = false): [Conversation!]!
-  messages(conversationId: ID!, afterSeq: Int, first: Int = 50): MessageConnection!
+  messages(
+    conversationId: ID!
+    afterSeq: Int
+    first: Int = 50
+  ): MessageConnection!
   quickQuestions(scope: ConversationKind!): [QuickQuestion!]!
 
   # meetings & calendar
   meeting(id: ID!): Meeting
   meetings(includeCompleted: Boolean = false): [Meeting!]!
-  agenda(from: DateTime!, to: DateTime!): [AgendaDay!]!    # merges meetings(+prep), timed tasks, sessions, events
+  agenda(from: DateTime!, to: DateTime!): [AgendaDay!]! # merges meetings(+prep), timed tasks, sessions, events
   monthOverview(year: Int!, month: Int!): [MonthDay!]!
   meetingOccurrences(from: DateTime!, to: DateTime!): [MeetingOccurrence!]!
 
   # operations (public health is REST; these are admin)
-  health: Health!                              # @admin
-  stats: Stats!                                # @admin
-  users(search: String, status: UserStatus, first: Int = 50, after: String): UserConnection!   # @admin
-  devices(userId: ID): [Device!]!              # @admin
-  settings: [Setting!]!                        # @admin
-  workflows: [Workflow!]!                      # @admin
+  health: Health! # @admin
+  stats: Stats! # @admin
+  users(
+    search: String
+    status: UserStatus
+    first: Int = 50
+    after: String
+  ): UserConnection! # @admin
+  devices(userId: ID): [Device!]! # @admin
+  settings: [Setting!]! # @admin
+  workflows: [Workflow!]! # @admin
   ingestionQueue(status: LinkStatus): [Link!]! # @admin (all users)
-  usage(from: Date!, to: Date!, userId: ID, byMember: Boolean = false): [UsageRow!]!   # @admin
-  audit(actor: ID, action: String, targetType: String, from: DateTime, to: DateTime, first: Int = 50, after: String): AuditConnection!   # @admin
+  usage(
+    from: Date!
+    to: Date!
+    userId: ID
+    byMember: Boolean = false
+  ): [UsageRow!]! # @admin
+  audit(
+    actor: ID
+    action: String
+    targetType: String
+    from: DateTime
+    to: DateTime
+    first: Int = 50
+    after: String
+  ): AuditConnection! # @admin
 }

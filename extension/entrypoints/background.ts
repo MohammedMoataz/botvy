@@ -100,8 +100,11 @@ export default defineBackground(() => {
 
 // ---------------------------------------------------------------- the session
 
-let cachedClient: { gateway: string; client: BotvyClient; tokens: TokenStore } | null =
-  null;
+let cachedClient: {
+  gateway: string;
+  client: BotvyClient;
+  tokens: TokenStore;
+} | null = null;
 
 /**
  * A client for this worker, rebuilt when the member points at another Botvy.
@@ -133,10 +136,10 @@ async function clientFor(): Promise<{
       },
     },
     (refreshToken) =>
-      refreshUnderLock(
-        (current) => refreshThrough(client, current),
-        { accessToken: held?.accessToken ?? '', refreshToken },
-      ),
+      refreshUnderLock((current) => refreshThrough(client, current), {
+        accessToken: held?.accessToken ?? '',
+        refreshToken,
+      }),
   );
   const client = new BotvyClient({ baseUrl: gateway, tokens });
 
@@ -171,9 +174,13 @@ function expiringSoon(accessToken: string | null): boolean {
   const [, payload] = accessToken.split('.');
   if (!payload) return true;
   try {
-    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    const decoded = JSON.parse(
+      atob(payload.replace(/-/g, '+').replace(/_/g, '/')),
+    );
     const expiresAt = Number(decoded.exp) * 1000;
-    return !Number.isFinite(expiresAt) || expiresAt - Date.now() < EXPIRY_SLACK_MS;
+    return (
+      !Number.isFinite(expiresAt) || expiresAt - Date.now() < EXPIRY_SLACK_MS
+    );
   } catch {
     // An unreadable token is one this worker cannot reason about, so it is
     // refreshed rather than used. The cost is one request; the alternative is a
@@ -267,7 +274,8 @@ async function syncNow(): Promise<void> {
 
   try {
     const { SyncStore } = await import('@botvy/sdk');
-    const { workerTables, workerCursor, installId } = await import('../lib/worker-sync');
+    const { workerTables, workerCursor, installId } =
+      await import('../lib/worker-sync');
 
     const engine = new SyncStore(session.client, {
       installId: await installId(),
@@ -399,7 +407,9 @@ async function onQuickCapture(): Promise<void> {
   const title = captureTitle(tab.title ?? '');
 
   if (tab.windowId !== undefined) {
-    await chrome.sidePanel?.open({ windowId: tab.windowId }).catch(() => undefined);
+    await chrome.sidePanel
+      ?.open({ windowId: tab.windowId })
+      .catch(() => undefined);
   }
 
   // A short delay, because the panel has to mount before it can listen. One

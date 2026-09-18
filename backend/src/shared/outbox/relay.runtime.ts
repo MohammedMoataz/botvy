@@ -59,7 +59,9 @@ const STOP_WAIT_MS = 5_000;
  * relay is healthy and a dead one is reported within the window.
  */
 @Injectable()
-export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdown, RelayLiveness {
+export class RelayRuntime
+  implements OnApplicationBootstrap, OnApplicationShutdown, RelayLiveness
+{
   private readonly logger = new Logger(RelayRuntime.name);
   #stopped = false;
   #running = false;
@@ -128,7 +130,10 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
     if (this.#stopped) return;
     try {
       const sent = await this.deps.relay.drainBacklog();
-      if (sent > 0) this.logger.log(`retried ${sent} deferred event${sent === 1 ? '' : 's'}`);
+      if (sent > 0)
+        this.logger.log(
+          `retried ${sent} deferred event${sent === 1 ? '' : 's'}`,
+        );
     } catch (error) {
       this.logger.warn(`retry sweep failed: ${(error as Error).message}`);
     }
@@ -144,7 +149,9 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
   }
 
   private async runForever(): Promise<void> {
-    const sleep = this.deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
+    const sleep =
+      this.deps.sleep ??
+      ((ms: number) => new Promise((r) => setTimeout(r, ms)));
     let delay = RESTART_MIN_MS;
 
     while (!this.#stopped) {
@@ -162,7 +169,9 @@ export class RelayRuntime implements OnApplicationBootstrap, OnApplicationShutdo
       } catch (error) {
         this.#running = false;
         const message = (error as Error).message;
-        this.logger.error(`relay stopped: ${message}; restarting in ${delay} ms`);
+        this.logger.error(
+          `relay stopped: ${message}; restarting in ${delay} ms`,
+        );
         await this.deps.heartbeat(false, message).catch(() => undefined);
         if (this.#stopped) break;
         await sleep(delay);

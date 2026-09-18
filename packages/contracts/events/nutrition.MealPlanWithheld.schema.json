@@ -9,9 +9,6 @@
     },
     "reason": {}
   },
-  "required": [
-    "date",
-    "reason"
-  ],
+  "required": ["date", "reason"],
   "additionalProperties": false
 }

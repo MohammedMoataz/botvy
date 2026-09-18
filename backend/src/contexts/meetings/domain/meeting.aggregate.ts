@@ -296,7 +296,10 @@ export class Meeting extends AggregateRoot<string> {
       }
     }
 
-    if (patch.startAt !== undefined && !sameInstant(patch.startAt, this.startAt)) {
+    if (
+      patch.startAt !== undefined &&
+      !sameInstant(patch.startAt, this.startAt)
+    ) {
       this.startAt = patch.startAt;
       changed.push('startAt');
     }
@@ -407,7 +410,7 @@ export class Meeting extends AggregateRoot<string> {
 
     if (changed.length === 0) return changed;
 
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     // Every one of these fields changes what an occurrence *is* or when it is,
     // and Notifications rebuilds the whole window from the rule anyway — so
     // unlike Planning's task there is no cheap subset to filter on here. A
@@ -423,7 +426,7 @@ export class Meeting extends AggregateRoot<string> {
       'This meeting does not repeat, so there is nothing to skip.',
     );
     this.recurrence = skipInRule(recurrence, originalStart);
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'meetings.OccurrenceSkipped',
       'meeting',
@@ -449,10 +452,9 @@ export class Meeting extends AggregateRoot<string> {
     );
     this.recurrence = moveInRule(recurrence, originalStart, {
       startAt,
-      durationMin:
-        durationMin === null ? null : requireDuration(durationMin),
+      durationMin: durationMin === null ? null : requireDuration(durationMin),
     });
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'meetings.OccurrenceMoved',
       'meeting',
@@ -472,7 +474,7 @@ export class Meeting extends AggregateRoot<string> {
   complete(at: Date = new Date()): void {
     this.status = 'completed';
     this.completedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'meetings.MeetingCompleted',
       'meeting',
@@ -485,7 +487,7 @@ export class Meeting extends AggregateRoot<string> {
   cancel(at: Date = new Date()): void {
     this.status = 'cancelled';
     this.completedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'meetings.MeetingCancelled',
       'meeting',
@@ -503,7 +505,7 @@ export class Meeting extends AggregateRoot<string> {
    */
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'meetings.MeetingDeleted',
       'meeting',
@@ -515,7 +517,7 @@ export class Meeting extends AggregateRoot<string> {
   /** Back from the Deleted view, with its status exactly as it was. */
   restore(at: Date = new Date()): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise('meetings.MeetingChanged', 'meeting', this.alertFacts(), at);
   }
 
@@ -707,7 +709,9 @@ function validatedRecurrence(
     dtstart: recurrence.dtstart,
     rrule: recurrence.rrule,
     exdates: [...(recurrence.exdates ?? [])],
-    overrides: (recurrence.overrides ?? []).map((override) => ({ ...override })),
+    overrides: (recurrence.overrides ?? []).map((override) => ({
+      ...override,
+    })),
   };
   if (!isReadableRule(copy, zone)) {
     throw new MeetingRuleError(
@@ -718,7 +722,10 @@ function validatedRecurrence(
   return copy;
 }
 
-function truncate(value: string | null | undefined, max: number): string | null {
+function truncate(
+  value: string | null | undefined,
+  max: number,
+): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.slice(0, max);
   return trimmed === '' ? null : trimmed;

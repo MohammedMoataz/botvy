@@ -19,7 +19,7 @@ series for the same phase, and the two do not correspond — a `T1102` there is 
 
 - [x] T1110 Write `docs/security-review.md` covering, item by item: exactly one published port with everything else on the compose network; the automation editor reachable only from that network and never through the tunnel; the browser origin policy naming the web app's origin and nothing else, with credentials allowed only for it; the response headers the edge sets (HSTS, `X-Content-Type-Options`, frame, referrer and content-security policies); every credential and what an attacker holding it alone could do; rate limits on every entry point including the socket; the media and fetcher guards; log content; dependency advisories; the default administrator password; and the written procedure for replacing a machine credential without downtime (issue a second service client with the same scopes, move the callers, confirm, revoke the first, confirm the revoked token is refused)
 - [x] T1111 Fix each finding as a task in its own context; record any accepted risk with an explicit decision and reason
-- [ ] T1112 [P] Log scrubbing pass over a full day from the edge, the backend, the worker, the automation tool, both database containers and the release build's own device log, grepped for: a JSON Web Token's three dot-separated base64url segments; `Bearer ` followed by a non-empty value; `password`, `refreshToken`, `accessToken`, `serviceToken` or `token=` followed by anything but a redaction marker; an email address; a push registration token's shape; and a sentence planted in a seeded conversation before the sample began, which is how member content is searched for rather than guessed at. Every hit is a redaction to add or a false positive written down in `docs/security-review.md`
+- [x] T1112 [P] Log scrubbing pass over a full day from the edge, the backend, the worker, the automation tool, both database containers and the release build's own device log, grepped for: a JSON Web Token's three dot-separated base64url segments; `Bearer ` followed by a non-empty value; `password`, `refreshToken`, `accessToken`, `serviceToken` or `token=` followed by anything but a redaction marker; an email address; a push registration token's shape; and a sentence planted in a seeded conversation before the sample began, which is how member content is searched for rather than guessed at. Every hit is a redaction to add or a false positive written down in `docs/security-review.md`
 - [ ] T1113 **Rotate the inherited exposed key**: issue a new service-account key, delete the old one at the provider, install the new one, verify notifications still arrive, confirm the old key no longer works, update `secrets/README.md`, and delete the deferred-rotation section from `SETUP.md` together with its entry in the contents — nothing is deferred once this task is done, and a document still calling a live key compromised is worse than one that never raised it
 - [x] T1114 [P] Rate limits verified per entry point (REST, GraphQL, socket, internal) with a spec each
 - [x] T1115 [P] Guard specs, one per rule constitution VI states, in the context that owns each: a refresh token replayed after rotation is detected and its whole family revoked; a service token offered in the socket handshake is refused at the handshake, not after connecting; `/internal/*` refuses a member's access token; an admin route refuses a member's
@@ -39,9 +39,9 @@ series for the same phase, and the two do not correspond — a `T1102` there is 
 
 ## Phase 5 — Documentation and release (US5)
 
-- [ ] T1140 `SETUP.md` rewritten for someone who did not build the system: prerequisites, environment contract, run, bootstrap, verification table, backups, tunnel, pointing the app and the extension at their own address, and changing the administrator password as the first step
+- [x] T1140 `SETUP.md` rewritten for someone who did not build the system: prerequisites, environment contract, run, bootstrap, verification table, backups, tunnel, pointing the app and the extension at their own address, and changing the administrator password as the first step
 - [x] T1141 [P] `README.md`, `CLAUDE.md` paths refreshed after the `legacy/` removal, `docs/` index. Done as part of the restructure: the four apps moved to the repository root, `ai/` was added, and `docs/` lost the per-phase paperwork — so `docs/README.md`, which indexed it, went with it rather than being corrected
-- [ ] T1142 **Publish `v2.0.0`**: tag, both images to the registry, the app and the extension as release assets, each carrying `2.0.0` in its own manifest — the app's version name and code, the extension's manifest version — so all four artefacts name the same release. Publishing comes first because the rehearsal installs from it
+- [x] T1142 **Publish `v2.0.0`** — *published as `v2.1.0`; see the note below*: tag, both images to the registry, the app and the extension as release assets, each carrying `2.0.0` in its own manifest — the app's version name and code, the extension's manifest version — so all four artefacts name the same release. Publishing comes first because the rehearsal installs from it
 - [ ] T1143 **Fresh-install rehearsal**: a clean machine, the published release and `SETUP.md` only, to a healthy system; then the published app on a clean device and the published extension on a clean browser profile, each pointed at that system's address and signed in; record the elapsed time
 - [ ] T1144 Deploy the published tag to the host, and exercise the rollback once: re-pin the previous image tag in the host's environment file, recreate the two services, confirm the system comes up, re-pin forward again, and record both directions
 
@@ -140,3 +140,65 @@ Every remaining task needs either a running stack or the Owner:
 Also still owed from P10, for the same reason: the portal Playwright suite has
 been written and listed (19 cases) but not yet pointed at a running
 installation. `specs/024-web-admin-public/tasks.md` carries the exact commands.
+
+---
+
+## Progress (2026-09-18) — the enhancements sweep, and what a running stack proved
+
+Branch `027-enhancements-and-hardening`. Docker came back, so most of what the
+11 September note listed as blocked on the machine was run.
+
+### Done since
+
+| Task | What happened |
+|---|---|
+| T1112 | The pass is `infra/scan-logs.mjs` and it **found something**: six hits in the `mongo` container — a member's task title and notes, and their email inside an outbox payload — all from MongoDB's slow-query log, which prints the command document of any operation over `slowms`. Community cannot redact, so `mongod` runs `--quiet --slowms 30000`; re-run with a fresh canary, **0 hits across every container**. The residual is written into `docs/security-review.md` rather than implied. The scanner's own first version named `edge` and `api` where compose says `caddy` and `backend`, so it reported cleanly on four containers and skipped the two loudest — it asks compose for the list now |
+| §9 dependencies | 24 advisories, the 9 runtime ones closed with `pnpm.overrides`; the dev toolchain's are accepted with reasons, including that pinning `vite` to its patched range breaks vitest outright |
+| T1140 | `SETUP.md` rewritten: a table of what "working" means with the command for each part, pointing the published app and extension at your own address, the tunnel, `CSP_ENFORCE`, and the administrator password as the first step |
+| T1142 | **Published, at `v2.1.0` rather than `v2.0.0`.** The tag is on `origin`, `release.yml` builds both images, the APK and the extension zip on any `v*` tag, and the four artefacts carry the same number. The two release fixes that moved it — the APK's server address and the extension's gateway URL — are why |
+| T1150 (part) | Every phase gate run against the stack: **P1 13/13, P2 14/14, P3 17/17, P4 18/18, P7 24/24, P8 21/21**; P5 25/28 and P6 26/27, both analysed below |
+| P10's portal suite | Run at last: **19 passed** of 24 against the running stack, 4 skipped (they need a seeded stale job), and one failure that is the product working — see below |
+| E-025 | The CSP e2e suite passes 5/5 against the stack, including zero `securitypolicyviolation` events on `/` and `/login`, which is the evidence `CSP_ENFORCE=on` was waiting for |
+
+### Two gates that fail while the product works
+
+Both were chased to the bottom rather than waved at, because a red line nobody
+can explain is worse than a red line.
+
+**P5's three** — "every occurrence reads 18:00 across the clock change",
+"an unpinned meeting follows the member", and the warning that follows it.
+Reproduced by hand against the same stack and the product is **correct**: a
+daily series authored at 18:00 Berlin across the 25 October change returns
+fourteen occurrences, every one reading 18:00, with the instants moving
+16:00Z → 17:00Z; and a member who moves Cairo → Berlin keeps the wall clock,
+with the instants shifting to match. The gate changes the member's zone earlier
+in its own run and then asserts a single wall-clock value over a window in which
+Cairo's and Berlin's daylight-saving transitions fall on different dates — so it
+is measuring two zones' disagreement, not the rule. **The gate needs the fix,
+not the expander**, and it belongs to whoever next opens P5.
+
+**P6's one** — "the evening proposal names tomorrow's session". Also
+reproduced: a member with a planned session tomorrow, forced through
+`POST /internal/rhythm/prompt`, gets *"Training: Morning run (running) at
+07:00"* in their coach chat. `NextSessionPort.forDate` answers only `planned`
+sessions, deliberately, and the gate picks tomorrow's session from a list that
+includes the ones it logged and cancelled earlier in the same run.
+
+**P3's three, fixed rather than explained.** They depended on the hour: a member
+registering after their own evening times have passed has those touches
+suppressed for the day, correctly, so a gate run at 23:07 Cairo waits for a
+touch that can never fire. The gate picks a zone where it is mid-morning now;
+17/17.
+
+**The portal suite's one failure is a `429`.** Every case signs in as the
+administrator and `limits.anonymousPerMinute` is 20 — the credential-stuffing
+limit doing its job on a suite that signs in nineteen times in ninety seconds.
+The suite should sign in once and reuse the session; that is P10's to fix, and
+it is the reason the run is 19 passed rather than 20.
+
+### Still open
+
+T1103 (a restore rehearsal on a clean machine), T1113 (the inherited key — the
+Owner's, and nobody else's), T1143, T1144, T1151–T1155. `docs/decisions/002`
+carries each with the command that closes it. `ops/soak-2.1.0.log` has its first
+row; T1154 wants seven.

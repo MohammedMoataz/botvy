@@ -1,6 +1,6 @@
 # E-020 — Four contexts each read one member preference their own way
 
-**Area**: architecture · **Status**: open · **Found**: P7, writing the fourth
+**Area**: architecture · **Status**: done · **Found**: P7, writing the fourth
 identical adapter
 
 ## What
@@ -101,3 +101,7 @@ which is how a shared port ends up with a field nobody needed.
 Until then the rule stands and is written down where it will be read:
 `CLAUDE.md` already says *a member preference is never read from the settings
 registry*, and each of the four adapters carries the argument in its own words.
+
+## How it landed
+
+The typed accessor, keyed by field, with the fallback in one place. Five copies went, including `mealMode` — the fifth this file predicted. The in-memory stub throws for a field a spec has not named, which closes the trap where a spec passes by reading the registry default the handler was supposed not to read.

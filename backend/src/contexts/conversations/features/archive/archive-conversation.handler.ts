@@ -41,7 +41,7 @@ export class ArchiveConversationHandler {
         id,
         expectedUpdatedAt,
       );
-      conversation.setArchived(archived, at);
+      conversation.setArchived(archived);
       await this.conversations.save(conversation);
       return conversation;
     });

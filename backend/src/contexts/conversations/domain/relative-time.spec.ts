@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, localHhMm, wallClockToUtc } from '../../../shared/time/time.js';
+import {
+  localDate,
+  localHhMm,
+  wallClockToUtc,
+} from '../../../shared/time/time.js';
 import {
   mentionsAClock,
   mentionsAMoment,
@@ -34,7 +38,10 @@ const CAIRO = 'Africa/Cairo';
 
 /** A known local wall clock today, so the arithmetic has something to be right about. */
 function at(hhmm: string, zone = CAIRO): Date {
-  const instant = wallClockToUtc(`${localDate(new Date(), zone)}T${hhmm}`, zone);
+  const instant = wallClockToUtc(
+    `${localDate(new Date(), zone)}T${hhmm}`,
+    zone,
+  );
   if (!instant) throw new Error(`cannot resolve ${hhmm} in ${zone}`);
   return instant;
 }
@@ -99,7 +106,9 @@ describe('a relative phrase is resolved in code, not by the model', () => {
     // Null and not a guess: the caller then trusts the model's `when`, and the
     // executor refuses a moment in the past. A default here would invent a
     // reminder the member never asked for.
-    expect(resolveRelativePhrase('remind me to call the dentist', now, CAIRO)).toBeNull();
+    expect(
+      resolveRelativePhrase('remind me to call the dentist', now, CAIRO),
+    ).toBeNull();
     expect(resolveRelativePhrase('what is on today?', now, CAIRO)).toBeNull();
   });
 
@@ -126,7 +135,12 @@ describe('a bare time means today when today has not passed it', () => {
     const tomorrow = localDate(new Date(now.getTime() + 86_400_000), CAIRO);
 
     expect(
-      preferSoonestDay(`${tomorrow}T21:00`, 'remind me tomorrow at 9pm', now, CAIRO),
+      preferSoonestDay(
+        `${tomorrow}T21:00`,
+        'remind me tomorrow at 9pm',
+        now,
+        CAIRO,
+      ),
     ).toBe(`${tomorrow}T21:00`);
     expect(
       preferSoonestDay(`${tomorrow}T21:00`, 'فكرني بكرة الساعة ٩', now, CAIRO),
@@ -159,7 +173,12 @@ describe('a bare time means today when today has not passed it', () => {
     const today = localDate(now, CAIRO);
 
     expect(
-      preferSoonestDay(`${tomorrow}T21:00`, 'remind me at 9pm if I may', now, CAIRO),
+      preferSoonestDay(
+        `${tomorrow}T21:00`,
+        'remind me at 9pm if I may',
+        now,
+        CAIRO,
+      ),
     ).toBe(`${today}T21:00`);
     expect(
       preferSoonestDay(`${tomorrow}T21:00`, 'we march at 9pm', now, CAIRO),
@@ -172,10 +191,20 @@ describe('a bare time means today when today has not passed it', () => {
 
     // "3 Jan" and "Jan 3" are both dates, and a member who named one meant it.
     expect(
-      preferSoonestDay(`${tomorrow}T21:00`, 'remind me 3 Jan at 9pm', now, CAIRO),
+      preferSoonestDay(
+        `${tomorrow}T21:00`,
+        'remind me 3 Jan at 9pm',
+        now,
+        CAIRO,
+      ),
     ).toBe(`${tomorrow}T21:00`);
     expect(
-      preferSoonestDay(`${tomorrow}T21:00`, 'remind me Jan 3 at 9pm', now, CAIRO),
+      preferSoonestDay(
+        `${tomorrow}T21:00`,
+        'remind me Jan 3 at 9pm',
+        now,
+        CAIRO,
+      ),
     ).toBe(`${tomorrow}T21:00`);
   });
 
@@ -184,7 +213,12 @@ describe('a bare time means today when today has not passed it', () => {
     const tomorrow = localDate(new Date(now.getTime() + 86_400_000), CAIRO);
 
     expect(
-      preferSoonestDay(`${tomorrow}T21:00`, 'remind me monday at 9pm', now, CAIRO),
+      preferSoonestDay(
+        `${tomorrow}T21:00`,
+        'remind me monday at 9pm',
+        now,
+        CAIRO,
+      ),
     ).toBe(`${tomorrow}T21:00`);
   });
 

@@ -15,10 +15,6 @@
       "type": "integer"
     }
   },
-  "required": [
-    "sessionId",
-    "exerciseId",
-    "sets"
-  ],
+  "required": ["sessionId", "exerciseId", "sets"],
   "additionalProperties": false
 }

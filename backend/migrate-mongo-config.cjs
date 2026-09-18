@@ -6,7 +6,9 @@
 
 const url = process.env.MONGO_URL;
 if (!url) {
-  throw new Error('MONGO_URL is not set; migrate-mongo has nothing to connect to.');
+  throw new Error(
+    'MONGO_URL is not set; migrate-mongo has nothing to connect to.',
+  );
 }
 
 // The database name rides in the URL, the way every other consumer reads it.

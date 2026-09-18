@@ -39,7 +39,9 @@ function UsagePage() {
   const [problem, setProblem] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 6 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   const [from, setFrom] = useState(weekAgo);
   const [to, setTo] = useState(today);
 
@@ -92,30 +94,41 @@ function UsagePage() {
       <div className="page-head">
         <h1>{t('title')}</h1>
         <p className="muted">{t('explain')}</p>
+        {/*
+          The gap, stated where the number is (E-013).
+
+          Ollama reports its token counts in the terminating frame of a stream
+          and nowhere else, so a turn the member stopped — or one the allergen
+          guard cut short — is metered as zero. The honest fix is a field the
+          model server does not have; the cheap one is not presenting a figure
+          as exact when it is a floor. It sits under the explanation rather than
+          beside a column because it is true of every number on the page.
+        */}
+        <p className="muted">{t('stoppedNote')}</p>
       </div>
 
       {problem && <Message severity="error" text={problem} />}
 
       <section className="panel">
-      <div className="row" style={{ alignItems: 'end' }}>
-        <label>
-          <span className="muted">{t('from')}</span>
-          <InputText
-            type="date"
-            value={from}
-            onChange={(event) => setFrom(event.target.value)}
-          />
-        </label>
-        <label>
-          <span className="muted">{t('to')}</span>
-          <InputText
-            type="date"
-            value={to}
-            onChange={(event) => setTo(event.target.value)}
-          />
-        </label>
-        <Button label={t('apply')} size="small" onClick={() => void load()} />
-      </div>
+        <div className="row" style={{ alignItems: 'end' }}>
+          <label>
+            <span className="muted">{t('from')}</span>
+            <InputText
+              type="date"
+              value={from}
+              onChange={(event) => setFrom(event.target.value)}
+            />
+          </label>
+          <label>
+            <span className="muted">{t('to')}</span>
+            <InputText
+              type="date"
+              value={to}
+              onChange={(event) => setTo(event.target.value)}
+            />
+          </label>
+          <Button label={t('apply')} size="small" onClick={() => void load()} />
+        </div>
       </section>
 
       <section className="panel">

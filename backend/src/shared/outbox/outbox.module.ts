@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import type { OutboxInsert } from '../persistence/mongo/mongo-repository.base.js';
-import { MODEL_NAMES, OutboxSchema, RelayStateSchema } from '../persistence/mongo/schemas.js';
+import {
+  MODEL_NAMES,
+  OutboxSchema,
+  RelayStateSchema,
+} from '../persistence/mongo/schemas.js';
 import { OutboxWriter } from './outbox-writer.js';
 
 /**

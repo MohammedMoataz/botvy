@@ -83,12 +83,14 @@ class SetEntryDto {
   @IsOptional() @IsInt() @Min(0) @Max(10_000) targetReps?: number | null;
   @IsOptional() @IsNumber() @Min(0) @Max(2_000) targetWeightKg?: number | null;
   @IsOptional() @IsInt() @Min(0) @Max(86_400) targetDurationSec?: number | null;
-  @IsOptional() @IsInt() @Min(0) @Max(1_000_000) targetDistanceM?: number | null;
+  @IsOptional() @IsInt() @Min(0) @Max(1_000_000) targetDistanceM?:
+    number | null;
 
   @IsOptional() @IsInt() @Min(0) @Max(10_000) actualReps?: number | null;
   @IsOptional() @IsNumber() @Min(0) @Max(2_000) actualWeightKg?: number | null;
   @IsOptional() @IsInt() @Min(0) @Max(86_400) actualDurationSec?: number | null;
-  @IsOptional() @IsInt() @Min(0) @Max(1_000_000) actualDistanceM?: number | null;
+  @IsOptional() @IsInt() @Min(0) @Max(1_000_000) actualDistanceM?:
+    number | null;
 
   @IsBoolean()
   done!: boolean;

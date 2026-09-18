@@ -64,8 +64,19 @@ export class RateLimiter {
    * chasing a problem should be able to take the limiter out of the picture
    * from the portal rather than by redeploying.
    */
-  take(bucket: string, key: string, limit: number, windowMs: number, now = Date.now()): Verdict {
-    if (limit <= 0) return { allowed: true, remaining: Number.POSITIVE_INFINITY, retryAfterMs: 0 };
+  take(
+    bucket: string,
+    key: string,
+    limit: number,
+    windowMs: number,
+    now = Date.now(),
+  ): Verdict {
+    if (limit <= 0)
+      return {
+        allowed: true,
+        remaining: Number.POSITIVE_INFINITY,
+        retryAfterMs: 0,
+      };
 
     this.#sweep(now);
 
@@ -82,10 +93,18 @@ export class RateLimiter {
       // Not reset on a refusal. A client that keeps hammering through a closed
       // window must not be able to hold it closed for everybody else either —
       // the count is per key, and the key is per caller.
-      return { allowed: false, remaining: 0, retryAfterMs: existing.until - now };
+      return {
+        allowed: false,
+        remaining: 0,
+        retryAfterMs: existing.until - now,
+      };
     }
 
-    return { allowed: true, remaining: limit - existing.count, retryAfterMs: 0 };
+    return {
+      allowed: true,
+      remaining: limit - existing.count,
+      retryAfterMs: 0,
+    };
   }
 
   /** For a spec, and for the rare case of an operator clearing a stuck key. */

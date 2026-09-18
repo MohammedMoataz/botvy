@@ -52,7 +52,11 @@ function browserStorage() {
     },
     write(tokens: TokenPair | null): void {
       try {
-        if (tokens) globalThis.sessionStorage?.setItem(STORAGE_KEY, JSON.stringify(tokens));
+        if (tokens)
+          globalThis.sessionStorage?.setItem(
+            STORAGE_KEY,
+            JSON.stringify(tokens),
+          );
         else globalThis.sessionStorage?.removeItem(STORAGE_KEY);
       } catch {
         // Nothing to do about it, and nothing worth breaking the page over.
@@ -109,7 +113,9 @@ export class AuthStore {
         if (!member && this.status === 'authenticated') {
           this.status = 'idle';
           this.failure =
-            this.sdk.lastSignOutReason === 'session_replay' ? 'session_replay' : null;
+            this.sdk.lastSignOutReason === 'session_replay'
+              ? 'session_replay'
+              : null;
         }
       });
     });

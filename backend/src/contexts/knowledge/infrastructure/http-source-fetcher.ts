@@ -122,7 +122,9 @@ export class HttpSourceFetcher extends SourceFetcher {
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
       const verdict = await checkResolvedTarget(url);
       if (!verdict.allowed) {
-        throw new SourceRefused(`Botvy will not fetch that address: ${verdict.reason}.`);
+        throw new SourceRefused(
+          `Botvy will not fetch that address: ${verdict.reason}.`,
+        );
       }
 
       let response: Response;

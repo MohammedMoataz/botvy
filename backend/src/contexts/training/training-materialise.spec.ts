@@ -33,6 +33,7 @@ import { ChooseSportsHandler } from './features/choose-sports/choose-sports.hand
 import {
   SessionMaterialiserSaga,
   slotOrdinal,
+  TRAINING_MATERIALISE_EVERY_MINUTES,
   TRAINING_MATERIALISE_JOB,
 } from './features/materialise/materialise.saga.js';
 import { SetSlotsHandler } from './features/set-slots/set-slots.handler.js';
@@ -392,7 +393,10 @@ describe('choose-sports and set-slots', () => {
     const result = await b.sports.handle(MEMBER, ['gym', 'swimming'], now());
 
     expect(result.changed).toBe(true);
-    expect((await b.profiles.find(MEMBER))?.sports).toEqual(['gym', 'swimming']);
+    expect((await b.profiles.find(MEMBER))?.sports).toEqual([
+      'gym',
+      'swimming',
+    ]);
     expect(b.names()).toEqual(['training.SportsChanged']);
   });
 
@@ -754,9 +758,8 @@ describe('the materialiser: filling from the active program', () => {
     // 'Task due'" in a different context.
     expect(b.names()).toContain('training.SessionRescheduled');
     expect(
-      b.uow.events.find(
-        (entry) => entry.name === 'training.SessionRescheduled',
-      )?.payload,
+      b.uow.events.find((entry) => entry.name === 'training.SessionRescheduled')
+        ?.payload,
     ).toMatchObject({ title: 'Week 1' });
   });
 
@@ -1183,6 +1186,7 @@ describe('the materialiser: the nightly pass', () => {
       true,
       undefined,
       expect.any(Number),
+      TRAINING_MATERIALISE_EVERY_MINUTES,
     );
   });
 
@@ -1207,6 +1211,7 @@ describe('the materialiser: the nightly pass', () => {
       true,
       undefined,
       expect.any(Number),
+      TRAINING_MATERIALISE_EVERY_MINUTES,
     );
   });
 
@@ -1219,13 +1224,15 @@ describe('the materialiser: the nightly pass', () => {
     await expect(b.saga.handle(now())).rejects.toThrow('mongo is away');
 
     // A scheduled job that stops arriving has to be visible; `/health` reports
-    // this key stale after fifteen minutes, and a silent 401 between n8n and
+    // this key stale once it has been quiet for longer than the cadence the
+    // stamp declares — a night, not fifteen minutes — and a silent 401 between n8n and
     // the gateway once went unnoticed for days.
     expect(b.stamp).toHaveBeenCalledWith(
       TRAINING_MATERIALISE_JOB,
       false,
       'mongo is away',
       expect.any(Number),
+      TRAINING_MATERIALISE_EVERY_MINUTES,
     );
   });
 

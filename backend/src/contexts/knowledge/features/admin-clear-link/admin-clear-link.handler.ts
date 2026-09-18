@@ -103,6 +103,11 @@ export class AdminClearLinkHandler {
     this.logger.log(
       `${actor.id} cleared link ${link.id} for ${link.userId} (${children.length} children, ${documents} document(s))`,
     );
-    return { id: link.id, userId: link.userId, children: children.length, documents };
+    return {
+      id: link.id,
+      userId: link.userId,
+      children: children.length,
+      documents,
+    };
   }
 }

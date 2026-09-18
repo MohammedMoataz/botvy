@@ -48,7 +48,7 @@ export class TasksQueryHandler {
     query: TasksQuery,
     now: Date = new Date(),
   ): Promise<TaskPage> {
-    const { timezone } = await this.member.clock(userId);
+    const { timezone, locale } = await this.member.clock(userId);
     const { dayStart, dayEnd } = memberDay(now, timezone);
 
     return this.tasks.page(userId, {
@@ -58,14 +58,17 @@ export class TasksQueryHandler {
       dayEnd,
       now,
       timezone,
+      // English for a member who has chosen no language, which is the same
+      // answer a locale we hold no table for gets (E-008).
+      locale: locale ?? 'en',
       limit: clampLimit(query.limit),
       cursor: query.cursor,
     });
   }
 
   async byId(userId: string, id: string): Promise<TaskView | null> {
-    const { timezone } = await this.member.clock(userId);
-    return this.tasks.byId(userId, id, timezone);
+    const { timezone, locale } = await this.member.clock(userId);
+    return this.tasks.byId(userId, id, timezone, locale ?? 'en');
   }
 
   async labels(userId: string, includeDeleted = false): Promise<LabelView[]> {

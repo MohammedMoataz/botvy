@@ -113,8 +113,10 @@ export function mongoSort(keys: SortKey[]): Record<string, 1 | -1> {
  * `null` is passed through as a value rather than translated. Mongo sorts null
  * below every number and date, and the in-memory comparator below is written to
  * agree with that — matching the store is what matters, not whether null-first
- * is the nicer reading. Where it shows on screen (undated tasks at the top of a
- * label's group) it is a deliberate, documented consequence.
+ * is the nicer reading. A view that wants a different answer says so by sorting
+ * on a *computed* key whose value is never null, which is what Planning's label
+ * view does with `dueSort` (E-007); the ordering question is then settled in
+ * one place rather than by a special case in here.
  */
 export function mongoAfter(
   keys: SortKey[],
@@ -166,6 +168,12 @@ export function mongoAfter(
  */
 const DATE_FIELDS = new Set([
   'dueAt',
+  // Planning's computed "a task with no deadline sorts last" key (E-007). It is
+  // a date like any other by the time it is compared — the only thing computed
+  // about it is where it came from — so it belongs in this list or every page
+  // after the first of a label view would compare a number against a BSON date
+  // and come back empty.
+  'dueSort',
   'completedAt',
   'deletedAt',
   'updatedAt',

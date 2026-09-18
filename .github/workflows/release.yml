@@ -190,7 +190,6 @@ jobs:
             -H "Content-Length: 0" \
             "https://www.googleapis.com/chromewebstore/v1.1/items/$EXTENSION_ID/publish"
 
-
   deploy:
     name: deploy
     needs: [images, artifacts]

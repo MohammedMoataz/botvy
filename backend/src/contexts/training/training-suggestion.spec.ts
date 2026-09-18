@@ -145,15 +145,13 @@ describe('a suggestion the member accepted', () => {
     // Leaving them set would have the materialiser decide later that this
     // session is filled wrongly and rewrite it.
     const session = (await h.sessions.findById(MEMBER, SESSION_ID))!;
-    session.fillFromProgram(
-      {
-        title: 'Week 1',
-        focus: 'legs',
-        programId: 'program-1',
-        weekIndex: 0,
-        exercises: [],
-      },
-    );
+    session.fillFromProgram({
+      title: 'Week 1',
+      focus: 'legs',
+      programId: 'program-1',
+      weekIndex: 0,
+      exercises: [],
+    });
     await h.uow.run(() => h.sessions.save(session));
 
     await h.handler.handle(accepted());

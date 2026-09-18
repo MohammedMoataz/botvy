@@ -32,6 +32,16 @@ import type {
 export interface MemberSchedule {
   userId: string;
   timezone: string;
+  /**
+   * What language the three touches are written in (E-012).
+   *
+   * Beside the zone because it comes off the same profile row, is wanted by the
+   * same caller at the same moment, and would otherwise be a second batched
+   * read per pass on a job whose budget is ten seconds for the whole roster.
+   * `profiles.locale` is the source of truth; a member whose row the relay has
+   * not written yet falls back to `defaults.locale`, exactly as the zone does.
+   */
+  locale: string;
   /** `HH:mm` in the member's own zone. */
   planTomorrowTime: string;
   endOfDayTime: string;
@@ -120,7 +130,7 @@ export interface MealHalf {
  * part of a plan that comes from the language model, so null is the shape of
  * "the model was unavailable this evening" as much as it was the shape of
  * "Nutrition is not built yet" — the rhythm has to tolerate it for ever, and
- * `DailyPlan.setMealLine(null, reason, at)` exists for exactly that. Asking for
+ * `DailyPlan.setMealLine(null, reason)` exists for exactly that. Asking for
  * a day the member has never opened *chooses* it, which is a decision that
  * belongs to Nutrition and is argued in its `RegenerateTodayHandler`.
  */

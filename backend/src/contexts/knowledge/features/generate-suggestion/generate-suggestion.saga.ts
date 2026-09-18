@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { DomainEvent } from '../../../../shared/cqrs/domain-event.js';
 import { MemberContextPort } from '../../../../shared/member/member-context.port.js';
+import { MemberPreferencesPort } from '../../../../shared/member/member-preferences.port.js';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { localDate } from '../../../../shared/time/time.js';
 import {
-  AiSuggestionsPort,
   KnowledgeTranscriptPort,
   SuggestionDrafterPort,
   type DraftSource,
@@ -84,7 +84,7 @@ export class GenerateSuggestionSaga {
     private readonly links: LinkRepository,
     private readonly readings: ReadingRepository,
     private readonly suggestions: SuggestionRepository,
-    private readonly preference: AiSuggestionsPort,
+    private readonly preferences: MemberPreferencesPort,
     private readonly drafter: SuggestionDrafterPort,
     private readonly transcript: KnowledgeTranscriptPort,
     private readonly member: MemberContextPort,
@@ -127,17 +127,24 @@ export class GenerateSuggestionSaga {
       return { generated: false, reason: 'too_soon' };
     }
 
-    if (!(await this.preference.enabledFor(userId))) {
+    if (!(await this.preferences.get(userId, 'aiSuggestions'))) {
       return { generated: false, reason: 'disabled' };
     }
 
-    const already = await this.suggestions.forSession(userId, payload.sessionId);
+    const already = await this.suggestions.forSession(
+      userId,
+      payload.sessionId,
+    );
     // Whatever became of it. A dismissed suggestion is exactly what FR-010's
     // "not proposed again for the same session" is about, and that is the whole
     // reason a dismissal is a row rather than a delete.
     if (already) return { generated: false, reason: 'already_proposed' };
 
-    const sources = await this.gather(userId, payload.sport, payload.focus ?? null);
+    const sources = await this.gather(
+      userId,
+      payload.sport,
+      payload.focus ?? null,
+    );
     if (sources.length === 0) return { generated: false, reason: 'no_sources' };
 
     const { timezone } = await this.member.clock(userId);
@@ -240,7 +247,9 @@ export class GenerateSuggestionSaga {
       userId,
       links.map((link) => link.id),
     );
-    const byLink = new Map(readings.map((reading) => [reading.linkId, reading]));
+    const byLink = new Map(
+      readings.map((reading) => [reading.linkId, reading]),
+    );
 
     const out: Array<{ title: string; forPrompt: DraftSource }> = [];
     for (const link of links) {

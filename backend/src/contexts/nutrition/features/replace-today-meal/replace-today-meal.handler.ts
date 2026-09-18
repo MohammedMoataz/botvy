@@ -1,14 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { UnitOfWork } from '../../../../shared/persistence/ports/unit-of-work.js';
 import { MealNotFound } from '../add-meal/add-meal.handler.js';
-import { MealSuggestionRepository, MealRepository } from '../../domain/nutrition.repositories.js';
+import {
+  MealSuggestionRepository,
+  MealRepository,
+} from '../../domain/nutrition.repositories.js';
 import { PastDayIsSettled } from '../regenerate-today/regenerate-today.handler.js';
 import type { MealHalf } from '../regenerate-today/regenerate-today.handler.js';
 import { RegenerateTodayHandler } from '../regenerate-today/regenerate-today.handler.js';
 
 export class NoMealsOnThatDay extends Error {
   constructor(date: string) {
-    super(`Nothing has been proposed for ${date}, so there is nothing to swap.`);
+    super(
+      `Nothing has been proposed for ${date}, so there is nothing to swap.`,
+    );
   }
 }
 

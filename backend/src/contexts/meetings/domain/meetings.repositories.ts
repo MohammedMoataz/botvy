@@ -53,7 +53,10 @@ export abstract class MeetingRepository extends SyncableRepository<Meeting> {
   abstract memberIdsWithMeetings(): Promise<string[]>;
 
   /** Erases tombstones deleted before `before`. Unscoped for the nightly sweep. */
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   /** Every row this member owns, for the purge on `identity.UserDeleted`. */
   abstract removeAllFor(userId: string): Promise<number>;
@@ -67,7 +70,10 @@ export abstract class CalendarEventRepository extends SyncableRepository<Calenda
     to: Date,
   ): Promise<CalendarEvent[]>;
 
-  abstract purgeTombstonesBefore(before: Date, userId?: string): Promise<number>;
+  abstract purgeTombstonesBefore(
+    before: Date,
+    userId?: string,
+  ): Promise<number>;
 
   abstract removeAllFor(userId: string): Promise<number>;
 }

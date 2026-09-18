@@ -1,6 +1,6 @@
 # E-015 — The meetings UI's chrome never reached the string table
 
-**Area**: product · **Status**: open · **Found**: P5, finishing the repeat picker's Arabic
+**Area**: product · **Status**: done · **Found**: P5, finishing the repeat picker's Arabic
 
 ## What
 
@@ -83,3 +83,7 @@ arguments precisely so the caller can be the one holding the context.
 these screens with a device in hand, and do it in the same change as the RTL
 screenshots. A pass of forty strings is worth doing once, with the result
 visible, rather than twice.
+
+## How it landed
+
+109 keys per table, and the enhancement's list was about a third of it. Date formatting — `Mon…Sun`, `Jan…Dec` — is deliberately still English: it needs a locale-aware formatter and a decision about Arabic month names and digit shaping, and the calendar page reads the same helpers. That is its own enhancement rather than a corner of this one.

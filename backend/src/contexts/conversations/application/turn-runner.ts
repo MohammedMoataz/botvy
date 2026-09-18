@@ -26,19 +26,37 @@ import { AppendMessageHandler } from '../features/append-message/append-message.
 
 /** What a turn tells its caller, as it happens. */
 export interface TurnEvents {
-  accepted(payload: { requestId: string; conversationId: string; seq: number }): void;
+  accepted(payload: {
+    requestId: string;
+    conversationId: string;
+    seq: number;
+  }): void;
   intent(payload: { requestId: string; name: string; scope: string }): void;
-  moved(payload: { requestId: string; from: string; to: string; title: string }): void;
+  moved(payload: {
+    requestId: string;
+    from: string;
+    to: string;
+    title: string;
+  }): void;
   token(payload: { requestId: string; text: string }): void;
   card(payload: { requestId: string; kind: string; items: CardItem[] }): void;
   done(payload: {
     requestId: string;
     conversationId: string;
     seq: number;
-    usage?: { model: string; promptTokens: number; completionTokens: number; ms: number };
+    usage?: {
+      model: string;
+      promptTokens: number;
+      completionTokens: number;
+      ms: number;
+    };
     actions: Array<{ kind: string; id?: string }>;
   }): void;
-  error(payload: { requestId: string; code: TurnErrorCode; message: string }): void;
+  error(payload: {
+    requestId: string;
+    code: TurnErrorCode;
+    message: string;
+  }): void;
 }
 
 /**
@@ -46,11 +64,7 @@ export interface TurnEvents {
  * cross the socket and a client reading `4` would have to hold a table.
  */
 export type TurnErrorCode =
-  | 'forbidden'
-  | 'quota'
-  | 'rate_limited'
-  | 'model_unavailable'
-  | 'internal';
+  'forbidden' | 'quota' | 'rate_limited' | 'model_unavailable' | 'internal';
 
 /*
  * These are the codes `contracts/ws-chat.md` fixes, with one addition and one
@@ -139,7 +153,11 @@ export class TurnRunner {
     private readonly settings: SettingsService,
   ) {}
 
-  async run(request: TurnRequest, events: TurnEvents, now = new Date()): Promise<void> {
+  async run(
+    request: TurnRequest,
+    events: TurnEvents,
+    now = new Date(),
+  ): Promise<void> {
     const { userId, requestId } = request;
 
     try {
@@ -270,7 +288,11 @@ export class TurnRunner {
           });
         }
         await this.reply(conversation, result.reply, requestId, events, now, {
-          intent: { name: intent.name, scope: intent.scope, asking: result.asking },
+          intent: {
+            name: intent.name,
+            scope: intent.scope,
+            asking: result.asking,
+          },
           actions: result.actions,
         });
         return;
@@ -407,8 +429,12 @@ export class TurnRunner {
 
     const scan = this.allergens.forMember(facts.allergies);
     const parts: string[] = [];
-    let usage: { model: string; promptTokens: number; completionTokens: number; ms: number } | null =
-      null;
+    let usage: {
+      model: string;
+      promptTokens: number;
+      completionTokens: number;
+      ms: number;
+    } | null = null;
     let cancelled = false;
 
     try {
@@ -455,7 +481,11 @@ export class TurnRunner {
            * finds these later; the member just reads the apology.
            */
           await this.reply(conversation, apology, requestId, events, now, {
-            intent: { name: intent.name, scope: intent.scope, allergenBlocked: true },
+            intent: {
+              name: intent.name,
+              scope: intent.scope,
+              allergenBlocked: true,
+            },
           });
           return;
         }
@@ -464,7 +494,23 @@ export class TurnRunner {
         events.token({ requestId, text: chunk });
       }
     } catch (error) {
-      // An abort is the member pressing Stop, and what arrived is kept.
+      /*
+       * An abort is the member pressing Stop, and what arrived is kept.
+       *
+       * `usage` stays null here, and so it does on the allergen branch above:
+       * Ollama reports `prompt_eval_count` and `eval_count` in the `done` frame
+       * and nowhere else, and a stream that was cut has no `done` frame. So the
+       * tokens this turn really spent are **not counted** against
+       * `chat.dailyQuotaTokens` (E-013), and the admin usage screen says so
+       * rather than presenting its figure as exact. The other limit still
+       * applies in full: `chat.ratePerMin` counts `chat.send` calls, so the
+       * uncounted work is bounded by that rate rather than unbounded.
+       *
+       * The field that would close it is `ChatUsage` built from an aborted
+       * response — see the note at the `frame.done` branch in
+       * `OllamaClient.chat`, which is where such a value would have to be read.
+       * One line here then: `usage = <what the abort reported>`.
+       */
       if (request.signal?.aborted) {
         cancelled = true;
       } else {
@@ -514,7 +560,12 @@ export class TurnRunner {
     events: TurnEvents,
     now: Date,
     extra: {
-      usage?: { model: string; promptTokens: number; completionTokens: number; ms: number } | null;
+      usage?: {
+        model: string;
+        promptTokens: number;
+        completionTokens: number;
+        ms: number;
+      } | null;
       intent?: Record<string, unknown>;
       actions?: Array<{ kind: string; id?: string }>;
       checkin?: boolean;

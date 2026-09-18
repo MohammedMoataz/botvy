@@ -1,6 +1,6 @@
 # E-003 — The speckit skills hard-code the PowerShell path
 
-**Area**: tooling · **Status**: open · **Found**: P2, while adding the bash halves
+**Area**: tooling · **Status**: done · **Found**: P2, while adding the bash halves
 
 ## What
 
@@ -42,3 +42,7 @@ Two honest routes:
 Route 1 is probably right, with a note in `SETUP.md` saying which platform the
 skills are generated for. Worth first checking whether spec-kit has since grown
 a both-platforms option.
+
+## How it landed
+
+Route 2, not the file's preferred route 1 — the reason is in `docs/decisions/001-the-options-i-chose-on-the-enhancements.md`. The seven skills name both scripts and say which shell each belongs to; the bash halves were compared mode by mode first and match. Marked as a local edit in each file.

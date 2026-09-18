@@ -11,10 +11,16 @@ export class InMemorySettingsStore extends SettingsStore {
   }
 
   async getMany(keys: string[]): Promise<StoredSetting[]> {
-    return keys.map((key) => this.rows.get(key)).filter((row): row is StoredSetting => Boolean(row));
+    return keys
+      .map((key) => this.rows.get(key))
+      .filter((row): row is StoredSetting => Boolean(row));
   }
 
-  async set(key: string, value: unknown, updatedBy: string | null): Promise<StoredSetting> {
+  async set(
+    key: string,
+    value: unknown,
+    updatedBy: string | null,
+  ): Promise<StoredSetting> {
     const row: StoredSetting = { key, value, updatedAt: new Date(), updatedBy };
     this.rows.set(key, row);
     return row;

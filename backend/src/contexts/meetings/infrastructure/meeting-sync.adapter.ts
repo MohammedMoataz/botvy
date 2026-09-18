@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { MemberContextPort } from '../../../shared/member/member-context.port.js';
 import {
   resolveConflict,
+  type RejectionCode,
   type RejectionReason,
   type SyncChange,
 } from '../../../shared/persistence/ports/sync-change.js';
@@ -57,10 +58,11 @@ export function refuseMeeting(
   change: SyncChange,
   reason: RejectionReason,
   server: unknown,
+  code?: RejectionCode,
 ): ApplyOutcome {
   return {
     applied: false,
-    rejection: { entity, id: change.id, reason, server },
+    rejection: { entity, id: change.id, reason, code, server },
   };
 }
 
@@ -129,6 +131,7 @@ export class MeetingSyncAdapter implements SyncableEntity {
         change,
         verdict.reason,
         serverRow(existing),
+        verdict.code,
       );
     }
 
@@ -397,7 +400,9 @@ function applyPushedStatus(
 }
 
 function isMeetingStatus(value: unknown): value is MeetingStatus {
-  return value === 'scheduled' || value === 'completed' || value === 'cancelled';
+  return (
+    value === 'scheduled' || value === 'completed' || value === 'cancelled'
+  );
 }
 
 /**
@@ -438,9 +443,7 @@ export function normaliseRecurrence(
   };
 }
 
-export function asDate(
-  value: string | Date | null | undefined,
-): Date | null {
+export function asDate(value: string | Date | null | undefined): Date | null {
   if (value === null || value === undefined) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;

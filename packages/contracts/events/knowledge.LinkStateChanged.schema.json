@@ -20,10 +20,6 @@
       ]
     }
   },
-  "required": [
-    "linkId",
-    "status",
-    "failReason"
-  ],
+  "required": ["linkId", "status", "failReason"],
   "additionalProperties": false
 }

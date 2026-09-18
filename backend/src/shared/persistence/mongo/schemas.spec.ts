@@ -46,11 +46,13 @@ import * as schemas from './schemas.js';
 const NOT_THROUGH_THE_BASE: Record<string, string> = {
   outbox: 'appended to directly, inside the same session as the aggregate save',
   relay_state: 'the relay writes its own resume token with a bare updateOne',
-  settings: 'SettingsService owns its store adapter and writes updatedAt itself',
+  settings:
+    'SettingsService owns its store adapter and writes updatedAt itself',
   ops_heartbeats: 'HeartbeatService stamps rows; there is no aggregate',
   audit_log: 'append-only, written by the audit adapter',
   idempotency_keys: 'written by the interceptor, and expire on a TTL index',
-  counters: 'one findOneAndUpdate with $inc; no aggregate and no optimistic check',
+  counters:
+    'one findOneAndUpdate with $inc; no aggregate and no optimistic check',
   /*
    * Append-only, one row per model call, inserted by Operations' handler from
    * `conversations.MessageSent`. There is no aggregate and nothing ever
@@ -63,7 +65,8 @@ const NOT_THROUGH_THE_BASE: Record<string, string> = {
    * discover it against a real Mongo two phases later, which is how both
    * `AlertSchema` and `MessageSchema` shipped broken.
    */
-  usage_log: 'append-only inserts by Operations; unique on eventId, never modified',
+  usage_log:
+    'append-only inserts by Operations; unique on eventId, never modified',
 };
 
 interface SchemaLike {
@@ -72,8 +75,13 @@ interface SchemaLike {
   options: { collection?: string } & Record<string, any>;
 }
 
-function collectionsOf(): Array<{ name: string; collection: string; schema: SchemaLike }> {
-  const found: Array<{ name: string; collection: string; schema: SchemaLike }> = [];
+function collectionsOf(): Array<{
+  name: string;
+  collection: string;
+  schema: SchemaLike;
+}> {
+  const found: Array<{ name: string; collection: string; schema: SchemaLike }> =
+    [];
   for (const [name, value] of Object.entries(schemas)) {
     if (!name.endsWith('Schema')) continue;
     const schema = value as unknown as SchemaLike;
@@ -103,6 +111,58 @@ describe('the schemas and the repository base agree', () => {
       .map((entry) => `${entry.name} (${entry.collection})`);
 
     expect(missing).toEqual([]);
+  });
+
+  it('every collection written through the base declares version', () => {
+    /*
+     * The same assertion for E-006's optimistic counter, and for the same
+     * reason: `MongoRepositoryBase.save` names `version` in its `$set` on
+     * **every** write, so a schema that does not declare it makes Mongoose
+     * reject the whole upsert under `strict: true` — `Path "version" is not in
+     * schema`. Not a dropped field: the collection simply stops accepting
+     * writes, and no handler spec can see it because the in-memory adapter has
+     * no schema to be strict about.
+     *
+     * That is precisely how `AlertSchema` killed the notification pipeline in
+     * P2 and `MessageSchema` killed the rhythm's chat writes in P3, both with
+     * a green unit suite. Adding a column the base writes without adding it
+     * here is the same change that shipped twice.
+     */
+    const missing = all
+      .filter((entry) => !(entry.collection in NOT_THROUGH_THE_BASE))
+      .filter((entry) => !('version' in entry.schema.paths))
+      .map((entry) => `${entry.name} (${entry.collection})`);
+
+    expect(missing).toEqual([]);
+  });
+
+  it('the heartbeat schema declares every field a stamp writes', () => {
+    /*
+     * The exemption above says `ops_heartbeats` does not go through the base,
+     * and that is true — but it does not make the collection safe. The stamp is
+     * an `updateOne` with `upsert: true`, and Mongoose's strict mode drops a
+     * path the schema does not declare from the `$set` without a word: the
+     * write succeeds, the column is simply never there, and `/health` goes on
+     * reading the field it thinks it wrote.
+     *
+     * `everyMinutes` is the one that made this worth asserting. It is how a job
+     * says it runs once a night (E-018), and a silently-dropped cadence puts
+     * every nightly job back on the fifteen-minute window — which is the defect
+     * that enhancement exists to remove, restored by a missing line in a schema.
+     */
+    const heartbeat = all.find(
+      (entry) => entry.collection === 'ops_heartbeats',
+    );
+    expect(heartbeat).toBeDefined();
+    for (const field of [
+      'lastRunAt',
+      'lastOkAt',
+      'lastDurationMs',
+      'lastError',
+      'everyMinutes',
+    ]) {
+      expect(Object.keys(heartbeat?.schema.paths ?? {})).toContain(field);
+    }
   });
 
   it('every exemption names a collection that exists', () => {

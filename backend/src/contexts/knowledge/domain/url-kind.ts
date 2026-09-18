@@ -46,7 +46,14 @@ const TRACKING_PARAMS = new Set([
 ]);
 
 /** YouTube's own share noise: `si` is the share id, `t`/`start` a timestamp. */
-const YOUTUBE_NOISE = new Set(['si', 't', 'start', 'feature', 'pp', 'ab_channel']);
+const YOUTUBE_NOISE = new Set([
+  'si',
+  't',
+  'start',
+  'feature',
+  'pp',
+  'ab_channel',
+]);
 
 const YOUTUBE_HOSTS = new Set([
   'youtube.com',
@@ -91,7 +98,10 @@ export interface NormalisedLink {
 export function normaliseLink(raw: string): NormalisedLink {
   const trimmed = raw.trim();
   if (trimmed.length > MAX_URL) {
-    throw new LinkUrlError('too_long', `A link may be at most ${MAX_URL} characters.`);
+    throw new LinkUrlError(
+      'too_long',
+      `A link may be at most ${MAX_URL} characters.`,
+    );
   }
 
   let url: URL;
@@ -199,7 +209,9 @@ function describeYoutube(host: string, url: URL): NormalisedLink | null {
  * would otherwise become a request for a video called `history`.
  */
 function isYoutubeId(value: string): boolean {
-  return value.length > 0 && value.length <= 64 && /^[A-Za-z0-9_-]+$/.test(value);
+  return (
+    value.length > 0 && value.length <= 64 && /^[A-Za-z0-9_-]+$/.test(value)
+  );
 }
 
 /**

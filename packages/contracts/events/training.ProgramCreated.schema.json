@@ -15,10 +15,6 @@
       "type": "integer"
     }
   },
-  "required": [
-    "programId",
-    "title",
-    "weeks"
-  ],
+  "required": ["programId", "title", "weeks"],
   "additionalProperties": false
 }

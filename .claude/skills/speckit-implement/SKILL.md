@@ -56,7 +56,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` on a POSIX shell, or `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` on Windows, from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+<!-- LOCAL EDIT (botvy, E-003): spec-kit generates this invocation PowerShell-only, from `"script": "ps"` in `.specify/init-options.json`, and this file's hash is recorded in `.specify/integrations/claude.manifest.json`. Both halves are named here instead, because the bash scripts under `.specify/scripts/bash/` carry an identical `--json` contract (same keys, same order — verified) and Linux is the deployment and CI platform. A future `specify` run will overwrite this line; reapply it rather than wondering. -->
 
 2. **Check checklists status** (if FEATURE_DIR/checklists/ exists):
    - Scan all checklist files in the checklists/ directory

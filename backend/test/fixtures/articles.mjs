@@ -202,7 +202,10 @@ const ARTICLES = [
       'Drill three: swim with a pull buoy for 100 metres, then without for 100. The buoy shows you what level hips feel like; the goal is to keep the feeling when it comes out.',
       'Drill four: press the chest. Not the head — the chest. A few degrees is enough and the hips follow.',
     ],
-    image: { src: '/img/pool.jpg', alt: 'A swimmer mid-rotation in a 25m pool' },
+    image: {
+      src: '/img/pool.jpg',
+      alt: 'A swimmer mid-rotation in a 25m pool',
+    },
   },
   {
     slug: 'short-note',

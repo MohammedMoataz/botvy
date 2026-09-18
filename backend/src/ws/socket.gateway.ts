@@ -9,7 +9,11 @@ import {
   WebSocketGateway,
 } from '@nestjs/websockets';
 import { Public } from '../shared/auth/decorators.js';
-import { WsAuthGuard, WsUnauthorized, type HandshakeLike } from '../shared/auth/ws-auth.guard.js';
+import {
+  WsAuthGuard,
+  WsUnauthorized,
+  type HandshakeLike,
+} from '../shared/auth/ws-auth.guard.js';
 import type { Principal } from '../shared/auth/principal.js';
 import { RegisterDeviceHandler } from '../contexts/identity/features/register-device/register-device.handler.js';
 import { RateLimiter } from '../shared/rate-limit/rate-limiter.js';
@@ -22,7 +26,9 @@ export const EXPIRY_WARNING_SECONDS = 60;
 /** Only the parts of a Socket.IO socket this gateway uses, so a spec can fake one. */
 export interface SocketLike {
   id: string;
-  handshake: HandshakeLike & { auth?: { token?: unknown; installId?: unknown } };
+  handshake: HandshakeLike & {
+    auth?: { token?: unknown; installId?: unknown };
+  };
   data: {
     principal?: Principal;
     entities?: string[];
@@ -35,7 +41,10 @@ export interface SocketLike {
 }
 
 /** The middleware signature Socket.IO's `server.use` takes. */
-export type SocketMiddleware = (socket: SocketLike, next: (error?: Error) => void) => void;
+export type SocketMiddleware = (
+  socket: SocketLike,
+  next: (error?: Error) => void,
+) => void;
 
 export interface ServerLike {
   use(middleware: SocketMiddleware): unknown;
@@ -71,7 +80,9 @@ export interface ServerLike {
   // what running behind the one published port gives you.
   cors: { origin: false, credentials: true },
 })
-export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class SocketGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(SocketGateway.name);
 
   constructor(
@@ -100,7 +111,10 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
    * Fails open when the registry cannot be read, on the same grounds as the
    * HTTP guard: this is a ceiling on abuse, not an authorisation decision.
    */
-  private async withinLimit(client: SocketLike, event: string): Promise<boolean> {
+  private async withinLimit(
+    client: SocketLike,
+    event: string,
+  ): Promise<boolean> {
     let limit: number;
     try {
       limit = await this.settings.get('limits.socketPerMinute');
@@ -127,12 +141,15 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
     server.use((socket, next) => {
       try {
-        const { principal, expiresAt } = this.auth.authenticateWithExpiry(socket.handshake);
+        const { principal, expiresAt } = this.auth.authenticateWithExpiry(
+          socket.handshake,
+        );
         socket.data.principal = principal;
         if (expiresAt) this.armExpiry(socket, expiresAt);
         next();
       } catch (error) {
-        const reason = error instanceof WsUnauthorized ? error.reason : 'unauthorized';
+        const reason =
+          error instanceof WsUnauthorized ? error.reason : 'unauthorized';
         const refusal = new Error(reason) as Error & { data?: unknown };
         // Socket.IO puts `data` on the client's `err.data`, which is how the
         // client tells a refresh-and-retry from a sign-in-again.
@@ -161,7 +178,9 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       // synced. A connected phone that never updated it would be swept for
       // alerts it had already scheduled itself.
       await this.devices.seen(installId).catch((error: Error) => {
-        this.logger.debug(`could not stamp install ${installId}: ${error.message}`);
+        this.logger.debug(
+          `could not stamp install ${installId}: ${error.message}`,
+        );
         return null;
       });
     }
@@ -184,7 +203,8 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   async presencePing(
     @ConnectedSocket() client: SocketLike,
   ): Promise<{ serverTime: string } | { ok: false }> {
-    if (!(await this.withinLimit(client, 'presence.ping'))) return { ok: false };
+    if (!(await this.withinLimit(client, 'presence.ping')))
+      return { ok: false };
     return { serverTime: new Date().toISOString() };
   }
 
@@ -202,10 +222,13 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     @MessageBody() body: { entities?: unknown },
     @ConnectedSocket() client: SocketLike,
   ): Promise<{ ok: boolean }> {
-    if (!(await this.withinLimit(client, 'sync.subscribe'))) return { ok: false };
+    if (!(await this.withinLimit(client, 'sync.subscribe')))
+      return { ok: false };
 
     const entities = Array.isArray(body?.entities)
-      ? body.entities.filter((entity): entity is string => typeof entity === 'string')
+      ? body.entities.filter(
+          (entity): entity is string => typeof entity === 'string',
+        )
       : [];
     client.data.entities = entities;
     return { ok: true };
@@ -227,7 +250,10 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
     socket.data.expiryWarning = setTimeout(() => {
       socket.emit('auth.expiring', {
-        inSeconds: Math.max(Math.round((expiresAt.getTime() - Date.now()) / 1000), 0),
+        inSeconds: Math.max(
+          Math.round((expiresAt.getTime() - Date.now()) / 1000),
+          0,
+        ),
       });
     }, warnIn);
 

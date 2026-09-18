@@ -57,7 +57,6 @@ export class ApplyWorkoutToSessionHandler {
     userId: string,
     sessionId: string,
     workoutId: string,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date; exercises: number }> {
     const session = await this.sessions.findById(userId, sessionId);
     // A tombstoned session is off the member's week, so it is "not there" as
@@ -69,8 +68,11 @@ export class ApplyWorkoutToSessionHandler {
     const workout = await this.workouts.findById(userId, workoutId);
     if (!workout || workout.isDeleted) throw new WorkoutNotFound(workoutId);
 
-    session.applyWorkout(workout.exercises, newId, at);
+    session.applyWorkout(workout.exercises, newId);
     await this.uow.run(() => this.sessions.save(session));
-    return { updatedAt: session.updatedAt, exercises: session.exercises.length };
+    return {
+      updatedAt: session.updatedAt,
+      exercises: session.exercises.length,
+    };
   }
 }

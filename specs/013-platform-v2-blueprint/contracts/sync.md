@@ -53,6 +53,10 @@ the extension (tasks, labels, meetings, calendar events).
 if op == purge and server row is not a tombstone      → reject 'not_deleted'
 if server row missing and op == create                → accept (insert)
 if server row missing and op != create                → reject 'gone'
+if op == update and server row IS a tombstone         → reject 'invalid' + code 'deleted_row' with the server row
+                                                        (never 'gone' — a tombstone is there and `restore` recovers it;
+                                                         never 'stale' — the phone would retry for ever. `delete`,
+                                                         `restore` and `purge` still reach a tombstone.)
 if server row is protected (coach/planner delete)     → reject 'protected'   (never 'stale' — a stale verdict makes the phone retry forever)
 if baseUpdatedAt == server.updatedAt                  → accept (no clock consulted — the ordinary case)
 if min(updatedAt, now) >= server.updatedAt            → accept (newest wins; clamp stops a handset set to 2099)
@@ -80,7 +84,7 @@ Deletes set `deletedAt` only; `status` is never rewritten by a delete.
     "moreMessages": false
   },
   "accepted": { "tasks": ["id", …], "reminders": [ … ], … },                       // exactly which pushes were applied
-  "rejections": [ { "entity": "tasks", "id": "uuid", "reason": "stale"|"gone"|"protected"|"not_deleted"|"invalid", "server": { …row… } | null } ],
+  "rejections": [ { "entity": "tasks", "id": "uuid", "reason": "stale"|"gone"|"protected"|"not_deleted"|"invalid", "code": "deleted_row" | absent, "server": { …row… } | null } ],
   "pendingAlerts": [ { "source": { "kind", "id", "occurrenceAt" }, "label", "notifyAt", "title", "body", "deepLink" } ]   // next 7 days, for local scheduling
 }
 ```
@@ -91,6 +95,11 @@ Deletes set `deletedAt` only; `status` is never rewritten by a delete.
   `server != null` → overwrite local row (and clear `pendingOp`); `server == null` →
   delete local row. Bump `pushAttempts`; stop re-sending after 5 attempts but never
   discard the user's edit silently (badge + tap-to-retry).
+- `code` refines `reason` and is optional. `invalid` + `code: "deleted_row"` is an
+  edit pushed onto a row somebody else deleted: stop re-sending it at once rather
+  than spending the 5 attempts, and tell the member the row is deleted — the write
+  will never be accepted while it is a tombstone, and `restore` is the only way
+  back. A code a client does not recognise falls back to plain `reason` handling.
 - Clear `pendingOp` only for ids listed in `accepted`.
 - Apply pulls as upserts by id; set `baseUpdatedAt = row.updatedAt` from the
   server row only — never from a local edit.

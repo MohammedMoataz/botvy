@@ -66,7 +66,9 @@ function build(socketLimit = 600) {
   const nudge = new NudgeService();
   const seen = vi.fn(async (_installId: string) => 'device-1');
   const limiter = new RateLimiter();
-  const settings = { get: async () => socketLimit } as unknown as SettingsService;
+  const settings = {
+    get: async () => socketLimit,
+  } as unknown as SettingsService;
   const gateway = new SocketGateway(
     new WsAuthGuard(verifier),
     nudge,
@@ -121,7 +123,9 @@ describe('the socket handshake', () => {
 
   it('admits a member and puts them in their own room', async () => {
     const { gateway, handshake } = build();
-    const socket = fakeSocket({ token: tokenFor({ sub: 'user-1', role: 'user' }) });
+    const socket = fakeSocket({
+      token: tokenFor({ sub: 'user-1', role: 'user' }),
+    });
 
     expect(handshake(socket)).toBeUndefined();
     await gateway.handleConnection(socket);
@@ -134,12 +138,16 @@ describe('the socket handshake', () => {
   it('puts an administrator in the ops room as well, and a member in neither', async () => {
     const { gateway, handshake } = build();
 
-    const admin = fakeSocket({ token: tokenFor({ sub: 'admin-1', role: 'admin' }) });
+    const admin = fakeSocket({
+      token: tokenFor({ sub: 'admin-1', role: 'admin' }),
+    });
     handshake(admin);
     await gateway.handleConnection(admin);
     expect(admin.rooms).toEqual([roomForUser('admin-1'), OPS_ROOM]);
 
-    const member = fakeSocket({ token: tokenFor({ sub: 'user-1', role: 'user' }) });
+    const member = fakeSocket({
+      token: tokenFor({ sub: 'user-1', role: 'user' }),
+    });
     handshake(member);
     await gateway.handleConnection(member);
     expect(member.rooms).not.toContain(OPS_ROOM);
@@ -151,7 +159,8 @@ describe('the socket handshake', () => {
   it('refuses a socket with no token, with a code the client can branch on', () => {
     const { handshake } = build();
 
-    const refusal = handshake(fakeSocket()) as (Error & { data?: { code?: string } }) | undefined;
+    const refusal = handshake(fakeSocket()) as
+      (Error & { data?: { code?: string } }) | undefined;
 
     expect(refusal?.message).toBe('unauthorized');
     expect(refusal?.data?.code).toBe('unauthorized');
@@ -166,13 +175,14 @@ describe('the socket handshake', () => {
     const { handshake } = build();
 
     const expired = handshake(
-      fakeSocket({ token: tokenFor({ sub: 'user-1', role: 'user' }, { expiresIn: '-1m' }) }),
+      fakeSocket({
+        token: tokenFor({ sub: 'user-1', role: 'user' }, { expiresIn: '-1m' }),
+      }),
     ) as (Error & { data?: { code?: string } }) | undefined;
     expect(expired?.data?.code).toBe('token_expired');
 
     const garbage = handshake(fakeSocket({ token: 'not-a-token' })) as
-      | (Error & { data?: { code?: string } })
-      | undefined;
+      (Error & { data?: { code?: string } }) | undefined;
     expect(garbage?.data?.code).toBe('unauthorized');
   });
 
@@ -217,9 +227,10 @@ describe('the socket handshake', () => {
       refusal = error;
     });
 
-    expect((refusal as (Error & { data?: { code?: string } }) | undefined)?.data?.code).toBe(
-      'unauthorized',
-    );
+    expect(
+      (refusal as (Error & { data?: { code?: string } }) | undefined)?.data
+        ?.code,
+    ).toBe('unauthorized');
 
     /*
      * Refused **at the handshake**, and not after connecting (P11, T1115).
@@ -253,7 +264,9 @@ describe('the socket handshake', () => {
   /** The portal has no device, and connecting must not depend on having one. */
   it('connects without an install id', async () => {
     const { gateway, seen, handshake } = build();
-    const socket = fakeSocket({ token: tokenFor({ sub: 'user-1', role: 'user' }) });
+    const socket = fakeSocket({
+      token: tokenFor({ sub: 'user-1', role: 'user' }),
+    });
 
     handshake(socket);
     await expect(gateway.handleConnection(socket)).resolves.toBeUndefined();
@@ -315,12 +328,17 @@ describe('the socket and its token expiring', () => {
 
     // One second past the warning point.
     vi.advanceTimersByTime((15 * 60 - EXPIRY_WARNING_SECONDS + 1) * 1000);
-    expect(socket.emitted.map((entry) => entry.event)).toEqual(['auth.expiring']);
+    expect(socket.emitted.map((entry) => entry.event)).toEqual([
+      'auth.expiring',
+    ]);
     expect(socket.disconnected).toBe(false);
 
     // A client that did not refresh does not keep an unauthenticated socket.
     vi.advanceTimersByTime(EXPIRY_WARNING_SECONDS * 1000);
-    expect(socket.emitted.map((entry) => entry.event)).toEqual(['auth.expiring', 'token_expired']);
+    expect(socket.emitted.map((entry) => entry.event)).toEqual([
+      'auth.expiring',
+      'token_expired',
+    ]);
     expect(socket.disconnected).toBe(true);
 
     gateway.handleDisconnect(socket);
@@ -340,7 +358,9 @@ describe('the socket and its token expiring', () => {
     expect(handshake(socket)).toBeUndefined();
 
     vi.advanceTimersByTime(1);
-    expect(socket.emitted.map((entry) => entry.event)).toEqual(['auth.expiring']);
+    expect(socket.emitted.map((entry) => entry.event)).toEqual([
+      'auth.expiring',
+    ]);
 
     gateway.handleDisconnect(socket);
   });
@@ -367,7 +387,9 @@ describe('the socket and its token expiring', () => {
 describe('the socket messages', () => {
   it('answers a presence ping with the server time', async () => {
     const { gateway } = build();
-    const answer = (await gateway.presencePing(fakeSocket())) as { serverTime: string };
+    const answer = (await gateway.presencePing(fakeSocket())) as {
+      serverTime: string;
+    };
 
     expect(Number.isNaN(Date.parse(answer.serverTime))).toBe(false);
   });
@@ -407,12 +429,17 @@ describe('the socket messages', () => {
     const { gateway } = build();
     const socket = fakeSocket();
 
-    expect(await gateway.syncSubscribe({ entities: ['tasks', 'reminders'] }, socket)).toEqual({
+    expect(
+      await gateway.syncSubscribe({ entities: ['tasks', 'reminders'] }, socket),
+    ).toEqual({
       ok: true,
     });
     expect(socket.data.entities).toEqual(['tasks', 'reminders']);
 
-    await gateway.syncSubscribe({ entities: ['tasks', 7, null] as unknown[] }, socket);
+    await gateway.syncSubscribe(
+      { entities: ['tasks', 7, null] as unknown[] },
+      socket,
+    );
     expect(socket.data.entities).toEqual(['tasks']);
 
     await gateway.syncSubscribe({}, socket);

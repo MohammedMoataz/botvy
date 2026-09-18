@@ -150,10 +150,14 @@ export class MongoQuickQuestionRepository extends QuickQuestionRepository {
   async save(question: QuickQuestion): Promise<void> {
     const doc = mapper.toPersistence(question);
     await this.model
-      .updateOne({ _id: question.id }, { $set: doc }, {
-        upsert: true,
-        session: MongoUnitOfWork.currentSession() ?? undefined,
-      })
+      .updateOne(
+        { _id: question.id },
+        { $set: doc },
+        {
+          upsert: true,
+          session: MongoUnitOfWork.currentSession() ?? undefined,
+        },
+      )
       .exec();
   }
 

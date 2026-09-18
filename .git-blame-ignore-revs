@@ -1,0 +1,10 @@
+# Revisions to skip when running `git blame`. Turn it on for this repository
+# once with:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Only whole-tree formatting belongs here — a commit that changed no behaviour.
+# Anything that changed what the code does must stay blameable.
+
+# style(027): prettier over the whole tree, and nothing else
+f69f0068e27d13ea3ba261a0db2fe1d9a39b73db

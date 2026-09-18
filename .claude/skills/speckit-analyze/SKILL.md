@@ -68,7 +68,8 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 
 ### 1. Initialize Analysis Context
 
-Run `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
+Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` on a POSIX shell, or `.specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks` on Windows, once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
+<!-- LOCAL EDIT (botvy, E-003): spec-kit generates this invocation PowerShell-only, from `"script": "ps"` in `.specify/init-options.json`, and this file's hash is recorded in `.specify/integrations/claude.manifest.json`. Both halves are named here instead, because the bash scripts under `.specify/scripts/bash/` carry an identical `--json` contract (same keys, same order — verified) and Linux is the deployment and CI platform. A future `specify` run will overwrite this line; reapply it rather than wondering. -->
 
 - SPEC = FEATURE_DIR/spec.md
 - PLAN = FEATURE_DIR/plan.md

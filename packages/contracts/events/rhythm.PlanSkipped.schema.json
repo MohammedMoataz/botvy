@@ -18,10 +18,6 @@
       "type": "boolean"
     }
   },
-  "required": [
-    "date",
-    "taskIds",
-    "autoConfirmed"
-  ],
+  "required": ["date", "taskIds", "autoConfirmed"],
   "additionalProperties": false
 }

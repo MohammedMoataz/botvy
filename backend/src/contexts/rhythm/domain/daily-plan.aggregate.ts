@@ -276,7 +276,11 @@ export class DailyPlan extends AggregateRoot<string> {
     this.raise(
       'rhythm.PlanSkipped',
       'daily_plan',
-      { date: this.date, taskIds: this.tasks.map((task) => task.id), autoConfirmed: false },
+      {
+        date: this.date,
+        taskIds: this.tasks.map((task) => task.id),
+        autoConfirmed: false,
+      },
       at,
     );
   }
@@ -355,15 +359,18 @@ export class DailyPlan extends AggregateRoot<string> {
    * their briefing, and the card on their phone must follow. Returns whether
    * anything moved, so an at-least-once redelivery writes nothing.
    */
-  setMealLine(
-    line: string | null,
-    reason: string | null,
-    at: Date,
-  ): boolean {
+  setMealLine(line: string | null, reason: string | null): boolean {
     if (this.mealLine === line && this.mealReason === reason) return false;
     this.mealLine = line;
     this.mealReason = reason;
-    this.updatedAt = at;
+    /*
+     * The server's clock, and no caller may supply it. The only caller is an
+     * event handler, and an event's `occurredAt` is older than now by however
+     * long the relay took — writing it here would move `updatedAt` backwards,
+     * behind a cursor a device has already passed, and the member's meal line
+     * would reach the plan and never reach the phone.
+     */
+    this.updatedAt = new Date();
     return true;
   }
 

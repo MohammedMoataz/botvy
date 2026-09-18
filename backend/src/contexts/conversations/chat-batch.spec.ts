@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { NudgeService, roomForUser } from '../../ws/nudge.service.js';
-import type { TurnEvents, TurnRequest, TurnRunner } from './application/turn-runner.js';
+import type {
+  TurnEvents,
+  TurnRequest,
+  TurnRunner,
+} from './application/turn-runner.js';
 import {
   BatchHandler,
   MAX_BATCH,
@@ -58,8 +62,14 @@ class FakeRunner {
     string,
     (request: TurnRequest, events: TurnEvents) => void
   >();
-  fallback: (request: TurnRequest, events: TurnEvents) => void = (request, events) => {
-    events.token({ requestId: request.requestId, text: `answering: ${request.text}` });
+  fallback: (request: TurnRequest, events: TurnEvents) => void = (
+    request,
+    events,
+  ) => {
+    events.token({
+      requestId: request.requestId,
+      text: `answering: ${request.text}`,
+    });
     events.done({
       requestId: request.requestId,
       conversationId: request.conversationId,
@@ -68,9 +78,16 @@ class FakeRunner {
     });
   };
 
-  async run(request: TurnRequest, events: TurnEvents, now = new Date()): Promise<void> {
+  async run(
+    request: TurnRequest,
+    events: TurnEvents,
+    now = new Date(),
+  ): Promise<void> {
     this.runs.push({ request, now });
-    (this.behaviour.get(request.conversationId) ?? this.fallback)(request, events);
+    (this.behaviour.get(request.conversationId) ?? this.fallback)(
+      request,
+      events,
+    );
   }
 
   get port(): TurnRunner {
@@ -79,7 +96,8 @@ class FakeRunner {
 }
 
 class RecordingSockets {
-  readonly frames: Array<{ room: string; event: string; payload: unknown }> = [];
+  readonly frames: Array<{ room: string; event: string; payload: unknown }> =
+    [];
 
   to(room: string) {
     return {
@@ -135,10 +153,22 @@ describe('flushing an offline batch', () => {
    */
   it('answers each conversation once, however many messages it holds', async () => {
     const result = await harness.handler.handle(MEMBER, [
-      message({ clientId: 'a', conversationId: COACH, text: 'how did I do today' }),
-      message({ clientId: 'b', conversationId: PLANNER, text: 'remind me to call Dad' }),
+      message({
+        clientId: 'a',
+        conversationId: COACH,
+        text: 'how did I do today',
+      }),
+      message({
+        clientId: 'b',
+        conversationId: PLANNER,
+        text: 'remind me to call Dad',
+      }),
       message({ clientId: 'c', conversationId: COACH, text: 'and yesterday' }),
-      message({ clientId: 'd', conversationId: FREE, text: 'what is the tallest building' }),
+      message({
+        clientId: 'd',
+        conversationId: FREE,
+        text: 'what is the tallest building',
+      }),
     ]);
 
     expect(harness.runner.runs).toHaveLength(3);
@@ -171,7 +201,11 @@ describe('flushing an offline batch', () => {
 
     await harness.handler.handle(MEMBER, [
       message({ clientId: 'later', text: 'and yesterday', composedAt: second }),
-      message({ clientId: 'earlier', text: 'how did I do today', composedAt: first }),
+      message({
+        clientId: 'earlier',
+        text: 'how did I do today',
+        composedAt: first,
+      }),
     ]);
 
     const [run] = harness.runner.runs;
@@ -269,7 +303,10 @@ describe('flushing an offline batch', () => {
     });
 
     const result = await harness.handler.handle(MEMBER, [
-      message({ clientId: 'a', text: 'what is the tallest building in the world' }),
+      message({
+        clientId: 'a',
+        text: 'what is the tallest building in the world',
+      }),
     ]);
 
     expect(result.replies[0]?.conversationId).toBe('conversation-new');
@@ -295,7 +332,10 @@ describe('flushing an offline batch', () => {
         kind: 'reminders',
         items: [{ id: 'reminder-1', title: 'call Dad', at: null }],
       });
-      events.token({ requestId: request.requestId, text: 'Reminder set for 5:00 pm: call Dad.' });
+      events.token({
+        requestId: request.requestId,
+        text: 'Reminder set for 5:00 pm: call Dad.',
+      });
       events.done({
         requestId: request.requestId,
         conversationId: PLANNER,
@@ -305,10 +345,16 @@ describe('flushing an offline batch', () => {
     });
 
     const result = await harness.handler.handle(MEMBER, [
-      message({ clientId: 'a', conversationId: PLANNER, text: 'remind me to call Dad at 5' }),
+      message({
+        clientId: 'a',
+        conversationId: PLANNER,
+        text: 'remind me to call Dad at 5',
+      }),
     ]);
 
-    expect(result.replies[0]?.reply).toBe('Reminder set for 5:00 pm: call Dad.');
+    expect(result.replies[0]?.reply).toBe(
+      'Reminder set for 5:00 pm: call Dad.',
+    );
     expect(result.replies[0]?.card).toEqual({
       kind: 'reminders',
       items: [{ id: 'reminder-1', title: 'call Dad', at: null }],
@@ -357,7 +403,11 @@ describe('the nudge after a flush', () => {
    */
   it('sends no nudge when every turn was refused', async () => {
     harness.runner.fallback = (request, events) => {
-      events.error({ requestId: request.requestId, code: 'quota', message: 'over allowance' });
+      events.error({
+        requestId: request.requestId,
+        code: 'quota',
+        message: 'over allowance',
+      });
     };
 
     const result = await harness.handler.handle(MEMBER, [

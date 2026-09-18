@@ -530,8 +530,8 @@ function recurrence(
   return {
     dtstart,
     rrule: dto.rrule,
-    exdates: (dto.exdates ?? []).map(
-      (value, index) => requireDate(value, `exdates[${index}]`),
+    exdates: (dto.exdates ?? []).map((value, index) =>
+      requireDate(value, `exdates[${index}]`),
     ),
     overrides: (dto.overrides ?? []).map((override, index) => {
       const entry: OccurrenceOverride = {

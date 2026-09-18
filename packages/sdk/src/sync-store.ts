@@ -44,6 +44,19 @@ export type RejectionReason =
   'stale' | 'gone' | 'protected' | 'not_deleted' | 'invalid';
 
 /**
+ * What kind of `invalid` it was, when the server can say.
+ *
+ * `invalid` means "stop and tell the member"; the code says what to tell them.
+ * `deleted_row` is an edit pushed onto a row somebody else deleted — the write
+ * is refused rather than written onto the tombstone and then erased by the next
+ * pull, which is what used to happen and was reported to nobody.
+ *
+ * Optional, and a client must treat a code it does not know exactly as it
+ * treats the reason alone: there is no retry that will help.
+ */
+export type RejectionCode = 'deleted_row';
+
+/**
  * The shape every synced row shares.
  *
  * The three fields below are the protocol's; the two after them are the local
@@ -181,6 +194,8 @@ export interface SyncRejection {
   entity: SyncEntity;
   id: string;
   reason: RejectionReason;
+  /** Narrows an `invalid`; absent on every other verdict, and on older servers. */
+  code?: RejectionCode;
   /** The server's row, or null when the server has nothing to offer. */
   server: SyncedRow | null;
 }

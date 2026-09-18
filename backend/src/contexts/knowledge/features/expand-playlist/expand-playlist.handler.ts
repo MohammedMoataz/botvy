@@ -82,7 +82,10 @@ export class ExpandPlaylistHandler {
           continue;
         }
 
-        const existing = await this.links.findByUrl(parent.userId, normalised.url);
+        const existing = await this.links.findByUrl(
+          parent.userId,
+          normalised.url,
+        );
         if (existing) {
           if (existing.id === parent.id) continue;
           if (existing.adopt(parent.id, at)) {

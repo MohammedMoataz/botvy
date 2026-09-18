@@ -11,8 +11,6 @@
       }
     }
   },
-  "required": [
-    "sports"
-  ],
+  "required": ["sports"],
   "additionalProperties": false
 }

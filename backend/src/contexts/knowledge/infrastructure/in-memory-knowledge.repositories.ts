@@ -247,7 +247,8 @@ export class InMemoryReadingRepository extends ReadingRepository {
         .filter(
           (reading) => reading.userId === userId && reading.linkId === linkId,
         )
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ??
+      null
     );
   }
 
@@ -326,7 +327,8 @@ export class InMemorySuggestionRepository extends SuggestionRepository {
       this.#rows
         .all()
         .filter((row) => row.userId === userId && row.sessionId === sessionId)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ??
+      null
     );
   }
 
@@ -338,8 +340,7 @@ export class InMemorySuggestionRepository extends SuggestionRepository {
       this.#rows
         .all()
         .find(
-          (row) =>
-            row.userId === userId && row.acceptedSessionId === sessionId,
+          (row) => row.userId === userId && row.acceptedSessionId === sessionId,
         ) ?? null
     );
   }

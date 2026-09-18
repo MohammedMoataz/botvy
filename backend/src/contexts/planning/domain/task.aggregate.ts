@@ -259,14 +259,9 @@ export class Task extends AggregateRoot<string> {
 
     if (changed.length === 0) return changed;
 
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     if (changed.some((field) => ALERT_FIELDS.has(field))) {
-      this.raise(
-        'planning.TaskRescheduled',
-        'task',
-        this.alertFacts(),
-        at,
-      );
+      this.raise('planning.TaskRescheduled', 'task', this.alertFacts(), at);
     }
     return changed;
   }
@@ -295,7 +290,7 @@ export class Task extends AggregateRoot<string> {
       // The occurrence that was just finished is not an exception: the rule
       // still describes it, and the member did it. Only a *skip* is an
       // exception, which is why `skipOccurrence` is a separate operation.
-      this.updatedAt = at;
+      this.updatedAt = new Date();
       this.raise(
         'planning.TaskCompleted',
         'task',
@@ -308,7 +303,7 @@ export class Task extends AggregateRoot<string> {
 
     this.status = 'completed';
     this.completedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise('planning.TaskCompleted', 'task', { taskId: this.id, at }, at);
     return null;
   }
@@ -342,7 +337,7 @@ export class Task extends AggregateRoot<string> {
     }
     this.status = 'open';
     this.completedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announceScheduled(at);
   }
 
@@ -350,7 +345,7 @@ export class Task extends AggregateRoot<string> {
   cancel(at: Date = new Date()): void {
     this.status = 'cancelled';
     this.completedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise('planning.TaskCancelled', 'task', { taskId: this.id, at }, at);
   }
 
@@ -368,7 +363,7 @@ export class Task extends AggregateRoot<string> {
     this.deferredFrom = fromDate;
     this.dueAt = toDate;
     this.deferCount += 1;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'planning.TaskDeferred',
       'task',
@@ -406,14 +401,14 @@ export class Task extends AggregateRoot<string> {
    */
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise('planning.TaskDeleted', 'task', { taskId: this.id, at }, at);
   }
 
   /** Back from the Deleted view, with its status exactly as it was. */
   restore(at: Date = new Date()): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.announceScheduled(at);
   }
 
@@ -466,33 +461,20 @@ export class Task extends AggregateRoot<string> {
     const reparsed = Recurrence.parse(this.recurrence, timezone);
     const next = reparsed?.next(occurrence, timezone) ?? null;
     this.dueAt = next;
-    this.updatedAt = at;
-    this.raise(
-      'planning.TaskRescheduled',
-      'task',
-      this.alertFacts(),
-      at,
-    );
+    this.updatedAt = new Date();
+    this.raise('planning.TaskRescheduled', 'task', this.alertFacts(), at);
     return next;
   }
 
-  /**
-   * The label snapshot, refreshed because the label itself was renamed or
-   * recoloured. Silent by design: it is a projection catching up, not a change
-   * the member made, and announcing it would have the alert saga re-plan every
-   * task carrying a label somebody recoloured.
+  /*
+   * `refreshLabel` was here, and is gone: the label rename is a bulk write
+   * (`TaskRepository.refreshLabelSnapshots`) precisely so that renaming a label
+   * does not load and save every task carrying it, so nothing had called this
+   * since that path landed. The rule it encoded — a snapshot catching up is
+   * silent, because announcing it would have the alert saga re-plan every task
+   * carrying a label somebody recoloured — lives in the repository method's own
+   * comment, which is where the write now happens.
    */
-  refreshLabel(snapshot: LabelSnapshot | null, at: Date = new Date()): boolean {
-    if (
-      this.label?.name === snapshot?.name &&
-      this.label?.color === snapshot?.color
-    ) {
-      return false;
-    }
-    this.label = snapshot;
-    this.updatedAt = at;
-    return true;
-  }
 
   private announceScheduled(at: Date): void {
     this.raise(

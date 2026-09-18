@@ -73,7 +73,10 @@ async function up(db) {
   // reverse, so one index serves both directions.
   await db
     .collection('sessions')
-    .createIndex({ userId: 1, plannedAt: 1 }, { name: 'sessions_user_planned' });
+    .createIndex(
+      { userId: 1, plannedAt: 1 },
+      { name: 'sessions_user_planned' },
+    );
 
   // `{ userId, status, plannedAt }` is the four reads that filter on a status
   // before they range: `plannedAfter` (the next practice card), `futurePlanned`
@@ -103,7 +106,10 @@ async function up(db) {
   // tombstone is the only way a deletion reaches the phone.
   await db
     .collection('sessions')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'sessions_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'sessions_user_updated' },
+    );
 
   // `{ userId, deletedAt }` is the live-row reads and the nightly tombstone
   // sweep. Every read above opens with `{ userId, deletedAt: null }`, and
@@ -121,7 +127,10 @@ async function up(db) {
   // time they look at the app, and the library screens are opened rarely.
   await db
     .collection('sessions')
-    .createIndex({ userId: 1, deletedAt: 1 }, { name: 'sessions_user_deleted' });
+    .createIndex(
+      { userId: 1, deletedAt: 1 },
+      { name: 'sessions_user_deleted' },
+    );
 
   // -------------------------------------- `programs`: the library and the one
   // the materialiser fills from.
@@ -144,7 +153,10 @@ async function up(db) {
   // reasoning as `sessions_user_updated` above.
   await db
     .collection('programs')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'programs_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'programs_user_updated' },
+    );
 
   // ------------------------------------------- `workouts`: the member's own
   // library, whole or narrowed to one sport.
@@ -160,7 +172,10 @@ async function up(db) {
   // The `/sync` pull, and `listFor`'s newest-first order.
   await db
     .collection('workouts')
-    .createIndex({ userId: 1, updatedAt: 1 }, { name: 'workouts_user_updated' });
+    .createIndex(
+      { userId: 1, updatedAt: 1 },
+      { name: 'workouts_user_updated' },
+    );
 }
 
 /**

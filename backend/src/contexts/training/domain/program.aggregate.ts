@@ -37,10 +37,7 @@ export interface TemplateExercise {
   sets: Array<
     Pick<
       SetEntry,
-      | 'targetReps'
-      | 'targetWeightKg'
-      | 'targetDurationSec'
-      | 'targetDistanceM'
+      'targetReps' | 'targetWeightKg' | 'targetDurationSec' | 'targetDistanceM'
     >
   >;
 }
@@ -181,16 +178,21 @@ export class Program extends AggregateRoot<string> {
     program.raise(
       'training.ProgramCreated',
       'program',
-      { programId: program.id, title: program.title, weeks: program.weeks.length },
+      {
+        programId: program.id,
+        title: program.title,
+        weeks: program.weeks.length,
+      },
       state.createdAt,
     );
     return program;
   }
 
-  edit(
-    patch: { title?: string; sport?: string; weeks?: ProgramWeek[] },
-    at: Date = new Date(),
-  ): string[] {
+  edit(patch: {
+    title?: string;
+    sport?: string;
+    weeks?: ProgramWeek[];
+  }): string[] {
     const changed: string[] = [];
     if (patch.title !== undefined) {
       const title = requireTitle(patch.title);
@@ -211,7 +213,7 @@ export class Program extends AggregateRoot<string> {
       changed.push('weeks');
     }
     if (changed.length === 0) return changed;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     return changed;
   }
 
@@ -234,7 +236,7 @@ export class Program extends AggregateRoot<string> {
       );
     }
     this.appliedStartDate = startDate;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.ProgramApplied',
       'program',
@@ -251,7 +253,7 @@ export class Program extends AggregateRoot<string> {
   /** Stop filling new sessions. Leaves the ones already filled alone. */
   archive(at: Date = new Date()): void {
     this.status = 'archived';
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.ProgramArchived',
       'program',
@@ -261,14 +263,14 @@ export class Program extends AggregateRoot<string> {
   }
 
   /** Make it fillable again, from the date it was originally applied. */
-  activate(at: Date = new Date()): void {
+  activate(): void {
     this.status = 'active';
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   tombstone(at: Date = new Date()): void {
     this.deletedAt = at;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
     this.raise(
       'training.ProgramDeleted',
       'program',
@@ -277,9 +279,9 @@ export class Program extends AggregateRoot<string> {
     );
   }
 
-  restore(at: Date = new Date()): void {
+  restore(): void {
     this.deletedAt = null;
-    this.updatedAt = at;
+    this.updatedAt = new Date();
   }
 
   get isDeleted(): boolean {
@@ -331,7 +333,9 @@ export class Program extends AggregateRoot<string> {
     );
     if (byWeekday) return byWeekday;
 
-    const floating = week.sessions.filter((session) => session.weekday === null);
+    const floating = week.sessions.filter(
+      (session) => session.weekday === null,
+    );
     return floating[slotOrdinal] ?? null;
   }
 
@@ -381,7 +385,10 @@ function requireSport(raw: string): string {
 function validatedWeeks(weeks: ProgramWeek[]): ProgramWeek[] {
   const list = weeks ?? [];
   if (list.length === 0) {
-    throw new ProgramRuleError('no_weeks', 'A program needs at least one week.');
+    throw new ProgramRuleError(
+      'no_weeks',
+      'A program needs at least one week.',
+    );
   }
   if (list.length > MAX_WEEKS) {
     throw new ProgramRuleError(

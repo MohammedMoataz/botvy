@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Model } from 'mongoose';
+import type { Model, PipelineStage } from 'mongoose';
 import {
   decodeCursor,
   encodeCursor,
@@ -18,6 +18,61 @@ import type {
   TaskView,
 } from '../domain/task-read.repository.js';
 import type { LabelDoc, TaskDoc } from './mongo-planning.repositories.js';
+
+/**
+ * Where a task with **no** deadline sorts, as an instant no member can reach.
+ *
+ * MongoDB orders `null` below every date, so the one view that carries undated
+ * tasks — `label` — showed "some day" above everything with a deadline. The
+ * design answer is the other way round: within a status, a task with a deadline
+ * comes first. Getting there is `$ifNull` onto a computed key rather than a
+ * stored `hasDueDate` boolean, because a derived value kept derived cannot fall
+ * out of step with the row it is derived from (E-007).
+ *
+ * **One constant, read by both halves.** The aggregation stage below and the
+ * in-memory `withDueSort` share it, and the field name is a constant for the
+ * same reason: the two adapters have already disagreed about exactly this
+ * question once, under a comment claiming they matched, and a sentinel written
+ * out twice is how that happens again.
+ */
+export const NO_DUE_DATE_SORTS_AT = new Date('9999-12-31T23:59:59.999Z');
+
+/** The computed key's name — in the sort list, in the pipeline, in the cursor. */
+export const DUE_SORT_FIELD = 'dueSort';
+
+/**
+ * `$addFields` for the computed key, evaluated by the store.
+ *
+ * It has to be a real pipeline stage and not a `$sort` expression: Mongo cannot
+ * sort on something it has not projected, and the keyset cursor's own filter
+ * names the field too — so the stage runs before both.
+ */
+export function dueSortStage(): PipelineStage.AddFields {
+  return {
+    $addFields: {
+      [DUE_SORT_FIELD]: { $ifNull: ['$dueAt', NO_DUE_DATE_SORTS_AT] },
+    },
+  };
+}
+
+/**
+ * The same computation in memory, and the same one used to read a cursor
+ * position off the last row of a page.
+ *
+ * Applied on the Mongo side as well when the cursor is encoded, so that the
+ * value the client carries is the computed key whatever the driver projected —
+ * a cursor holding the raw `null` would be a position in an order nothing
+ * sorts by.
+ */
+export function withDueSort(
+  doc: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...doc,
+    [DUE_SORT_FIELD]:
+      (doc.dueAt as Date | null | undefined) ?? NO_DUE_DATE_SORTS_AT,
+  };
+}
 
 /**
  * The order each view is read in, and therefore the order its cursor walks.
@@ -41,14 +96,12 @@ export const TASK_SORT_KEYS: Record<TaskListFilter['view'], SortKey[]> = {
     { field: 'dueAt', direction: 'asc' },
     { field: 'priority', direction: 'asc' },
   ],
-  // The one view that carries undated tasks, and `null` sorts *first* here
-  // because that is how Mongo orders it. Sorting them last would need an
-  // aggregation with `$ifNull`, and the in-memory adapter would then have to
-  // reproduce that rather than the store's own ordering — so the ordering
-  // preference is recorded in `enhancements/` and the two adapters agree.
+  // The one view that carries undated tasks. It orders on the *computed* key
+  // rather than on `dueAt`, so that within each status a task with a deadline
+  // sorts above one without — see `NO_DUE_DATE_SORTS_AT` (E-007).
   label: [
     { field: 'status', direction: 'asc' },
-    { field: 'dueAt', direction: 'asc' },
+    { field: DUE_SORT_FIELD, direction: 'asc' },
     { field: 'priority', direction: 'asc' },
   ],
   completed: [{ field: 'completedAt', direction: 'desc' }],
@@ -128,18 +181,18 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     // The cursor is a position in *this* order, not a value in some unrelated
     // field. `keyset-cursor.ts` records what was wrong before and why it
     // survived a green suite.
-    if (filter.cursor) {
-      const position = decodeCursor(filter.cursor);
-      if (position) Object.assign(query, mongoAfter(keys, position));
-    }
+    const position = filter.cursor ? decodeCursor(filter.cursor) : null;
+    const after = position ? mongoAfter(keys, position) : null;
 
-    const docs = await this.taskModel
-      .find(query)
-      .sort(mongoSort(keys))
-      .limit(filter.limit + 1)
-      .session(MongoUnitOfWork.currentSession())
-      .lean<TaskDoc[]>()
-      .exec();
+    const docs = keys.some((key) => key.field === DUE_SORT_FIELD)
+      ? await this.pageByPipeline(query, after, keys, filter.limit)
+      : await this.taskModel
+          .find(after ? { ...query, ...after } : query)
+          .sort(mongoSort(keys))
+          .limit(filter.limit + 1)
+          .session(MongoUnitOfWork.currentSession())
+          .lean<TaskDoc[]>()
+          .exec();
 
     // One more than asked for, so "is there another page" is answered without a
     // second count query against a collection that is being written to.
@@ -148,13 +201,13 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     const last = page.at(-1);
 
     return {
-      nodes: page.map((doc) => toTaskView(doc, filter.timezone)),
+      nodes: page.map((doc) => toTaskView(doc, filter.timezone, filter.locale)),
       nextCursor:
         hasMore && last
           ? encodeCursor(
               positionOf(
                 keys,
-                last as unknown as Record<string, unknown>,
+                withDueSort(last as unknown as Record<string, unknown>),
                 last._id,
               ),
             )
@@ -162,17 +215,48 @@ export class MongoTaskReadRepository implements TaskReadRepository {
     };
   }
 
+  /**
+   * The same page, through an aggregation, for a view that sorts on a computed
+   * key.
+   *
+   * The stage order is the whole of it. The predicate narrows to the member's
+   * own rows first — an `$addFields` before `$match` would compute the key for
+   * every task in the collection — then the key is projected, then the cursor's
+   * filter, which *names* that key and therefore cannot run before it, and only
+   * then the sort and the limit.
+   *
+   * `find()` is kept for the other five views rather than moved here for
+   * symmetry: they sort on stored fields, where an index answers the sort, and
+   * an `$addFields` in front of `$sort` would give that up for nothing.
+   */
+  private async pageByPipeline(
+    query: Record<string, unknown>,
+    after: Record<string, unknown> | null,
+    keys: SortKey[],
+    limit: number,
+  ): Promise<TaskDoc[]> {
+    const pipeline: PipelineStage[] = [{ $match: query }, dueSortStage()];
+    if (after) pipeline.push({ $match: after });
+    pipeline.push({ $sort: mongoSort(keys) }, { $limit: limit + 1 });
+
+    return this.taskModel
+      .aggregate<TaskDoc>(pipeline)
+      .session(MongoUnitOfWork.currentSession())
+      .exec();
+  }
+
   async byId(
     userId: string,
     id: string,
     timezone: string,
+    locale = 'en',
   ): Promise<TaskView | null> {
     const doc = await this.taskModel
       .findOne({ userId, _id: id })
       .session(MongoUnitOfWork.currentSession())
       .lean<TaskDoc>()
       .exec();
-    return doc ? toTaskView(doc, timezone) : null;
+    return doc ? toTaskView(doc, timezone, locale) : null;
   }
 
   /**
@@ -287,8 +371,18 @@ export class MongoTaskReadRepository implements TaskReadRepository {
   }
 }
 
-/** Exported so the in-memory adapter renders a view identically. */
-export function toTaskView(doc: TaskDoc, timezone: string): TaskView {
+/**
+ * Exported so the in-memory adapter renders a view identically.
+ *
+ * `locale` defaults to English rather than being required, which is the same
+ * answer a member with no locale gets: the three cross-context reads below have
+ * no member language to hand and no consumer that renders the sentence.
+ */
+export function toTaskView(
+  doc: TaskDoc,
+  timezone: string,
+  locale = 'en',
+): TaskView {
   const recurrence = doc.recurrence ?? null;
   const rule = recurrence
     ? Recurrence.parse(
@@ -312,7 +406,7 @@ export function toTaskView(doc: TaskDoc, timezone: string): TaskView {
     recurrenceMode: recurrence?.mode ?? null,
     // A rule the library cannot read still renders its own string rather than
     // nothing, so a member with a rule from somewhere else at least sees it.
-    recurrenceText: rule ? rule.humanText() : (recurrence?.rrule ?? null),
+    recurrenceText: rule ? rule.humanText(locale) : (recurrence?.rrule ?? null),
     estimatedMinutes: doc.estimatedMinutes ?? null,
     deferCount: doc.deferCount ?? 0,
     source: doc.source ?? 'app',

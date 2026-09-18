@@ -21,7 +21,9 @@ function ServiceClientsPage() {
   const [clients, setClients] = useState<ServiceClientSummary[]>([]);
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState('');
-  const [secret, setSecret] = useState<{ name: string; secret: string } | null>(null);
+  const [secret, setSecret] = useState<{ name: string; secret: string } | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -76,7 +78,9 @@ function ServiceClientsPage() {
         <p className="muted">{t('explain')}</p>
       </div>
 
-      {problem && <Message severity="error" text={problem} style={{ marginBottom: 12 }} />}
+      {problem && (
+        <Message severity="error" text={problem} style={{ marginBottom: 12 }} />
+      )}
 
       <section className="panel">
         <h2>{t('create')}</h2>
@@ -107,42 +111,46 @@ function ServiceClientsPage() {
       </section>
 
       <section className="panel">
-      <DataTable value={clients} emptyMessage={t('none')}>
-        <Column field="name" header={t('name')} />
-        <Column
-          header={t('scopes')}
-          body={(client: ServiceClientSummary) => client.scopes.join(', ') || '—'}
-        />
-        <Column
-          header={t('status')}
-          body={(client: ServiceClientSummary) => (
-            <Tag
-              severity={client.revokedAt ? 'danger' : 'success'}
-              value={t(client.revokedAt ? 'revoked' : 'active')}
-            />
-          )}
-        />
-        <Column
-          header={t('lastUsed')}
-          body={(client: ServiceClientSummary) =>
-            client.lastUsedAt ? new Date(client.lastUsedAt).toLocaleString() : t('never')
-          }
-        />
-        <Column
-          header={t('actions')}
-          body={(client: ServiceClientSummary) =>
-            client.revokedAt ? null : (
-              <Button
-                label={t('revoke')}
-                severity="danger"
-                outlined
-                disabled={busy}
-                onClick={() => void revoke(client)}
+        <DataTable value={clients} emptyMessage={t('none')}>
+          <Column field="name" header={t('name')} />
+          <Column
+            header={t('scopes')}
+            body={(client: ServiceClientSummary) =>
+              client.scopes.join(', ') || '—'
+            }
+          />
+          <Column
+            header={t('status')}
+            body={(client: ServiceClientSummary) => (
+              <Tag
+                severity={client.revokedAt ? 'danger' : 'success'}
+                value={t(client.revokedAt ? 'revoked' : 'active')}
               />
-            )
-          }
-        />
-      </DataTable>
+            )}
+          />
+          <Column
+            header={t('lastUsed')}
+            body={(client: ServiceClientSummary) =>
+              client.lastUsedAt
+                ? new Date(client.lastUsedAt).toLocaleString()
+                : t('never')
+            }
+          />
+          <Column
+            header={t('actions')}
+            body={(client: ServiceClientSummary) =>
+              client.revokedAt ? null : (
+                <Button
+                  label={t('revoke')}
+                  severity="danger"
+                  outlined
+                  disabled={busy}
+                  onClick={() => void revoke(client)}
+                />
+              )
+            }
+          />
+        </DataTable>
       </section>
 
       {/*
@@ -157,9 +165,15 @@ function ServiceClientsPage() {
         dismissableMask={false}
         style={{ maxWidth: 560 }}
         onHide={() => setSecret(null)}
-        footer={<Button label={t('secretDone')} onClick={() => setSecret(null)} />}
+        footer={
+          <Button label={t('secretDone')} onClick={() => setSecret(null)} />
+        }
       >
-        <Message severity="warn" text={t('secretWarning')} style={{ marginBottom: 12 }} />
+        <Message
+          severity="warn"
+          text={t('secretWarning')}
+          style={{ marginBottom: 12 }}
+        />
         <code
           style={{
             display: 'block',

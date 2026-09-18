@@ -279,3 +279,12 @@ import { ConversationsCoachTranscript } from './infrastructure/rhythm-coach-tran
   ],
 })
 export class RhythmModule {}
+
+/** What this context asks the outbox relay for; see `shared/outbox/dispatch-table.ts`. */
+export const RHYTHM_SUBSCRIPTIONS = {
+  'identity.UserRegistered': 'BootstrapOnRegisteredHandler',
+  'identity.UserDeleted': 'PurgeOnDeletedHandler',
+  'profile.PreferencesChanged': 'PreferencesChangedHandler',
+  'nutrition.MealPlanReady': 'MealLineChangedHandler',
+  'nutrition.MealPlanWithheld': 'MealLineChangedHandler',
+} as const;

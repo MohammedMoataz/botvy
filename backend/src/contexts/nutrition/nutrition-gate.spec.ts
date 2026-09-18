@@ -95,11 +95,14 @@ describe('matching a day of meals against what the member declared', () => {
     ['edamame', ['soya']],
   ];
 
-  it.each(CAUGHT)('withholds "%s" from a member allergic to %s', (text, allergies) => {
-    const matches = findAllergens(text, allergies, FAMILIES);
-    expect(matches.length).toBeGreaterThan(0);
-    expect(matches[0]!.declared).toBe(allergies[0]);
-  });
+  it.each(CAUGHT)(
+    'withholds "%s" from a member allergic to %s',
+    (text, allergies) => {
+      const matches = findAllergens(text, allergies, FAMILIES);
+      expect(matches.length).toBeGreaterThan(0);
+      expect(matches[0]!.declared).toBe(allergies[0]);
+    },
+  );
 
   /**
    * The false-positive half, and the one the word-set matcher exists for.
@@ -130,9 +133,12 @@ describe('matching a day of meals against what the member declared', () => {
     ['beef and potato stew', ['soy']],
   ];
 
-  it.each(PASSED)('lets "%s" through for a member allergic to %s', (text, allergies) => {
-    expect(findAllergens(text, allergies, FAMILIES)).toEqual([]);
-  });
+  it.each(PASSED)(
+    'lets "%s" through for a member allergic to %s',
+    (text, allergies) => {
+      expect(findAllergens(text, allergies, FAMILIES)).toEqual([]);
+    },
+  );
 
   it('names both the member’s word and the word it found', () => {
     const [match] = findAllergens('almond cake', ['nuts'], FAMILIES);

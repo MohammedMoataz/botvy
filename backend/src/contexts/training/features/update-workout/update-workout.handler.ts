@@ -40,12 +40,11 @@ export class UpdateWorkoutHandler {
     userId: string,
     id: string,
     command: UpdateWorkoutCommand,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date; changed: string[] }> {
     const workout = await this.workouts.findById(userId, id);
     if (!workout) throw new WorkoutNotFound(id);
 
-    const changed = workout.edit(command, at);
+    const changed = workout.edit(command);
     if (changed.length === 0) {
       return { updatedAt: workout.updatedAt, changed };
     }

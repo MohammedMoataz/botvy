@@ -143,7 +143,10 @@ export async function flushCaptures(client: BotvyClient): Promise<number> {
   return sent;
 }
 
-async function sendCapture(client: BotvyClient, row: CaptureRow): Promise<void> {
+async function sendCapture(
+  client: BotvyClient,
+  row: CaptureRow,
+): Promise<void> {
   if (row.kind === 'link') {
     await client.command('/links', { id: row.id, url: row.url }, row.id);
     return;

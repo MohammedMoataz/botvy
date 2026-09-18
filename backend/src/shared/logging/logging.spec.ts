@@ -4,13 +4,16 @@ import { redact } from './redact.js';
 
 describe('request context', () => {
   it('carries the request id and the slice into every line', () => {
-    RequestContextStore.run({ requestId: 'req-1', context: 'operations', slice: 'ping' }, () => {
-      expect(RequestContextStore.bindings()).toEqual({
-        requestId: 'req-1',
-        botvyContext: 'operations',
-        slice: 'ping',
-      });
-    });
+    RequestContextStore.run(
+      { requestId: 'req-1', context: 'operations', slice: 'ping' },
+      () => {
+        expect(RequestContextStore.bindings()).toEqual({
+          requestId: 'req-1',
+          botvyContext: 'operations',
+          slice: 'ping',
+        });
+      },
+    );
   });
 
   it('is empty outside a request rather than throwing', () => {
@@ -23,7 +26,12 @@ describe('request context', () => {
     RequestContextStore.run(
       {
         requestId: 'req-2',
-        principal: { kind: 'user', id: 'user-1', role: 'admin', email: 'owner@example.test' },
+        principal: {
+          kind: 'user',
+          id: 'user-1',
+          role: 'admin',
+          email: 'owner@example.test',
+        },
       },
       () => {
         const bindings = RequestContextStore.bindings();
@@ -93,7 +101,10 @@ describe('redaction', () => {
     const redacted = redact({
       user: { name: 'a', password: 'p' },
       devices: [{ pushToken: 't' }],
-    }) as { user: Record<string, unknown>; devices: Array<Record<string, unknown>> };
+    }) as {
+      user: Record<string, unknown>;
+      devices: Array<Record<string, unknown>>;
+    };
 
     expect(redacted.user.password).toBe('[redacted]');
     expect(redacted.devices[0]!.pushToken).toBe('[redacted]');

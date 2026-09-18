@@ -15,6 +15,9 @@ import {
 /** The heartbeat key `/health` and the admin overview report staleness on. */
 export const SWEEP_JOB = 'notifications.sweep';
 
+/** `notifications_sweep` triggers every five minutes; the row says so (E-018). */
+export const SWEEP_EVERY_MINUTES = 5;
+
 /**
  * The shape `contracts/internal.md` fixes. Every number is about something the
  * sweep actually did, and `purged` is the only one that counts rows another
@@ -91,6 +94,7 @@ export class SweepHandler {
         true,
         undefined,
         Date.now() - startedAt,
+        SWEEP_EVERY_MINUTES,
       );
       return result;
     } catch (error) {
@@ -103,6 +107,7 @@ export class SweepHandler {
         false,
         error instanceof Error ? error.message : String(error),
         Date.now() - startedAt,
+        SWEEP_EVERY_MINUTES,
       );
       throw error;
     }

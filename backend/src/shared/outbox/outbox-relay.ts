@@ -35,7 +35,9 @@ export interface RelayStore {
   loadResumeToken(): Promise<unknown | null>;
   saveResumeToken(token: unknown): Promise<void>;
   /** Yields inserts as they happen, resuming from the token when there is one. */
-  watch(resumeToken: unknown | null): AsyncGenerator<{ event: DomainEvent; token: unknown }>;
+  watch(
+    resumeToken: unknown | null,
+  ): AsyncGenerator<{ event: DomainEvent; token: unknown }>;
 }
 
 export interface RelayDeps {
@@ -130,7 +132,9 @@ export class OutboxRelay {
       const failed = outcomes.filter((outcome) => !outcome.ok);
 
       if (failed.length > 0) {
-        const reason = failed.map((outcome) => `${outcome.url}: ${outcome.error}`).join('; ');
+        const reason = failed
+          .map((outcome) => `${outcome.url}: ${outcome.error}`)
+          .join('; ');
         await this.recordAndSchedule(event, reason);
         // Still `ok`, deliberately. This heartbeat answers "is the relay
         // looping", and it is — a subscriber nobody can reach is a delivery
@@ -154,7 +158,10 @@ export class OutboxRelay {
   }
 
   /** Counts the failure, then puts the next attempt where the ladder says. */
-  private async recordAndSchedule(event: DomainEvent, reason: string): Promise<void> {
+  private async recordAndSchedule(
+    event: DomainEvent,
+    reason: string,
+  ): Promise<void> {
     const attempts = await this.deps.store.recordFailure(event.eventId, reason);
     const next = nextAttemptAfter(attempts);
     await this.deps.store.scheduleRetry(event.eventId, next.at);

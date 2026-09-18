@@ -27,12 +27,29 @@ class ProfileMirror {
   ///
   /// Both together, because every screen that wants one wants the other — the
   /// profile page shows a time zone beside the daily times — and two round
-  /// trips for one render is two chances to paint a half-loaded form.
-  Future<void> fill() async {
-    final profile = await _api.profile();
-    final preferences = await _api.preferences();
+  /// trips for one render is two chances to paint a half-loaded form. One
+  /// request rather than two for the same reason.
+  ///
+  /// Returns false when the server has neither record yet and writes nothing.
+  /// That is the bootstrap window: registration commits the account and an
+  /// outbox entry, and the relay writes `profiles` and `user_preferences` on a
+  /// later tick (E-019). It is not an error — the account is real and the rows
+  /// are on their way — so the caller waits and asks again rather than
+  /// reporting a failed sign-in.
+  ///
+  /// A half-filled answer counts as not filled. The two are written in one unit
+  /// of work on the server, so seeing one and not the other means the read
+  /// crossed the write; treating it as done would leave the mirror with a
+  /// profile and no preferences, and every screen reading the daily times would
+  /// find nothing with no reason to look again.
+  Future<bool> fill() async {
+    final both = await _api.profileAndPreferences();
+    final profile = both.profile;
+    final preferences = both.preferences;
+    if (profile == null || preferences == null) return false;
     await writeProfile(profile);
     await writePreferences(preferences);
+    return true;
   }
 
   Future<void> writeProfile(Map<String, dynamic> json) async {

@@ -1,6 +1,7 @@
 import type { BotvyClient } from './client.js';
 import { newId } from './ids.js';
 import { MemorySyncTable, type SyncedRow } from './sync-store.js';
+import { taskView } from './taskViews.js';
 
 export type Priority = 1 | 2 | 3 | 4;
 
@@ -136,33 +137,6 @@ export interface RolloverAck {
   skipped: string[];
 }
 
-/**
- * The calendar date an instant falls on, where the member is.
- *
- * **Times belong to the member, not to the machine.** `timeZone` is a required
- * argument and there is no default: reading the host's own zone here is the
- * mistake that once shifted every extracted reminder by three hours, and a
- * browser in a hotel is no more authoritative than a server in Frankfurt. The
- * caller passes `profile.timezone`.
- *
- * Comparing *calendar dates* is also why this returns a string rather than a
- * pair of instants. The server computes `dayStart`/`dayEnd` with a
- * daylight-saving-aware helper because it filters in Mongo; a client comparing
- * `YYYY-MM-DD` needs no boundary arithmetic at all, and `dueAt < dayEnd` is
- * exactly `localDay(dueAt) <= localDay(now)`. No arithmetic is no chance to get
- * a 23-hour spring-forward day wrong.
- */
-export function localDay(instant: string | Date, timeZone: string): string {
-  // `en-CA` because its short date format is already `YYYY-MM-DD`, so the parts
-  // need no reassembly and no locale can reorder them.
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(instant instanceof Date ? instant : new Date(instant));
-}
-
 export interface TaskViewFilter {
   /** The member's own zone, from their profile. Never the host's. */
   timezone: string;
@@ -199,17 +173,20 @@ export class TasksStore {
    * In-memory, and **not injectable** — which contradicts what this class used
    * to claim, so here is the actual position.
    *
-   * The extension needs Dexie-backed storage and cannot use this store because
-   * of it; it restated `view('today')` in its own code instead, which is the
-   * third copy of the member's-day rule after the two server adapters. That is
-   * a real cost and it is recorded as E-011.
-   *
    * It is not fixed by taking a `SyncTable` in the constructor, which was
    * tried. The reads below are *synchronous* — `rows`, `byId`, `subscribe` —
    * and IndexedDB is not, so satisfying the port is not the obstacle: the
    * store's own read surface is. Making it injectable means making every read
    * async and following that through the portal, which is a refactor rather
    * than a fix in passing.
+   *
+   * So a surface with its own storage does not use this store, and the
+   * extension does not: it drives `SyncStore` with a Dexie-backed table of its
+   * own. What that used to cost was a *restated* Today — a fourth copy of the
+   * member's-day rule (E-011). It no longer does: the definitions moved to
+   * `taskViews.ts`, which is pure and takes whatever rows a caller holds, and
+   * `view` below is now a call into it rather than a copy of it. The panel
+   * calls the same function over its Dexie rows.
    */
   readonly table = new MemorySyncTable<TaskRow>();
 
@@ -237,68 +214,13 @@ export class TasksStore {
   /**
    * One of the six lists, filtered and ordered the way the server does it.
    *
-   * A mirror of the backend's `taskPredicateFor` and of the ordering its
-   * adapters share — deliberately, and it is the only duplication in this file:
-   * the extension's Today list has to work with no connection, so the
-   * definition of Today has to exist on this side too. Two definitions is a
-   * risk, so this one is written to be *checkably* the same rather than
-   * merely similar, and the spec asserts each row of it.
-   *
-   * `today` includes the overdue ones (`dueAt` before the end of today, not
-   * inside today) because a task the member has not dealt with is still theirs
-   * to deal with today. That is the server's rule, not a convenience.
+   * The definitions are in `taskViews.ts` rather than here, so that a surface
+   * whose rows are not in this store — the extension's Dexie tables — applies
+   * the same predicate instead of restating it. See that file for why Today
+   * carries the overdue ones and why a null date sorts first.
    */
   view(view: TaskListView, filter: TaskViewFilter): TaskRow[] {
-    const today = localDay(filter.now ?? new Date(), filter.timezone);
-    const dayOf = (row: TaskRow): string | null =>
-      row.dueAt ? localDay(row.dueAt, filter.timezone) : null;
-
-    const matches = this.tasks.filter((row) => {
-      switch (view) {
-        case 'today': {
-          const due = dayOf(row);
-          return (
-            row.deletedAt === null &&
-            row.status === 'open' &&
-            due !== null &&
-            due <= today
-          );
-        }
-        case 'upcoming': {
-          const due = dayOf(row);
-          return (
-            row.deletedAt === null &&
-            row.status === 'open' &&
-            due !== null &&
-            due > today
-          );
-        }
-        case 'overdue': {
-          const due = dayOf(row);
-          return (
-            row.deletedAt === null &&
-            row.status === 'open' &&
-            due !== null &&
-            due < today
-          );
-        }
-        case 'label':
-          return (
-            row.deletedAt === null && row.labelId === (filter.labelId ?? null)
-          );
-        case 'completed':
-          return row.deletedAt === null && row.status === 'completed';
-        case 'deleted':
-          return row.deletedAt !== null;
-      }
-    });
-
-    return matches.sort((a, b) => {
-      if (view === 'completed')
-        return time(b.completedAt) - time(a.completedAt);
-      if (view === 'deleted') return time(b.deletedAt) - time(a.deletedAt);
-      return time(a.dueAt) - time(b.dueAt) || a.priority - b.priority;
-    });
+    return taskView(view, this.tasks, filter);
   }
 
   /**
@@ -499,23 +421,6 @@ export class TasksStore {
   #announce(): void {
     for (const listener of this.#listeners) listener();
   }
-}
-
-/**
- * Milliseconds, with a null sorting **first** — deliberately, and not because
- * it is nicer.
- *
- * MongoDB orders null below every date, so the server's two adapters both put
- * an undated task above everything with a deadline; `label` is the only view
- * that carries one, and `enhancements/E-007` records that ordering as a known
- * cost rather than a defect. This is the third adapter of the same list, so it
- * agrees with the other two. A client that quietly sorted nulls last would put
- * the extension's by-label list in a different order from the phone's, which is
- * exactly the silent disagreement the server's two adapters were reconciled to
- * end. If E-007 is ever taken, this line changes with it.
- */
-function time(value: string | null): number {
-  return value ? new Date(value).getTime() : 0;
 }
 
 /**

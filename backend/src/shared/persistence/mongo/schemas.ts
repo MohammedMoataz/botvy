@@ -59,6 +59,14 @@ export const HeartbeatSchema = new Schema(
     lastOkAt: { type: Date, default: null },
     lastDurationMs: { type: Number, default: null },
     lastError: { type: String, default: null },
+    // How often the job says it runs, so `/health` judges its silence by its
+    // own cadence rather than by a list of nightly job names kept elsewhere
+    // (E-018). Declared here because the stamp is an upsert and Mongoose is
+    // strict: an undeclared path is dropped from the write at best, and this
+    // project has twice shipped a schema missing a column the writer names.
+    // Null on a row written before the column existed; the fallback is then
+    // `ops.staleAfterMinutes`, so the migration is the next stamp.
+    everyMinutes: { type: Number, default: null },
   },
   { collection: 'ops_heartbeats', versionKey: false, _id: false },
 );
@@ -125,6 +133,8 @@ export const ProfileSchema = new Schema(
     onboardingCompletedAt: { type: Date, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'profiles', versionKey: false, _id: false },
@@ -155,6 +165,8 @@ export const PreferencesSchema = new Schema(
     aiSuggestions: { type: Boolean, required: true },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'user_preferences', versionKey: false, _id: false },
@@ -184,6 +196,8 @@ export const LabelSchema = new Schema(
     sortOrder: { type: Number, required: true, default: 0 },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -240,6 +254,8 @@ export const TaskSchema = new Schema(
     source: { type: String, required: true, default: 'app' },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -267,6 +283,8 @@ export const ReminderSchema = new Schema(
     source: { type: String, required: true, default: 'app' },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -325,6 +343,8 @@ export const AlertSchema = new Schema(
      * simply never arrived.
      */
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'alerts', versionKey: false },
@@ -426,6 +446,8 @@ export const DailyPlanSchema = new Schema(
     briefedAt: { type: Date, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'daily_plans', versionKey: false, _id: false },
@@ -450,6 +472,8 @@ export const CheckinSchema = new Schema(
     source: { type: String, required: true, default: 'app' },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'checkins', versionKey: false, _id: false },
@@ -488,6 +512,8 @@ export const RhythmStateSchema = new Schema(
     },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'rhythm_states', versionKey: false, _id: false },
@@ -516,6 +542,8 @@ export const ConversationSchema = new Schema(
     lastMessageAt: { type: Date, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -578,6 +606,8 @@ export const MessageSchema = new Schema(
      * Nothing reads it. It must never become a sync cursor for this collection.
      */
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'messages', versionKey: false },
@@ -677,6 +707,8 @@ export const QuickQuestionSchema = new Schema(
     enabled: { type: Boolean, required: true, default: true },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'quick_questions', versionKey: false, _id: false },
@@ -782,6 +814,8 @@ export const MeetingSchema = new Schema(
     source: { type: String, required: true, default: 'app' },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -811,6 +845,8 @@ export const CalendarEventSchema = new Schema(
     authoredTimezone: { type: String, required: true },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -952,6 +988,8 @@ export const AthleteProfileSchema = new Schema(
       default: [],
     },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'athlete_profiles', versionKey: false, _id: false },
@@ -996,6 +1034,8 @@ export const SessionSchema = new Schema(
     notes: { type: String, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -1059,6 +1099,8 @@ export const ProgramSchema = new Schema(
     appliedStartDate: { type: String, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -1084,6 +1126,8 @@ export const WorkoutSchema = new Schema(
     tags: { type: [String], default: [] },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -1133,6 +1177,8 @@ export const LinkSchema = new Schema(
     processedAt: { type: Date, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -1194,6 +1240,8 @@ export const KnowledgeDocSchema = new Schema(
     tokens: { type: Number, default: 0 },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
   },
   { collection: 'knowledge_docs', versionKey: false, _id: false },
 );
@@ -1266,6 +1314,8 @@ export const SuggestionSchema = new Schema(
     outcome: { type: String, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
   },
   { collection: 'suggestions', versionKey: false, _id: false },
 );
@@ -1296,6 +1346,8 @@ export const MealSchema = new Schema(
     tags: { type: [String], default: [] },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     deletedAt: { type: Date, default: null },
     schemaVersion: { type: Number, default: 1 },
   },
@@ -1362,6 +1414,8 @@ export const MealSuggestionSchema = new Schema(
     causeEventId: { type: String, default: null },
     createdAt: { type: Date, required: true },
     updatedAt: { type: Date, required: true },
+    /** E-006: the optimistic counter. Absent on a row written before it. */
+    version: { type: Number },
     schemaVersion: { type: Number, default: 1 },
   },
   { collection: 'meal_suggestions', versionKey: false, _id: false },

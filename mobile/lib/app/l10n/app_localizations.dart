@@ -572,6 +572,174 @@ class AppLocalizations {
   String get onboardingSportsBody => _t('onboardingSportsBody');
   String get onboardingSlotsBody => _t('onboardingSlotsBody');
 
+  // -- the repeat picker, meetings and events (E-015) -------------------------
+
+  /// A counted noun, whole: the number and the word that agrees with it.
+  ///
+  /// The four keys are `<key>One`, `<key>Two`, `<key>Few` and `<key>Many`, which
+  /// is the shape `homeStreakDays` already uses. English reads two of them and
+  /// the other two are the same word; both languages keep all four so the
+  /// parity test can see them.
+  String _counted(String key, int count) => _isArabic
+      ? arabicCounted(
+          count,
+          one: _t('${key}One'),
+          two: _t('${key}Two'),
+          few: _t('${key}Few'),
+          many: _t('${key}Many'),
+        )
+      : englishCounted(
+          count,
+          one: _t('${key}One'),
+          other: _t('${key}Many'),
+        );
+
+  /// The same noun, without the number — for a label that stands beside the
+  /// control the member is typing the number into.
+  ///
+  /// The choice between the four forms is still [arabicCounted]'s, because that
+  /// rule belongs in one place and this app has exactly one copy of it. What
+  /// comes off again is the digit the helper prefixes to the plural forms: the
+  /// count box is an inch away and "6 6 مرات" is not a label.
+  String _unit(String key, int count) {
+    final phrase = _counted(key, count);
+    final numbered = '$count ';
+    return phrase.startsWith(numbered)
+        ? phrase.substring(numbered.length)
+        : phrase;
+  }
+
+  String get repeatTitle => _t('repeatTitle');
+  String get repeatDaily => _t('repeatDaily');
+  String get repeatWeekly => _t('repeatWeekly');
+  String get repeatMonthly => _t('repeatMonthly');
+  String get repeatEvery => _t('repeatEvery');
+
+  /// `day` / `week` / `month` in agreement with the interval beside them.
+  String repeatDayUnit(int count) => _unit('repeatDay', count);
+  String repeatWeekUnit(int count) => _unit('repeatWeek', count);
+  String repeatMonthUnit(int count) => _unit('repeatMonth', count);
+
+  /// `times`, the picker's own counted noun — the caveat E-015 names. The four
+  /// Arabic forms are the ones the rule's own sentence uses, reached through
+  /// the same call rather than spelled a second time.
+  String repeatTimesUnit(int count) => _unit('repeatTimes', count);
+
+  String get repeatEnds => _t('repeatEnds');
+  String get repeatEndNever => _t('repeatEndNever');
+  String get repeatEndAfter => _t('repeatEndAfter');
+  String get repeatEndOnDate => _t('repeatEndOnDate');
+  String get repeatNone => _t('repeatNone');
+  String get repeatSet => _t('repeatSet');
+  String get repeatLastDay => _t('repeatLastDay');
+  String get repeatChooseLastDate => _t('repeatChooseLastDate');
+  String get repeatSetElsewhere => _t('repeatSetElsewhere');
+
+  /// "Day 31", the monthly segment's label.
+  ///
+  /// A cardinal in both languages, where the confirmation line underneath says
+  /// "on the 31st" in English and `في يوم 31 من الشهر` in Arabic. A segment is
+  /// two words wide, and an Arabic ordinal inflects for gender and case — the
+  /// reason `rule_words` does not write one either.
+  String repeatOnDayOfMonth(int day) =>
+      _f('repeatOnDayOfMonth', {'day': '$day'});
+
+  /// What the monthly rule does to a short month — the three sentences that
+  /// make the picker worth reading. See `core/recurrence/rule_words.dart` for
+  /// why the question is asked at all.
+  String get repeatLastDayInFebruary => _t('repeatLastDayInFebruary');
+  String get repeatSameDateEveryMonth => _t('repeatSameDateEveryMonth');
+  String repeatSkipsShortMonths(int day) =>
+      _f('repeatSkipsShortMonths', {'day': '$day'});
+
+  // -- meetings, the list ----------------------------------------------------
+  String get meetingsTitle => _t('meetingsTitle');
+  String get meetingsUpcoming => _t('meetingsUpcoming');
+  String get meetingsPast => _t('meetingsPast');
+  String get meetingsDeleted => _t('meetingsDeleted');
+  String get meetingsDismiss => _t('meetingsDismiss');
+  String get meetingsNoneYet => _t('meetingsNoneYet');
+  String get meetingsNoMoreOccurrences => _t('meetingsNoMoreOccurrences');
+  String get meetingsNotSaved => _t('meetingsNotSaved');
+  String get meetingsMarkHappened => _t('meetingsMarkHappened');
+  String get meetingsWholeSeries => _t('meetingsWholeSeries');
+  String get meetingsCancel => _t('meetingsCancel');
+  String get meetingsReopen => _t('meetingsReopen');
+  String get meetingsCannotOpen => _t('meetingsCannotOpen');
+  String get meetingsJoin => _t('meetingsJoin');
+  String get meetingsOpenInMap => _t('meetingsOpenInMap');
+  String get meetingsSkipOne => _t('meetingsSkipOne');
+  String get meetingsRestUntouched => _t('meetingsRestUntouched');
+  String get meetingsMoveOne => _t('meetingsMoveOne');
+  String get meetingsEditSeries => _t('meetingsEditSeries');
+
+  String meetingsNext(String when) => _f('meetingsNext', {'when': when});
+  String meetingsOnClock(String zone) => _f('meetingsOnClock', {'zone': zone});
+  String meetingDeletedMessage(String title) =>
+      _f('meetingDeletedMessage', {'title': title});
+
+  // -- meetings, the editor --------------------------------------------------
+  String get meetingNew => _t('meetingNew');
+  String get meetingEdit => _t('meetingEdit');
+  String get meetingName => _t('meetingName');
+  String get meetingDescription => _t('meetingDescription');
+  String get meetingLength => _t('meetingLength');
+  String get meetingWhere => _t('meetingWhere');
+  String get meetingLink => _t('meetingLink');
+  String get meetingAddress => _t('meetingAddress');
+  String get meetingBoth => _t('meetingBoth');
+  String get meetingJoiningLink => _t('meetingJoiningLink');
+  String get meetingPreparation => _t('meetingPreparation');
+  String get meetingTimeNeeded => _t('meetingTimeNeeded');
+  String get meetingPrepNone => _t('meetingPrepNone');
+  String get meetingWhatToPrepare => _t('meetingWhatToPrepare');
+  String get meetingRemindMe => _t('meetingRemindMe');
+  String get meetingAlertAtTime => _t('meetingAlertAtTime');
+  String get meetingAlertDayBefore => _t('meetingAlertDayBefore');
+  String get meetingAlertHourBefore => _t('meetingAlertHourBefore');
+  String get meetingPinOff => _t('meetingPinOff');
+  String get meetingThisDevice => _t('meetingThisDevice');
+  String get meetingNeedsName => _t('meetingNeedsName');
+  String get meetingNeedsWhere => _t('meetingNeedsWhere');
+  String get meetingDiscardTitle => _t('meetingDiscardTitle');
+  String get meetingKeepOldRepeat => _t('meetingKeepOldRepeat');
+  String get meetingDiscardAndSave => _t('meetingDiscardAndSave');
+
+  /// A length, in minutes or in hours, agreeing with its number: `45 دقيقةً`
+  /// and `3 ساعات`, not `45 دقيقة` and `3 ساعة`.
+  String meetingMinutes(int count) => _counted('meetingMinute', count);
+  String meetingHours(int count) => _counted('meetingHour', count);
+
+  /// "30 min before" — the lead time, built from [meetingMinutes] so the
+  /// agreement is decided once.
+  String meetingAlertMinutesBefore(int minutes) =>
+      _f('meetingAlertBefore', {'amount': meetingMinutes(minutes)});
+
+  String meetingPinToClock(String zone) =>
+      _f('meetingPinToClock', {'zone': zone});
+  String meetingPinOn(String zone) => _f('meetingPinOn', {'zone': zone});
+
+  /// The warning before a series edit throws away occurrences the member moved.
+  /// The dates are counted, so Arabic gets its dual rather than `2 تاريخ`.
+  String meetingDiscardBody(int dates) =>
+      _f('meetingDiscardBody', {'dates': _counted('meetingDate', dates)});
+  String meetingAndMore(int count) => _f('meetingAndMore', {'count': '$count'});
+
+  // -- personal events -------------------------------------------------------
+  String get eventNew => _t('eventNew');
+  String get eventEdit => _t('eventEdit');
+  String get eventTitle => _t('eventTitle');
+  String get eventAllDay => _t('eventAllDay');
+  String get eventColour => _t('eventColour');
+  String get eventNoColour => _t('eventNoColour');
+  String get eventNotes => _t('eventNotes');
+  String get eventNeedsTitle => _t('eventNeedsTitle');
+
+  String eventFrom(String time) => _f('eventFrom', {'time': time});
+  String eventTo(String time) => _f('eventTo', {'time': time});
+  String eventDeletedMessage(String title) =>
+      _f('eventDeletedMessage', {'title': title});
+
   /// The tables, for the parity test and nothing else.
   ///
   /// Every key must exist in every locale, because `_t` falls back to English
@@ -993,6 +1161,119 @@ class AppLocalizations {
       'onboardingSports': 'What do you train?',
       'onboardingSportsBody': 'Pick the sports you practise. You can add your own.',
       'onboardingSlotsBody': 'Add the days and times you usually train. Botvy fills the weeks ahead from them.',
+
+      'repeatTitle': 'Repeat',
+      'repeatDaily': 'Daily',
+      'repeatWeekly': 'Weekly',
+      'repeatMonthly': 'Monthly',
+      'repeatEvery': 'Every',
+      'repeatDayOne': 'day',
+      'repeatDayTwo': 'days',
+      'repeatDayFew': 'days',
+      'repeatDayMany': 'days',
+      'repeatWeekOne': 'week',
+      'repeatWeekTwo': 'weeks',
+      'repeatWeekFew': 'weeks',
+      'repeatWeekMany': 'weeks',
+      'repeatMonthOne': 'month',
+      'repeatMonthTwo': 'months',
+      'repeatMonthFew': 'months',
+      'repeatMonthMany': 'months',
+      'repeatTimesOne': 'time',
+      'repeatTimesTwo': 'times',
+      'repeatTimesFew': 'times',
+      'repeatTimesMany': 'times',
+      'repeatEnds': 'Ends',
+      'repeatEndNever': 'Never',
+      'repeatEndAfter': 'After',
+      'repeatEndOnDate': 'On date',
+      'repeatNone': 'Does not repeat',
+      'repeatSet': 'Set repeat',
+      'repeatOnDayOfMonth': 'Day {day}',
+      'repeatLastDay': 'Last day',
+      'repeatLastDayInFebruary': 'The 28th or 29th in February.',
+      'repeatSkipsShortMonths': 'Months without day {day} are skipped.',
+      'repeatSameDateEveryMonth': 'The same date every month.',
+      'repeatChooseLastDate': 'Choose the last date',
+      'repeatSetElsewhere': 'This repeat was set elsewhere and is kept as it is.',
+
+      'meetingsTitle': 'Meetings',
+      'meetingsUpcoming': 'Upcoming',
+      'meetingsPast': 'Past',
+      'meetingsDeleted': 'Deleted',
+      'meetingsDismiss': 'Dismiss',
+      'meetingsNoneYet': 'Nothing here yet.',
+      'meetingsNext': 'next {when}',
+      'meetingsNoMoreOccurrences': 'no more occurrences',
+      'meetingsOnClock': "on {zone}'s clock",
+      'meetingsNotSaved': 'Not saved to the server. Tap to try again.',
+      'meetingsMarkHappened': 'Mark as happened',
+      'meetingsWholeSeries': 'The whole series',
+      'meetingsCancel': 'Cancel',
+      'meetingsReopen': 'Put back in the diary',
+      'meetingsCannotOpen': 'Nothing on this phone can open that.',
+      'meetingsJoin': 'Join',
+      'meetingsOpenInMap': 'Open in a map',
+      'meetingsSkipOne': 'Skip this one',
+      'meetingsRestUntouched': 'The rest of the series is untouched',
+      'meetingsMoveOne': 'Move this one',
+      'meetingsEditSeries': 'Edit the whole series',
+      'meetingDeletedMessage': 'Deleted "{title}"',
+
+      'meetingNew': 'New meeting',
+      'meetingEdit': 'Meeting',
+      'meetingName': 'Name',
+      'meetingDescription': 'Description',
+      'meetingLength': 'Length',
+      'meetingMinuteOne': 'min',
+      'meetingMinuteTwo': 'min',
+      'meetingMinuteFew': 'min',
+      'meetingMinuteMany': 'min',
+      'meetingHourOne': 'h',
+      'meetingHourTwo': 'h',
+      'meetingHourFew': 'h',
+      'meetingHourMany': 'h',
+      'meetingWhere': 'Where',
+      'meetingLink': 'Link',
+      'meetingAddress': 'Address',
+      'meetingBoth': 'Both',
+      'meetingJoiningLink': 'Joining link',
+      'meetingPreparation': 'Preparation',
+      'meetingTimeNeeded': 'Time needed',
+      'meetingPrepNone': 'None',
+      'meetingWhatToPrepare': 'What to prepare',
+      'meetingRemindMe': 'Remind me',
+      'meetingAlertAtTime': 'At the time',
+      'meetingAlertDayBefore': '1 day before',
+      'meetingAlertHourBefore': '1 hour before',
+      'meetingAlertBefore': '{amount} before',
+      'meetingPinToClock': "Keep this on {zone}'s clock",
+      'meetingPinOff': 'Moves with you when you travel.',
+      'meetingPinOn': 'Stays at this local time in {zone}.',
+      'meetingThisDevice': 'this device',
+      'meetingNeedsName': 'A meeting needs a name.',
+      'meetingNeedsWhere': 'A meeting needs a link or an address.',
+      'meetingDiscardTitle': 'Discard moved occurrences?',
+      'meetingDiscardBody': 'This repeat no longer includes {dates} you had moved:',
+      'meetingDateOne': 'date',
+      'meetingDateTwo': 'dates',
+      'meetingDateFew': 'dates',
+      'meetingDateMany': 'dates',
+      'meetingAndMore': 'and {count} more',
+      'meetingKeepOldRepeat': 'Keep the old repeat',
+      'meetingDiscardAndSave': 'Discard and save',
+
+      'eventNew': 'New event',
+      'eventEdit': 'Event',
+      'eventTitle': 'Title',
+      'eventAllDay': 'All day',
+      'eventFrom': 'From {time}',
+      'eventTo': 'To {time}',
+      'eventColour': 'Colour',
+      'eventNoColour': 'No colour',
+      'eventNotes': 'Notes',
+      'eventNeedsTitle': 'An event needs a title.',
+      'eventDeletedMessage': 'Deleted "{title}"',
     },
     'ar': {
       'appTitle': 'بوتفي',
@@ -1401,6 +1682,125 @@ class AppLocalizations {
     'onboardingSports': 'ما الذي تتدرب عليه؟',
     'onboardingSportsBody': 'اختر الرياضات التي تمارسها. ويمكنك إضافة رياضتك.',
     'onboardingSlotsBody': 'أضف الأيام والأوقات التي تتدرب فيها عادة، ليملأ بوتفي الأسابيع القادمة منها.',
+
+    'repeatTitle': 'التكرار',
+    'repeatDaily': 'يوميًا',
+    'repeatWeekly': 'أسبوعيًا',
+    'repeatMonthly': 'شهريًا',
+    'repeatEvery': 'كل',
+    // The four forms `counted.dart` describes, as bare nouns: the number is in
+    // the control beside the label. Same words as `rule_words.dart` uses in the
+    // confirmation line, so the two halves of the screen agree.
+    'repeatDayOne': 'يوم',
+    'repeatDayTwo': 'يومين',
+    'repeatDayFew': 'أيام',
+    'repeatDayMany': 'يومًا',
+    'repeatWeekOne': 'أسبوع',
+    'repeatWeekTwo': 'أسبوعين',
+    'repeatWeekFew': 'أسابيع',
+    'repeatWeekMany': 'أسبوعًا',
+    'repeatMonthOne': 'شهر',
+    'repeatMonthTwo': 'شهرين',
+    'repeatMonthFew': 'أشهر',
+    'repeatMonthMany': 'شهرًا',
+    'repeatTimesOne': 'مرة',
+    'repeatTimesTwo': 'مرتين',
+    'repeatTimesFew': 'مرات',
+    'repeatTimesMany': 'مرةً',
+    'repeatEnds': 'ينتهي',
+    'repeatEndNever': 'أبدًا',
+    'repeatEndAfter': 'بعد',
+    'repeatEndOnDate': 'في تاريخ',
+    'repeatNone': 'بلا تكرار',
+    'repeatSet': 'اضبط التكرار',
+    'repeatOnDayOfMonth': 'يوم {day}',
+    'repeatLastDay': 'آخر يوم',
+    // Not a literal rendering of the English: these say what the rule does.
+    // "It falls on the 28th or the 29th in February", "months that have no day
+    // {day} in them are skipped", "the same date of every month".
+    'repeatLastDayInFebruary': 'في فبراير يقع على 28 أو 29.',
+    'repeatSkipsShortMonths': 'تُتخطّى الأشهر التي ليس فيها يوم {day}.',
+    'repeatSameDateEveryMonth': 'نفس التاريخ من كل شهر.',
+    'repeatChooseLastDate': 'اختر تاريخ النهاية',
+    'repeatSetElsewhere': 'ضُبط هذا التكرار في مكان آخر، ويُترك كما هو.',
+
+    'meetingsTitle': 'الاجتماعات',
+    'meetingsUpcoming': 'القادمة',
+    'meetingsPast': 'السابقة',
+    'meetingsDeleted': 'المحذوفة',
+    'meetingsDismiss': 'إخفاء',
+    'meetingsNoneYet': 'لا شيء هنا بعد.',
+    'meetingsNext': 'التالي {when}',
+    'meetingsNoMoreOccurrences': 'لا مواعيد أخرى',
+    'meetingsOnClock': 'بتوقيت {zone}',
+    'meetingsNotSaved': 'لم يُحفظ على الخادم. اضغط للمحاولة مرة أخرى.',
+    'meetingsMarkHappened': 'سجّل أنه تم',
+    'meetingsWholeSeries': 'السلسلة كاملة',
+    'meetingsCancel': 'إلغاء',
+    'meetingsReopen': 'أعِده إلى المفكرة',
+    'meetingsCannotOpen': 'لا يوجد على هذا الهاتف ما يفتح ذلك.',
+    'meetingsJoin': 'انضم',
+    'meetingsOpenInMap': 'افتح في الخريطة',
+    'meetingsSkipOne': 'تخطَّ هذا الموعد',
+    'meetingsRestUntouched': 'بقية السلسلة لا تتغير',
+    'meetingsMoveOne': 'انقل هذا الموعد',
+    'meetingsEditSeries': 'حرّر السلسلة كاملة',
+    'meetingDeletedMessage': 'تم حذف «{title}»',
+
+    'meetingNew': 'اجتماع جديد',
+    'meetingEdit': 'اجتماع',
+    'meetingName': 'الاسم',
+    'meetingDescription': 'الوصف',
+    'meetingLength': 'المدة',
+    'meetingMinuteOne': 'دقيقة',
+    'meetingMinuteTwo': 'دقيقتين',
+    'meetingMinuteFew': 'دقائق',
+    'meetingMinuteMany': 'دقيقةً',
+    'meetingHourOne': 'ساعة',
+    'meetingHourTwo': 'ساعتين',
+    'meetingHourFew': 'ساعات',
+    'meetingHourMany': 'ساعةً',
+    'meetingWhere': 'أين',
+    'meetingLink': 'رابط',
+    'meetingAddress': 'عنوان',
+    'meetingBoth': 'كلاهما',
+    'meetingJoiningLink': 'رابط الانضمام',
+    'meetingPreparation': 'التحضير',
+    'meetingTimeNeeded': 'الوقت اللازم',
+    'meetingPrepNone': 'بلا',
+    'meetingWhatToPrepare': 'ما الذي تحضّره',
+    'meetingRemindMe': 'ذكّرني',
+    'meetingAlertAtTime': 'في موعده',
+    'meetingAlertDayBefore': 'قبل يوم',
+    'meetingAlertHourBefore': 'قبل ساعة',
+    'meetingAlertBefore': 'قبل {amount}',
+    'meetingPinToClock': 'أبقِه على توقيت {zone}',
+    'meetingPinOff': 'ينتقل معك عند السفر.',
+    'meetingPinOn': 'يبقى على هذا التوقيت المحلي في {zone}.',
+    'meetingThisDevice': 'هذا الجهاز',
+    'meetingNeedsName': 'الاجتماع يحتاج إلى اسم.',
+    'meetingNeedsWhere': 'الاجتماع يحتاج إلى رابط أو عنوان.',
+    'meetingDiscardTitle': 'هل تتجاهل المواعيد التي نقلتها؟',
+    'meetingDiscardBody': 'لم يعد هذا التكرار يشمل {dates} كنت قد نقلتها:',
+    'meetingDateOne': 'تاريخًا واحدًا',
+    'meetingDateTwo': 'تاريخين',
+    'meetingDateFew': 'تواريخ',
+    'meetingDateMany': 'تاريخًا',
+    'meetingAndMore': 'و{count} غيرها',
+    'meetingKeepOldRepeat': 'أبقِ التكرار القديم',
+    'meetingDiscardAndSave': 'تجاهلها واحفظ',
+
+    'eventNew': 'حدث جديد',
+    'eventEdit': 'حدث',
+    'eventTitle': 'العنوان',
+    'eventAllDay': 'طوال اليوم',
+    'eventFrom': 'من {time}',
+    'eventTo': 'إلى {time}',
+    'eventColour': 'اللون',
+    'eventNoColour': 'بلا لون',
+    'eventNotes': 'ملاحظات',
+    'eventNeedsTitle': 'الحدث يحتاج إلى عنوان.',
+    'eventDeletedMessage': 'تم حذف «{title}»',
     },
   };
 }

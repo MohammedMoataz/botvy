@@ -28,11 +28,7 @@
           ]
         }
       },
-      "required": [
-        "kind",
-        "id",
-        "occurrenceAt"
-      ],
+      "required": ["kind", "id", "occurrenceAt"],
       "additionalProperties": false
     },
     "deviceIds": {
@@ -42,10 +38,6 @@
       }
     }
   },
-  "required": [
-    "alertId",
-    "source",
-    "deviceIds"
-  ],
+  "required": ["alertId", "source", "deviceIds"],
   "additionalProperties": false
 }

@@ -15,10 +15,6 @@
       "type": "string"
     }
   },
-  "required": [
-    "labelId",
-    "name",
-    "color"
-  ],
+  "required": ["labelId", "name", "color"],
   "additionalProperties": false
 }

@@ -426,9 +426,7 @@ describe('a pushed chat row', () => {
         since: null,
         entities: ENTITIES,
         push: {
-          conversations: [
-            change('upsert', conversation.id, { pinned: false }),
-          ],
+          conversations: [change('upsert', conversation.id, { pinned: false })],
         },
       });
 
@@ -445,7 +443,9 @@ describe('a pushed chat row', () => {
         since: null,
         entities: ENTITIES,
         push: {
-          conversations: [change('upsert', conversation.id, { archived: true })],
+          conversations: [
+            change('upsert', conversation.id, { archived: true }),
+          ],
         },
       });
 

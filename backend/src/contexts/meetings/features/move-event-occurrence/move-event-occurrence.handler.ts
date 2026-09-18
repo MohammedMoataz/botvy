@@ -23,12 +23,11 @@ export class MoveCalendarEventOccurrenceHandler {
     id: string,
     originalStart: Date,
     startAt: Date,
-    at: Date = new Date(),
   ): Promise<{ updatedAt: Date }> {
     const event = await this.events.findById(userId, id);
     if (!event) throw new CalendarEventNotFound(id);
 
-    event.moveOccurrence(originalStart, startAt, at);
+    event.moveOccurrence(originalStart, startAt);
     await this.uow.run(() => this.events.save(event));
     return { updatedAt: event.updatedAt };
   }

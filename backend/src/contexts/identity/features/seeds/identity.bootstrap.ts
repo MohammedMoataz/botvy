@@ -111,7 +111,6 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
     );
     this.logger.log(`service client seed: ${client}`);
   }
-
 }
 
 /**
@@ -128,5 +127,7 @@ export class IdentityBootstrap implements OnApplicationBootstrap {
 function isMissingSchema(error: unknown): boolean {
   const code = (error as { code?: string }).code;
   const message = (error as Error)?.message ?? '';
-  return code === 'P2021' || /does not exist in the current database/i.test(message);
+  return (
+    code === 'P2021' || /does not exist in the current database/i.test(message)
+  );
 }

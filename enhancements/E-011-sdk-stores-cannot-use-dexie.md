@@ -1,6 +1,6 @@
 # E-011 — The SDK's stores cannot use Dexie, so the extension restated "Today"
 
-**Area**: architecture · **Status**: open · **Found**: P2, building the extension panel
+**Area**: architecture · **Status**: done · **Found**: P2, building the extension panel
 
 ## What
 
@@ -64,3 +64,7 @@ Two routes, and the second is probably right.
 Route 2 is smaller and fixes the thing that actually matters, which is the
 duplicated rule rather than the storage abstraction. Worth doing before P9 adds
 the extension's meetings list and makes it five copies.
+
+## How it landed
+
+Route 2. `packages/sdk/src/taskViews.ts` holds the predicate and the comparator; the extension panel's restatement of `today` is deleted. The 73-case fixture table is transcribed from the Mongo read adapter's own predicate table, boundary rows included, so a divergence fails a test.

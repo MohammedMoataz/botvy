@@ -1,6 +1,6 @@
 # E-019 — A new member has no preferences for a few seconds
 
-**Area**: architecture · **Status**: open · **Found**: P6, by the gate patching
+**Area**: architecture · **Status**: done · **Found**: P6, by the gate patching
 a preference three seconds after registering
 
 ## What
@@ -84,3 +84,7 @@ rather than by a script, and the flag costs one field. Until then the window is
 documented here and in the materialiser's own comment, and every client that
 meets a 404 on `/preferences` immediately after registering is meeting this and
 not a bug.
+
+## How it landed
+
+Option 1: `bootstrapped` on the auth responses, and the phone's first-run path waits for it. It also exposed a real crash on that path — a null profile threw past the error handler, so a fast registration reported a failed sign-in for an account that had been created.

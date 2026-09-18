@@ -10,7 +10,16 @@ import { definitionOf } from '../settings/settings.registry.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { assessHealth, type HealthReport } from './health.assess.js';
 
-export const BOTVY_VERSION = '2.0.0';
+/**
+ * What `/health` says it is running.
+ *
+ * A literal, because the compiled output cannot read `package.json` from
+ * anywhere it can be sure of, and pinned to that file by
+ * `health-version.spec.ts` — it read `2.0.0` for the whole of the 2.1.0 release
+ * otherwise, which is a version number that matters twice: the soak log records
+ * it, and a rollback is judged by it.
+ */
+export const BOTVY_VERSION = '2.1.0';
 
 /**
  * Liveness, readiness and job freshness in one public answer.
@@ -45,29 +54,28 @@ export class HealthController {
       staleAfterMinutes,
       backupStaleHours,
       defaultAdminPassword,
-    ] =
-      await Promise.all([
-        this.probe('postgres', () => this.prisma.ping()),
-        this.probe('mongo', async () => {
-          const result = await this.mongo.db?.admin().ping();
-          return result?.ok === 1;
-        }),
-        this.probe('ollama', () => this.ollama.isReachable()),
-        this.heartbeats.listAll().catch((error: Error) => {
-          this.logger.warn(`heartbeats unreadable: ${error.message}`);
-          return [];
-        }),
-        this.setting('ops.staleAfterMinutes'),
-        // The nightly jobs get their own window. `backup.staleHours` has been in
-        // the registry since the phase began with nothing reading it, which is
-        // how a job that runs at 03:00 came to be judged by a fifteen-minute
-        // rule and reported the platform degraded for the rest of every day.
-        this.setting('backup.staleHours'),
-        // Written by the system at boot and cleared by identity.PasswordChanged.
-        // Read here rather than recomputed: only Identity can answer the
-        // question, and /health must not reach into another context to ask it.
-        this.flag('ops.adminPasswordIsDefault'),
-      ]);
+    ] = await Promise.all([
+      this.probe('postgres', () => this.prisma.ping()),
+      this.probe('mongo', async () => {
+        const result = await this.mongo.db?.admin().ping();
+        return result?.ok === 1;
+      }),
+      this.probe('ollama', () => this.ollama.isReachable()),
+      this.heartbeats.listAll().catch((error: Error) => {
+        this.logger.warn(`heartbeats unreadable: ${error.message}`);
+        return [];
+      }),
+      this.setting('ops.staleAfterMinutes'),
+      // The nightly jobs get their own window. `backup.staleHours` has been in
+      // the registry since the phase began with nothing reading it, which is
+      // how a job that runs at 03:00 came to be judged by a fifteen-minute
+      // rule and reported the platform degraded for the rest of every day.
+      this.setting('backup.staleHours'),
+      // Written by the system at boot and cleared by identity.PasswordChanged.
+      // Read here rather than recomputed: only Identity can answer the
+      // question, and /health must not reach into another context to ask it.
+      this.flag('ops.adminPasswordIsDefault'),
+    ]);
 
     return {
       ...assessHealth({
@@ -93,13 +101,15 @@ export class HealthController {
    * diverges silently the first time the registry's changes — which is what
    * principle XII means by "a hard-coded default is a bug".
    */
-  private async setting<K extends 'ops.staleAfterMinutes' | 'backup.staleHours'>(
-    key: K,
-  ): Promise<number> {
+  private async setting<
+    K extends 'ops.staleAfterMinutes' | 'backup.staleHours',
+  >(key: K): Promise<number> {
     try {
       return (await this.settings.get(key)) as number;
     } catch (error) {
-      this.logger.warn(`${key} unreadable, using the registry default: ${(error as Error).message}`);
+      this.logger.warn(
+        `${key} unreadable, using the registry default: ${(error as Error).message}`,
+      );
       return definitionOf(key).default as number;
     }
   }
@@ -115,12 +125,17 @@ export class HealthController {
     try {
       return await this.settings.get(key);
     } catch (error) {
-      this.logger.warn(`${key} unreadable, assuming the warning applies: ${(error as Error).message}`);
+      this.logger.warn(
+        `${key} unreadable, assuming the warning applies: ${(error as Error).message}`,
+      );
       return definitionOf(key).default as boolean;
     }
   }
 
-  private async probe(name: string, check: () => Promise<boolean>): Promise<boolean> {
+  private async probe(
+    name: string,
+    check: () => Promise<boolean>,
+  ): Promise<boolean> {
     try {
       return await check();
     } catch (error) {
