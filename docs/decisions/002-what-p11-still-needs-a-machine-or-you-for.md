@@ -6,24 +6,21 @@ cost, and the exact command that closes it.
 
 ## The machine
 
-**Docker's engine does not start on this host.** The desktop processes are
-running, `com.docker.service` — the privileged half — is `Stopped`, and starting
-it needs elevation this session does not have:
+**Docker came back while this work was running**, so most of what was blocked is
+now done and recorded in `specs/025-hardening-release/tasks.md`: the stack is up,
+`node infra/verify.mjs` passes 5/5, the log-scrubbing pass ran and found
+something, every phase gate P1–P8 ran, and the portal and CSP end-to-end suites
+ran against it for the first time.
 
-```
-Start-Service com.docker.service
-FAILED: Cannot open com.docker.service service on computer '.'
-docker version → request returned 500 Internal Server Error
-```
-
-So no container ran during this work. Everything below that says "needs the
-stack" means exactly that and nothing worse. From an elevated PowerShell:
-
-```powershell
-Start-Service com.docker.service
-docker compose -p botvy-v2 -f infra/docker-compose.yml up -d
-node infra/verify.mjs
-```
+One thing about the stack is worth knowing before you trust it again: **n8n had
+no owner account and no workflows.** Its data volume had been recreated at some
+point, so the API key in `.env` belonged to an installation that no longer
+existed and `bootstrap.mjs` answered `401` when it tried to import the workflows
+— which means no scheduled job had run since. The owner is set up from
+`N8N_OWNER_EMAIL`/`N8N_OWNER_PASSWORD`, a key was minted and written into `.env`
+(the file is git-ignored; the old key was deleted at n8n), and the six workflows
+are imported and five are active. This is the exact shape of the silent-401
+failure `CLAUDE.md` already records once.
 
 ## The tasks
 
@@ -36,9 +33,9 @@ confirm a phone that last synced before the backup reconciles to a complete
 picture, and record the elapsed time and every correction the procedure needed.
 An untested backup counts as no backup, which is this phase's own sentence.
 
-### T1112 — the log-scrubbing pass · needs a day of logs from running containers
+### T1112 — the log-scrubbing pass · **done, and it found something**
 
-The pass is now a command rather than a paragraph:
+The pass is a command rather than a paragraph:
 
 ```bash
 node infra/scan-logs.mjs --since 24h --canary "<a sentence planted in a seeded conversation>" --out gate-logs/scrub-$(date +%Y%m%dT%H%M%SZ).log
@@ -51,11 +48,12 @@ shape, and the canary. It prints no match — only the rule, the source, the lin
 and a masked excerpt — because a gate log that quotes the token it found has
 moved the secret rather than reported it.
 
-Run against the 23 committed `gate-logs/` files it reports **0 hits** with the
-three documented allow rules in `infra/scan-logs.allow.txt`. That is the tooling
-proven, not the pass performed: those are gate transcripts, not a day of the
-platform's own logs. Plant the canary **before** the sample window opens, or the
-run searches for member content by shape alone and says so in its summary.
+It was run against the live stack with a canary planted first, and it found
+member content in MongoDB's slow-query log — six hits, fixed by `--quiet
+--slowms 30000`, re-run clean. The finding, the fix and the residual are in
+`docs/security-review.md` §8. Nothing is owed here except the habit: plant the
+canary **before** the sample window opens, or the run searches for member
+content by shape alone and says so in its own summary.
 
 ### T1113 — rotating the inherited key · needs you
 
@@ -90,7 +88,17 @@ device and the published extension on a clean browser profile, each pointed at
 that system's address without being rebuilt; then the rollback exercised in both
 directions on the host. Nothing is missing from the code for either.
 
-### T1150 – T1155 — measurement and the soak · need a deployed system, and seven days
+### T1150 — the phase criteria · **run, with two gates to fix rather than two defects**
+
+Every phase gate ran against the stack: P1 13/13, P2 14/14, P3 17/17 (after its
+own hour-dependence was fixed), P4 18/18, P7 24/24, P8 21/21. P5 is 25/28 and P6
+26/27, and both remainders were chased to the bottom and are the gates' rather
+than the product's — the reproductions are in
+`specs/025-hardening-release/tasks.md`. P10's portal suite ran for the first
+time: 19 passed, 4 skipped, and one failure that is `limits.anonymousPerMinute`
+doing its job on a suite that signs in nineteen times in ninety seconds.
+
+### T1151 – T1155 — the blueprint's ten, the sweep and the soak · need a deploy, a device, and seven days
 
 The daily sample is a command now:
 
@@ -103,12 +111,22 @@ printing a bare verdict, writes the row even when the sample fails — a soak
 whose bad days are missing is a soak that always passes — and exits non-zero so
 a scheduler fails loudly. Seven consecutive rows are the record.
 
-The right-to-left sweep (T1152) needs the released build on a device in hand.
-The measurements (T1150, T1151) need a running system to measure; the table they
-fill is in the blueprint's own `tasks.md`.
+`ops/soak-2.1.0.log` has its first row, from this stack, reading `HEALTHY` with
+every job fresh.
+
+The right-to-left sweep (T1152) needs the released build on a device in hand —
+the portal's and the public site's Arabic pass in the e2e suite, and the phone's
+does not, because nothing here can hold a phone. SC-001…SC-010 (T1151) want the
+deployed system rather than this one.
 
 ## What that leaves
 
-Every P11 item that could be closed without a container or your account has
-been. What remains is a rehearsal, a day of logs, a key only you can rotate, a
-deploy, and seven days of clock.
+Every P11 item that could be closed here has been. What remains is a restore
+rehearsal on a second machine, a fresh-install rehearsal from the published
+release, the deploy and its rollback, a key only you can rotate, a phone in
+somebody's hand, and seven days of clock.
+
+Two loose threads worth a name, neither of them blocking: **P5's and P6's gates**
+assert things their own setup makes untrue, and **P10's portal suite** should
+sign in once and reuse the session instead of nineteen times. Both are small, and
+both are the kind of red that teaches people to ignore red.
