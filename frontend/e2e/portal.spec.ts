@@ -285,6 +285,17 @@ test('reaches every act within three steps of the overview (SC-004)', async ({
     /what changed/i,
   ]) {
     await page.goto(`${BASE}/overview`);
+    /*
+     * Wait for the overview to be *rendered* before clicking away from it.
+     * `RequireAdmin` renders null until it has mounted and checked the role, so
+     * a click issued against the first paint lands on a link the next render
+     * detaches — Playwright reports "element was detached from the DOM,
+     * retrying" and then times out, which reads as a missing link rather than
+     * as a click that was too early.
+     */
+    await expect(
+      page.getByRole('heading', { name: /overview|نظرة/i }),
+    ).toBeVisible();
     await page.getByRole('link', { name }).click();
     await expect(page.getByRole('heading').first()).toBeVisible({
       timeout: 10_000,

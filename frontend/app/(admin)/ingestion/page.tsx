@@ -1,5 +1,6 @@
 'use client';
 
+import { observer } from 'mobx-react-lite';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
@@ -64,7 +65,7 @@ const QUEUE = `
  * every article the installation has ever read is a screen nobody can find a
  * stuck row in. `done` is available by name.
  */
-function IngestionPage() {
+const IngestionPage = observer(function IngestionPage() {
   const t = useTranslations('ingestion');
   const { auth } = useStores();
   const [rows, setRows] = useState<QueueRow[]>([]);
@@ -243,7 +244,7 @@ function IngestionPage() {
       </section>
     </main>
   );
-}
+});
 
 export default function Page() {
   return (

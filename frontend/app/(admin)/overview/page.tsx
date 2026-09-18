@@ -13,7 +13,7 @@ import { RequireAdmin } from '../require-admin';
 
 const REGISTRATION_KEY = 'auth.registrationOpen';
 
-function OverviewPage() {
+const OverviewPage = observer(function OverviewPage() {
   const t = useTranslations('overview');
   const locale = useLocale();
   const { auth, admin, health, profile } = useStores();
@@ -257,7 +257,7 @@ function OverviewPage() {
       </div>
     </main>
   );
-}
+});
 
 export default observer(function Overview() {
   return (

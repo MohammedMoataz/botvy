@@ -119,48 +119,53 @@ the portal's and the public site's Arabic pass in the e2e suite, and the phone's
 does not, because nothing here can hold a phone. SC-001…SC-010 (T1151) want the
 deployed system rather than this one.
 
-## One defect found and not fixed: the portal's health panel never loads
+## One defect found, and fixed: every admin screen rendered once and never again
 
-Worth reading before anything else here, because it is the Owner's own screen.
+Worth reading, because it was the Owner's own screens and nothing said so.
 
-On the running stack, signing into the portal and landing on `/overview` leaves
-the Health panel reading **"Loading…" for ever**. Measured rather than guessed:
+Signing into the portal and landing on `/overview` left the Health panel reading
+**"Loading…" for ever**, while `/health` answered `200` every thirty seconds and
+no error was raised anywhere:
 
 ```
 +2s  Health | Loading…      health responses: 20:51:43 200
-+5s  Health | Loading…                        20:52:13 200
-+10s Health | Loading…                        20:52:43 200
-+20s Health | Loading…
-+30s Health | Loading…
++10s Health | Loading…                        20:52:13 200
++30s Health | Loading…                        20:52:43 200
 ```
 
-So the request is made every thirty seconds, the API answers `200`, no console
-error is raised, and `health.problem` — which the page would render as a warning
-— stays empty. Everything else on the page renders, including the usage figures
-that come from GraphQL. `curl` against the same endpoint returns the full report
-with four fresh jobs.
+The cause is one word in the wrong place, repeated eight times:
 
-It is the failure the portal suite's first case is written to catch, and that
-case is red for this reason now that the `429` in front of it is handled.
+```tsx
+export default observer(function Overview() {
+  return (
+    <RequireAdmin>
+      <OverviewPage />   // ← reads the stores, and is not an observer
+    </RequireAdmin>
+  );
+});
+```
 
-**What is already ruled out**, so nobody repeats it: the endpoint (200, correct
-body), the credential (the same session reads GraphQL fine), an exception in the
-poll (`problem` would be set and shown), the store being provided twice (the
-provider holds one `RootStore` in a `useState` initialiser), and the SDK's own
-`AdminStore.health` (the portal imports the SDK's class, not a local one).
+`observer` wrapped the outer component, which reads no store at all. The inner
+one — which reads `health.report`, the member list, the settings, the queue —
+was a plain component, so MobX never subscribed it to anything. Every admin
+screen therefore rendered whatever was in the stores at first paint and then
+ignored every update: the health panel, the member table, the settings after a
+save, the reading queue. `login/page.tsx` was the one page written the other way
+round, `export default observer(LoginPage)`, and it is the one page that has
+always worked.
 
-**What to try next, in order:** whether the portal's MobX `HealthStore` wrapper
-actually receives the SDK store's `subscribe` callback in the browser bundle —
-`staleJobs` on that wrapper is a getter over a non-observable and is exactly the
-"computed that reads no observable is cached for ever" trap this project has
-already been bitten by once; whether the image's bundled `@botvy/sdk` is the
-built one this branch produced; and whether `reactStrictMode` plus the effect's
-`health.start()`/`health.stop()` pair is bumping the store's `#epoch` between
-the read being issued and its answer arriving, which would discard every report
-silently and look exactly like this.
+All eight are wrapped at the component that does the reading now. The Health
+panel fills in within a second — "Healthy", every job named with the time it
+last ran — and the portal suite's first case, which is written to catch exactly
+this, is green.
 
-It needs a browser with the store in front of it rather than another round of
-reasoning, which is why it is written down here instead of guessed at.
+**One flake is left in that suite and it is not the product.** Under a full run
+the shared administrator account trips the rate limits — `limits.anonymousPerMinute`
+is twenty by design — and a page whose read is refused shows the error boundary.
+The sign-in helper waits the window out now; a read refused mid-navigation still
+fails `SC-004` about one run in two. The suite should use one session and a
+back-off rather than nineteen sign-ins; that is P10's to fix and it is written
+here so the next red run is recognised rather than re-diagnosed.
 
 ## What that leaves
 

@@ -33,7 +33,7 @@ import { RequireAdmin } from '../require-admin';
  * is resolved when the page is drawn, and somebody who has since deleted their
  * account shows as their id, which is honest and still traceable.
  */
-function AuditPage() {
+const AuditPage = observer(function AuditPage() {
   const t = useTranslations('audit');
   const { auth } = useStores();
   const [admin] = useState(() => new AdminStore(auth.client));
@@ -169,7 +169,7 @@ function AuditPage() {
       </section>
     </main>
   );
-}
+});
 
 const Audit = observer(function Audit() {
   return (

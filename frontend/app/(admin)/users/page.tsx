@@ -19,7 +19,7 @@ import { Tag } from 'primereact/tag';
 import { useStores } from '../../../stores/provider';
 import { RequireAdmin } from '../require-admin';
 
-function UsersPage() {
+const UsersPage = observer(function UsersPage() {
   const t = useTranslations('users');
   const { auth } = useStores();
   const [admin] = useState(() => new AdminStore(auth.client));
@@ -217,7 +217,7 @@ function UsersPage() {
       </section>
     </main>
   );
-}
+});
 
 export default observer(function Users() {
   return (

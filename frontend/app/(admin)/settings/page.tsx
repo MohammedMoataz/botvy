@@ -39,7 +39,7 @@ import { RequireAdmin } from '../require-admin';
  * the rule named and is shown against that row — which is FR-006 in as many
  * words, and why an out-of-range number is not a silent no-op here.
  */
-function SettingsPage() {
+const SettingsPage = observer(function SettingsPage() {
   const t = useTranslations('settings');
   const { auth } = useStores();
   const [admin] = useState(() => new AdminStore(auth.client));
@@ -191,7 +191,7 @@ function SettingsPage() {
       </div>
     </main>
   );
-}
+});
 
 /** One input, chosen by the server's own description of the key. */
 function Control({

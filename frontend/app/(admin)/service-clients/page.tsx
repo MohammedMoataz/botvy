@@ -14,7 +14,7 @@ import { Tag } from 'primereact/tag';
 import { useStores } from '../../../stores/provider';
 import { RequireAdmin } from '../require-admin';
 
-function ServiceClientsPage() {
+const ServiceClientsPage = observer(function ServiceClientsPage() {
   const t = useTranslations('serviceClients');
   const { auth } = useStores();
   const [admin] = useState(() => new AdminStore(auth.client));
@@ -187,7 +187,7 @@ function ServiceClientsPage() {
       </Dialog>
     </main>
   );
-}
+});
 
 export default observer(function ServiceClients() {
   return (

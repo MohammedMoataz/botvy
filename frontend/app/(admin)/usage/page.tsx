@@ -30,7 +30,7 @@ import { RequireAdmin } from '../require-admin';
  * and a total in another would not add up. So the boundary is UTC and the header
  * says it, which is better than a boundary nobody can see.
  */
-function UsagePage() {
+const UsagePage = observer(function UsagePage() {
   const t = useTranslations('usage');
   const { auth } = useStores();
   const [admin] = useState(() => new AdminStore(auth.client));
@@ -184,7 +184,7 @@ function UsagePage() {
       </section>
     </main>
   );
-}
+});
 
 export default observer(function Usage() {
   return (

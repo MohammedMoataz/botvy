@@ -34,7 +34,7 @@ import { RequireAdmin } from '../require-admin';
  * screen would be a second way to write one value, and the audit row would then
  * depend on which screen somebody used.
  */
-function WorkflowsPage() {
+const WorkflowsPage = observer(function WorkflowsPage() {
   const t = useTranslations('workflows');
   const { auth } = useStores();
   const [admin] = useState(() => new AdminStore(auth.client));
@@ -177,7 +177,7 @@ function WorkflowsPage() {
       />
     </main>
   );
-}
+});
 
 export default observer(function Workflows() {
   return (
