@@ -81,3 +81,7 @@ secrets/
 # TypeScript. It is deleted on a clean exit and left behind on a kill, so it
 # must never be committable — one was staged once.
 *.timestamp-*.mjs
+
+# Playwright's own output, written by `pnpm --filter @botvy/frontend test:e2e`.
+test-results/
+playwright-report/

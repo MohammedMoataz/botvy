@@ -32,3 +32,12 @@ packages/contracts/openapi.json
 # n8n's own export shape, imported verbatim by `infra/bootstrap.mjs`. Prettier
 # would reformat every one and make the next export a whole-file diff.
 workflows/*.json
+
+# `infra/gen-lint-contexts.mjs` owns this one: it rewrites the constitution-IX
+# group with `JSON.stringify(…, null, 2)` and refuses to touch the file if that
+# would reformat anything else — which Prettier's JSON style does.
+oxlint.json
+
+# Playwright's own output.
+**/test-results/
+**/playwright-report/
