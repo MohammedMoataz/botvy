@@ -90,6 +90,10 @@ jobs:
       # from the directory listing now; this is the step that notices when the
       # committed config and the tree have parted company.
       - run: pnpm lint:contexts
+      # Formatting, so the argument happens once here rather than once per pull
+      # request. Markdown and the generated files are out — `.prettierignore`
+      # says why each one is.
+      - run: pnpm format:check
       - run: pnpm --filter @botvy/backend exec tsc --noEmit -p tsconfig.json
       - run: pnpm --filter @botvy/backend build
       # `tsc` and `vitest` both run against source, and vitest supplies its own
