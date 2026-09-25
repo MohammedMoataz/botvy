@@ -78,7 +78,7 @@ docker compose --env-file .env -f infra/docker-compose.yml stop backend worker
 # 2. Identity. The `backups` image holds pg_restore, the archive directory and
 #    the connection string, so it is the process that does the writing.
 docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
-  -c 'pg_restore --clean --if-exists --dbname "$DATABASE_URL" /backups/<NIGHT>/identity.dump'
+  -c 'pg_restore --clean --if-exists --no-owner --no-acl --dbname "$DATABASE_URL" /backups/<NIGHT>/identity.dump'
 
 # 3. Everything else.
 docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \

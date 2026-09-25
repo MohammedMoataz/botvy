@@ -27,6 +27,12 @@ alarms and catches up when the connection returns — that is what it was built
 for — but the portal and the chat need the stores. An installation that must
 work with the internet down is the `local-stores` profile.
 
+Profile photos are the one member artefact still on this machine: they sit on
+the `media` volume behind the platform's storage provider, and a client is
+handed a signed URL for each (`GET /media/files?key=…&sig=…`) rather than a
+path — so moving them to an object store later is a second provider and no
+client notices. The nightly backup carries the volume.
+
 ## Bringing it up
 
 Create the two databases first. In Neon: a project in the region nearest you,
@@ -76,7 +82,7 @@ If it exits non-zero, do not go further — each line names what failed.
 | Scheduled work is arriving | the `jobs` block of the same response | no job older than `ops.staleAfterMinutes`, and `backup` no older than `backup.staleHours` |
 | The built code is loadable | `node infra/verify-esm.mjs` | exits 0 — the compiled output imports under plain Node, which `tsc` and the tests cannot tell you |
 | Nothing secret is in the logs | `node infra/scan-logs.mjs --since 24h --canary "<a planted sentence>"` | `0 hits` |
-| It stays healthy | `node infra/soak-sample.mjs --version 2.1.0`, once a day | a row in `ops/soak-2.1.0.log` reading `HEALTHY` |
+| It stays healthy | `node infra/soak-sample.mjs --version 2.2.0`, once a day | a row in `ops/soak-2.2.0.log` reading `HEALTHY` |
 
 The first two are the ones to run today. The rest are the ones that tell you
 months from now that it is still true.
@@ -181,7 +187,7 @@ serve a hosted store and a `local-stores` container alike:
 docker compose --env-file .env -f infra/docker-compose.yml stop backend worker
 
 docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
-  -c 'pg_restore --clean --if-exists --dbname "$DATABASE_URL" /backups/<NIGHT>/identity.dump'
+  -c 'pg_restore --clean --if-exists --no-owner --no-acl --dbname "$DATABASE_URL" /backups/<NIGHT>/identity.dump'
 
 docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
   -c 'mongorestore --uri "$MONGO_URL" --archive=/backups/<NIGHT>/botvy.archive.gz --gzip --drop'
@@ -265,7 +271,7 @@ owning a host.
 The running version is one line in `.env`:
 
 ```
-BOTVY_TAG=v2.1.0
+BOTVY_TAG=v2.2.0
 ```
 
 **Rolling back** is re-pinning the previous tag and pulling — images are

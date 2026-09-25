@@ -80,8 +80,13 @@ fi
 # --------------------------------------------------------------- PostgreSQL
 PG_ARCHIVE="${NIGHT}/identity.dump"
 # Custom format, so the verification below can list it and a restore can be
-# selective if it ever has to be.
-if pg_dump --dbname="${DATABASE_URL}" --format=custom --file="${PG_ARCHIVE}"; then
+# selective if it ever has to be. No ownership and no privileges: a managed
+# PostgreSQL adds its own grants to the schema (`ALTER DEFAULT PRIVILEGES FOR
+# ROLE cloud_admin …`), which the application's role cannot re-apply — so the
+# first restore rehearsal against Neon landed every table and still exited 1
+# over two statements that were never ours. The role that restores owns
+# what it restores, on any install.
+if pg_dump --dbname="${DATABASE_URL}" --format=custom --no-owner --no-acl --file="${PG_ARCHIVE}"; then
   if pg_restore --list "${PG_ARCHIVE}" >/dev/null 2>&1; then
     add_archive "{\"name\":\"identity.dump\",\"bytes\":$(size_of "${PG_ARCHIVE}")}"
   else
@@ -103,8 +108,18 @@ if [ -d "${MEDIA_DIR}" ]; then
     # equivalent of `--dryRun` for a tar, and `-t` reading the whole stream is
     # the same parse. The file count is what catches the failure a checksum
     # cannot — a tar of an empty directory is a valid tar.
-    MEDIA_FILES="$(tar -tzf "${MEDIA_ARCHIVE}" 2>/dev/null | grep -vc '/$' || echo 0)"
-    if [ "${MEDIA_FILES}" -ge 0 ] 2>/dev/null; then
+    # Two steps, because they answer two questions. `tar -t` failing means the
+    # archive does not parse, which is the failure this branch exists for.
+    # The count is separate: `grep -c` prints `0` *and* exits 1 when nothing
+    # matches, so the old `|| echo 0` fallback produced "0\n0" for an empty
+    # media directory and the numeric test below refused it — every fresh
+    # install with no photo yet reported its first night as a failed backup.
+    if LISTING="$(tar -tzf "${MEDIA_ARCHIVE}" 2>/dev/null)"; then
+      MEDIA_FILES="$(printf '%s\n' "${LISTING}" | grep -vc '/$' || true)"
+    else
+      MEDIA_FILES=''
+    fi
+    if [ -n "${MEDIA_FILES}" ] && [ "${MEDIA_FILES}" -ge 0 ] 2>/dev/null; then
       MEDIA_SUM="$(sha256sum "${MEDIA_ARCHIVE}" | cut -d' ' -f1)"
       add_archive "{\"name\":\"media.tar.gz\",\"bytes\":$(size_of "${MEDIA_ARCHIVE}"),\"sha256\":\"${MEDIA_SUM}\",\"files\":${MEDIA_FILES}}"
       echo "${MEDIA_SUM}  media.tar.gz" > "${NIGHT}/media.tar.gz.sha256"
