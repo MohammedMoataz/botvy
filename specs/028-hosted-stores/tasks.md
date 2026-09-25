@@ -103,10 +103,19 @@ restore are performed, not described.
   grants (`ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin …`) that
   `botvy_owner` cannot re-apply; dump and restore run `--no-owner --no-acl`
   now, in the script and in both documents
-- [ ] T2826 Cut the connection to Atlas for a minute during the gate; the relay
-  reconnects and the next outbox row is delivered — not performed; the relay's
-  reconnect is covered by its spec, and the free cluster gave no maintenance
-  window to observe
+- [x] T2826 The relay's recovery was exercised for real, and it failed. The
+  restore in T2825 recreated `outbox` under a new identity, so the saved resume
+  token could never be resumed again — and the store cleared a bad token only
+  on `ChangeStreamHistoryLost` (286), which is not what MongoDB reports here:
+  the driver simply marks the stream closed and iterating it throws a plain
+  `MongoAPIError` with no code. So the relay reopened the same dead stream
+  every thirty seconds for eight hours, delivered nothing, and `/health` was
+  the only thing that said so — which is the heartbeat rule earning its keep
+  for the second time in this phase. Any failure *while resuming* now forgets
+  the token, which is safe because `run()` drains undelivered rows before it
+  watches; `mongo-outbox.store.spec.ts` pins both shapes of the failure (a
+  throw with no code, and a stream that ends the moment it resumes), and
+  `docs/restore.md` tells a reader what to look for after a `--drop`
 - [x] T2827 Measurements in `spec.md`, cold and warm. The finding is the
   200-row push at 66 s: one transaction per pushed row × one internet round
   trip; a Sync change (one transaction per entity per push), not a store one

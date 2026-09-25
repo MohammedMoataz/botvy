@@ -135,24 +135,66 @@ export class MongoOutboxStore implements RelayStore {
       },
     );
     this.#stream = stream;
+    const resumed = resumeToken != null;
 
     try {
       for await (const change of stream) {
         if (change.operationType !== 'insert' || !change.fullDocument) continue;
         yield { event: toEvent(change.fullDocument), token: change._id };
       }
-    } catch (error) {
-      if ((error as { code?: number }).code === CHANGE_STREAM_HISTORY_LOST) {
-        this.logger.warn(
-          'resume token fell off the oplog; clearing it so the next run starts fresh',
+      // The iteration ended without throwing. On shutdown that is `close()`
+      // below, which nulls `#stream` before ending it; anything else is the
+      // server ending the stream on its own, and straight after a resume that
+      // means the token is the reason.
+      if (resumed && this.#stream !== null) {
+        await this.#forgetResumeToken(
+          'the change stream ended as soon as it resumed',
         );
-        await this.saveResumeToken(null);
+      }
+    } catch (error) {
+      if (resumed) {
+        const code = (error as { code?: number }).code;
+        await this.#forgetResumeToken(
+          code === CHANGE_STREAM_HISTORY_LOST
+            ? 'the resume token fell off the oplog'
+            : `resuming the change stream failed: ${(error as Error).message}`,
+        );
       }
       throw error;
     } finally {
       this.#stream = null;
       await stream.close().catch(() => undefined);
     }
+  }
+
+  /**
+   * Drops the stored token so the next run opens a fresh stream.
+   *
+   * Any failure *while resuming* is treated as the token's fault, not only the
+   * one error code that says so. A resume token is tied to the collection it
+   * was minted against, so a `mongorestore --drop` — the documented restore —
+   * recreates `outbox` under a new identity and leaves the token pointing at a
+   * collection that no longer exists. MongoDB does not report that as
+   * `ChangeStreamHistoryLost`: the driver simply marks the stream closed, and
+   * iterating it throws a plain `MongoAPIError: ChangeStream is closed` with no
+   * code at all. Matching on 286 alone meant the relay retried the same
+   * poisoned token every thirty seconds for ever — which is exactly what it did
+   * after 028's restore rehearsal, silently, with `/health` the only thing
+   * saying so.
+   *
+   * Forgetting the token is safe in every case, which is why it is not hedged:
+   * `OutboxRelay.run()` drains undelivered rows *before* it watches, so a
+   * stream that starts from now rather than from a saved position still
+   * delivers everything the outbox holds. The cost of clearing one that was
+   * actually fine is a redelivery, and every consumer is idempotent on
+   * `eventId`.
+   */
+  async #forgetResumeToken(why: string): Promise<void> {
+    this.logger.warn(
+      `${why}; clearing it so the next run starts fresh. No event is lost — ` +
+        'the relay drains undelivered rows before it watches.',
+    );
+    await this.saveResumeToken(null).catch(() => undefined);
   }
 
   /** Ends the current watch, which lets `run()` return on shutdown. */

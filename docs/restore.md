@@ -107,6 +107,15 @@ Not "the containers started" — that is not the question:
 1. `curl -s http://localhost:${EDGE_PORT:-80}/health` reads `ok`, with every job
    present. The `backup` job will read stale until the next night runs, which is
    correct and expected.
+   **`outbox.relay` deserves a second look.** `--drop` recreates the
+   collections under new identities, so the relay's saved resume token points
+   at an `outbox` that no longer exists and its change stream dies on the spot.
+   It clears the token and starts fresh by itself — within a minute or two of
+   the restart, `outbox.relay` should read fresh with no `lastError`. If it is
+   still repeating `ChangeStream is closed`, the recovery is not running and
+   the relay is delivering nothing: `db.relay_state.deleteMany({})` in the
+   restored database gets it going again. Nothing is lost either way; the relay
+   drains undelivered rows before it watches.
 2. Sign in as a member who existed before the backup. Their tasks, meetings and
    conversations are there.
 3. Open a photo. If it 404s, the media step was skipped or the volume name was
