@@ -4,8 +4,8 @@
     "tagline": "One assistant for your day."
   },
   "marketing": {
-    "headline": "Your day, on your own machine.",
-    "body": "Botvy keeps your tasks, meetings and reminders in one place — on your phone, in your browser, and on the web. It coaches, plans your week and reads what you save, using a language model that runs on your own hardware. Nothing leaves it.",
+    "headline": "Your day, in one private place.",
+    "body": "Botvy keeps your tasks, meetings and reminders in one place — on your phone, in your browser, and on the web. It coaches, plans your week and reads what you save, with a language model that runs on your own hardware: what you tell the coach never leaves it. Your data lives in databases that are yours, reached by nothing but your own Botvy.",
     "featuresTitle": "What it does",
     "features": {
       "day": {

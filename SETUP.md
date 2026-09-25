@@ -7,7 +7,8 @@ actually working, and get it back after something goes wrong.
 
 | | |
 |---|---|
-| **Docker** | Compose v2. On Linux or WSL2 for a machine that runs unattended; Docker Desktop is fine for development. |
+| **Docker** | Compose v2, 2.20 or later. On Linux or WSL2 for a machine that runs unattended; Docker Desktop is fine for development. |
+| **Two databases** | A [Neon](https://neon.tech) project (PostgreSQL — Identity) and a [MongoDB Atlas](https://www.mongodb.com/atlas) cluster (everything else; a free `M0` is enough for a household). Their two connection strings are the only thing the platform knows about them. Or neither: `--profile local-stores` runs both as containers on this machine, which is what CI does. |
 | **Node 24** | Only for the developer loop and the two scripts in `infra/`. The containers carry their own. |
 | **pnpm 9.15** | `corepack enable` is enough — the version is pinned in `package.json`. |
 | **Ollama** | Host-native, with the models named in the settings registry pulled. It stays outside Docker so it can reach the GPU — `ai/ollama/SETUP.md` installs it. |
@@ -16,11 +17,30 @@ actually working, and get it back after something goes wrong.
 A tunnel is optional. Without one the platform is reachable on the LAN; with
 one it is reachable from anywhere, still through the single published port.
 
+**Where the data lives.** The API, the worker, the edge, the automation tool
+and the model all run on this machine; the two databases do not. Identity is in
+the Neon project and everything else is in the Atlas cluster, both reached over
+TLS with the credentials in `.env` and by nothing but the API. The consequence
+worth knowing before it happens: **without internet there is no server**, even
+on the LAN. The phone keeps working from its own database, rings its own
+alarms and catches up when the connection returns — that is what it was built
+for — but the portal and the chat need the stores. An installation that must
+work with the internet down is the `local-stores` profile.
+
 ## Bringing it up
+
+Create the two databases first. In Neon: a project in the region nearest you,
+a database named `botvy`, and the **direct** connection string (the one whose
+host has no `-pooler`), with `?sslmode=require` on the end. In Atlas: a cluster
+in the same region, a database user with read/write on `botvy`, a Network
+Access rule for this machine's address — a home connection's address moves, so
+`0.0.0.0/0` with a long generated password is the honest setting — and the
+SRV connection string with `/botvy` inserted before the `?`.
 
 ```bash
 cp infra/.env.example .env
-# Fill in every value marked REQUIRED. For the secrets:
+# Fill in every value marked REQUIRED — the two connection strings first.
+# For the secrets:
 #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 docker compose --env-file .env -f infra/docker-compose.yml up -d --build
@@ -28,8 +48,13 @@ node infra/bootstrap.mjs
 node infra/verify.mjs
 ```
 
-`bootstrap.mjs` waits for the stores, applies both sets of migrations, checks
-that the machine credential answers, and imports the workflows. It is safe to
+To run the stores as containers instead, set `COMPOSE_PROFILES=local-stores`
+in the shell (or pass `--profile local-stores` to every compose call) and
+point the two URLs at `postgres` and `mongo` as the example file shows.
+
+`bootstrap.mjs` waits for the API to report both stores, applies both sets of
+migrations, checks that the machine credential answers, and imports the
+workflows. It is safe to
 run again — and `verify.mjs` proves that by running it a second time and
 requiring that nothing changed.
 
@@ -105,10 +130,21 @@ Both stores are dumped nightly to `backups/`, and each archive is read back
 immediately after it is written. A backup nobody has opened is a hope, not a
 backup.
 
+The dumps come over the network from the managed stores to this machine, which
+is the point: the providers' own safety nets are not a backup of *yours*. A
+free Atlas cluster has no backups at all, and Neon's point-in-time restore
+covers one store when what you need back is both from the same night. The
+archives on this disk are the only copy that restores the platform whole, so
+the `backups` service stays exactly as necessary as it was when the stores were
+containers.
+
 The `backups` service runs **one** script, `infra/backup.sh`, on one schedule:
 MongoDB, the Identity database and the media directory into a dated folder under
 `BACKUP_DIR`. It is a built image (`infra/backup/Dockerfile`) rather than
-`mongo:8` with a command, because that image ships neither `cron` nor `pg_dump`.
+`mongo:8` with a command, because that image ships neither `cron` nor `pg_dump`
+— and the `pg_dump` it installs comes from PostgreSQL's own repository, pinned
+to a major at least as new as the server's, because an older client refuses to
+dump a newer server and the nightly would fail on every hosted install.
 
 The three are one backup because they are only useful together. `userId` in
 MongoDB is the PostgreSQL uuid with no join to rebuild it from, and a photo
@@ -136,16 +172,19 @@ to follow — including the set of secrets that must accompany the archives and
 are not in them, restoring onto a different machine, and what a rollback does
 and does not put back.
 
-The short version, for the same machine and one night's directory:
+The short version, for one night's directory. The restore tools run in the
+`backups` image, which already holds both of them and the archive directory,
+and write into whatever the two URLs in `.env` name — so the same commands
+serve a hosted store and a `local-stores` container alike:
 
 ```bash
 docker compose --env-file .env -f infra/docker-compose.yml stop backend worker
 
-docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres \
-  pg_restore --clean --if-exists --dbname "$DATABASE_URL" < ../backups/<NIGHT>/identity.dump
+docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
+  -c 'pg_restore --clean --if-exists --dbname "$DATABASE_URL" /backups/<NIGHT>/identity.dump'
 
-docker compose --env-file .env -f infra/docker-compose.yml exec -T mongo \
-  mongorestore --uri "$MONGO_URL" --archive --gzip --drop < ../backups/<NIGHT>/botvy.archive.gz
+docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
+  -c 'mongorestore --uri "$MONGO_URL" --archive=/backups/<NIGHT>/botvy.archive.gz --gzip --drop'
 
 docker run --rm -v botvy-v2_media:/data/media -v "$(pwd)/../backups/<NIGHT>:/in:ro" \
   alpine sh -c 'cd /data/media && tar -xzf /in/media.tar.gz'

@@ -4,7 +4,11 @@ A self-hosted life-coaching assistant. It helps one household of members live th
 life they say they want: it keeps their tasks and reminders, plans tomorrow with
 them each evening and hands it back each morning, tracks their training and meals,
 reads the articles and videos they save, and talks all of it through in a chat that
-runs on a model on the owner's own machine. Nothing leaves the host.
+runs on a model on the owner's own machine. The API, the worker, the edge, the
+automation and the model all live on that machine; what the members say to the
+coach never leaves it. The data lives in two managed databases the owner holds
+the keys to — Identity in a Neon PostgreSQL project, everything else in a
+MongoDB Atlas cluster — reached over TLS by the API and by nothing else.
 
 ## Where things are
 

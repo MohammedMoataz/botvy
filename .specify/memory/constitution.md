@@ -1,5 +1,14 @@
 <!--
 Sync Impact Report
+- 2.2.0 (MINOR, 2026-09-25, phase 028-hosted-stores): principles I and V now
+  admit a managed store. I: a store may be a managed service reached over TLS;
+  the API stays its only client and the only holder of its credentials. V: the
+  "MUST remain on the Docker network or localhost" list loses PostgreSQL and
+  MongoDB; a store is either on the Docker network (`--profile local-stores`)
+  or a managed service, and is never a port this stack publishes. III is
+  untouched — the model still runs on the owner's machine. Templates: no change
+  needed; CLAUDE.md, SETUP.md, README.md and docs/security-review.md updated
+  in the same change.
 - 2.1.1 (PATCH, same day): principle I clarifies that every store keeps its own
   transactional outbox (PostgreSQL's `identity_outbox`), closing an at-most-once hop
 - Version change: 1.0.0 → 2.0.0 → 2.1.0 (2.1.0 MINOR, same day: principle IX expanded
@@ -41,7 +50,11 @@ context owns its MongoDB collections. A context MUST NOT read or write another
 context's tables or collections; it asks through a query handler or reacts to an
 event. There are no cross-store joins and no distributed transactions — each store
 records its events in its own outbox inside the same transaction, the worker
-relays them, and consumers are idempotent.
+relays them, and consumers are idempotent. A store may be a managed service
+reached over TLS (Identity's PostgreSQL on Neon, the MongoDB replica set on
+Atlas) or a container on the Docker network; either way the API is its only
+client and the only holder of its credentials, which are environment
+variables and nothing else.
 Rationale: a single writer per store eliminates concurrency bugs and keeps
 validation and auth in one reviewable place; store-per-context keeps the seams
 that let a context become its own service later without a rewrite.
@@ -81,9 +94,11 @@ on the phone, a missing branch makes every existing install refuse to open.
 ### V. Single Public Surface
 Exactly one container publishes a port: the Caddy edge, which routes `/` to the
 web app and `/api/*`, `/graphql`, `/ws`, `/health`, `/media` to the API. It is
-reached through one named Cloudflare tunnel or the LAN. PostgreSQL, MongoDB,
-n8n, the worker and Ollama MUST remain on the Docker network or localhost and
-are never tunnelled or port-forwarded.
+reached through one named Cloudflare tunnel or the LAN. n8n, the worker and
+Ollama MUST remain on the Docker network or localhost and are never tunnelled or
+port-forwarded. Each store is either on the Docker network (the `local-stores`
+profile) or a managed service the API reaches over TLS; in neither case is it a
+port this stack publishes, tunnels or forwards.
 Rationale: one audited, authenticated entry point; the old quick-tunnel exposed
 an entire editor.
 
@@ -203,4 +218,4 @@ principle or materially expanded guidance, PATCH for wording. Every phase plan
 MUST carry the Constitution Check table and justify any deviation in its
 Complexity Tracking section, never absorb it silently.
 
-**Version**: 2.1.1 | **Ratified**: 2026-08-29 | **Last Amended**: 2026-09-05
+**Version**: 2.2.0 | **Ratified**: 2026-08-29 | **Last Amended**: 2026-09-25

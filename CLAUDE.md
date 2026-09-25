@@ -10,8 +10,10 @@ Read those before proposing structure, technology or shell commands.
 `specs/001`–`012` record what v1 built and why; `specs/013-platform-v2-blueprint`
 is the whole-platform plan for v2, and each implementation phase (`014` onward)
 is its own spec-kit feature on its own branch. `.specify/memory/constitution.md`
-(v2.1.1) holds the twelve rules every change is held to — the API is the only
-writer to either store and each bounded context owns its own; n8n holds one
+(v2.2.0) holds the twelve rules every change is held to — the API is the only
+writer to either store and each bounded context owns its own, and since 028 a
+store is a managed service (Identity on Neon, the rest on Atlas) unless the
+`local-stores` compose profile is on; n8n holds one
 credential and no data; migrations only go forward; one public port; three
 principal kinds; bounded contexts talk through events; commands (REST), queries
 (GraphQL) and streams (WebSocket) stay separate; times belong to the user;
@@ -685,3 +687,34 @@ finds it, with a test, and named in the commit; it does not go there.
   pass that found it; it asks compose for the service list, because its first
   version named the blueprint's `edge` and `api` and silently skipped the two
   containers compose calls `caddy` and `backend`.
+- **`directConnection` and an SRV URI are mutually exclusive.** The driver
+  throws `MongoParseError` on the pair and nothing connects — so the flag that
+  the local single-node set needs (its advertised host is the container name,
+  which nothing outside compose resolves) lives in the *local* URL's query
+  string and never in code. It was hard-coded in `mongoose.module.ts` and in
+  `migrate-mongo-config.cjs`, and that one line was what made a hosted cluster
+  unreachable in phase 028.
+- **A `MONGO_URL` with no database in its path is two databases.** Mongoose
+  opens `test`, migrate-mongo's own parser falls back to `botvy`, and the
+  migrations then index a store the application never reads — with every
+  request answering as if the platform were empty and the migrator reporting
+  success. A copied SRV string ends at the host, so this is the mistake a first
+  hosted install makes. Refused at boot by the env schema now, naming the
+  variable.
+- **`pg_dump` has to be at least the server's major.** An older client refuses
+  a newer server outright (`aborting because of server version mismatch`). The
+  backup image is built on `mongo:8`, whose Ubuntu ships client 16; a managed
+  PostgreSQL is created on the provider's current major, which is 17 — so the
+  nightly would have failed on every hosted install, and `/health` reporting
+  `backup` stale is the only thing that would have said so. The client comes
+  from PostgreSQL's own repository now, pinned by `PG_CLIENT_MAJOR` in
+  `infra/backup/Dockerfile`; a newer client reads an older server, so it only
+  ever needs to go up.
+- **`${VAR:?}` in compose is interpolated whether or not the service's profile
+  is on.** `compose config` — which `verify.mjs` reads to count published ports
+  — demands every required variable in the file, so a `postgres` service behind
+  `--profile local-stores` with `${POSTGRES_USER:?}` fails the gate on every
+  host that uses a managed store. A profiled service's variables carry defaults
+  and the image refuses an empty password loudly enough; the cloudflared
+  service's comment has said this since P0 and it applied to two more services
+  than it was written for.

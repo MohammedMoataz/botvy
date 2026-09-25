@@ -54,28 +54,35 @@ The last one deserves its own line: n8n encrypts its credentials at rest with
 workflows that cannot run and cannot be repaired except by re-entering every
 credential by hand.
 
-### The machine
+### The machine, and the stores
 
 Docker with the compose plugin, and enough disk for both dumps uncompressed.
 Everything else comes out of the images.
+
+The archives restore into whatever `DATABASE_URL` and `MONGO_URL` in `.env`
+name. By default those are the managed stores — the Neon project and the
+Atlas cluster — so a restore needs their connection strings, and it needs them
+to be the databases you *mean*: the commands below wipe what is there first. An
+installation running the `local-stores` profile restores into its containers
+with the same commands, because the tools run in the `backups` image and read
+the same two URLs.
 
 ---
 
 ## 2. Restoring onto the same machine
 
 ```bash
-# 1. Stop everything that writes, so nothing is half-restored. Leave the stores up.
+# 1. Stop everything that writes, so nothing is half-restored.
 docker compose --env-file .env -f infra/docker-compose.yml stop backend worker
 
-# 2. Identity.
-docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres \
-  pg_restore --clean --if-exists --dbname "$DATABASE_URL" \
-  < ../backups/<NIGHT>/identity.dump
+# 2. Identity. The `backups` image holds pg_restore, the archive directory and
+#    the connection string, so it is the process that does the writing.
+docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
+  -c 'pg_restore --clean --if-exists --dbname "$DATABASE_URL" /backups/<NIGHT>/identity.dump'
 
 # 3. Everything else.
-docker compose --env-file .env -f infra/docker-compose.yml exec -T mongo \
-  mongorestore --uri "$MONGO_URL" --archive --gzip --drop \
-  < ../backups/<NIGHT>/botvy.archive.gz
+docker compose --env-file .env -f infra/docker-compose.yml run --rm --entrypoint bash backups \
+  -c 'mongorestore --uri "$MONGO_URL" --archive=/backups/<NIGHT>/botvy.archive.gz --gzip --drop'
 
 # 4. The media. Check the checksum first — this is the one archive whose
 #    verification was a checksum rather than a parse, so it is the one that can
@@ -118,6 +125,7 @@ them is a thing that will appear to work until somebody tries it from outside:
 
 | What | Where | Symptom if it still names the old machine |
 |---|---|---|
+| The two store connection strings | `DATABASE_URL`, `MONGO_URL` in `.env` | the restore is written into the old installation's databases, which still answer — and the new machine then serves them, so nothing looks wrong until both machines are running against one store |
 | Tunnel hostname and credential | `TUNNEL_TOKEN` in `.env`, and the tunnel's own configuration at the provider | nothing is reachable from outside, or the old machine is |
 | Edge site address | `CADDY_SITE` in `.env` | Caddy tries to obtain a certificate for a name that no longer points here |
 | Allowed browser origin | `CORS_ORIGINS` in `.env` | the portal loads and every request from it is refused |
@@ -176,6 +184,10 @@ rather than after.
 
 - **`pg_restore` complains about existing objects** — you ran it without
   `--clean --if-exists`. Drop and recreate the database, then run it again.
+- **`pg_dump` or `pg_restore` aborts with "server version mismatch"** — the
+  client in the `backups` image is older than the store's PostgreSQL major.
+  Raise `PG_CLIENT_MAJOR` in `infra/backup/Dockerfile` and rebuild the image; a
+  newer client reads an older server, never the reverse.
 - **`mongorestore` reports "E11000 duplicate key"** — you ran it without
   `--drop` onto a database that already had rows. Same fix: restore into an
   empty one.

@@ -5,8 +5,17 @@ branch. Each item says what is true, how it was checked, and — where something
 is not closed — what was decided and why.
 
 This is a **self-hosted personal system**: one Owner, a handful of members they
-know, on a machine they control. That shapes several of the trades below, and
-where it does, it is said out loud rather than left as an unexamined assumption.
+know, the API and the model on a machine they control. That shapes several of
+the trades below, and where it does, it is said out loud rather than left as an
+unexamined assumption.
+
+Since `028-hosted-stores` the two databases are **managed services** — Identity
+in a Neon PostgreSQL project, everything else in a MongoDB Atlas cluster — so
+"the host" is no longer the whole trust boundary. What crosses it: every store
+round trip, over TLS, authenticated by the two connection strings in `.env`,
+which the API, the worker and the `backups` container hold and nothing else
+does. What that changes is marked below wherever it does; the `local-stores`
+profile puts the containers back and every older statement holds again.
 
 ---
 
@@ -18,8 +27,12 @@ where it does, it is said out loud rather than left as an unexamined assumption.
 | `n8n` | `${N8N_BIND:-127.0.0.1:5679}:5678` | the host's loopback only |
 | everything else | none | the compose network only |
 
-`postgres`, `mongo`, `backend`, `worker`, `frontend` and `backups` publish
-nothing. Constitution V holds.
+`backend`, `worker`, `frontend` and `backups` publish nothing, and `postgres`
+and `mongo` exist only behind `--profile local-stores`, where they publish
+nothing either. The managed stores answer on the internet by their nature; what
+constitution V says of them now is that *this stack* publishes no port to
+reach them and holds their credentials in exactly one place. Constitution V
+holds.
 
 **The automation editor is not on the internet.** n8n binds to `127.0.0.1`, so
 the Owner reaches it through an SSH tunnel and nothing outside the host can. It
@@ -155,7 +168,7 @@ origin.
 | `MEDIA_SIGNING_SECRET` | API | mint media URLs — but `checkTarget` still applies, so the proxy is no more reachable than it is for anybody |
 | `N8N_API_KEY` | API | drive the automation tool: list, activate and run workflows |
 | `N8N_ENCRYPTION_KEY` | n8n | decrypt every credential n8n stores, which on this installation is the service token |
-| `DATABASE_URL` / `MONGO_URL` password | API, worker, backups | everything, if they can also reach the port — which from outside the host they cannot |
+| `DATABASE_URL` / `MONGO_URL` password | API, worker, backups | **everything.** The stores are managed services that answer on the internet, so this credential alone is the whole platform — which is why each is a long generated password, why both URLs carry TLS (`sslmode=require`, `mongodb+srv`), and why the Atlas cluster carries a Network Access rule. Neon's free tier has no address allow-list, so there the password is the only control. Rotation is provider-side: reset the password there, update `.env`, `up -d` — the two processes reconnect and nothing else holds it |
 | `ADMIN_PASSWORD` | seeded once | the portal, if it is still the seeded value |
 
 Two consequences worth stating:
@@ -317,6 +330,12 @@ seconds still logs its command, and that command may carry member content. It is
 on the Owner's own host, readable by whoever can already read the volume, and it
 cannot be redacted without Enterprise. If that becomes unacceptable the answer is
 a log driver that filters, not a higher number.
+
+**With the managed store the residual moves, it does not shrink.** Atlas keeps
+the server log; the `--slowms` flag above is the local container's and reaches
+no hosted cluster. Atlas's profiler is off by default on a free cluster and its
+logs are readable by whoever holds the Atlas account — which is the Owner, and
+is the same shape of residual on somebody else's disk. Leave the profiler off.
 
 `gate-logs/T1112-scrub-*.log` holds both runs — the finding and the clean pass.
 The three allow rules in `infra/scan-logs.allow.txt` are the gate's own
