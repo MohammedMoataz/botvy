@@ -22,7 +22,7 @@ restore are performed, not described.
   hook and `N8N_DB` deleted. `check:` `compose config --services` lists six
   services without the profile and eight with it
 - [x] T2804 `infra/backup/Dockerfile`: PostgreSQL's repository,
-  `postgresql-client-${PG_CLIENT_MAJOR}` (17)
+  `postgresql-client-${PG_CLIENT_MAJOR}` (18 — Neon created the project on 18)
 - [x] T2805 `infra/bootstrap.mjs`: `waitForStores` asks `/health` for both
   store flags instead of compose for two service names
 - [x] T2806 `infra/.env.example`: managed URLs first, the profile's local ones

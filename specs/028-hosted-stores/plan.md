@@ -19,7 +19,7 @@ two connection strings.
 ## Technical Context
 
 **Primary Dependencies**: none new. Prisma 6 against Neon's direct endpoint;
-Mongoose 8 / `migrate-mongo` 11 against an Atlas SRV URL; `postgresql-client-17`
+Mongoose 8 / `migrate-mongo` 11 against an Atlas SRV URL; `postgresql-client-18`
 from PGDG in the backup image.
 
 **Storage**: unchanged in shape. Identity in PostgreSQL, everything else in a

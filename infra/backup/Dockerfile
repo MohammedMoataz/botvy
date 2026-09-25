@@ -16,7 +16,7 @@ FROM mongo:8
 # client dumps an older server fine, so this only ever needs to go up, and it
 # goes up here when the store does. Without this the nightly failed on the
 # first hosted install and `/health` was the only thing that said so.
-ARG PG_CLIENT_MAJOR=17
+ARG PG_CLIENT_MAJOR=18
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates cron curl gnupg \
  && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \

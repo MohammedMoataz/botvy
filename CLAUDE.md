@@ -704,7 +704,8 @@ finds it, with a test, and named in the commit; it does not go there.
 - **`pg_dump` has to be at least the server's major.** An older client refuses
   a newer server outright (`aborting because of server version mismatch`). The
   backup image is built on `mongo:8`, whose Ubuntu ships client 16; a managed
-  PostgreSQL is created on the provider's current major, which is 17 — so the
+  PostgreSQL is created on the provider's current major — 18 on the first hosted
+  install, one above the pin the plan had guessed — so the
   nightly would have failed on every hosted install, and `/health` reporting
   `backup` stale is the only thing that would have said so. The client comes
   from PostgreSQL's own repository now, pinned by `PG_CLIENT_MAJOR` in
