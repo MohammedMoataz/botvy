@@ -677,7 +677,7 @@ export const UsageLogSchema = new Schema(
  *
  * `text` carries both languages rather than one, because the seeded set is
  * shown to every member whatever their locale, and a chip that falls back to
- * English on an Arabic screen is the defect `enhancements/E-012` describes for
+ * English on an Arabic screen is the defect `E-012` describes for
  * the coach's own sentences.
  */
 export const QuickQuestionSchema = new Schema(

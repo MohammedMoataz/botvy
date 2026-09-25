@@ -37,7 +37,7 @@
  * `JSON.stringify(…, null, 2)` round-trips this file byte for byte, which is
  * asserted below rather than assumed.
  *
- * Recorded as E-004 in `enhancements/`, and this is the fix.
+ * Recorded as E-004 in the enhancements ledger, retired in 028 (git history keeps the note); this is the fix.
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

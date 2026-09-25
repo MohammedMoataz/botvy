@@ -192,7 +192,7 @@ were both judged by the fifteen-minute window and both were permanently stale
 from twenty minutes after their nightly pass until the next one. `/health`
 answering `degraded` when nothing is wrong is worth less than no signal, and the
 platform gate's "no stale jobs" check would have failed every day. Replaced with
-an explicit `NIGHTLY_JOBS` set, two tests, and `enhancements/E-018` for the
+an explicit `NIGHTLY_JOBS` set, two tests, and `E-018` for the
 shape that would remove the table entirely (the heartbeat row carrying its own
 cadence).
 

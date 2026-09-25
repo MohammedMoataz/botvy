@@ -37,7 +37,7 @@
  * containers. This is the cheap middle: seconds, no Docker, and it catches the
  * one class of bug the other two miss between them.
  *
- * Recorded as E-009 in `enhancements/`, and this is the fix.
+ * Recorded as E-009 in the enhancements ledger, retired in 028 (git history keeps the note); this is the fix.
  */
 import { access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

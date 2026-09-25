@@ -178,7 +178,7 @@ export class QuickQuestionType {
    * client renders what it is given and has no business choosing a language
    * the server already knows from the profile. Publishing both halves would
    * invite a client to pick, and a client that picked differently from the
-   * coach's own sentences would be the inconsistency `enhancements/E-012`
+   * coach's own sentences would be the inconsistency `E-012`
    * describes.
    */
   @Field()

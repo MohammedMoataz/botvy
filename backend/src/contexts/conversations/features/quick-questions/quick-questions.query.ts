@@ -64,7 +64,7 @@ export class QuickQuestionsQueryHandler {
       // Arabic when the member reads Arabic, and English otherwise. Both are
       // stored on every row, because the seeded set is shown to everybody and a
       // chip that fell back to English on an Arabic screen is exactly the
-      // defect `enhancements/E-012` describes for the coach's own sentences.
+      // defect `E-012` describes for the coach's own sentences.
       text: locale.startsWith('ar') ? row.text.ar : row.text.en,
       mood: row.mood,
       isMine: row.userId !== null,

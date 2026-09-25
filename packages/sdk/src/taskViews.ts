@@ -157,7 +157,7 @@ export function matchesTaskView(
  * A null date sorts **first** — deliberately, and not because it is nicer.
  * MongoDB orders null below every date, so both server adapters put an undated
  * task above everything with a deadline; `label` is the only view that carries
- * one, and `enhancements/E-007` records that ordering as a known cost rather
+ * one, and `E-007` records that ordering as a known cost rather
  * than a defect. A client that quietly sorted nulls last would put the panel's
  * by-label list in a different order from the phone's, which is exactly the
  * silent disagreement the server's two adapters were reconciled to end. If

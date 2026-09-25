@@ -55,7 +55,7 @@ the day the clock reached it.
 
 ## Phase 7 — Polish
 
-- [x] T560 [P] `migrate-mongo` indexes; Arabic strings for the repeat picker (plural and dual forms) — **RTL screenshots outstanding**, they need a physical Android device and are the same open item P2, P3 and P4 each recorded. The picker's *chrome* is still English and is recorded as `enhancements/E-015`; the plural-and-dual clause, which is the part with linguistic risk in it, is done and tested
+- [x] T560 [P] `migrate-mongo` indexes; Arabic strings for the repeat picker (plural and dual forms) — **RTL screenshots outstanding**, they need a physical Android device and are the same open item P2, P3 and P4 each recorded. The picker's *chrome* is still English and is recorded as `E-015`; the plural-and-dual clause, which is the part with linguistic risk in it, is done and tested
 - [x] T561 [P] `purge-on-deleted` handler for `meetings` and `calendar_events` on `identity.UserDeleted`; spec
 - [x] T562 Record gate evidence; open `020-training`
 
@@ -294,7 +294,7 @@ twice:
   does with numbers that come from data, not an oversight.
 - **The repeat picker's chrome is still English** — about forty strings across
   five widget files that never reached the string table, while the *content* they
-  surround is localised. Recorded as `enhancements/E-015`, and it belongs in the
+  surround is localised. Recorded as `E-015`, and it belongs in the
   same change as the RTL screenshots: an English form inside an RTL column is
   exactly where the alignment defects will be, and neither has been seen yet.
 - **SC-004** as above.

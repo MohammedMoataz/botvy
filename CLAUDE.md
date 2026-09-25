@@ -29,10 +29,15 @@ disk: `backend/`, `frontend/`, `extension/`, `mobile/`, `ai/`,
 containers healthy, exactly one non-loopback published port, both stores answering,
 and a second `bootstrap.mjs` run that changes nothing.
 
-`enhancements/` holds one file per improvement that is **not** a defect and not
-in any phase's scope — what it is, why it is not simply a bug, what leaving it
-costs, and what fixing it would take. A real defect is fixed in the phase that
-finds it, with a test, and named in the commit; it does not go there.
+There is no `enhancements/` ledger any more. It held one note per improvement
+that was not a defect and not in any phase's scope; every entry but one had
+been closed by 027, so 028 retired the directory. The notes are in git history
+before `7331a16`, and `docs/decisions/001` records which route each one took.
+**An `E-0NN` in a comment is one of those notes** — a dozen still cite them,
+and they are a `git log -S` away, not a file. The one still open is `E-001`:
+Prettier is a dev dependency and `pnpm format:check` exists, but no gate runs
+it. A real defect is fixed in the phase that finds it, with a test, and named
+in the commit — never filed away.
 
 ## Things that are easy to get wrong here
 
@@ -719,3 +724,41 @@ finds it, with a test, and named in the commit; it does not go there.
   and the image refuses an empty password loudly enough; the cloudflared
   service's comment has said this since P0 and it applied to two more services
   than it was written for.
+- **A resume token is tied to the collection it was minted against, so the
+  documented restore poisons it.** `mongorestore --drop` recreates `outbox`
+  under a new identity, and MongoDB does not report the resulting failure as
+  `ChangeStreamHistoryLost`: the driver marks the stream closed and iterating
+  it throws a plain `MongoAPIError: ChangeStream is closed` with no code at
+  all. The store cleared a token only on code 286, so after 028's restore
+  rehearsal the relay reopened the same dead stream every thirty seconds for
+  eight hours — delivering nothing, with `outbox.relay` going stale on
+  `/health` as the only sign. Any failure *while resuming* now forgets the
+  token, which is safe unconditionally because `run()` drains undelivered rows
+  before it watches: a stream that starts from now still delivers everything
+  the outbox holds, and the cost of clearing a good token is one redelivery to
+  consumers that are idempotent on `eventId`. Match the *situation* — "we were
+  resuming and it failed" — not one error code, because the code is the
+  server's choice and the situation is yours.
+- **`up -d --build` does not recreate a running container.** The image builds,
+  the tag moves, compose reports the service up, and the old process keeps
+  serving the old code — the mirror image of the incremental-build trap above,
+  and it looks even more like success because the build genuinely succeeded.
+  `--force-recreate` is what deploys. Check the code is in the container, not
+  that the build was green: `docker compose exec backend ls dist/<the new
+  directory>` answers in one line. (On Docker Desktop for Windows a recreate
+  regularly wedges the old container in `Dead` and `docker rm -f` answers
+  `removal is already in progress`; only `wsl --shutdown` and a cold daemon
+  start clear it, and the new container runs under a temporary
+  `<oldid>_<name>` name until it does — which is enough to make
+  `compose restart <service>` fail and take `bootstrap.mjs` with it. After
+  recreating the backend, recreate `caddy` too: it held a stale upstream and
+  served nothing while the backend was healthy behind it.)
+- **A version written by hand beside the file that defines it drifts, and the
+  drift ships.** `BOTVY_VERSION` was a literal next to `package.json`;
+  `health-version.spec.ts` exists because it read `2.0.0` for the whole of
+  2.1.0, and it then read `2.1.0` into the 2.2.0 release — the spec caught it
+  in CI *after* the images were built and pushed, which is why v2.2.0 was
+  superseded rather than re-tagged. It is read from the package now, by
+  walking up from `import.meta.url` to the one named `@botvy/backend` rather
+  than counting `..`, and proven against the compiled output: the hop count
+  agrees between `src/` and `dist/` only by accident of the build layout.

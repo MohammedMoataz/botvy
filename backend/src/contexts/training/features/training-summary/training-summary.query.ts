@@ -60,7 +60,7 @@ const STREAK_SCAN = 60;
  * ## English, and that is the existing gap rather than a new one
  *
  * This is prompt context, never a stored member-facing message, so it does not
- * widen `enhancements/E-012`: the coach's own reply is written by the model,
+ * widen `E-012`: the coach's own reply is written by the model,
  * which is under instruction to answer in the member's language, exactly as it
  * already is for `ProfileQueryHandler.summary`'s English "Allergies: …". A
  * sentence that reached the member would belong in E-012's fix; this one never

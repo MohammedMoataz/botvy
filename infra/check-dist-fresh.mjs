@@ -30,7 +30,7 @@
  * them: they are not in `dist/`, so editing one cannot stale it, and a guard
  * that cries wolf on every test edit is a guard people learn to work around.
  *
- * Recorded as E-009 in `enhancements/`.
+ * Recorded as E-009 in the enhancements ledger, retired in 028 (git history keeps the note).
  */
 import { readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

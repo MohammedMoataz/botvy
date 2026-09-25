@@ -27,7 +27,6 @@ data/
 mobile/
 docs/
 gate-logs/
-enhancements/
 .specify/
 .harness/
 .github/

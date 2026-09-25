@@ -412,7 +412,7 @@ const DECLARED_SUBSCRIPTIONS = {
               // rather than a decorator, which is the trade this table makes:
               // the whole subscription list is readable in one place, at the
               // cost of a handler being silently inert if somebody forgets a
-              // row. E-005 in `enhancements/` proposes closing that half
+              // row. E-005 proposes closing that half
               // without giving up the readability.
               case 'planning.TaskScheduled':
               case 'planning.TaskRescheduled':

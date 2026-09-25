@@ -213,7 +213,7 @@ describe('the order each view is read in', () => {
    * Null first, which is Mongo's ordering and therefore both server adapters'.
    * A client sorting nulls last would put this list in a different order from
    * the phone's — the exact silent disagreement the two adapters were
-   * reconciled to end. `enhancements/E-007` records the preference; if it is
+   * reconciled to end. `E-007` records the preference; if it is
    * ever taken, this changes with it.
    */
   it('sorts an undated task above a dated one in the label view', () => {

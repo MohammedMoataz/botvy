@@ -1,6 +1,7 @@
 # The options I chose on the enhancements
 
-Every file in `enhancements/` that offered more than one route, the route taken,
+Every file in the enhancements ledger — retired in 028, its notes kept in git
+history — that offered more than one route, the route taken,
 and what to say if you want the other one. Where the file itself named a
 recommendation, it was followed unless the reason it gave has since expired —
 and the three places it had are called out as such, because a recommendation

@@ -242,7 +242,7 @@ describe('the questions a chat offers, as the screen reads them', () => {
    *
    * Both languages are stored on every row precisely because the seeded set is
    * shown to everybody, and a chip that fell back to English on an Arabic
-   * screen is exactly the defect `enhancements/E-012` describes for the coach's
+   * screen is exactly the defect `E-012` describes for the coach's
    * own sentences. The locale match is on the prefix, so `ar-EG` counts.
    */
   it('returns Arabic for an Arabic locale', async () => {
