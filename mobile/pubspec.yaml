@@ -10,7 +10,7 @@ publish_to: 'none'
 # artefacts: an APK that says 0.1.0 while the tag says v2.0.0 is a release
 # nobody can support — the first question about a bug is "which build", and the
 # phone is the surface least able to answer it.
-version: 2.1.0+3
+version: 2.2.0+4
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

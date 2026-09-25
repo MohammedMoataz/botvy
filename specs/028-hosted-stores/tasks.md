@@ -74,28 +74,45 @@ restore are performed, not described.
 
 ## Phase 3 — Cut-over (US1, US2) — needs the Owner's connection strings
 
-- [ ] T2820 Neon: project in the nearest region, database `botvy`, the direct
-  connection string with `sslmode=require` in `.env`
-- [ ] T2821 Atlas: `M0` in the same region, a read/write user on `botvy`, the
-  Network Access rule, the SRV string with `/botvy` in `.env`
-- [ ] T2822 *Optional*: a last local night — run `backup.sh` by hand in the old
-  `backups` container — restored into the managed stores with the new commands
-  before the first boot, so the migrators find nothing to apply
-- [ ] T2823 `down` (volumes kept) → `up -d --build` → `bootstrap.mjs` → n8n
-  first run at `127.0.0.1:5679` (owner, API key into `.env`) → `bootstrap.mjs`
-  again → `verify.mjs`: four PASS lines
-- [ ] T2824 `scan-logs.mjs --canary` with the new URLs in the environment: no
-  password in any container's log
-- [ ] T2825 One `backup.sh` run by hand: three archives verified, `backup`
-  heartbeat ok; then the restore from that night into the managed stores,
-  `verify.mjs` green, a member signs in — **T1103 of P11, performed**; elapsed
-  times into `spec.md`
+- [x] T2820 Neon: project `withered-hall-53563348` (`aws-us-east-2`, PostgreSQL
+  18.6 — one major above the plan's guess, so the backup client moved to 18),
+  database `botvy`, the direct connection string with
+  `sslmode=require&connect_timeout=15` in `.env`. The timeout is a finding: on
+  the first boot the backend timed out on Prisma's default five seconds while
+  the compute woke, and the worker, a moment later, found it awake
+- [x] T2821 Atlas: `M0` (`atlas-11f5t3-shard-0`, MongoDB 8.0.32, three nodes),
+  read/write user, the SRV string with `/botvy` in `.env`; reachable from the
+  host and from inside a container. Finding: Node on this host resolves through
+  a local proxy (`127.0.0.1`) that refuses SRV queries — the containers do not
+- [x] T2822 *Optional* carry-over — declined: the Owner chose a fresh start.
+  The local volumes stay untouched until T2828
+- [x] T2823 `down` → `up -d --build` → `bootstrap.mjs` (both migration sets
+  applied, seeds ran, service client answers 201) → `verify.mjs` **5/5**; P1
+  13/13, P2 14/14, P4 18/18 against the managed stores. Found on the way: a
+  rebuilt image does not recreate a running container — `up -d --build` left
+  both processes on the old image, and `--force-recreate` is the deploy. The
+  n8n first run and its API key are still the Owner's (`127.0.0.1:5679`); then
+  `bootstrap.mjs` imports the six workflows
+- [x] T2824 `scan-logs.mjs --since 2h --canary`: 5 sources, 1664 lines, canary
+  present, **0 hits** — no connection string in any container's log
+- [x] T2825 `backup.sh` by hand: the first run refused its own empty media tar
+  (fixed — `grep -c` prints `0` *and* exits 1, so the fallback doubled it), the
+  second **written and verified** in 37 s. Restored into the managed stores:
+  992 Mongo documents, Identity, media checksum OK, the administrator signs in
+  — **T1103 of P11, performed**, 79 s. `pg_restore` exited 1 over two Neon
+  grants (`ALTER DEFAULT PRIVILEGES FOR ROLE cloud_admin …`) that
+  `botvy_owner` cannot re-apply; dump and restore run `--no-owner --no-acl`
+  now, in the script and in both documents
 - [ ] T2826 Cut the connection to Atlas for a minute during the gate; the relay
-  reconnects and the next outbox row is delivered
-- [ ] T2827 Measurements into `spec.md`: `/sync` 200 rows, one coach turn,
-  before and after
-- [ ] T2828 Only after T2825: `docker volume rm botvy-v2_pg_data
-  botvy-v2_mongo_data` — the Owner runs it
+  reconnects and the next outbox row is delivered — not performed; the relay's
+  reconnect is covered by its spec, and the free cluster gave no maintenance
+  window to observe
+- [x] T2827 Measurements in `spec.md`, cold and warm. The finding is the
+  200-row push at 66 s: one transaction per pushed row × one internet round
+  trip; a Sync change (one transaction per entity per push), not a store one
+- [ ] T2828 `docker volume rm botvy-v2_pg_data botvy-v2_mongo_data` — the
+  rehearsal has happened, so the condition is met; the Owner asked for unused
+  volumes to go
 
 ## Follow-ups named, not started
 

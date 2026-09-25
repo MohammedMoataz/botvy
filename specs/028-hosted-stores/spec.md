@@ -143,12 +143,32 @@ review learns where their data actually is.
 
 ## Measurements
 
-Filled in at cut-over.
+Taken at cut-over on 2026-09-25 with `infra/measure-stores.mjs`, from this
+machine in Cairo against Neon `aws-us-east-2` (PostgreSQL 18.6, compute
+autosuspends) and Atlas `M0` (MongoDB 8.0.32, three nodes). "Before" was not
+captured: the container stack was taken down before the script existed, and
+bringing it back for one number was not worth the hour — the local figures
+were a few milliseconds per round trip, which is the whole difference.
 
-| What | Before (containers) | After (managed) |
+| What | After (managed), cold | After (managed), warm |
 |---|---|---|
-| `/sync` push, 200 rows | | |
-| Coach turn, first token | | |
-| Coach turn, complete | | |
-| Nightly backup, elapsed | | |
-| Restore, elapsed | | |
+| Register + sign in (Identity) | 3.3 s | 2.4 s |
+| `POST /tasks`, one transaction, median of 20 | 318 ms | 319 ms |
+| `/sync` push of 200 creates + full pull | 67.3 s | 66.0 s |
+| `/sync` full pull, 3 entities, 220 tasks | 1.6 s | 1.6 s |
+| Coach turn: accepted · first token · done | 0.8 s · 45.5 s · 52.0 s | 0.8 s · 6.6 s · 13.0 s |
+| Nightly backup, both stores + media | 37 s | 37 s |
+| Restore, both stores + media, to admin sign-in | 79 s | — |
+
+What the numbers say. A single command costs one internet round trip per
+store operation, ~100 ms each way to Ohio, and a transaction with an outbox
+append is three of them — hence ~320 ms where the container answered in ten.
+The sync push is that cost multiplied: the engine applies each pushed row in
+its own transaction, so 200 rows are 200 × 330 ms. A phone pushing a handful
+of edits will not feel it; one syncing after a day offline will, and that is
+the first thing to change if it matters — one transaction per entity per push,
+which is a Sync change and not a store one. The coach's cold first token is
+Ollama loading the model after the restart, not the stores: warm, the model
+answers in 6.6 s and the stores' share of a turn is under a second. The region
+is the lever for everything in the first four rows; a Neon project cannot move
+regions, so that is a new project and a restore, when it is worth it.
