@@ -8,11 +8,16 @@ import { MongoUnitOfWork } from './mongo-unit-of-work.js';
  * The Mongo connection, and the unit of work every non-Identity context runs
  * inside.
  *
- * `directConnection` matters on a single-node replica set: without it the
+ * The URL decides how the driver connects, and nothing here overrides it. The
+ * local single-node replica set needs `directConnection=true` — without it the
  * driver discovers the set's advertised host name, which inside compose is the
  * container's own name and is not resolvable from wherever the client happens
- * to be. The set itself is not optional — transactions and change streams both
- * require one, and the outbox needs both.
+ * to be — and `.env.example`'s local URL carries it in the query string. A
+ * hosted cluster's `mongodb+srv://` URL must *not* carry it: the driver refuses
+ * the pair outright (`MongoParseError`), which is why the flag used to be
+ * hard-coded here was the one line that made Atlas unreachable. The set itself
+ * is not optional — transactions and change streams both require one, and the
+ * outbox needs both.
  */
 @Global()
 @Module({
@@ -21,7 +26,6 @@ import { MongoUnitOfWork } from './mongo-unit-of-work.js';
       inject: [ENV],
       useFactory: (env: Env) => ({
         uri: env.MONGO_URL,
-        directConnection: true,
         // A command that cannot reach the server should fail the request, not
         // hang it: a queued command holds the caller's connection open with no
         // way to tell it anything is wrong.

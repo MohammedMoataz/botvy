@@ -35,6 +35,38 @@ describe('environment contract', () => {
     expect(() => loadEnv(withoutMongo)).toThrow(/MONGO_URL/);
   });
 
+  /**
+   * A hosted cluster's SRV string is the shape the contract now expects, and
+   * the database name rides in its path like every other consumer reads it.
+   */
+  it('accepts an SRV connection string that names its database', () => {
+    const env = loadEnv({
+      ...complete,
+      MONGO_URL:
+        'mongodb+srv://botvy:secret@cluster0.abcde.mongodb.net/botvy?retryWrites=true&w=majority',
+    });
+
+    expect(env.MONGO_URL).toContain('mongodb+srv://');
+  });
+
+  /**
+   * The failure this test exists for: a URL with no database in its path is
+   * two databases. Mongoose falls back to `test`, migrate-mongo's own parser
+   * to `botvy`, and the migrations then index a database the application
+   * never opens — silently, with every request answering as if the store were
+   * empty. Refused at boot, naming the variable.
+   */
+  it.each([
+    'mongodb+srv://botvy:secret@cluster0.abcde.mongodb.net/?retryWrites=true',
+    'mongodb+srv://botvy:secret@cluster0.abcde.mongodb.net',
+    'mongodb://mongo:27017',
+    'mongodb://mongo:27017/?replicaSet=rs0',
+  ])('refuses a MONGO_URL with no database in its path (%s)', (url) => {
+    expect(() => loadEnv({ ...complete, MONGO_URL: url })).toThrow(
+      /MONGO_URL.*database/,
+    );
+  });
+
   it('names every missing key at once rather than one per restart', () => {
     let message = '';
     try {

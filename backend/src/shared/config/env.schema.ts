@@ -11,6 +11,24 @@ import { z } from 'zod';
  */
 const roles = ['backend', 'worker'] as const;
 
+/**
+ * Whether a MongoDB URL carries a database name in its path.
+ *
+ * Two consumers read that name and they disagree about its absence: Mongoose
+ * opens `test`, migrate-mongo's own parser falls back to `botvy`. A hosted
+ * cluster's copy-pasted SRV string ends at the host, so this is the mistake a
+ * first hosted install makes — and the symptom is a platform whose every
+ * request answers as if the store were empty, with migrations reported
+ * applied. String arithmetic rather than `new URL`, because a replica-set list
+ * (`host1:27017,host2:27017`) is not a URL the parser accepts.
+ */
+function mongoUrlNamesADatabase(url: string): boolean {
+  const withoutQuery = url.split('?')[0] ?? '';
+  const afterScheme = withoutQuery.slice(withoutQuery.indexOf('://') + 3);
+  const slash = afterScheme.indexOf('/');
+  return slash >= 0 && afterScheme.slice(slash + 1).length > 0;
+}
+
 export const envSchema = z.object({
   BOTVY_ROLE: z.enum(roles).default('backend'),
   NODE_ENV: z
@@ -26,7 +44,12 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'PostgreSQL connection string (Identity)'),
   MONGO_URL: z
     .string()
-    .min(1, 'MongoDB connection string (every other context)'),
+    .min(1, 'MongoDB connection string (every other context)')
+    .refine(mongoUrlNamesADatabase, {
+      message:
+        'must name a database in its path (…/botvy): without one Mongoose ' +
+        'writes to "test" and migrate-mongo to "botvy", and the two never meet',
+    }),
 
   // Credentials
   JWT_ACCESS_SECRET: z.string().min(16),

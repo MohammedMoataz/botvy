@@ -22,7 +22,9 @@ module.exports = {
   mongodb: {
     url,
     databaseName,
-    options: { directConnection: true },
+    // No connection options here: the URL carries them, the way the backend's
+    // own connection reads it. `directConnection` in particular belongs in the
+    // local URL's query string and is refused by the driver on an SRV one.
   },
   // The migrations, and this file no longer among them. It used to sit inside
   // this directory, which made migrate-mongo treat the configuration itself as
