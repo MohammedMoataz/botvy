@@ -172,4 +172,9 @@ export class InMemoryPhotoStore extends PhotoStore {
   async read(path: string): Promise<Buffer | null> {
     return this.files.get(path) ?? null;
   }
+
+  /** Recognisably not the real route, so a spec cannot pass on the constant. */
+  url(path: string): string {
+    return `memory://photos/${path}`;
+  }
 }

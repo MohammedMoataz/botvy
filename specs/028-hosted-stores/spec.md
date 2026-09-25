@@ -108,6 +108,11 @@ review learns where their data actually is.
   landing copy in both languages and the three non-historical artifact pages
   describe the hosted stores; III is unchanged.
 - **FR-009** CI runs the `local-stores` profile and is otherwise untouched.
+- **FR-010** Attachment bytes sit behind one storage provider with one adapter
+  per place they can be, and a client is handed a URL it can load with no
+  session — never a path. The filesystem adapter's URL is a signed route on
+  this API; an object store's is whatever it mints; Profile does not know
+  which.
 
 ## Success Criteria *(mandatory)*
 

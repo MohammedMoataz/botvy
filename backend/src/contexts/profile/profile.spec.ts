@@ -460,6 +460,7 @@ describe('profile query', () => {
         new InMemorySettingsStore(),
         new InMemoryAuditAdapter(),
       ),
+      new InMemoryPhotoStore(),
     );
     await new BootstrapOnRegisteredHandler(
       uow,

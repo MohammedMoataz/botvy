@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
-import { ENV } from '../../shared/config/config.module.js';
-import type { Env } from '../../shared/config/env.schema.js';
 import type { OutboxInsert } from '../../shared/persistence/mongo/mongo-repository.base.js';
 import { MongoUnitOfWork } from '../../shared/persistence/mongo/mongo-unit-of-work.js';
 import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
@@ -27,7 +25,8 @@ import { ProfileQueryHandler } from './features/profile-query/profile.query.js';
 import { PurgeOnDeletedHandler } from './features/purge-on-deleted/purge-on-deleted.handler.js';
 import { UpdatePreferencesHandler } from './features/update-preferences/update-preferences.handler.js';
 import { UpdateProfileHandler } from './features/update-profile/update-profile.handler.js';
-import { FilesystemPhotoStore } from './infrastructure/filesystem-photo.store.js';
+import { StorageProvider } from '../../shared/storage/storage.provider.js';
+import { StoredPhotoStore } from './infrastructure/stored-photo.store.js';
 import {
   ProfileMemberBootstrap,
   ProfileMemberContext,
@@ -83,11 +82,12 @@ import {
         new MongoPreferencesRepository(model, outbox),
     },
     {
-      // The bytes live on the media volume, whose path is an environment
-      // variable because it is a mount point, not a knob.
+      // The bytes live wherever the platform's storage provider puts them —
+      // the media volume today, an object store when 029 binds one. This
+      // adapter owns only what a photo becomes before it is kept.
       provide: PhotoStore,
-      inject: [ENV],
-      useFactory: (env: Env) => new FilesystemPhotoStore(env.MEDIA_DIR),
+      inject: [StorageProvider],
+      useFactory: (storage: StorageProvider) => new StoredPhotoStore(storage),
     },
     {
       provide: BootstrapOnRegisteredHandler,

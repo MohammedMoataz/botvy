@@ -275,6 +275,20 @@ attacker controls, to reach a service on a compose network, on an installation
 whose outbound fetches are links its own owner saved. Not worth a second HTTP
 stack.
 
+### Attachments are capability URLs · **added in 028**
+
+A member's photo is handed to clients as a URL, not a path: `photoUrl` is
+`GET /media/files?key=…&sig=…`, public for the same reason the image proxy is
+(an `<img>` cannot send a bearer token), authorised by an HMAC over the key
+under `MEDIA_SIGNING_SECRET`, and served immutable because the key carries a
+content hash. What that means: anyone holding the URL can fetch that one file
+— the same property a signed object-store URL has, which is the point of the
+seam — and nobody can enumerate keys, because a wrong signature is a bad
+request that says nothing about whether the key exists. The route reads only
+through the storage provider, whose filesystem adapter refuses a key that
+escapes the media root. The member's own authenticated `GET /api/v1/profile/photo`
+stays as it was.
+
 ## 7. Principals and guards
 
 Constitution VI's three kinds, each with a spec:

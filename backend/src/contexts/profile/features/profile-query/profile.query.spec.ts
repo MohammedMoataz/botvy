@@ -6,6 +6,7 @@ import { SettingsService } from '../../../../shared/settings/settings.service.js
 import { Preferences } from '../../domain/preferences.aggregate.js';
 import { Profile } from '../../domain/profile.aggregate.js';
 import {
+  InMemoryPhotoStore,
   InMemoryPreferencesRepository,
   InMemoryProfileRepository,
 } from '../../infrastructure/in-memory-profile.repositories.js';
@@ -43,7 +44,51 @@ describe('member schedules', () => {
       new InMemorySettingsStore(),
       new InMemoryAuditAdapter(),
     );
-    query = new ProfileQueryHandler(profiles, preferences, settings);
+    query = new ProfileQueryHandler(
+      profiles,
+      preferences,
+      settings,
+      new InMemoryPhotoStore(),
+    );
+  });
+
+  /**
+   * The client is handed a URL, never the path. The path is where the bytes
+   * sit — the server's business — and the URL comes from the store that holds
+   * them, so an object store can mint its own without the handler changing.
+   * The in-memory store answers a recognisably fake scheme, which is what
+   * makes this assert the delegation and not a constant.
+   */
+  it('hands a client the photo URL the store mints, and never the path', async () => {
+    await profiles.save(
+      Profile.create({
+        userId: 'u-photo',
+        displayName: null,
+        photoPath: 'photos/u-photo/avatar-abc.webp',
+        timezone: 'Africa/Cairo',
+        locale: 'en',
+        metrics: [],
+        foodLikes: [],
+        foodDislikes: [],
+        allergies: [],
+        symptoms: [],
+        onboardingCompletedAt: null,
+        createdAt: NOW,
+      }),
+    );
+
+    const view = await query.profile('u-photo');
+    expect(view?.photoUrl).toBe(
+      'memory://photos/photos/u-photo/avatar-abc.webp',
+    );
+    expect(view?.photoPath).toBe('photos/u-photo/avatar-abc.webp');
+  });
+
+  it('leaves photoUrl absent for a member with no photo', async () => {
+    await seed('u-none');
+    const view = await query.profile('u-none');
+    expect(view?.photoUrl).toBeUndefined();
+    expect('photoUrl' in (view ?? {})).toBe(false);
   });
 
   async function seed(

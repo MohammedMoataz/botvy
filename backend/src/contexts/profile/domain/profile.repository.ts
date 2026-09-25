@@ -65,4 +65,10 @@ export abstract class PhotoStore {
   abstract put(userId: string, bytes: Buffer): Promise<string>;
   abstract remove(path: string): Promise<void>;
   abstract read(path: string): Promise<Buffer | null>;
+  /**
+   * The URL a client loads the photo from — what the profile's `photoUrl`
+   * carries. The path is the server's business; the URL is the client's, and
+   * the adapter that holds the bytes is the one that knows how to mint it.
+   */
+  abstract url(path: string): string;
 }

@@ -54,6 +54,24 @@ restore are performed, not described.
   (53 edits, each asserted to match exactly once; roadmap chips P0–P10 marked
   landed)
 
+## Phase 2b — Attachments behind a storage provider (Owner's ask, 2026-09-25)
+
+- [x] T2830 `shared/storage/`: a `StorageProvider` port (`put · remove · read ·
+  url`), the filesystem adapter over `MEDIA_DIR` with a traversal guard, and
+  `GET /media/files?key&sig` serving a signed key immutable; bound once in a
+  global `StorageModule` imported by both roles. `spec:` signed key served as
+  its type; wrong signature is 400 not 403; missing key 404; the URL the
+  provider mints is the one the route accepts; a key escaping the root is
+  refused
+- [x] T2831 Profile: `PhotoStore` gains `url()`; `StoredPhotoStore` keeps the
+  WebP/EXIF/hash policy and delegates the bytes; the query handler fills
+  `photoUrl` from the store; the fixed `/api/v1/profile/photo` constant is
+  gone from the response (the route itself stays). `spec:` a profile with a
+  photo answers the store's URL and never the path; one without has no
+  `photoUrl`
+- [ ] T2832 029 becomes: a `SupabaseStorageProvider` implementing the same
+  port, chosen by `StorageModule`'s factory — nothing in Profile changes
+
 ## Phase 3 — Cut-over (US1, US2) — needs the Owner's connection strings
 
 - [ ] T2820 Neon: project in the nearest region, database `botvy`, the direct

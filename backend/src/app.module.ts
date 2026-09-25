@@ -56,6 +56,8 @@ import { HealthModule } from './shared/health/health.module.js';
 import { MediaController } from './shared/media/media.controller.js';
 import { OutboxModule } from './shared/outbox/outbox.module.js';
 import { MongoPersistenceModule } from './shared/persistence/mongo/mongoose.module.js';
+import { LocalFilesController } from './shared/storage/local-files.controller.js';
+import { StorageModule } from './shared/storage/storage.module.js';
 import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
 import { GraphQLModule } from './graphql/graphql.module.js';
 import { WsModule } from './ws/ws.module.js';
@@ -83,6 +85,7 @@ import { WsModule } from './ws/ws.module.js';
     CqrsModule.forRoot(),
     PrismaModule,
     MongoPersistenceModule,
+    StorageModule,
     IdentityModule,
     OutboxModule,
     OperationsModule,
@@ -148,6 +151,7 @@ import { WsModule } from './ws/ws.module.js';
      * owning a capability three of them will eventually want.
      */
     MediaController,
+    LocalFilesController,
     SyncController,
     InternalAlertsController,
     InternalBackupsController,

@@ -17,6 +17,7 @@ import { OutboxModule } from './shared/outbox/outbox.module.js';
 import { RelayModule } from './shared/outbox/relay.module.js';
 import { MongoPersistenceModule } from './shared/persistence/mongo/mongoose.module.js';
 import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
+import { StorageModule } from './shared/storage/storage.module.js';
 
 /**
  * The worker role: the outbox relay, the identity forwarder and the scheduled
@@ -37,6 +38,9 @@ import { PrismaModule } from './shared/persistence/prisma/prisma.module.js';
     CqrsModule.forRoot(),
     PrismaModule,
     MongoPersistenceModule,
+    // Profile's photo store is bound over the storage provider, and the
+    // worker imports Profile for its purge handler — which deletes the bytes.
+    StorageModule,
     IdentityModule,
     OutboxModule,
     OperationsModule,

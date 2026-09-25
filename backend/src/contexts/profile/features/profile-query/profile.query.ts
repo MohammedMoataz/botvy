@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { SettingsService } from '../../../../shared/settings/settings.service.js';
 import type { BodyMetric } from '../../domain/profile.aggregate.js';
 import {
+  PhotoStore,
   PreferencesRepository,
   ProfileRepository,
 } from '../../domain/profile.repository.js';
@@ -9,7 +10,10 @@ import {
 export interface ProfileView {
   userId: string;
   displayName?: string;
+  /** Where the bytes are, for the server's own reads; never leaves the API. */
   photoPath?: string;
+  /** Where a client loads the photo from; minted by the store that holds it. */
+  photoUrl?: string;
   timezone: string;
   locale: string;
   latestWeightKg?: number;
@@ -95,6 +99,7 @@ export class ProfileQueryHandler {
     private readonly profiles: ProfileRepository,
     private readonly preferences: PreferencesRepository,
     private readonly settings: SettingsService,
+    private readonly photos: PhotoStore,
   ) {}
 
   async profile(userId: string): Promise<ProfileView | null> {
@@ -106,6 +111,9 @@ export class ProfileQueryHandler {
       ...omitEmpty({
         displayName: profile.displayName,
         photoPath: profile.photoPath,
+        photoUrl: profile.photoPath
+          ? this.photos.url(profile.photoPath)
+          : undefined,
       }),
       timezone: profile.timezone,
       locale: profile.locale,
