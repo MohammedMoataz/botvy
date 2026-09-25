@@ -5,6 +5,15 @@
 # can reach its editor through an SSH tunnel without it being on the internet —
 # which the principle permits, and which `verify.mjs` excludes when it counts
 # public ports.
+#
+# The stores are managed services by default — Identity on a hosted PostgreSQL
+# (Neon), everything else on a hosted MongoDB replica set (Atlas) — reached by
+# the two URLs in `.env` and nothing else. The `postgres` and `mongo` services
+# below still exist behind `--profile local-stores`: CI runs them, and an Owner
+# who would rather keep the data on this machine can too, with the two URLs
+# pointed at the container names. Everything that depends on them says
+# `required: false`, which Compose (2.20+) reads as "wait for it if it is
+# enabled, ignore it if it is not" — the same file serves both installs.
 
 # v2 is its own compose project.
 #
@@ -96,8 +105,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       mongo:
         condition: service_healthy
+        required: false
     healthcheck:
       test:
         [
@@ -129,8 +140,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       mongo:
         condition: service_healthy
+        required: false
     healthcheck:
       # Marking the worker healthy on process start would hide a dead relay,
       # which is the one thing this container exists to run.
@@ -164,20 +177,26 @@ services:
     # match the bytes on disk.
     image: postgres:16
     restart: unless-stopped
+    # Only with `--profile local-stores`; the default install reaches a managed
+    # PostgreSQL through DATABASE_URL and never starts this container.
+    profiles: [local-stores]
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?set it in .env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      # Defaults rather than `:?`, for the reason the cloudflared service gives
+      # below: a required variable is interpolated by `compose config` whether
+      # or not the profile is on, so demanding these would fail the gate on
+      # every host that uses a managed store and has no reason to set them.
+      # The image refuses to initialise with an empty password loudly enough.
+      POSTGRES_USER: ${POSTGRES_USER:-botvy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
       POSTGRES_DB: ${POSTGRES_DB:-botvy}
-      # Read by 001_create_databases.sh, which creates n8n's database on
-      # an empty data directory. Without it that script would create a
-      # database n8n is not configured to open.
-      N8N_DB: ${N8N_DB:-n8n}
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test:
-        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-botvy}']
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-botvy} -d ${POSTGRES_DB:-botvy}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -186,6 +205,9 @@ services:
   mongo:
     image: mongo:8
     restart: unless-stopped
+    # Only with `--profile local-stores`; the default install reaches a managed
+    # replica set through MONGO_URL and never starts this container.
+    profiles: [local-stores]
     # A replica set of one. Not optional: transactions and change streams both
     # need one, and the outbox needs both.
     # `--quiet` and a high `slowms`, because MongoDB's slow-query log prints the
@@ -282,8 +304,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       mongo:
         condition: service_healthy
+        required: false
     networks: [botvy]
 
   n8n:
@@ -295,11 +319,11 @@ services:
     ports:
       - '${N8N_BIND:-127.0.0.1:5679}:5678'
     environment:
-      DB_TYPE: postgresdb
-      DB_POSTGRESDB_HOST: postgres
-      DB_POSTGRESDB_DATABASE: ${N8N_DB:-n8n}
-      DB_POSTGRESDB_USER: ${POSTGRES_USER:?set it in .env}
-      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD:?set it in .env}
+      # SQLite in its own volume. It used to share the Postgres container in a
+      # second database, and that container is now optional — and there is no
+      # reason to hand a managed Identity store the workflow tool's execution
+      # log. Principle II reads the same: one credential, no member data.
+      DB_TYPE: sqlite
       N8N_HOST: ${N8N_HOST:-localhost}
       N8N_PORT: 5678
       GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Africa/Cairo}
@@ -339,9 +363,6 @@ services:
       BOTVY_API_BASE: http://backend:8080
     volumes:
       - n8n_data:/home/node/.n8n
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks: [botvy]
 
   # A tunnel with no Cloudflare account, for showing somebody the running

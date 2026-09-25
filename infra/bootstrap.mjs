@@ -90,19 +90,19 @@ async function compose(...args) {
 
 // ---------------------------------------------------------------- steps
 
+/**
+ * The stores are wherever the two URLs point — managed services by default,
+ * the `local-stores` profile's containers otherwise — so this asks the one
+ * process that opens them rather than asking compose for a container by name.
+ * `/health` reports each store separately, and a backend that cannot reach one
+ * does not boot at all, so the first good answer is also the proof that both
+ * connection strings in `.env` work. It used to look for services literally
+ * called `postgres` and `mongo`, which a hosted install never has.
+ */
 async function waitForStores() {
   return waitFor('stores accepting connections', async () => {
-    const { stdout } = await compose('ps', '--format', 'json');
-    const services = stdout
-      .trim()
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line));
-    const needed = ['postgres', 'mongo'];
-    return needed.every((name) => {
-      const svc = services.find((s) => s.Service === name);
-      return svc && (svc.Health === 'healthy' || svc.State === 'running');
-    });
+    const report = await (await fetch(`${API}/health`)).json();
+    return report.postgres === true && report.mongo === true;
   });
 }
 

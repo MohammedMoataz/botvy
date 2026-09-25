@@ -188,7 +188,10 @@ jobs:
           secret() { node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"; }
           {
             echo "POSTGRES_PASSWORD=ci-postgres"
+            # Both URLs at the containers: the example file now points at the
+            # managed stores, and a later line wins over an earlier one.
             echo "DATABASE_URL=postgresql://botvy:ci-postgres@postgres:5432/botvy"
+            echo "MONGO_URL=mongodb://mongo:27017/botvy?replicaSet=rs0&directConnection=true"
             echo "JWT_ACCESS_SECRET=$(secret)"
             echo "JWT_REFRESH_SECRET=$(secret)"
             echo "INTERNAL_SERVICE_TOKEN=$(secret)"
@@ -203,6 +206,12 @@ jobs:
           # failure when they disagree is a 401 that looks like a broken login
           # page rather than a mismatched fixture.
           echo "BOTVY_E2E_PASSWORD=${ADMIN_PASSWORD}" >> "$GITHUB_ENV"
+          # The stores as containers. The default install reaches managed
+          # services through the two URLs; this job has none, so it enables the
+          # profile that runs `postgres` and `mongo` on the runner. Set once
+          # here rather than as `--profile` on every compose call below, which
+          # is exactly the kind of flag one of them would forget.
+          echo "COMPOSE_PROFILES=local-stores" >> "$GITHUB_ENV"
         env:
           ADMIN_PASSWORD: ci-${{ github.run_id }}-Owner!
 
