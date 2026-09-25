@@ -121,3 +121,30 @@ restore are performed, not described.
   media step retired.
 - `FORWARDER_POLL_MS` as a settings key, only if Neon's compute cost proves
   real.
+
+## Phase 4 — what CI found after the tag (2026-09-25)
+
+`v2.2.0` was tagged from a commit whose CI then went red in two jobs. Both are
+recorded here because both are the same shape: a value written twice, and a
+fixture that only held on some days.
+
+- [x] T2833 `/health` reported the wrong version. `BOTVY_VERSION` was a
+  hand-written literal beside `package.json`, and `health-version.spec.ts`
+  exists precisely because it read `2.0.0` for all of 2.1.0 — this time it read
+  `2.1.0` into the 2.2.0 release, and the spec caught it *after* the images were
+  built and pushed. The constant now walks up from `import.meta.url` to the
+  package named `@botvy/backend` and reads its version, so there is one copy;
+  proven against the **compiled** output (`dist/` answers `2.2.1`), because the
+  hop count differs between `src/` and `dist/` and the image keeps the file at
+  `/app/package.json`
+- [x] T2834 The mobile SC-003 benchmark's fixture shrank on late dates. Its
+  three series were anchored twenty days before `now`, but the calendar window
+  starts at the first of the month minus seven days — up to thirty-eight days
+  back — so the fixture held its two hundred occurrences early in a month and
+  about a hundred and eighty late in one. Anchored forty days back now. The
+  lesson is a sharper version of the one the alert fixtures taught: relative to
+  `now` is necessary and not sufficient; the offset has to clear the *widest*
+  window `now` can produce
+- [x] T2835 Released as `v2.2.1` rather than moving the `v2.2.0` tag: its images
+  are pushed and immutable, and a tag that moves is what makes "which build is
+  this" unanswerable — the question `/health`'s version exists to answer

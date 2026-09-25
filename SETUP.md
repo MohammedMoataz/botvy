@@ -82,7 +82,7 @@ If it exits non-zero, do not go further — each line names what failed.
 | Scheduled work is arriving | the `jobs` block of the same response | no job older than `ops.staleAfterMinutes`, and `backup` no older than `backup.staleHours` |
 | The built code is loadable | `node infra/verify-esm.mjs` | exits 0 — the compiled output imports under plain Node, which `tsc` and the tests cannot tell you |
 | Nothing secret is in the logs | `node infra/scan-logs.mjs --since 24h --canary "<a planted sentence>"` | `0 hits` |
-| It stays healthy | `node infra/soak-sample.mjs --version 2.2.0`, once a day | a row in `ops/soak-2.2.0.log` reading `HEALTHY` |
+| It stays healthy | `node infra/soak-sample.mjs --version 2.2.1`, once a day | a row in `ops/soak-2.2.1.log` reading `HEALTHY` |
 
 The first two are the ones to run today. The rest are the ones that tell you
 months from now that it is still true.
@@ -271,7 +271,7 @@ owning a host.
 The running version is one line in `.env`:
 
 ```
-BOTVY_TAG=v2.2.0
+BOTVY_TAG=v2.2.1
 ```
 
 **Rolling back** is re-pinning the previous tag and pulling — images are

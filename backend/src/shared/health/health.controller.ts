@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Controller, Get, Logger } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
@@ -11,15 +14,38 @@ import { SettingsService } from '../settings/settings.service.js';
 import { assessHealth, type HealthReport } from './health.assess.js';
 
 /**
- * What `/health` says it is running.
+ * What `/health` says it is running: the backend package's own version.
  *
- * A literal, because the compiled output cannot read `package.json` from
- * anywhere it can be sure of, and pinned to that file by
- * `health-version.spec.ts` — it read `2.0.0` for the whole of the 2.1.0 release
- * otherwise, which is a version number that matters twice: the soak log records
- * it, and a rollback is judged by it.
+ * Read from `package.json` rather than written by hand. The literal it
+ * replaces read `2.0.0` through the whole of 2.1.0 and `2.1.0` into the 2.2.0
+ * release — `health-version.spec.ts` caught the second one in CI after the
+ * images were already built — and it is a number that matters twice: the soak
+ * log records it, and a rollback is judged by it. The file is found by walking
+ * up from this module to the package named `@botvy/backend`, never by counting
+ * `..`: the count agrees between `src/` and `dist/` only by accident of the
+ * build layout, and the image ships the file at `/app/package.json`.
  */
-export const BOTVY_VERSION = '2.1.0';
+export const BOTVY_VERSION = packageVersion();
+
+function packageVersion(): string {
+  let directory = dirname(fileURLToPath(import.meta.url));
+  for (let hop = 0; hop < 8; hop += 1) {
+    const candidate = join(directory, 'package.json');
+    if (existsSync(candidate)) {
+      const { name, version } = JSON.parse(readFileSync(candidate, 'utf8')) as {
+        name?: string;
+        version?: string;
+      };
+      if (name === '@botvy/backend' && version) return version;
+    }
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  // Serving with an unknown version beats not serving; the spec makes sure
+  // this branch is never the one a real install takes.
+  return 'unknown';
+}
 
 /**
  * Liveness, readiness and job freshness in one public answer.

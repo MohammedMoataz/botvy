@@ -910,21 +910,33 @@ void main() {
       // shape the criterion names: a handful of rows that expand to a monthful
       // of occurrences, because FR-006 says a series of any length costs one
       // row and two hundred stored rows would measure the wrong thing.
+      //
+      // **Forty days back, and the number is load-bearing.** A series only
+      // fills the part of the window that follows its `dtstart`, and the
+      // window begins at the first of the month *minus seven days* — which on
+      // the last day of a long month is thirty-eight days before now. These
+      // were anchored twenty days back, so the fixture held its full two
+      // hundred only when the suite ran early in a month and fell to about a
+      // hundred and eighty late in one: green for three weeks, red on the
+      // twenty-fifth, which is where CI found it. Relative to `now` was
+      // already the rule (the lesson the alert fixtures taught); the offset
+      // has to clear the *widest* window that `now` can produce, not a typical
+      // one.
       await series(
         'Standup',
-        memberWallClock(9, 0, inDays: -20),
+        memberWallClock(9, 0, inDays: -40),
         'FREQ=DAILY',
         prepMinutes: 5,
       );
       await series(
         'Reading',
-        memberWallClock(20, 0, inDays: -20),
+        memberWallClock(20, 0, inDays: -40),
         'FREQ=DAILY',
         prepMinutes: 10,
       );
       await series(
         'Review',
-        memberWallClock(14, 0, inDays: -20),
+        memberWallClock(14, 0, inDays: -40),
         'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
         prepMinutes: 15,
       );
