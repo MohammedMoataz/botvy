@@ -29,8 +29,12 @@ they start with `packages/` or `.github/`.
 - [ ] T3005 [P] `lib/features/calendar/presentation/calendar_page.dart:358`:
   the one `Colors.` becomes a scheme role
 - [ ] T3006 `tool/check_ui_literals.sh` + `.github/workflows/ci.yml` mobile
-  job: the grep of plan §9, **warning only**. `spec:` a fixture file with
-  each banned pattern is reported; one with tokens is not
+  job: the grep of plan §9, **warning only**. `spec:` a fixture file with one
+  line per banned form — `EdgeInsets.all(8)`, `EdgeInsetsDirectional.only(start: 8)`,
+  `SizedBox(height: 8)`, `SizedBox.square(dimension: 8)`,
+  `BorderRadius.circular(8)`, `Color(0x…)`, `fontSize:`, `Colors.red` — is
+  reported line by line; a fixture using `BotvySpace`/`BotvyRadius` and
+  `EdgeInsetsDirectional.zero` is not
 
 ## Phase 2 — Appearance (FR-007, US4 scenarios 2-3)
 
@@ -56,7 +60,8 @@ they start with `packages/` or `.github/`.
 - [ ] T3023 [P] `lib/ui/empty_state.dart`, `error_state.dart`,
   `loading_view.dart` + goldens
 - [ ] T3024 [P] `lib/ui/status_chip.dart` + golden for up/down/unknown in
-  both modes
+  both modes; `test/ui/card_golden_test.dart` pins a `Card.filled` under the
+  theme (light/dark × en/ar)
 - [ ] T3025 [P] `lib/ui/confirm_dialog.dart` + widget test (confirm returns
   true, cancel and barrier return false)
 - [ ] T3026 [P] `lib/ui/scroll_aware_fab.dart` + widget test (collapses on
@@ -138,7 +143,8 @@ states, `SliverAppBar.large` on tab roots, `Card.filled` items,
 - [ ] T3069 [P] profile, onboarding (optional: per-step accent from scheme
   roles, research B-2), sign-in, server
 - [ ] T3071 `tool/check_ui_literals.sh`: warning → failure in CI.
-  `check:` CI red on a deliberate literal, green without it
+  `check:` CI red on each T3006 fixture form placed in `lib/features/`, green
+  without it
 
 ## Phase 8 — Motion (FR-012, FR-013, US6, SC-006)
 

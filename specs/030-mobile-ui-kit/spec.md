@@ -190,7 +190,10 @@ reduced motion.
 - **FR-008** `lib/app/tokens.dart` MUST match `packages/tokens/tokens.json`,
   and spacing, radius and motion MUST come from named tokens.
 - **FR-009** A component kit under `lib/ui/` MUST provide: section, settings
-  tiles, card, empty/error/loading states, status chip, confirm dialog.
+  tiles, empty/error/loading states, status chip, confirm dialog. Cards are
+  Flutter's `Card.filled` styled once by the theme's `cardTheme` — no wrapper
+  widget, since it would add no behaviour — and pinned by a golden like the
+  kit.
 - **FR-010** No new screen code MUST use a raw `EdgeInsets` number, a
   non-directional inset, `Color(0x…)` or `fontSize:`; a CI check enforces it.
 - **FR-011** Every icon-only control MUST have a tooltip or semantic label;

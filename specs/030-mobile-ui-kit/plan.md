@@ -112,7 +112,8 @@ packages/tokens/tokens.json         # + space, radius.xl/xxl, motion
   test (`tokens_parity_test.dart`) reads `tokens.json` and fails on drift.
 - Dark accent becomes `60A5FA` as the JSON says; dark bg/surface/line corrected.
 - `theme.dart` builds `FlexThemeData.light/dark` from both mode columns, with
-  `FlexSubThemesData`: `defaultRadius: radius.xl`, cards `radius.xl`,
+  `FlexSubThemesData`: `defaultRadius: radius.xl`, `cardTheme` (filled,
+  `radius.xl`, no margin — screens use `Card.filled` directly),
   FAB `radius.xl`, bottom sheets/dialogs `radius.xxl`, inputs filled,
   `navigationBarIndicatorSchemeColor: secondaryContainer`, chips rounded,
   `useM2StyleDividerInM3: false`. `BotvyStatusColors extends
@@ -244,9 +245,18 @@ this pass, on the reworked screens.
 ### 9. Enforcement (FR-010, R-7)
 
 `mobile/tool/check_ui_literals.sh`: fails if `lib/features/**` (excluding
-`*.g.dart`) matches `EdgeInsets\.(all|symmetric|only|fromLTRB)\(`,
-`SizedBox\((height|width): *[0-9]`, `BorderRadius\.circular\( *[0-9]`,
-`Color\(0x`, `fontSize:`, or `Colors\.`. Wired into the mobile CI job after
+`*.g.dart`) matches any of:
+
+- `EdgeInsets\.(all|symmetric|only|fromLTRB)\(` — non-directional, banned
+  outright;
+- `EdgeInsetsDirectional\.\w+\([^)]*[0-9]` — directional is required, but
+  with tokens, not numbers;
+- `SizedBox\((height|width): *[0-9]` and `SizedBox\.square\([^)]*[0-9]`;
+- `BorderRadius(Directional)?\.(circular|all|only)\([^)]*[0-9]`;
+- `Color\(0x`, `fontSize:`, `Colors\.`.
+
+`0` is allowed (`EdgeInsetsDirectional.zero` has no digit; `SizedBox(height: 0)`
+is flagged and should be `SizedBox.shrink()`). Wired into the mobile CI job after
 `flutter analyze`. Enabled as a warning in Phase 1 and as a failure once
 Phase 7 lands, so the screen pass can go feature by feature.
 
