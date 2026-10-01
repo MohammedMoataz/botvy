@@ -29,7 +29,7 @@ they start with `packages/` or `.github/`.
 - [ ] T3005 [P] `lib/features/calendar/presentation/calendar_page.dart:358`:
   the one `Colors.` becomes a scheme role
 - [ ] T3006 `tool/check_ui_literals.sh` + `.github/workflows/ci.yml` mobile
-  job: the grep of plan §8, **warning only**. `spec:` a fixture file with
+  job: the grep of plan §9, **warning only**. `spec:` a fixture file with
   each banned pattern is reported; one with tokens is not
 
 ## Phase 2 — Appearance (FR-007, US4 scenarios 2-3)
@@ -121,36 +121,73 @@ they start with `packages/` or `.github/`.
 - [ ] T3054 `lib/app/l10n/app_localizations.dart`: section and row labels,
   en + ar; parity test green
 
-## Phase 7 — Screen pass (SC-003, US5, US6)
+## Phase 7 — Screen pass (SC-003, US5)
 
 One commit per feature; each: literals → tokens, directional insets, kit
-states, `SliverAppBar.large` on tab roots, `Card.filled` items, haptics where
-plan §7 says.
+states, `SliverAppBar.large` on tab roots, `Card.filled` items,
+`selectionClick` on switches (plan §8).
 
 - [ ] T3061 [P] home
 - [ ] T3062 [P] tasks (+ labels)
 - [ ] T3063 [P] reminders
 - [ ] T3064 [P] calendar + meetings
-- [ ] T3065 [P] chat (conversations, conversation; `Hero` on the title)
+- [ ] T3065 [P] chat (conversations, conversation)
 - [ ] T3066 [P] athlete (+ programs, session)
 - [ ] T3067 [P] nutrition
 - [ ] T3068 [P] knowledge
 - [ ] T3069 [P] profile, onboarding (optional: per-step accent from scheme
   roles, research B-2), sign-in, server
-- [ ] T3070 `lib/ui/shell/app_shell.dart`: fade-through on tab change,
-  `BotvyMotion.medium`, off under `MediaQuery.disableAnimations`.
-  `spec:` with `disableAnimations: true` no `FadeTransition` is pumped
 - [ ] T3071 `tool/check_ui_literals.sh`: warning → failure in CI.
   `check:` CI red on a deliberate literal, green without it
 
-## Phase 8 — Verify (SC-001…SC-005)
+## Phase 8 — Motion (FR-012, FR-013, US6, SC-006)
 
-- [ ] T3081 `flutter analyze`, `flutter test`, `flutter build apk --debug
+Plan §7 is the table this phase implements. Every task's `spec:` also runs
+with `disableAnimations: true` and asserts the end state is reached in one
+frame.
+
+- [ ] T3081 `pubspec.yaml`: `animations: ^2.2.0`. `check:` `flutter pub get`;
+  `flutter analyze`
+- [ ] T3082 `lib/app/tokens.dart`: `BotvyMotion.of(context)` returning the
+  token durations, or `Duration.zero` under `disableAnimations`; curves
+  `Easing.emphasizedDecelerate` / `emphasizedAccelerate` / `standard`.
+  `spec:` both branches (`test/motion_test.dart`)
+- [ ] T3083 `lib/app/theme.dart`: `PageTransitionsTheme` with
+  `SharedAxisPageTransitionsBuilder(transitionType: horizontal)` for Android
+  and iOS. `spec:` a pushed route pumps a `SharedAxisTransition`; in `ar` it
+  enters from the left
+- [ ] T3084 `lib/ui/shell/app_shell.dart`: `FadeThroughTransition` keyed on
+  `currentIndex`. `spec:` switching tabs pumps one; with reduce-motion none
+- [ ] T3085 [P] `OpenContainer` list → detail on conversations, meetings,
+  athlete sessions, knowledge links; `openBuilder` returns the route's page.
+  `spec:` tap opens with transform and exactly one route on the stack; the
+  same deep link opens without it (US6 scenario 2)
+- [ ] T3086 [P] `SliverAnimatedList` for tasks, reminders, meetings: insert,
+  remove, reorder from the cubit's list diff (`lib/ui/motion/list_diff.dart`).
+  `spec:` diff of before/after lists yields the right insert/remove indices,
+  including duplicates and a move
+- [ ] T3087 [P] `lib/ui/motion/animated_check.dart`: check morph,
+  strike-through, `lightImpact` when haptics on; used by task and reminder
+  rows. `spec:` haptics off → no `HapticFeedback` call (mock the platform
+  channel)
+- [ ] T3088 [P] `lib/ui/motion/stagger.dart` on Today: first build only.
+  `spec:` refresh does not restart the controller
+- [ ] T3089 [P] `home_dials.dart`: `TweenAnimationBuilder` around
+  `CompletionRing` and `AdherenceStrip`; dialogs via `showModal` +
+  `FadeScaleTransition` in `confirm_dialog.dart`; `LoadingView` 300 ms delay.
+  `spec:` a load that answers in under 300 ms never shows the spinner
+
+## Phase 9 — Verify (SC-001…SC-006)
+
+- [ ] T3091 `flutter analyze`, `flutter test`, `flutter build apk --debug
   --flavor dev` — output in the PR
-- [ ] T3082 Manual walk on a device: every screen in en and ar, light and
-  dark, text scale 1.0 and 2.0; screenshots attached; any clip or unmirrored
-  icon filed and fixed before merge
-- [ ] T3083 TalkBack pass on the shell, drawer and settings: every control
+- [ ] T3092 Manual walk on a device: every screen in en and ar, light and
+  dark, text scale 1.0 and 2.0, animations on and with "remove animations";
+  screen recording of the US6 transitions attached; any clip, unmirrored icon
+  or janky frame (profile mode, `flutter run --profile`, no frame over 16 ms
+  on the transitions) filed and fixed before merge
+- [ ] T3093 TalkBack pass on the shell, drawer and settings: every control
   announced, every target ≥ 48 dp
-- [ ] T3084 `docs/` and `CLAUDE.md`: the kit's rule (tokens only, `lib/ui/`
-  imports no feature) and the literal check, in the mobile gotchas
+- [ ] T3094 `docs/` and `CLAUDE.md`: the kit's rule (tokens only, `lib/ui/`
+  imports no feature), `BotvyMotion.of` as the only source of durations, and
+  the literal check, in the mobile gotchas

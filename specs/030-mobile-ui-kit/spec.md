@@ -16,6 +16,10 @@ divided into sections, reusable components". Clarified the same day:
 | What goes in the bottom bar vs the side menu | The plan decides, from the feature inventory |
 | How far this branch goes | Plan documents only; implementation is the next branches |
 | Visual direction | Keep the Botvy palette and tokens; adopt the Material 3 Expressive *feel* (shape, motion, tonal surfaces) through our own tokens |
+| Motion (follow-up) | Full Material 3 motion: fade-through, shared axis, container transform, animated lists, completion and entrance animations; no Lottie/Rive |
+| Fifth tab | Training; Nutrition stays in the drawer |
+| Reminders | A drawer item, not a tab inside Tasks |
+| Font and illustrations | Platform font; Material icons for empty states; no bundled assets |
 
 029 stays reserved for Supabase storage; this is 030.
 
@@ -124,11 +128,30 @@ both directions.
 2. **Given** any component in the kit, **Then** a golden test pins it in
    light/dark × en/ar.
 
-### User Story 6 — It feels current (Priority: P3)
+### User Story 6 — It moves like a current app (Priority: P2)
 
-Large collapsing app bars on tab roots, rounder tonal cards, short motion on
-tab and state changes, light haptics on completion, and none of it when the
-handset asks for reduced motion.
+Large collapsing app bars on tab roots, rounder tonal cards, and Material 3
+motion on every transition: tabs fade through, screens slide on a shared
+axis, a card opens into its detail, list rows animate in and out, completing
+a task animates and taps lightly. None of it when the handset asks for
+reduced motion.
+
+**Acceptance Scenarios**:
+
+1. **Given** a tab, **When** the member switches tabs, **Then** the content
+   fades through (out, then in) in about 250 ms.
+2. **Given** the conversation list, **When** the member taps a conversation,
+   **Then** its card expands into the conversation (container transform),
+   and back collapses it into the same card.
+3. **Given** Tasks, **When** a task is created, completed or deleted, **Then**
+   the row animates in, morphs its check and strikes through, or slides out —
+   the rest of the list moves rather than jumps.
+4. **Given** Today on first open, **Then** its cards enter in a short stagger;
+   pull-to-refresh does not replay it.
+5. **Given** the handset's "remove animations" setting, **Then** every one of
+   the above is instant, and nothing waits on an animation to become
+   tappable.
+6. **Given** Arabic, **Then** shared-axis slides run right-to-left.
 
 ### Edge Cases
 
@@ -172,8 +195,13 @@ handset asks for reduced motion.
   non-directional inset, `Color(0x…)` or `fontSize:`; a CI check enforces it.
 - **FR-011** Every icon-only control MUST have a tooltip or semantic label;
   every tap target MUST be ≥ 48 dp.
-- **FR-012** Motion MUST be disabled when `MediaQuery.disableAnimations` is
-  true; haptics MUST be behind a setting that defaults on.
+- **FR-012** Motion MUST follow Material 3 patterns — fade-through between
+  tabs, shared axis between screens, container transform from list cards to
+  their detail, animated insert/remove in lists, emphasised easing — with
+  durations and curves only from `BotvyMotion`.
+- **FR-013** Every animation MUST collapse to zero duration when
+  `MediaQuery.disableAnimations` is true; haptics MUST be behind a setting
+  that defaults on.
 
 ### Key Entities
 
@@ -195,6 +223,8 @@ handset asks for reduced motion.
   green.
 - **SC-005** Every screen walked in Arabic at 200% text scale with nothing
   clipped or unmirrored (manual, recorded in the PR with screenshots).
+- **SC-006** Every transition in US6 is visible at normal settings and absent
+  with remove-animations on (widget tests + the manual walk).
 
 ## Out of scope
 
@@ -205,3 +235,4 @@ handset asks for reduced motion.
 - A community "Material 3 Expressive" widget package (see research R-3).
 - Moving localisation to ARB/gen-l10n.
 - Widgetbook (YAGNI until the kit passes ~15 components; R-8).
+- Lottie or Rive illustrations, and a bundled font (Owner: icons only).

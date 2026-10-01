@@ -55,8 +55,10 @@ Avoided, because Pulse shows the cost:
 - **R-8 Goldens & catalog.** `golden_toolkit` is discontinued; `alchemist` 0.14 (March 2026) is the maintained successor ([pub](https://pub.dev/packages/alchemist), [VGV tutorial](https://verygood.ventures/blog/alchemist-golden-tests-tutorial.md)). CI goldens render text as blocks so they are stable across OSes. Widgetbook is worth it past ~15 components; not now.
 - **R-9 Bloc.** Cubit by default; Bloc when event transformers are needed. Sealed state classes with exhaustive `switch` are the modern shape, but rewriting 13 working states is not this phase. App-level `AppearanceCubit` provided above `MaterialApp`. Navigation stays in go_router — no navigation cubit.
 - **R-10 Settings.** Section header (`titleSmall`, primary colour) + grouped tiles; `SwitchListTile` for booleans; value + chevron for sub-pages; `SegmentedButton` for theme mode; destructive actions last with confirmation; whole tile tappable, ≥ 48 dp. Search only past ~20 settings (Botvy has ~12).
-- **R-11 Feel.** `SliverAppBar.large` on tab roots; `Card.filled` tonal cards; radii 12–28; motion 150–400 ms and off under `MediaQuery.disableAnimations`; fade-through between tabs (built from `FadeTransition`, no `animations` dependency); `HapticFeedback.selectionClick` on toggles, `lightImpact` on completion; empty state = icon + one line + one action; skeletons rarely needed in a local-first app (the drift cache answers instantly).
+- **R-11 Feel.** `SliverAppBar.large` on tab roots; `Card.filled` tonal cards; radii 12–28; motion 150–400 ms and off under `MediaQuery.disableAnimations`; fade-through between tabs (first drafted on plain `FadeTransition`; superseded by R-13 once the Owner asked for full motion); `HapticFeedback.selectionClick` on toggles, `lightImpact` on completion; empty state = icon + one line + one action; skeletons rarely needed in a local-first app (the drift cache answers instantly).
 - **R-12 Accessibility & RTL.** ≥ 48 dp targets, labels on icon-only buttons, test at 200% text scale, WCAG AA in both themes; `EdgeInsetsDirectional` / `AlignmentDirectional`; mirror directional icons, not media icons. The framework mirrors bar, rail and drawer.
+
+- **R-13 Material motion package.** `animations` 2.2.0 (April 2026; Flutter ≥ 3.35, Dart ^3.9) is Google's own package for the M3 transition patterns: `OpenContainer` (container transform), `SharedAxisTransition` / `SharedAxisPageTransitionsBuilder`, `FadeThroughTransition`, `FadeScaleTransition` + `showModal` ([pub docs](https://pub.dev/documentation/animations/latest/), [changelog](https://flutter.googlesource.com/mirrors/packages/+/refs/heads/main/packages/animations/CHANGELOG.md), [VGV deep dive](https://verygood.ventures/blog/a-deep-dive-into-the-flutter-animations-package)). Taken after the Owner asked for full M3 motion; it replaces what would otherwise be several hundred lines of hand-rolled transitions. Easing comes from Flutter's own M3 `Easing` constants.
 
 ## D. Navigation decision
 
@@ -79,5 +81,5 @@ Fifteen features; five go in the bar by daily use, the rest in the drawer.
 | Profile, Settings | Secondary by M3 guidance |
 | Sign out | Last, with confirmation |
 
-Open for the Owner, not blocking: swap Training ↔ Nutrition in the bar if
-the member base logs meals more than sessions.
+Settled by the Owner on 2026-10-02: Training is the fifth tab, Nutrition and
+Reminders stay in the drawer.
