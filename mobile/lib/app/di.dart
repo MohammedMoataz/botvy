@@ -30,6 +30,7 @@ import '../features/reminders/application/reminders_cubit.dart';
 import '../features/rhythm/application/rhythm_cubit.dart';
 import '../features/tasks/application/tasks_cubit.dart';
 import 'router.dart';
+import 'appearance/appearance_cubit.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -43,6 +44,7 @@ Future<void> configureDependencies({required String baseUrl}) async {
     ..registerSingleton<FlutterSecureStorage>(kSecureStorage)
     ..registerSingleton<SecretStore>(SecureSecretStore(sl<FlutterSecureStorage>()))
     ..registerSingleton<TokenStore>(TokenStore(sl<SecretStore>()))
+    ..registerSingleton<AppearanceCubit>(AppearanceCubit(sl<SecretStore>()))
     ..registerSingleton<AppDatabase>(AppDatabase())
     ..registerSingleton<ApiClient>(
       ApiClient(sl<TokenStore>(), baseUrl: baseUrl),

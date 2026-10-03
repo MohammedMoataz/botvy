@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app/appearance/appearance_cubit.dart';
 import 'app/di.dart';
 import 'app/l10n/app_localizations.dart';
 import 'app/router.dart';
@@ -49,6 +50,8 @@ Future<void> main() async {
   // it afterwards is what makes a returning member watch the sign-in form
   // appear and vanish.
   await sl<AuthCubit>().restore();
+  // Also before the first frame: an Arabic choice must not flash English.
+  await sl<AppearanceCubit>().restore();
 
   // Registered in the container so `handleAlertTap` can reach it. It is built
   // here rather than in `configureDependencies` because it needs the restored
@@ -75,34 +78,55 @@ class BotvyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The one place the cubit reaches the widget tree.
+    // The one place the app-wide cubits reach the widget tree.
     //
-    // `.value`, not a builder: it is a singleton from the container, already
+    // `.value`, not a builder: both are singletons from the container, already
     // restored before the first frame, and letting BlocProvider construct one
     // would give the screens a different instance from the one the router's
     // redirect reads — so a sign-in would update one and navigate on the other.
-    return BlocProvider<AuthCubit>.value(
-      value: sl<AuthCubit>(),
-      child: MaterialApp.router(
-        title: 'Botvy',
-        debugShowCheckedModeBanner: false,
-        routerConfig: router,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        // The direction follows the locale, and is stated rather than inherited:
-        // Arabic reads right to left and every screen below here has to agree,
-        // including the ones a plugin or a dialog inserts.
-        builder: (context, child) => Directionality(
-          textDirection: AppLocalizations.of(context).textDirection,
-          child: child ?? const SizedBox.shrink(),
-        ),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthCubit>.value(value: sl<AuthCubit>()),
+        BlocProvider<AppearanceCubit>.value(value: sl<AppearanceCubit>()),
+      ],
+      child: BotvyMaterialApp(router: router),
+    );
+  }
+}
+
+/// The MaterialApp, themed and localised from [AppearanceCubit].
+///
+/// Apart from [BotvyApp] so a test can pump it without the container.
+class BotvyMaterialApp extends StatelessWidget {
+  const BotvyMaterialApp({super.key, required this.router});
+
+  final GoRouter router;
+
+  @override
+  Widget build(BuildContext context) {
+    final appearance = context.watch<AppearanceCubit>().state;
+    return MaterialApp.router(
+      title: 'Botvy',
+      debugShowCheckedModeBanner: false,
+      routerConfig: router,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: appearance.themeMode,
+      // Null follows the handset, as the app always did.
+      locale: appearance.locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      // The direction follows the locale, and is stated rather than inherited:
+      // Arabic reads right to left and every screen below here has to agree,
+      // including the ones a plugin or a dialog inserts.
+      builder: (context, child) => Directionality(
+        textDirection: AppLocalizations.of(context).textDirection,
+        child: child ?? const SizedBox.shrink(),
       ),
     );
   }
