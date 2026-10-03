@@ -31,6 +31,12 @@ const staticVars = [
   ...Object.entries(t.radius).map(
     ([k, v]) => `  --botvy-radius-${kebab(k)}: ${v}px;`,
   ),
+  ...Object.entries(t.space).map(
+    ([k, v]) => `  --botvy-space-${kebab(k)}: ${v}px;`,
+  ),
+  ...Object.entries(t.motion).map(
+    ([k, v]) => `  --botvy-motion-${kebab(k)}: ${v}ms;`,
+  ),
 ].join('\n');
 
 // Three-state theming: bare :root is light, the media query covers the
@@ -76,6 +82,12 @@ const dartScale = [
   `  static const double lineHeight = ${t.font.lineHeight};`,
   ...Object.entries(t.radius).map(
     ([k, v]) => `  static const double radius${pascal(k)} = ${v};`,
+  ),
+  ...Object.entries(t.space).map(
+    ([k, v]) => `  static const double space${pascal(k)} = ${v};`,
+  ),
+  ...Object.entries(t.motion).map(
+    ([k, v]) => `  static const int motion${pascal(k)}Ms = ${v};`,
   ),
 ].join('\n');
 

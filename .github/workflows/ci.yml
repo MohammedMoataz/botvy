@@ -385,6 +385,12 @@ jobs:
       - name: Analyse
         working-directory: mobile
         run: flutter analyze
+      - name: No raw spacing, radii or colours in features
+        working-directory: mobile
+        # 030 FR-010. A warning until the screen pass (T3071) has migrated
+        # every feature; then this line goes and the step fails the job.
+        continue-on-error: true
+        run: bash tool/check_ui_literals.sh
       - name: Test
         working-directory: mobile
         # The migration ladder harness lives here. A schema bump without its
