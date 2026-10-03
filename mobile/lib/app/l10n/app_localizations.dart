@@ -77,6 +77,10 @@ class AppLocalizations {
   String get offline => _t('offline');
   String get somethingWentWrong => _t('somethingWentWrong');
   String get signOut => _t('signOut');
+  String get taskNew => _t('taskNew');
+  String get reminderNew => _t('reminderNew');
+  String get calendarAdd => _t('calendarAdd');
+  String get labelNew => _t('labelNew');
   String get navToday => _t('navToday');
   String get navTasks => _t('navTasks');
   String get navCalendar => _t('navCalendar');
@@ -851,6 +855,10 @@ class AppLocalizations {
       'offline': 'Cannot reach Botvy. Check the server address in settings.',
       'somethingWentWrong': 'That did not work. Please try again.',
       'signOut': 'Sign out',
+      'taskNew': 'New task',
+      'reminderNew': 'New reminder',
+      'calendarAdd': 'Add',
+      'labelNew': 'New label',
       'navToday': 'Today',
       'navTasks': 'Tasks',
       'navCalendar': 'Calendar',
@@ -1322,6 +1330,10 @@ class AppLocalizations {
       'offline': 'تعذّر الوصول إلى بوتفي. تحقّق من عنوان الخادم في الإعدادات.',
       'somethingWentWrong': 'لم ينجح ذلك. حاول مرة أخرى.',
       'signOut': 'تسجيل الخروج',
+      'taskNew': 'مهمة جديدة',
+      'reminderNew': 'تذكير جديد',
+      'calendarAdd': 'إضافة',
+      'labelNew': 'تصنيف جديد',
       'navToday': 'اليوم',
       'navTasks': 'المهام',
       'navCalendar': 'التقويم',

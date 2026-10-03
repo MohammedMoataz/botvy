@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/knowledge_cubit.dart';
+import '../../../ui/scroll_aware_fab.dart';
 
 /// What the member saved to read, and what Botvy proposed from it (T741, T742).
 ///
@@ -68,10 +69,11 @@ class _KnowledgePageState extends State<KnowledgePage>
               ],
             ),
           ),
-          floatingActionButton: FloatingActionButton.extended(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add_link,
+            label: t.knowledgeAdd,
+            tooltip: t.knowledgeAdd,
             onPressed: () => unawaited(_saveSheet(context, cubit)),
-            icon: const Icon(Icons.add_link),
-            label: Text(t.knowledgeAdd),
           ),
           body: TabBarView(
             controller: _tabs,

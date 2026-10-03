@@ -1,5 +1,6 @@
 import 'package:alchemist/alchemist.dart';
 import 'package:botvy/app/tokens.dart';
+import 'package:botvy/ui/scroll_aware_fab.dart';
 import 'package:botvy/ui/section.dart';
 import 'package:botvy/ui/settings_tiles.dart';
 import 'package:botvy/ui/states.dart';
@@ -91,6 +92,25 @@ void main() {
             leading: Icon(Icons.event),
             title: Text('Stand-up'),
             subtitle: Text('09:30'),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  goldenTest(
+    'the FAB under the theme',
+    fileName: 'fab',
+    builder: () => goldenMatrix(
+      builder: () => Padding(
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
+        child: Align(
+          alignment: AlignmentDirectional.centerEnd,
+          child: ScrollAwareFab(
+            icon: Icons.add_task,
+            label: 'New task',
+            tooltip: 'New task',
+            onPressed: () {},
           ),
         ),
       ),

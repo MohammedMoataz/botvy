@@ -54,19 +54,17 @@ void main() {
   group('ScrollAwareFab', () {
     Future<void> pumpList(WidgetTester tester) => tester.pumpWidget(
       MaterialApp(
-        home: FabScrollScope(
-          child: Scaffold(
-            body: ListView(
-              children: [
-                for (var i = 0; i < 100; i++) ListTile(title: Text('row $i')),
-              ],
-            ),
-            floatingActionButton: ScrollAwareFab(
-              icon: Icons.add,
-              label: 'New task',
-              tooltip: 'New task',
-              onPressed: () {},
-            ),
+        home: Scaffold(
+          body: ListView(
+            children: [
+              for (var i = 0; i < 100; i++) ListTile(title: Text('row $i')),
+            ],
+          ),
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add,
+            label: 'New task',
+            tooltip: 'New task',
+            onPressed: () {},
           ),
         ),
       ),
@@ -96,7 +94,7 @@ void main() {
       expect(find.byTooltip('New task'), findsOneWidget);
     });
 
-    testWidgets('without a scope it stays extended', (tester) async {
+    testWidgets('with no list on the page it stays extended', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
