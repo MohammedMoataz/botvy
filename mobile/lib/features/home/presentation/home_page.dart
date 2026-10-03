@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../../../app/router.dart';
+import '../../../ui/shell/app_shell.dart';
 import '../../calendar/application/agenda.dart';
 import '../../rhythm/application/rhythm_cubit.dart';
 import '../../rhythm/presentation/checkin_sheet.dart';
@@ -47,45 +48,12 @@ class HomePage extends StatelessWidget {
                   ? t.homeGreetingNoName
                   : t.homeGreeting(state.displayName!),
             ),
+            // The menu opens the side drawer; the seven shortcuts that used to
+            // crowd this bar are now the tabs and the drawer (030).
+            leading: const ShellMenuButton(),
             actions: [
-              // First, because it is what this phase makes the app for: the
-              // rest of Home is a list of what the member already knows and
-              // this is where they can ask.
               IconButton(
-                icon: const Icon(Icons.forum_outlined),
-                tooltip: t.chatsTitle,
-                onPressed: () => context.push(Routes.chats),
-              ),
-              IconButton(
-                icon: const Icon(Icons.checklist),
-                tooltip: t.taskToday,
-                onPressed: () => context.push(Routes.tasks),
-              ),
-              IconButton(
-                icon: const Icon(Icons.notifications_none),
-                tooltip: t.remindersTitle,
-                onPressed: () => context.push(Routes.reminders),
-              ),
-              IconButton(
-                icon: const Icon(Icons.calendar_month),
-                tooltip: 'Calendar',
-                onPressed: () => context.push(Routes.calendar),
-              ),
-              IconButton(
-                icon: const Icon(Icons.fitness_center),
-                tooltip: t.athleteTitle,
-                onPressed: () => context.push(Routes.athlete),
-              ),
-              // Beside training rather than beside the profile: the day's line
-              // is "Workout: … | Meals: …", and the two halves are the same
-              // idea about the same day.
-              IconButton(
-                icon: const Icon(Icons.restaurant),
-                tooltip: t.nutritionTitle,
-                onPressed: () => context.push(Routes.nutrition),
-              ),
-              IconButton(
-                icon: const Icon(Icons.person_outline),
+                icon: const Icon(Icons.account_circle_outlined),
                 tooltip: t.profileTitle,
                 onPressed: () => context.push(Routes.profile),
               ),
@@ -249,6 +217,7 @@ class _ScheduleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
 
     return Card(
       child: Padding(
@@ -260,13 +229,14 @@ class _ScheduleCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Today',
+                    t.taskToday,
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
+                // `go`: the calendar is a tab, so this switches to it.
                 TextButton(
-                  onPressed: () => context.push(Routes.calendar),
-                  child: const Text('Calendar'),
+                  onPressed: () => context.go(Routes.calendar),
+                  child: Text(t.navCalendar),
                 ),
               ],
             ),
@@ -293,12 +263,12 @@ class _ScheduleCard extends StatelessWidget {
                 // the map are one tap away (story 1, scenarios 1 and 2).
                 // Everything else opens the calendar, which is the screen that
                 // knows how to draw it.
-                onTap: () => context.push(
-                  item.kind == AgendaKind.meeting ||
-                          item.kind == AgendaKind.preparation
-                      ? Routes.meeting(item.id)
-                      : Routes.calendar,
-                ),
+                // A meeting is pushed over Today; the calendar is a tab, gone to.
+                onTap: () =>
+                    item.kind == AgendaKind.meeting ||
+                        item.kind == AgendaKind.preparation
+                    ? context.push(Routes.meeting(item.id))
+                    : context.go(Routes.calendar),
               ),
           ],
         ),

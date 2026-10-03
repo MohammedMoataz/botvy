@@ -111,7 +111,9 @@ class _SessionRow extends StatelessWidget {
         ],
       ),
       trailing: const Icon(Icons.chevron_right),
-      onTap: () => context.push(Routes.session(session.id)),
+      // `go`, not `push`: the session lives in the Training tab, and going
+      // there puts the week under it so back lands on the list.
+      onTap: () => context.go(Routes.session(session.id)),
     );
   }
 }
