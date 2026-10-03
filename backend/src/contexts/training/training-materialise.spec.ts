@@ -210,6 +210,7 @@ function event(
   name: string,
   payload: unknown,
   userId: string | null = MEMBER,
+  occurredAt: Date = new Date(),
 ): DomainEvent {
   return {
     eventId: newId(),
@@ -230,7 +231,7 @@ function event(
      * green all day and failed after midnight, which is the shape of fixture
      * this project has already written a rule about.
      */
-    occurredAt: new Date(),
+    occurredAt,
     payload,
     schemaVersion: EVENT_SCHEMA_VERSION,
   };
@@ -957,8 +958,13 @@ describe('the materialiser: a zone change', () => {
     b.quiesce();
 
     b.member.zone(MEMBER, BERLIN);
+    // Dated at the bench's `now()`, not the real clock: the saga re-times only
+    // *future* sessions, and today's 18:00 is past for every run between 18:00
+    // and midnight in Cairo — the suite went red each evening. `now()` is
+    // never later than the real clock, so this is not a stamp from the future
+    // either.
     await b.saga.onMemberContextChanged(
-      event('profile.ProfileUpdated', { changed: ['timezone'] }),
+      event('profile.ProfileUpdated', { changed: ['timezone'] }, MEMBER, now()),
     );
 
     const sessions = await b.mine();

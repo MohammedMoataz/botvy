@@ -305,8 +305,12 @@ describe('recurrence: the edges', () => {
     const rule = Recurrence.parse(spec, CAIRO)!;
 
     const from = spec.dtstart;
-    const to = new Date(from.getTime() + 28 * 86_400_000);
-    // Inclusive of both ends: five Wednesdays across four weeks.
+    // 09:00 local, 28 calendar days on — not 28 × 24 h, which is an hour short
+    // of it whenever the window crosses a clock change (Cairo leaves summer
+    // time on the last Thursday of October, and every run from 1 October on
+    // lost the fifth occurrence to that hour).
+    const to = ruleFrom(28, '09:00', 'FREQ=WEEKLY', 'schedule', CAIRO).dtstart;
+    // Inclusive of both ends: five occurrences across four weeks.
     expect(rule.between(from, to, CAIRO)).toHaveLength(5);
   });
 
