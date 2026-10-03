@@ -56,8 +56,11 @@ class _DiffAnimatedListState<T> extends State<DiffAnimatedList<T>> {
       final gone = old.items[i];
       list.removeItem(
         i,
-        (context, animation) =>
-            _transition(animation, old.itemBuilder(context, gone)),
+        // Gone from the data: drawn while it shrinks, but a tap on it would
+        // act on a deleted item through its old callbacks.
+        (context, animation) => IgnorePointer(
+          child: _transition(animation, old.itemBuilder(context, gone)),
+        ),
         duration: duration,
       );
     }

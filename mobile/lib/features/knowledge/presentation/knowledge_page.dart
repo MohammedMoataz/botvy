@@ -166,7 +166,12 @@ class _LinkList extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: cubit.refresh,
       child: ListView(
-        padding: const EdgeInsetsDirectional.all(BotvySpace.md),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+          BotvySpace.md,
+          BotvySpace.md,
+          BotvySpace.md,
+          fabClearance,
+        ),
         children: [
           // The filter is by the member's three words, not the server's six
           // states: `fetching` and `extracting` are one thing from outside.

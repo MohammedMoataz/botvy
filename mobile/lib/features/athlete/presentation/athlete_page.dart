@@ -45,7 +45,7 @@ class AthletePage extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            leading: const ShellMenuButton(),
+            leading: ShellMenuButton.maybe(context),
             title: Text(t.athleteTitle),
             actions: [
               IconButton(
@@ -88,7 +88,12 @@ class AthletePage extends StatelessWidget {
                   // member who wants to be sure the screen is current.
                   onRefresh: cubit.refresh,
                   child: ListView(
-                    padding: const EdgeInsetsDirectional.all(BotvySpace.md),
+                    padding: const EdgeInsetsDirectional.fromSTEB(
+                      BotvySpace.md,
+                      BotvySpace.md,
+                      BotvySpace.md,
+                      fabClearance,
+                    ),
                     children: [
                       NextPracticeCard(state: state),
                       // Story 1 scenario 3, verbatim: no slots at all invites

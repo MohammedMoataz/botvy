@@ -84,6 +84,7 @@ class MeetingsPage extends StatelessWidget {
                             message: l10n.meetingsNoneYet,
                           )
                         : DiffAnimatedList(
+                            padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
                             items: state.meetings,
                             keyOf: (meeting) => meeting.id,
                             itemBuilder: (context, meeting) => _MeetingRow(

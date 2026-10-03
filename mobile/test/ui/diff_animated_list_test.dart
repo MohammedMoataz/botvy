@@ -51,4 +51,24 @@ void main() {
     // hundreds of them to fill the screen. Only what fits is built.
     expect(find.byType(ListTile).evaluate().length, lessThan(30));
   });
+
+  testWidgets('a row on its way out takes no taps', (tester) async {
+    var taps = 0;
+    Widget list(List<String> items) => MaterialApp(
+      home: Scaffold(
+        body: DiffAnimatedList<String>(
+          items: items,
+          keyOf: (s) => s,
+          itemBuilder: (context, s) =>
+              ListTile(title: Text(s), onTap: () => taps++),
+        ),
+      ),
+    );
+    await tester.pumpWidget(list(['a', 'b']));
+    await tester.pumpWidget(list(['a']));
+    await tester.pump(const Duration(milliseconds: 30));
+    await tester.tap(find.text('b'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(taps, 0);
+  });
 }

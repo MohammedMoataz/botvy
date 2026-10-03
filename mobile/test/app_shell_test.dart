@@ -26,7 +26,7 @@ class _ListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(leading: const ShellMenuButton(), title: Text(name)),
+    appBar: AppBar(leading: ShellMenuButton.maybe(context), title: Text(name)),
     body: ListView(
       key: PageStorageKey(name),
       children: [
@@ -277,5 +277,71 @@ void main() {
     await tester.pumpAndSettle();
     final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
     expect(bar.selectedIndex, 0);
+  });
+
+  testWidgets('a wide screen has one menu button, on the rail', (tester) async {
+    await _pump(tester, size: const Size(840, 1200));
+    expect(find.byIcon(Icons.menu), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(NavigationRail),
+        matching: find.byIcon(Icons.menu),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('outside a shell a page keeps its own back arrow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => Scaffold(
+                  appBar: AppBar(
+                    leading: ShellMenuButton.maybe(context),
+                    title: const Text('alone'),
+                  ),
+                ),
+              ),
+            ),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BackButton), findsOneWidget);
+  });
+
+  testWidgets('switching fast lets each leaving tab finish its fade', (
+    tester,
+  ) async {
+    await _pump(tester);
+    await _tab(tester, 'Tasks');
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Calendar'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 40));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Coach'),
+      ),
+    );
+    await tester.pump();
+    // Tasks was still fading out when Coach was picked: it keeps fading
+    // rather than vanishing in one frame.
+    expect(find.text('/tasks row 0'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('/tasks row 0'), findsNothing);
   });
 }

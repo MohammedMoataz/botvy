@@ -48,7 +48,7 @@ class TasksPage extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            leading: const ShellMenuButton(),
+            leading: ShellMenuButton.maybe(context),
             title: Text(_viewTitle(t, state)),
             actions: [
               PopupMenuButton<TaskView>(
@@ -192,6 +192,8 @@ class _TaskList extends StatelessWidget {
     // created, completed or deleted grows in or shrinks out, and the rows
     // around it move rather than jump (030, US6).
     return DiffAnimatedList<Object>(
+      // The last row scrolls clear of the FAB.
+      padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
       items: entries,
       keyOf: (entry) => switch (entry) {
         LocalTask task => task.id,

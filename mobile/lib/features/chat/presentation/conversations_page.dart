@@ -67,7 +67,7 @@ class ConversationsPage extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            leading: const ShellMenuButton(),
+            leading: ShellMenuButton.maybe(context),
             title: Text(t.chatsTitle),
           ),
           floatingActionButton: ScrollAwareFab(
@@ -79,6 +79,7 @@ class ConversationsPage extends StatelessWidget {
           body: state.loading
               ? const LoadingView()
               : ListView(
+                  padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
                   children: [
                     if (state.pinned.isNotEmpty) _SectionHeader(t.chatPinned),
                     for (final row in state.pinned)

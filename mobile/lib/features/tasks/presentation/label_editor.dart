@@ -44,6 +44,7 @@ class LabelEditorPage extends StatelessWidget {
                   message: t.labelNoneYet,
                 )
               : ListView.builder(
+                  padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
                   itemCount: state.labels.length,
                   itemBuilder: (context, index) {
                     final label = state.labels[index];

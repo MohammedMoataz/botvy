@@ -52,7 +52,7 @@ class CalendarPage extends StatelessWidget {
         final zone = memberZone(state.timezone);
         return Scaffold(
           appBar: AppBar(
-            leading: const ShellMenuButton(),
+            leading: ShellMenuButton.maybe(context),
             title: Text(AppLocalizations.of(context).navCalendar),
             actions: [
               IconButton(
@@ -477,6 +477,7 @@ class _Agenda extends StatelessWidget {
     final timed = [for (final item in items) if (!item.allDay) item];
 
     return ListView(
+      padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
       children: [
         if (allDay.isNotEmpty) ...[
           for (final item in allDay)
