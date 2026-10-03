@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/api/api_client.dart';
 import '../core/notifications/alert_plan.dart' show memberZone;
 import '../features/athlete/application/athlete_cubit.dart';
 import '../features/athlete/application/programs_cubit.dart';
@@ -28,14 +29,15 @@ import '../features/home/presentation/home_page.dart';
 import '../features/meetings/application/meetings_cubit.dart';
 import '../features/meetings/presentation/meetings_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
-import '../features/preferences/presentation/preferences_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/reminders/application/reminders_cubit.dart';
 import '../features/reminders/presentation/reminders_page.dart';
 import '../features/rhythm/application/rhythm_cubit.dart';
 import '../features/rhythm/presentation/checkin_sheet.dart';
 import '../features/rhythm/presentation/confirm_plan_sheet.dart';
+import '../features/profile/data/profile_mirror.dart';
 import '../features/settings/presentation/server_page.dart';
+import '../features/settings/presentation/settings_page.dart';
 import '../features/tasks/application/tasks_cubit.dart';
 import '../features/tasks/presentation/tasks_page.dart';
 import '../ui/shell/app_shell.dart';
@@ -466,13 +468,19 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
       path: Routes.profile,
       builder: (context, state) => const ProfilePage(),
     ),
+    // The old preferences screen is a section of Settings now; the path stays
+    // for any link that still carries it.
     GoRoute(
       path: Routes.preferences,
-      builder: (context, state) => const PreferencesPage(),
+      redirect: (context, state) => Routes.settings,
     ),
     GoRoute(
       path: Routes.settings,
-      builder: (context, state) => const PreferencesPage(),
+      builder: (context, state) => SettingsPage(
+        mirror: sl<ProfileMirror>(),
+        serverOrigin: sl<ApiClient>().origin,
+        onSignOut: () => sl<AuthCubit>().signOut(),
+      ),
     ),
     GoRoute(
       path: Routes.reminders,

@@ -141,10 +141,15 @@ jobs:
           # Passed only when there is something to pass. An explicitly empty
           # define is worse than none: it overrides the Dart default with `''`,
           # and the client reads that as `UrlProblem.empty`.
+          #
+          # The version is a define for the same reason: Settings → About shows
+          # it, and reading it at runtime would need package_info_plus for one
+          # string the build already knows (030, T3053).
+          version="$(sed -n 's/^version: *//p' pubspec.yaml)"
           if [ -n "${BOTVY_BASE_URL:-}" ]; then
-            flutter build apk --flavor prod --release --dart-define=BOTVY_BASE_URL="$BOTVY_BASE_URL"
+            flutter build apk --flavor prod --release --dart-define=BOTVY_VERSION="$version" --dart-define=BOTVY_BASE_URL="$BOTVY_BASE_URL"
           else
-            flutter build apk --flavor prod --release
+            flutter build apk --flavor prod --release --dart-define=BOTVY_VERSION="$version"
           fi
         env:
           # Baked at build time. The release phase decides whether an installer
