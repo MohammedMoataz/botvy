@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../../../app/router.dart';
+import '../../../ui/large_title.dart';
 import '../../../ui/motion/stagger.dart';
 import '../../../ui/shell/app_shell.dart';
 import '../../calendar/application/agenda.dart';
@@ -39,65 +40,64 @@ class HomePage extends StatelessWidget {
     // ever set, and a snack bar for it would be a branch no test could reach.
     return BlocBuilder<HomeCubit, HomeState>(
       builder: (context, state) {
-        return Scaffold(
-          appBar: AppBar(
-            // The greeting is the title, so it does not cost a row of its own
-            // on a screen whose whole job is to be read in one look. The name
-            // is dropped rather than defaulted when the profile mirror is
-            // empty — a member who signed in on a plane gets "Hello", not
-            // "Hello, null".
-            title: Text(
-              state.displayName == null || state.displayName!.isEmpty
-                  ? t.homeGreetingNoName
-                  : t.homeGreeting(state.displayName!),
-            ),
-            // The menu opens the side drawer; the seven shortcuts that used to
-            // crowd this bar are now the tabs and the drawer (030).
-            leading: ShellMenuButton.maybe(context),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.account_circle_outlined),
-                tooltip: t.profileTitle,
-                onPressed: () => context.push(Routes.profile),
-              ),
-            ],
+        final page = LargeTitleScrollView(
+          // The menu opens the side drawer; the seven shortcuts that used to
+          // crowd this bar are now the tabs and the drawer (030).
+          leading: ShellMenuButton.maybe(context),
+          // The greeting is the title, large on arrival and folding into the
+          // toolbar as the day is read. The name is dropped rather than
+          // defaulted when the profile mirror is empty — a member who signed
+          // in on a plane gets "Hello", not "Hello, null".
+          title: Text(
+            state.displayName == null || state.displayName!.isEmpty
+                ? t.homeGreetingNoName
+                : t.homeGreeting(state.displayName!),
           ),
-          body: state.loading
-              ? const LoadingView()
-              : RefreshIndicator(
-                  // A pull-to-refresh that re-reads the *database*, not the
-                  // network. The sync engine has its own triggers; what this is
-                  // for is the member who wants to be sure the screen is
-                  // current, and re-reading is the honest answer to that.
-                  onRefresh: () => context.read<HomeCubit>().refresh(),
-                  // The cards enter one after another on the first paint,
-                  // and only then: a refresh is not an arrival (030, US6).
-                  child: StaggerScope(
-                    child: ListView(
-                      padding: const EdgeInsetsDirectional.all(BotvySpace.md),
-                      children: [
-                        for (final (i, card) in <Widget>[
-                          if (state.draft != null) const _PlanTomorrowCard(),
-                          if (state.awaitingCheckin) const _CheckinCard(),
-                          _TodayCard(state: state),
-                          // Today's training, as its own kind of row and never as
-                          // a task (FR-010, story 6 scenario 1). It draws itself
-                          // from the phone's `sessions` table rather than from the
-                          // plan snapshot, so completing or skipping a session
-                          // offline changes it at once — see [TrainingRow].
-                          TrainingRow(
-                            date: state.today,
-                            timezone: state.timezone,
-                          ),
-                          if (state.agenda.isNotEmpty)
-                            _ScheduleCard(state: state),
-                          _StreakCard(state: state),
-                        ].indexed)
-                          StaggerItem(index: i, child: card),
-                      ],
-                    ),
-                  ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.account_circle_outlined),
+              tooltip: t.profileTitle,
+              onPressed: () => context.push(Routes.profile),
+            ),
+          ],
+          // A pull-to-refresh that re-reads the *database*, not the network.
+          // The sync engine has its own triggers; what this is for is the
+          // member who wants to be sure the screen is current, and
+          // re-reading is the honest answer to that.
+          onRefresh: state.loading
+              ? null
+              : () => context.read<HomeCubit>().refresh(),
+          slivers: [
+            if (state.loading)
+              const SliverFillRemaining(child: LoadingView())
+            else
+              SliverPadding(
+                padding: const EdgeInsetsDirectional.all(BotvySpace.md),
+                sliver: SliverList.list(
+                  children: [
+                    for (final (i, card) in <Widget>[
+                      if (state.draft != null) const _PlanTomorrowCard(),
+                      if (state.awaitingCheckin) const _CheckinCard(),
+                      _TodayCard(state: state),
+                      // Today's training, as its own kind of row and never as
+                      // a task (FR-010, story 6 scenario 1). It draws itself
+                      // from the phone's `sessions` table rather than from the
+                      // plan snapshot, so completing or skipping a session
+                      // offline changes it at once — see [TrainingRow].
+                      TrainingRow(date: state.today, timezone: state.timezone),
+                      if (state.agenda.isNotEmpty) _ScheduleCard(state: state),
+                      _StreakCard(state: state),
+                    ].indexed)
+                      StaggerItem(index: i, child: card),
+                  ],
                 ),
+              ),
+          ],
+        );
+        return Scaffold(
+          // The cards enter one after another on the first paint after
+          // loading, and only then: a refresh is not an arrival (030, US6).
+          body: state.loading ? page : StaggerScope(child: page),
         );
       },
     );

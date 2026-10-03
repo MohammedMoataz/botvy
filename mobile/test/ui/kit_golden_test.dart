@@ -1,5 +1,6 @@
 import 'package:alchemist/alchemist.dart';
 import 'package:botvy/app/tokens.dart';
+import 'package:botvy/ui/large_title.dart';
 import 'package:botvy/ui/scroll_aware_fab.dart';
 import 'package:botvy/ui/section.dart';
 import 'package:botvy/ui/settings_tiles.dart';
@@ -112,6 +113,29 @@ void main() {
             tooltip: 'New task',
             onPressed: () {},
           ),
+        ),
+      ),
+    ),
+  );
+
+  goldenTest(
+    'a tab under its large title',
+    fileName: 'large_title',
+    builder: () => goldenMatrix(
+      builder: () => SizedBox(
+        height: 320,
+        child: LargeTitleScrollView(
+          leading: const Icon(Icons.menu),
+          title: const Text('Good morning, Mona'),
+          actions: const [Icon(Icons.account_circle_outlined)],
+          slivers: [
+            SliverList.list(
+              children: const [
+                Card.filled(child: ListTile(title: Text('Today'))),
+                Card.filled(child: ListTile(title: Text('Training'))),
+              ],
+            ),
+          ],
         ),
       ),
     ),

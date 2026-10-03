@@ -13,6 +13,7 @@ import 'task_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
 import '../../../app/tokens.dart';
+import '../../../ui/large_title.dart';
 import '../../../ui/motion/animated_check.dart';
 import '../../../ui/motion/diff_animated_list.dart';
 import '../../../ui/motion/haptics.dart';
@@ -38,16 +39,21 @@ class TasksPage extends StatelessWidget {
       listener: (context, state) {
         // The server's own sentence, or the local duplicate-name refusal. Shown
         // and then cleared, so it does not follow the member to the next screen.
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.problem!)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(state.problem!)));
         context.read<TasksCubit>().clearProblem();
       },
       builder: (context, state) {
         final cubit = context.read<TasksCubit>();
 
         return Scaffold(
-          appBar: AppBar(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add_task,
+            label: t.taskNew,
+            tooltip: t.taskNew,
+            onPressed: () => unawaited(showTaskSheet(context, cubit)),
+          ),
+          body: LargeTitleScrollView(
             leading: ShellMenuButton.maybe(context),
             title: Text(_viewTitle(t, state)),
             actions: [
@@ -55,7 +61,10 @@ class TasksPage extends StatelessWidget {
                 icon: const Icon(Icons.filter_list),
                 onSelected: (view) => unawaited(cubit.show(view)),
                 itemBuilder: (context) => [
-                  PopupMenuItem(value: TaskView.today, child: Text(t.taskToday)),
+                  PopupMenuItem(
+                    value: TaskView.today,
+                    child: Text(t.taskToday),
+                  ),
                   PopupMenuItem(
                     value: TaskView.upcoming,
                     child: Text(t.taskUpcoming),
@@ -89,21 +98,17 @@ class TasksPage extends StatelessWidget {
                 ),
               ),
             ],
+
+            slivers: [
+              if (state.loading)
+                const SliverFillRemaining(child: LoadingView())
+              else ...[
+                if (state.labels.isNotEmpty)
+                  SliverToBoxAdapter(child: _LabelFilters(state: state)),
+                _TaskList(state: state),
+              ],
+            ],
           ),
-          floatingActionButton: ScrollAwareFab(
-            icon: Icons.add_task,
-            label: t.taskNew,
-            tooltip: t.taskNew,
-            onPressed: () => unawaited(showTaskSheet(context, cubit)),
-          ),
-          body: state.loading
-              ? const LoadingView()
-              : Column(
-                  children: [
-                    if (state.labels.isNotEmpty) _LabelFilters(state: state),
-                    Expanded(child: _TaskList(state: state)),
-                  ],
-                ),
         );
       },
     );
@@ -135,7 +140,10 @@ class _LabelFilters extends StatelessWidget {
     final cubit = context.read<TasksCubit>();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md, vertical: BotvySpace.sm),
+      padding: const EdgeInsetsDirectional.symmetric(
+        horizontal: BotvySpace.md,
+        vertical: BotvySpace.sm,
+      ),
       child: Row(
         children: [
           for (final label in state.labels)
@@ -171,7 +179,10 @@ class _TaskList extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     if (state.tasks.isEmpty) {
-      return EmptyState(icon: Icons.task_alt, message: t.taskNothingHere);
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: EmptyState(icon: Icons.task_alt, message: t.taskNothingHere),
+      );
     }
 
     // Today is the one view with headings, and they are the point of it:
@@ -191,25 +202,28 @@ class _TaskList extends StatelessWidget {
     // Animated, and still lazy: rows are built as they scroll in. A task
     // created, completed or deleted grows in or shrinks out, and the rows
     // around it move rather than jump (030, US6).
-    return DiffAnimatedList<Object>(
-      // The last row scrolls clear of the FAB.
+    // A sliver of the page's one scroll view, under the large title; the last
+    // row scrolls clear of the FAB.
+    return SliverPadding(
       padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
-      items: entries,
-      keyOf: (entry) => switch (entry) {
-        LocalTask task => task.id,
-        _Note note => 'note:${note.text}',
-        _ => 'heading:$entry',
-      },
-      itemBuilder: (context, entry) {
-        if (entry is String) return _Heading(entry);
-        if (entry is _Note) {
-          return Padding(
-            padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
-            child: Text(entry.text),
-          );
-        }
-        return _TaskRow(task: entry as LocalTask, view: state.view);
-      },
+      sliver: DiffAnimatedList<Object>.sliver(
+        items: entries,
+        keyOf: (entry) => switch (entry) {
+          LocalTask task => task.id,
+          _Note note => 'note:${note.text}',
+          _ => 'heading:$entry',
+        },
+        itemBuilder: (context, entry) {
+          if (entry is String) return _Heading(entry);
+          if (entry is _Note) {
+            return Padding(
+              padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
+              child: Text(entry.text),
+            );
+          }
+          return _TaskRow(task: entry as LocalTask, view: state.view);
+        },
+      ),
     );
   }
 
@@ -246,7 +260,12 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsetsDirectional.fromSTEB(BotvySpace.lg, BotvySpace.lg, BotvySpace.lg, BotvySpace.xs),
+    padding: const EdgeInsetsDirectional.fromSTEB(
+      BotvySpace.lg,
+      BotvySpace.lg,
+      BotvySpace.lg,
+      BotvySpace.xs,
+    ),
     child: Text(text, style: Theme.of(context).textTheme.titleSmall),
   );
 }
@@ -386,7 +405,9 @@ class _TaskRow extends StatelessWidget {
           Text(task.labelName!),
           if (pieces.isNotEmpty) const Text(' · '),
         ],
-        Expanded(child: Text(pieces.join(' · '), overflow: TextOverflow.ellipsis)),
+        Expanded(
+          child: Text(pieces.join(' · '), overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
   }
@@ -432,7 +453,11 @@ class _SwipeHint extends StatelessWidget {
     alignment: alignment,
     child: Row(
       mainAxisSize: MainAxisSize.min,
-      children: [Icon(icon), const SizedBox(width: BotvySpace.sm), Text(label)],
+      children: [
+        Icon(icon),
+        const SizedBox(width: BotvySpace.sm),
+        Text(label),
+      ],
     ),
   );
 }
@@ -475,4 +500,3 @@ String _dateText(DateTime instant) {
 
 String _timeText(BuildContext context, DateTime instant) =>
     TimeOfDay.fromDateTime(instant.toLocal()).format(context);
-
