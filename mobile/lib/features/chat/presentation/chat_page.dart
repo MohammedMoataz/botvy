@@ -10,6 +10,7 @@ import '../application/conversations_cubit.dart';
 import 'assistant_markdown.dart';
 import '../../../app/tokens.dart';
 import '../../../ui/states.dart';
+import '../../../ui/motion/hero_title.dart';
 
 /// One conversation: its history, the answer as it is written, and the box.
 ///
@@ -103,7 +104,10 @@ class _ChatPageState extends State<ChatPage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(_title(t, state.conversation)),
+            title: HeroTitle(
+              tag: 'conversation:${widget.conversationId}',
+              text: _title(t, state.conversation),
+            ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.cleaning_services_outlined),

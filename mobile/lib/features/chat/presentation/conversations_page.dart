@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/conversations_cubit.dart';
+import '../../../ui/motion/hero_title.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
 import '../../../app/tokens.dart';
@@ -197,7 +198,10 @@ class _ConversationTile extends StatelessWidget {
         ChatKinds.planner => Icons.event_note_outlined,
         _ => Icons.chat_bubble_outline,
       }),
-      title: Text(_title(t, conversation)),
+      title: HeroTitle(
+        tag: 'conversation:${conversation.id}',
+        text: _title(t, conversation),
+      ),
       onTap: onOpen,
       trailing: PopupMenuButton<_ChatAction>(
         onSelected: (action) => unawaited(_run(context, cubit, action)),

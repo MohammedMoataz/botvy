@@ -14,6 +14,7 @@ import '../application/meetings_cubit.dart';
 import 'meeting_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../app/tokens.dart';
+import '../../../ui/motion/diff_animated_list.dart';
 import '../../../ui/states.dart';
 
 /// The member's meetings, as a list.
@@ -82,10 +83,11 @@ class MeetingsPage extends StatelessWidget {
                             icon: Icons.videocam_off_outlined,
                             message: l10n.meetingsNoneYet,
                           )
-                        : ListView.builder(
-                            itemCount: state.meetings.length,
-                            itemBuilder: (context, index) => _MeetingRow(
-                              meeting: state.meetings[index],
+                        : DiffAnimatedList(
+                            items: state.meetings,
+                            keyOf: (meeting) => meeting.id,
+                            itemBuilder: (context, meeting) => _MeetingRow(
+                              meeting: meeting,
                               state: state,
                               cubit: cubit,
                             ),

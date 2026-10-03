@@ -13,6 +13,9 @@ import 'task_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
 import '../../../app/tokens.dart';
+import '../../../ui/motion/animated_check.dart';
+import '../../../ui/motion/diff_animated_list.dart';
+import '../../../ui/motion/haptics.dart';
 import '../../../ui/states.dart';
 
 /// The member's task lists.
@@ -185,10 +188,17 @@ class _TaskList extends StatelessWidget {
         ? _todayEntries(state, t)
         : [for (final task in state.tasks) task];
 
-    return ListView.builder(
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
+    // Animated, and still lazy: rows are built as they scroll in. A task
+    // created, completed or deleted grows in or shrinks out, and the rows
+    // around it move rather than jump (030, US6).
+    return DiffAnimatedList<Object>(
+      items: entries,
+      keyOf: (entry) => switch (entry) {
+        LocalTask task => task.id,
+        _Note note => 'note:${note.text}',
+        _ => 'heading:$entry',
+      },
+      itemBuilder: (context, entry) {
         if (entry is String) return _Heading(entry);
         if (entry is _Note) {
           return Padding(
@@ -281,15 +291,15 @@ class _TaskRow extends StatelessWidget {
     }
 
     final row = ListTile(
-      leading: task.status == 'open'
-          ? IconButton(
-              icon: const Icon(Icons.circle_outlined),
-              onPressed: () => unawaited(cubit.complete(task.id)),
-            )
-          : IconButton(
-              icon: const Icon(Icons.check_circle),
-              onPressed: () => unawaited(cubit.reopen(task.id)),
-            ),
+      leading: AnimatedCheck(
+        done: task.status != 'open',
+        tooltip: t.taskComplete,
+        onPressed: () => unawaited(
+          task.status == 'open'
+              ? cubit.complete(task.id)
+              : cubit.reopen(task.id),
+        ),
+      ),
       title: Text(
         task.title,
         style: task.status == 'open'
@@ -323,6 +333,7 @@ class _TaskRow extends StatelessWidget {
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
+          Haptics.light(context);
           await cubit.complete(task.id);
         } else {
           await cubit.cancel(task.id);
