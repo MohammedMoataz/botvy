@@ -97,8 +97,8 @@ they start with `packages/` or `.github/`.
 - [x] T3037 `lib/app/l10n/app_localizations.dart`: labels for the five
   destinations, the drawer sections and items, en + ar.
   `check:` `test/localisation_parity_test.dart` green
-- [ ] T3038 `pubspec.yaml`: bump the build number for the release that
-  carries this phase — **deferred to the release**: the version name is shared with the tag, images and extension
+- [x] T3038 `pubspec.yaml`: bump the build number for the release that
+  carries this phase — 2.3.0+6, with the backend, frontend and extension, for the v2.3.0 release
 
 ## Phase 5 — FAB pass (FR-005, US3)
 
