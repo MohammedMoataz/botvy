@@ -55,7 +55,8 @@ class _Page extends StatelessWidget {
 GoRouter _router() => GoRouter(
   initialLocation: Routes.home,
   routes: [
-    StatefulShellRoute.indexedStack(
+    StatefulShellRoute(
+      navigatorContainerBuilder: AppShell.branches,
       builder: (context, state, shell) => AppShell(
         shell: shell,
         destinations: shellDestinations(AppLocalizations.of(context)),
@@ -96,11 +97,15 @@ Future<GoRouter> _pump(
   WidgetTester tester, {
   Size size = const Size(400, 800),
   Locale locale = const Locale('en'),
+  bool reduceMotion = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final router = _router();
+  tester.platformDispatcher.accessibilityFeaturesTestValue =
+      FakeAccessibilityFeatures(disableAnimations: reduceMotion);
+  addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
   await tester.pumpWidget(
     MaterialApp.router(
       routerConfig: router,
@@ -224,5 +229,44 @@ void main() {
     await _pump(tester, size: const Size(840, 1200));
     expect(find.byType(NavigationRail), findsOneWidget);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  double opacityOf(WidgetTester tester, String text) {
+    final fade = tester.widget<FadeTransition>(
+      find
+          .ancestor(of: find.text(text), matching: find.byType(FadeTransition))
+          .first,
+    );
+    return fade.opacity.value;
+  }
+
+  testWidgets('tabs change by fading through', (tester) async {
+    await _pump(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Tasks'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 160));
+    final midway = opacityOf(tester, '/tasks row 0');
+    expect(midway, greaterThan(0));
+    expect(midway, lessThan(1));
+    await tester.pumpAndSettle();
+    expect(opacityOf(tester, '/tasks row 0'), 1);
+  });
+
+  testWidgets('and switch at once when animations are off', (tester) async {
+    await _pump(tester, reduceMotion: true);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Tasks'),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(opacityOf(tester, '/tasks row 0'), 1);
   });
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/tokens.dart';
+
 /// One tab of the shell: what the bar and the rail draw for it.
 class ShellDestination {
   const ShellDestination({
@@ -39,6 +41,16 @@ class AppShell extends StatefulWidget {
 
   /// Material's compact/medium boundary.
   static const double railWidth = 600;
+
+  /// The branches' container, for `StatefulShellRoute.navigatorContainerBuilder`:
+  /// every tab stays built (its navigator, its scroll) and the one shown
+  /// changes by Material's fade-through — the old tab fades out in the first
+  /// third, the new one fades in and settles from 92 % scale in the rest.
+  static Widget branches(
+    BuildContext context,
+    StatefulNavigationShell shell,
+    List<Widget> children,
+  ) => _FadeThroughBranches(index: shell.currentIndex, children: children);
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -138,4 +150,79 @@ class _ShellScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(_ShellScope old) => old.scaffold != scaffold;
+}
+
+class _FadeThroughBranches extends StatefulWidget {
+  const _FadeThroughBranches({required this.index, required this.children});
+
+  final int index;
+  final List<Widget> children;
+
+  @override
+  State<_FadeThroughBranches> createState() => _FadeThroughBranchesState();
+}
+
+class _FadeThroughBranchesState extends State<_FadeThroughBranches> {
+  // Material's fade-through split: out over the first ~35 %, in after it.
+  static const Curve _out = Interval(0, 0.35, curve: BotvyMotion.exit);
+  static const Curve _in = Interval(0.35, 1, curve: BotvyMotion.enter);
+
+  /// The tab fading out, kept on stage until its fade ends; every other
+  /// hidden tab is offstage, as the IndexedStack kept it — built and holding
+  /// its state, but not laid out, painted, hit or read by a screen reader.
+  int? _leaving;
+
+  @override
+  void didUpdateWidget(_FadeThroughBranches old) {
+    super.didUpdateWidget(old);
+    // With animations off there is no fade to wait for: the old tab goes
+    // offstage at once (and an `onEnd` would fire mid-build).
+    if (old.index != widget.index) {
+      _leaving = BotvyMotion.of(context).enabled ? old.index : null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = BotvyMotion.of(context).medium;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (var i = 0; i < widget.children.length; i++)
+          _branch(i, duration, widget.children[i]),
+      ],
+    );
+  }
+
+  Widget _branch(int i, Duration duration, Widget child) {
+    final shown = i == widget.index;
+    return Offstage(
+      offstage: !shown && i != _leaving,
+      child: IgnorePointer(
+        ignoring: !shown,
+        child: ExcludeSemantics(
+          excluding: !shown,
+          // A hidden tab's tickers stop, as they did in the IndexedStack —
+          // once it has finished fading out.
+          child: TickerMode(
+            enabled: shown || i == _leaving,
+            child: AnimatedOpacity(
+              opacity: shown ? 1 : 0,
+              duration: duration,
+              curve: shown ? _in : _out,
+              onEnd: () {
+                if (i == _leaving && mounted) setState(() => _leaving = null);
+              },
+              child: AnimatedScale(
+                scale: shown ? 1 : 0.92,
+                duration: duration,
+                curve: shown ? _in : _out,
+                child: child,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
