@@ -10,6 +10,9 @@ import 'list_diff.dart';
 /// Driven by a key diff ([diffKeys]) on every rebuild, so the cubit keeps
 /// emitting plain lists and the page keeps passing them in — nothing about the
 /// data has to know it is animated. Moves re-render in place.
+///
+/// [DiffAnimatedList.sliver] is the same list as a sliver, for a page that is
+/// one `CustomScrollView` (a large-title tab).
 class DiffAnimatedList<T> extends StatefulWidget {
   const DiffAnimatedList({
     super.key,
@@ -17,12 +20,21 @@ class DiffAnimatedList<T> extends StatefulWidget {
     required this.keyOf,
     required this.itemBuilder,
     this.padding,
-  });
+  }) : sliver = false;
+
+  const DiffAnimatedList.sliver({
+    super.key,
+    required this.items,
+    required this.keyOf,
+    required this.itemBuilder,
+  }) : padding = null,
+       sliver = true;
 
   final List<T> items;
   final Object Function(T item) keyOf;
   final Widget Function(BuildContext context, T item) itemBuilder;
   final EdgeInsetsGeometry? padding;
+  final bool sliver;
 
   @override
   State<DiffAnimatedList<T>> createState() => _DiffAnimatedListState<T>();
@@ -36,36 +48,54 @@ class _DiffAnimatedListState<T> extends State<DiffAnimatedList<T>> {
   /// caught it.
   static const int _maxAnimated = 10;
 
-  var _list = GlobalKey<AnimatedListState>();
+  // AnimatedListState or SliverAnimatedListState: the same two calls, no
+  // shared interface.
+  var _list = GlobalKey();
+
+  void _insert(int index, Duration duration) => switch (_list.currentState) {
+    AnimatedListState list => list.insertItem(index, duration: duration),
+    SliverAnimatedListState list => list.insertItem(index, duration: duration),
+    _ => null,
+  };
+
+  void _remove(int index, AnimatedRemovedItemBuilder builder, Duration d) =>
+      switch (_list.currentState) {
+        AnimatedListState list => list.removeItem(index, builder, duration: d),
+        SliverAnimatedListState list => list.removeItem(
+          index,
+          builder,
+          duration: d,
+        ),
+        _ => null,
+      };
 
   @override
   void didUpdateWidget(DiffAnimatedList<T> old) {
     super.didUpdateWidget(old);
-    final list = _list.currentState;
-    if (list == null) return;
+    if (_list.currentState == null) return;
     final diff = diffKeys(
       old.items.map(old.keyOf).toList(),
       widget.items.map(widget.keyOf).toList(),
     );
     if (diff.removed.length + diff.inserted.length > _maxAnimated) {
-      _list = GlobalKey<AnimatedListState>();
+      _list = GlobalKey();
       return;
     }
     final duration = BotvyMotion.of(context).short;
     for (final i in diff.removed) {
       final gone = old.items[i];
-      list.removeItem(
+      _remove(
         i,
         // Gone from the data: drawn while it shrinks, but a tap on it would
         // act on a deleted item through its old callbacks.
         (context, animation) => IgnorePointer(
           child: _transition(animation, old.itemBuilder(context, gone)),
         ),
-        duration: duration,
+        duration,
       );
     }
     for (final i in diff.inserted) {
-      list.insertItem(i, duration: duration);
+      _insert(i, duration);
     }
   }
 
@@ -79,20 +109,30 @@ class _DiffAnimatedListState<T> extends State<DiffAnimatedList<T>> {
         child: FadeTransition(opacity: animation, child: child),
       );
 
+  Widget _row(BuildContext context, int index, Animation<double> animation) =>
+      _transition(animation, widget.itemBuilder(context, widget.items[index]));
+
   @override
-  Widget build(BuildContext context) => KeyedSubtree(
-    // A bulk change swaps in a new AnimatedList; this key is what lets the
-    // new one pick up the old one's scroll offset from the route's
-    // PageStorage instead of jumping to the top.
-    key: const PageStorageKey<String>('DiffAnimatedList'),
-    child: AnimatedList(
-      key: _list,
-      padding: widget.padding,
-      initialItemCount: widget.items.length,
-      itemBuilder: (context, index, animation) => _transition(
-        animation,
-        widget.itemBuilder(context, widget.items[index]),
+  Widget build(BuildContext context) {
+    // In a sliver the scroll view is the page's, and outlives a rebuild.
+    if (widget.sliver) {
+      return SliverAnimatedList(
+        key: _list,
+        initialItemCount: widget.items.length,
+        itemBuilder: _row,
+      );
+    }
+    return KeyedSubtree(
+      // A bulk change swaps in a new AnimatedList; this key is what lets the
+      // new one pick up the old one's scroll offset from the route's
+      // PageStorage instead of jumping to the top.
+      key: const PageStorageKey<String>('DiffAnimatedList'),
+      child: AnimatedList(
+        key: _list,
+        padding: widget.padding,
+        initialItemCount: widget.items.length,
+        itemBuilder: _row,
       ),
-    ),
-  );
+    );
+  }
 }

@@ -459,7 +459,9 @@ void main() {
       await tester.pumpWidget(page());
       await tester.pump();
 
-      expect(find.text('Hello, Mona'), findsOneWidget);
+      // The large title bar draws the greeting twice: large, and in the
+      // toolbar it folds into.
+      expect(find.text('Hello, Mona'), findsWidgets);
       expect(find.text('Renew the passport'), findsOneWidget);
       expect(find.text('1/2'), findsOneWidget);
       expect(find.byType(CompletionRing), findsOneWidget);

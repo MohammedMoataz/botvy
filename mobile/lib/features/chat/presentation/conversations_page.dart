@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/conversations_cubit.dart';
+import '../../../ui/large_title.dart';
 import '../../../ui/motion/hero_title.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
@@ -56,9 +57,8 @@ class ConversationsPage extends StatelessWidget {
 
         final problem = state.problem;
         if (problem != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_problemText(t, problem))),
-          );
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(_problemText(t, problem))));
           cubit.clearProblem();
         }
       },
@@ -66,44 +66,52 @@ class ConversationsPage extends StatelessWidget {
         final cubit = context.read<ConversationsCubit>();
 
         return Scaffold(
-          appBar: AppBar(
-            leading: ShellMenuButton.maybe(context),
-            title: Text(t.chatsTitle),
-          ),
           floatingActionButton: ScrollAwareFab(
             icon: Icons.add_comment_outlined,
             label: t.chatNewChat,
             tooltip: t.chatNewChat,
             onPressed: state.busy ? null : () => unawaited(cubit.create()),
           ),
-          body: state.loading
-              ? const LoadingView()
-              : ListView(
-                  padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
-                  children: [
-                    if (state.pinned.isNotEmpty) _SectionHeader(t.chatPinned),
-                    for (final row in state.pinned)
-                      _ConversationTile(
-                        conversation: row,
-                        onOpen: () => onOpen(row.id),
-                      ),
-                    // The divider is the whole point of the section: it is what
-                    // says the two above are not simply the most recent two.
-                    if (state.pinned.isNotEmpty && state.others.isNotEmpty)
-                      const Divider(height: 1),
-                    if (state.others.isNotEmpty) _SectionHeader(t.chatOthers),
-                    for (final row in state.others)
-                      _ConversationTile(
-                        conversation: row,
-                        onOpen: () => onOpen(row.id),
-                      ),
-                    if (state.pinned.isEmpty && state.others.isEmpty)
-                      EmptyState(
-                        icon: Icons.forum_outlined,
-                        message: t.chatNoneYet,
-                      ),
-                  ],
+          body: LargeTitleScrollView(
+            leading: ShellMenuButton.maybe(context),
+            title: Text(t.chatsTitle),
+
+            slivers: [
+              if (state.loading)
+                const SliverFillRemaining(child: LoadingView())
+              else
+                SliverPadding(
+                  padding: const EdgeInsetsDirectional.only(
+                    bottom: fabClearance,
+                  ),
+                  sliver: SliverList.list(
+                    children: [
+                      if (state.pinned.isNotEmpty) _SectionHeader(t.chatPinned),
+                      for (final row in state.pinned)
+                        _ConversationTile(
+                          conversation: row,
+                          onOpen: () => onOpen(row.id),
+                        ),
+                      // The divider is the whole point of the section: it is what
+                      // says the two above are not simply the most recent two.
+                      if (state.pinned.isNotEmpty && state.others.isNotEmpty)
+                        const Divider(height: 1),
+                      if (state.others.isNotEmpty) _SectionHeader(t.chatOthers),
+                      for (final row in state.others)
+                        _ConversationTile(
+                          conversation: row,
+                          onOpen: () => onOpen(row.id),
+                        ),
+                      if (state.pinned.isEmpty && state.others.isEmpty)
+                        EmptyState(
+                          icon: Icons.forum_outlined,
+                          message: t.chatNoneYet,
+                        ),
+                    ],
+                  ),
                 ),
+            ],
+          ),
         );
       },
     );
@@ -175,9 +183,8 @@ class _SectionHeader extends StatelessWidget {
       label,
       // `start`, not `left`.
       textAlign: TextAlign.start,
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        color: Theme.of(context).colorScheme.primary,
-      ),
+      style: Theme.of(context).textTheme.labelLarge
+          ?.copyWith(color: Theme.of(context).colorScheme.primary),
     ),
   );
 }
@@ -207,20 +214,14 @@ class _ConversationTile extends StatelessWidget {
       trailing: PopupMenuButton<_ChatAction>(
         onSelected: (action) => unawaited(_run(context, cubit, action)),
         itemBuilder: (context) => [
-          PopupMenuItem(
-            value: _ChatAction.clear,
-            child: Text(t.chatClear),
-          ),
+          PopupMenuItem(value: _ChatAction.clear, child: Text(t.chatClear)),
           // The three that a pinned chat refuses are still offered, and
           // deliberately. Hiding them would be this build deciding what the
           // server's rule is — and the rule is the server's (a third pinned
           // kind seeded by the operator would be refused too, and this list
           // would not know). Attempting one is answered with the explanation
           // and the offer to clear, which is what US3 asks for.
-          PopupMenuItem(
-            value: _ChatAction.rename,
-            child: Text(t.chatRename),
-          ),
+          PopupMenuItem(value: _ChatAction.rename, child: Text(t.chatRename)),
           PopupMenuItem(
             value: _ChatAction.unpin,
             child: Text(conversation.pinned ? t.chatUnpin : t.chatArchive),

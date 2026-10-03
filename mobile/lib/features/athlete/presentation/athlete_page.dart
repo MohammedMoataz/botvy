@@ -10,6 +10,7 @@ import '../../../core/db/database.dart';
 import '../application/athlete.dart';
 import '../application/athlete_cubit.dart';
 import 'athlete_sheets.dart';
+import '../../../ui/large_title.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
 import '../../../app/tokens.dart';
@@ -35,16 +36,21 @@ class AthletePage extends StatelessWidget {
       listenWhen: (before, after) =>
           after.problem != null && before.problem != after.problem,
       listener: (context, state) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(state.problem!)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(state.problem!)));
         context.read<AthleteCubit>().clearProblem();
       },
       builder: (context, state) {
         final cubit = context.read<AthleteCubit>();
 
         return Scaffold(
-          appBar: AppBar(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add,
+            label: t.athleteAddSession,
+            tooltip: t.athleteAddSession,
+            onPressed: () => unawaited(showSessionCreator(context, cubit)),
+          ),
+          body: LargeTitleScrollView(
             leading: ShellMenuButton.maybe(context),
             title: Text(t.athleteTitle),
             actions: [
@@ -73,27 +79,23 @@ class AthletePage extends StatelessWidget {
                 onPressed: () => unawaited(showSlotEditor(context, cubit)),
               ),
             ],
-          ),
-          floatingActionButton: ScrollAwareFab(
-            icon: Icons.add,
-            label: t.athleteAddSession,
-            tooltip: t.athleteAddSession,
-            onPressed: () => unawaited(showSessionCreator(context, cubit)),
-          ),
-          body: state.loading
-              ? const LoadingView()
-              : RefreshIndicator(
-                  // Re-reads the *database*, not the network — the engine has
-                  // its own triggers, and re-reading is the honest answer to a
-                  // member who wants to be sure the screen is current.
-                  onRefresh: cubit.refresh,
-                  child: ListView(
-                    padding: const EdgeInsetsDirectional.fromSTEB(
-                      BotvySpace.md,
-                      BotvySpace.md,
-                      BotvySpace.md,
-                      fabClearance,
-                    ),
+
+            // Re-reads the *database*, not the network — the engine has its
+            // own triggers, and re-reading is the honest answer to a member
+            // who wants to be sure the screen is current.
+            onRefresh: state.loading ? null : cubit.refresh,
+            slivers: [
+              if (state.loading)
+                const SliverFillRemaining(child: LoadingView())
+              else
+                SliverPadding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    BotvySpace.md,
+                    BotvySpace.md,
+                    BotvySpace.md,
+                    fabClearance,
+                  ),
+                  sliver: SliverList.list(
                     children: [
                       NextPracticeCard(state: state),
                       // Story 1 scenario 3, verbatim: no slots at all invites
@@ -108,6 +110,8 @@ class AthletePage extends StatelessWidget {
                     ],
                   ),
                 ),
+            ],
+          ),
         );
       },
     );
@@ -191,7 +195,10 @@ class NextPracticeCard extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
-                  Chip(label: Text(label), visualDensity: VisualDensity.compact),
+                  Chip(
+                    label: Text(label),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ],
               ),
               const SizedBox(height: BotvySpace.xs),
@@ -337,9 +344,8 @@ class _DayRow extends StatelessWidget {
                 subtitle: Row(
                   children: [
                     Text(
-                      TimeOfDay.fromDateTime(
-                        session.plannedAt.toLocal(),
-                      ).format(context),
+                      TimeOfDay.fromDateTime(session.plannedAt.toLocal())
+                          .format(context),
                     ),
                     const SizedBox(width: BotvySpace.sm),
                     StatusText(session: session, now: now),

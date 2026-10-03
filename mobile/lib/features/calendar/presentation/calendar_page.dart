@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../ui/hex_color.dart';
+import '../../../ui/large_title.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart'
@@ -51,7 +52,11 @@ class CalendarPage extends StatelessWidget {
       builder: (context, state) {
         final zone = memberZone(state.timezone);
         return Scaffold(
-          appBar: AppBar(
+          floatingActionButton: _AddButton(cubit: cubit, meetings: meetings),
+          // Month, week and day each scroll their own way, so the large title
+          // sits over the whole body and folds as whichever one is showing
+          // scrolls.
+          body: LargeTitleScrollView.box(
             leading: ShellMenuButton.maybe(context),
             title: Text(AppLocalizations.of(context).navCalendar),
             actions: [
@@ -61,64 +66,68 @@ class CalendarPage extends StatelessWidget {
                 onPressed: () => unawaited(cubit.goToToday()),
               ),
             ],
-          ),
-          floatingActionButton: _AddButton(cubit: cubit, meetings: meetings),
-          body: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md),
-                child: SegmentedButton<CalendarMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: CalendarMode.month,
-                      label: Text('Month'),
-                    ),
-                    ButtonSegment(
-                      value: CalendarMode.week,
-                      label: Text('Week'),
-                    ),
-                    ButtonSegment(value: CalendarMode.day, label: Text('Day')),
-                  ],
-                  selected: {state.mode},
-                  onSelectionChanged: (choice) =>
-                      cubit.setMode(choice.first),
+
+            body: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.symmetric(
+                    horizontal: BotvySpace.md,
+                  ),
+                  child: SegmentedButton<CalendarMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: CalendarMode.month,
+                        label: Text('Month'),
+                      ),
+                      ButtonSegment(
+                        value: CalendarMode.week,
+                        label: Text('Week'),
+                      ),
+                      ButtonSegment(
+                        value: CalendarMode.day,
+                        label: Text('Day'),
+                      ),
+                    ],
+                    selected: {state.mode},
+                    onSelectionChanged: (choice) => cubit.setMode(choice.first),
+                  ),
                 ),
-              ),
-              if (state.problem != null)
-                MaterialBanner(
-                  content: Text(state.problem!),
-                  actions: [
-                    TextButton(
-                      onPressed: cubit.clearProblem,
-                      child: const Text('Dismiss'),
-                    ),
-                  ],
+                if (state.problem != null)
+                  MaterialBanner(
+                    content: Text(state.problem!),
+                    actions: [
+                      TextButton(
+                        onPressed: cubit.clearProblem,
+                        child: const Text('Dismiss'),
+                      ),
+                    ],
+                  ),
+                Expanded(
+                  child: state.loading
+                      ? const LoadingView()
+                      : switch (state.mode) {
+                          CalendarMode.month => _MonthView(
+                            state: state,
+                            cubit: cubit,
+                            meetings: meetings,
+                            zone: zone,
+                          ),
+                          CalendarMode.week => _WeekView(
+                            state: state,
+                            cubit: cubit,
+                            meetings: meetings,
+                            zone: zone,
+                          ),
+                          CalendarMode.day => _DayView(
+                            state: state,
+                            cubit: cubit,
+                            meetings: meetings,
+                            zone: zone,
+                          ),
+                        },
                 ),
-              Expanded(
-                child: state.loading
-                    ? const LoadingView()
-                    : switch (state.mode) {
-                        CalendarMode.month => _MonthView(
-                          state: state,
-                          cubit: cubit,
-                          meetings: meetings,
-                          zone: zone,
-                        ),
-                        CalendarMode.week => _WeekView(
-                          state: state,
-                          cubit: cubit,
-                          meetings: meetings,
-                          zone: zone,
-                        ),
-                        CalendarMode.day => _DayView(
-                          state: state,
-                          cubit: cubit,
-                          meetings: meetings,
-                          zone: zone,
-                        ),
-                      },
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -365,14 +374,13 @@ class _WeekColumn extends StatelessWidget {
           InkWell(
             onTap: onSelect,
             child: Container(
-              padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.sm),
+              padding: const EdgeInsetsDirectional.symmetric(
+                vertical: BotvySpace.sm,
+              ),
               color: selected ? theme.colorScheme.primaryContainer : null,
               child: Column(
                 children: [
-                  Text(
-                    _weekdayShort(date),
-                    style: theme.textTheme.labelMedium,
-                  ),
+                  Text(_weekdayShort(date), style: theme.textTheme.labelMedium),
                   Text(
                     date.substring(8, 10),
                     style: theme.textTheme.titleMedium,
@@ -392,7 +400,11 @@ class _WeekColumn extends StatelessWidget {
           for (final item in items)
             Padding(
               padding: const EdgeInsetsDirectional.only(bottom: BotvySpace.xs),
-              child: _ItemChip(item: item, zone: zone, onTap: () => onOpen(item)),
+              child: _ItemChip(
+                item: item,
+                zone: zone,
+                onTap: () => onOpen(item),
+              ),
             ),
         ],
       ),
@@ -473,8 +485,14 @@ class _Agenda extends StatelessWidget {
       );
     }
 
-    final allDay = [for (final item in items) if (item.allDay) item];
-    final timed = [for (final item in items) if (!item.allDay) item];
+    final allDay = [
+      for (final item in items)
+        if (item.allDay) item,
+    ];
+    final timed = [
+      for (final item in items)
+        if (!item.allDay) item,
+    ];
 
     return ListView(
       padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
@@ -743,9 +761,10 @@ Future<void> _openLocation(BuildContext context, AgendaItem item) async {
 }
 
 IconData _iconFor(AgendaItem item) => switch (item.kind) {
-  AgendaKind.meeting => item.location.onlineLink != null
-      ? Icons.videocam_outlined
-      : Icons.groups_outlined,
+  AgendaKind.meeting =>
+    item.location.onlineLink != null
+        ? Icons.videocam_outlined
+        : Icons.groups_outlined,
   AgendaKind.preparation => Icons.timer_outlined,
   AgendaKind.task => Icons.check_box_outline_blank,
   AgendaKind.training => Icons.fitness_center,
