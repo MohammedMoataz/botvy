@@ -7,6 +7,7 @@ import '../../../app/l10n/app_localizations.dart';
 import '../application/daily_plan.dart';
 import '../application/rhythm_cubit.dart';
 import 'rhythm_problem.dart';
+import '../../../app/tokens.dart';
 
 /// Confirming tomorrow.
 ///
@@ -96,7 +97,7 @@ class _ConfirmPlanSheetState extends State<_ConfirmPlanSheet> {
         if (state.loading) {
           return const SafeArea(
             child: Padding(
-              padding: EdgeInsets.all(32),
+              padding: EdgeInsetsDirectional.all(BotvySpace.xxl),
               child: Center(child: CircularProgressIndicator()),
             ),
           );
@@ -110,7 +111,7 @@ class _ConfirmPlanSheetState extends State<_ConfirmPlanSheet> {
         if (state.plan == null) {
           return SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
               child: Text(t.rhythmNothingDrafted),
             ),
           );
@@ -118,7 +119,7 @@ class _ConfirmPlanSheetState extends State<_ConfirmPlanSheet> {
 
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -131,16 +132,16 @@ class _ConfirmPlanSheetState extends State<_ConfirmPlanSheet> {
                   state.date,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: BotvySpace.xs),
                 Text(
                   t.rhythmConfirmBody,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: BotvySpace.sm),
 
                 if (state.candidates.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.lg),
                     child: Text(t.rhythmNoCandidates),
                   )
                 else
@@ -185,7 +186,7 @@ class _ConfirmPlanSheetState extends State<_ConfirmPlanSheet> {
                   t.rhythmTraining,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: BotvySpace.xs),
                 // Three choices, not a switch. A switch has two positions and
                 // one of them would have to stand for "did not say", which is
                 // exactly the state that must not be confused with "no".
@@ -220,7 +221,7 @@ class _ConfirmPlanSheetState extends State<_ConfirmPlanSheet> {
                 if (state.problem != null)
                   RhythmProblem(problem: state.problem!),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: BotvySpace.md),
                 FilledButton(
                   onPressed: state.busy
                       ? null

@@ -14,6 +14,8 @@ import '../../rhythm/presentation/confirm_plan_sheet.dart';
 import '../application/home_cubit.dart';
 import '../widgets/training_row.dart';
 import 'home_dials.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The day at a glance (US5).
 ///
@@ -60,7 +62,7 @@ class HomePage extends StatelessWidget {
             ],
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : RefreshIndicator(
                   // A pull-to-refresh that re-reads the *database*, not the
                   // network. The sync engine has its own triggers; what this is
@@ -68,7 +70,7 @@ class HomePage extends StatelessWidget {
                   // current, and re-reading is the honest answer to that.
                   onRefresh: () => context.read<HomeCubit>().refresh(),
                   child: ListView(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsetsDirectional.all(BotvySpace.md),
                     children: [
                       if (state.draft != null) const _PlanTomorrowCard(),
                       if (state.awaitingCheckin) const _CheckinCard(),
@@ -101,9 +103,9 @@ class _TodayCard extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final cubit = context.read<HomeCubit>();
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -132,7 +134,7 @@ class _TodayCard extends StatelessWidget {
             // product rather than as a quiet day.
             if (state.emptyDay)
               Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsetsDirectional.only(top: BotvySpace.md),
                 child: Text(t.homeNothingPlanned),
               ),
 
@@ -219,9 +221,9 @@ class _ScheduleCard extends StatelessWidget {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -287,12 +289,12 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsetsDirectional.only(top: BotvySpace.sm),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 18, color: Theme.of(context).colorScheme.outline),
-        const SizedBox(width: 8),
+        const SizedBox(width: BotvySpace.sm),
         Expanded(
           child: Text.rich(
             TextSpan(
@@ -321,9 +323,9 @@ class _StreakCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -349,9 +351,9 @@ class _StreakCard extends StatelessWidget {
                 t.homeStreakBest(state.streakBest),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Text(t.homeWeek, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 6),
+            const SizedBox(height: BotvySpace.xs),
             AdherenceStrip(week: state.week),
           ],
         ),
@@ -371,7 +373,7 @@ class _PlanTomorrowCard extends StatelessWidget {
       (cubit) => cubit.state.draft?.date ?? cubit.state.tomorrow,
     );
 
-    return Card(
+    return Card.filled(
       child: ListTile(
         leading: const Icon(Icons.event_note),
         title: Text(t.homePlanTomorrow),
@@ -398,7 +400,7 @@ class _CheckinCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    return Card(
+    return Card.filled(
       child: ListTile(
         leading: const Icon(Icons.mood),
         title: Text(t.rhythmCheckinTitle),

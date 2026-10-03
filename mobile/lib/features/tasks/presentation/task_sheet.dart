@@ -6,7 +6,9 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/recurrence.dart';
 import '../application/tasks_cubit.dart';
-import 'tasks_page.dart' show deleteTaskWithUndo, parseHexColor;
+import '../../../ui/hex_color.dart';
+import 'tasks_page.dart' show deleteTaskWithUndo;
+import '../../../app/tokens.dart';
 
 /// Creates or edits a task.
 ///
@@ -29,7 +31,7 @@ Future<void> showTaskSheet(
   builder: (_) => Padding(
     // The keyboard's own inset. Without it the title field is under the
     // keyboard on every phone smaller than the one it was built on.
-    padding: EdgeInsets.only(
+    padding: EdgeInsetsDirectional.only(
       bottom: MediaQuery.of(context).viewInsets.bottom,
     ),
     child: _TaskSheet(cubit: cubit, task: task),
@@ -102,7 +104,7 @@ class _TaskSheetState extends State<_TaskSheet> {
 
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -113,14 +115,14 @@ class _TaskSheetState extends State<_TaskSheet> {
               decoration: InputDecoration(labelText: t.taskTitle),
               onSubmitted: (_) => unawaited(_save()),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             TextField(
               controller: _notes,
               maxLines: 3,
               minLines: 1,
               decoration: InputDecoration(labelText: t.taskNotes),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
 
             Row(
               children: [
@@ -133,7 +135,7 @@ class _TaskSheetState extends State<_TaskSheet> {
                     onPressed: _pickDate,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.schedule, size: 18),
@@ -162,7 +164,7 @@ class _TaskSheetState extends State<_TaskSheet> {
                 ),
               ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Text(t.taskPriority, style: Theme.of(context).textTheme.bodySmall),
             Wrap(
               spacing: 8,
@@ -176,7 +178,7 @@ class _TaskSheetState extends State<_TaskSheet> {
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Text(t.labels, style: Theme.of(context).textTheme.bodySmall),
             Wrap(
               spacing: 8,
@@ -199,7 +201,7 @@ class _TaskSheetState extends State<_TaskSheet> {
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Text(t.taskRepeat, style: Theme.of(context).textTheme.bodySmall),
             Wrap(
               spacing: 8,
@@ -218,7 +220,7 @@ class _TaskSheetState extends State<_TaskSheet> {
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Text(t.taskEstimate, style: Theme.of(context).textTheme.bodySmall),
             Wrap(
               spacing: 8,
@@ -232,7 +234,7 @@ class _TaskSheetState extends State<_TaskSheet> {
               ],
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: BotvySpace.xl),
             FilledButton(onPressed: _save, child: Text(t.save)),
             if (widget.task != null)
               TextButton(

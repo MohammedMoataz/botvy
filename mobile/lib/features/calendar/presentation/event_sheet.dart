@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../ui/hex_color.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/recurrence/expander.dart';
 import '../../../core/recurrence/rule_words.dart';
 import '../../meetings/presentation/repeat_picker.dart';
 import '../application/calendar_cubit.dart';
+import '../../../app/tokens.dart';
 
 /// Creates or edits a personal event — a birthday, a holiday, a block of focus
 /// time (FR-011).
@@ -30,7 +32,7 @@ Future<void> showEventSheet(
   context: context,
   isScrollControlled: true,
   builder: (_) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+    padding: EdgeInsetsDirectional.only(bottom: MediaQuery.of(context).viewInsets.bottom),
     child: _EventSheet(cubit: cubit, event: event, on: on),
   ),
 );
@@ -100,7 +102,7 @@ class _EventSheetState extends State<_EventSheet> {
     final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -108,7 +110,7 @@ class _EventSheetState extends State<_EventSheet> {
               widget.event == null ? l10n.eventNew : l10n.eventEdit,
               style: theme.textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             TextField(
               controller: _title,
               autofocus: widget.event == null,
@@ -116,7 +118,7 @@ class _EventSheetState extends State<_EventSheet> {
               decoration: InputDecoration(labelText: l10n.eventTitle),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             OutlinedButton.icon(
               icon: const Icon(Icons.event),
               label: Text(_dateText(_date)),
@@ -142,7 +144,7 @@ class _EventSheetState extends State<_EventSheet> {
                       child: Text(l10n.eventFrom(_from.format(context))),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: BotvySpace.sm),
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => unawaited(_pickTime(from: false)),
@@ -152,9 +154,9 @@ class _EventSheetState extends State<_EventSheet> {
                 ],
               ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Text(l10n.eventColour, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Wrap(
               spacing: 8,
               children: [
@@ -165,7 +167,7 @@ class _EventSheetState extends State<_EventSheet> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: _hex(hex),
+                        color: parseHexColor(hex),
                         shape: BoxShape.circle,
                         border: _color == hex
                             ? Border.all(
@@ -184,7 +186,7 @@ class _EventSheetState extends State<_EventSheet> {
               ],
             ),
 
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.repeat),
@@ -208,7 +210,7 @@ class _EventSheetState extends State<_EventSheet> {
             ),
 
             if (_error != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: BotvySpace.sm),
               Text(
                 _error!,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -217,7 +219,7 @@ class _EventSheetState extends State<_EventSheet> {
               ),
             ],
 
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Row(
               children: [
                 if (widget.event != null)
@@ -405,12 +407,6 @@ const List<String> kEventColours = [
 
 int _minutes(TimeOfDay time) => time.hour * 60 + time.minute;
 
-Color _hex(String hex) {
-  final cleaned = hex.replaceFirst('#', '');
-  final value = int.tryParse(cleaned, radix: 16);
-  if (value == null || cleaned.length != 6) return const Color(0xFF475569);
-  return Color(0xFF000000 | value);
-}
 
 String _dateText(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}'

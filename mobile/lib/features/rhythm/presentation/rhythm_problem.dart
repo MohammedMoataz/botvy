@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../application/rhythm_cubit.dart';
+import '../../../app/tokens.dart';
 
 /// A refused command, said in the member's own language.
 ///
@@ -28,12 +29,12 @@ class RhythmProblem extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsetsDirectional.only(top: BotvySpace.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.error_outline, size: 18, color: scheme.error),
-          const SizedBox(width: 8),
+          const SizedBox(width: BotvySpace.sm),
           Expanded(
             child: Text(
               switch (problem) {

@@ -13,6 +13,8 @@ import '../../../core/recurrence/rule_words.dart';
 import '../application/meetings_cubit.dart';
 import 'meeting_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The member's meetings, as a list.
 ///
@@ -41,7 +43,7 @@ class MeetingsPage extends StatelessWidget {
         body: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md),
               child: SegmentedButton<MeetingView>(
                 segments: [
                   ButtonSegment(
@@ -74,9 +76,12 @@ class MeetingsPage extends StatelessWidget {
               ),
             Expanded(
               child: state.loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const LoadingView()
                   : state.meetings.isEmpty
-                        ? Center(child: Text(l10n.meetingsNoneYet))
+                        ? EmptyState(
+                            icon: Icons.videocam_off_outlined,
+                            message: l10n.meetingsNoneYet,
+                          )
                         : ListView.builder(
                             itemCount: state.meetings.length,
                             itemBuilder: (context, index) => _MeetingRow(

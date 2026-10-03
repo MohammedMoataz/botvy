@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../profile/data/profile_mirror.dart';
 import 'onboarding_steps.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The steps this phase contributes: name, time zone, and a look at the three
 /// daily times.
@@ -75,9 +77,9 @@ class _NameStepState extends State<_NameStep> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(t.welcomeTitle, style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         Text(t.welcomeBody),
-        const SizedBox(height: 24),
+        const SizedBox(height: BotvySpace.xl),
         TextField(
           controller: _controller,
           decoration: InputDecoration(labelText: t.displayName),
@@ -131,9 +133,9 @@ class _TimezoneStepState extends State<_TimezoneStep> {
           t.onboardingTimezone,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         Text(t.onboardingTimezoneBody),
-        const SizedBox(height: 24),
+        const SizedBox(height: BotvySpace.xl),
         // Shown as a fact to confirm rather than a field to fill. It was
         // detected from the handset at registration, and the common case is
         // that it is already right.
@@ -190,14 +192,14 @@ class _TimesStepState extends State<_TimesStep> {
           t.onboardingTimes,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         Text(t.onboardingTimesBody),
-        const SizedBox(height: 24),
+        const SizedBox(height: BotvySpace.xl),
         // A preview, not an editor. The member has just arrived and has no
         // basis yet for choosing a briefing time; Preferences is where they
         // change it once they do, and this is so they know it exists.
         if (view == null)
-          const Center(child: CircularProgressIndicator())
+          const LoadingView()
         else ...[
           _row(context, Icons.wb_sunny_outlined, t.morningBriefingTime, view.morning),
           _row(context, Icons.event_note_outlined, t.planTomorrowTime, view.plan),

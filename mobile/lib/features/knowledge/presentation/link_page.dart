@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/knowledge_cubit.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// One saved link: what Botvy read, so the member does not have to (FR-006).
 ///
@@ -67,13 +69,16 @@ class _LinkPageState extends State<LinkPage> {
     return Scaffold(
       appBar: AppBar(title: Text(row?.title ?? t.knowledgeTitle)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : row == null
-              ? Center(child: Text(t.knowledgeEmptyTitle))
+              ? EmptyState(
+                  icon: Icons.link_off,
+                  message: t.knowledgeEmptyTitle,
+                )
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
                     children: _body(context, t, row),
                   ),
                 ),
@@ -90,7 +95,7 @@ class _LinkPageState extends State<LinkPage> {
 
     return [
       Text(row.url, style: Theme.of(context).textTheme.bodySmall),
-      const SizedBox(height: 12),
+      const SizedBox(height: BotvySpace.md),
 
       if (phase == LinkPhase.failed && row.failReason != null)
         Text(
@@ -107,13 +112,13 @@ class _LinkPageState extends State<LinkPage> {
 
       if (doc != null) ...[
         Text(t.knowledgeSummary, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
+        const SizedBox(height: BotvySpace.xs),
         Text(doc['summary'] as String? ?? ''),
 
         // The spec's own edge case, said plainly rather than left as a gap the
         // member has to notice.
         if (doc['hadTranscript'] == false) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: BotvySpace.sm),
           Text(
             t.knowledgeNoTranscript,
             style: Theme.of(context).textTheme.bodySmall,
@@ -121,17 +126,17 @@ class _LinkPageState extends State<LinkPage> {
         ],
 
         if ((doc['keyPoints'] as List? ?? const []).isNotEmpty) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: BotvySpace.lg),
           Text(
             t.knowledgeKeyPoints,
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: BotvySpace.xs),
           for (final point in doc['keyPoints'] as List) Text('• $point'),
         ],
 
         if ((doc['media'] as List? ?? const []).isNotEmpty) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: BotvySpace.lg),
           SizedBox(
             height: 140,
             child: ListView(
@@ -143,7 +148,7 @@ class _LinkPageState extends State<LinkPage> {
                           .mediaUrl((raw as Map)['url'] as String?) !=
                       null)
                     Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 8),
+                      padding: const EdgeInsetsDirectional.only(end: BotvySpace.sm),
                       child: Image.network(
                         context
                             .read<KnowledgeCubit>()
@@ -162,7 +167,7 @@ class _LinkPageState extends State<LinkPage> {
       // A playlist's videos, each with its own state — which is the whole
       // reason a playlist becomes one entry per video rather than one blob.
       if ((_detail?['children'] as List? ?? const []).isNotEmpty) ...[
-        const SizedBox(height: 16),
+        const SizedBox(height: BotvySpace.lg),
         Text(t.knowledgeVideos, style: Theme.of(context).textTheme.titleMedium),
         for (final raw in _detail!['children'] as List)
           ListTile(
@@ -174,7 +179,7 @@ class _LinkPageState extends State<LinkPage> {
           ),
       ],
 
-      const SizedBox(height: 24),
+      const SizedBox(height: BotvySpace.xl),
       OutlinedButton.icon(
         onPressed: () => _open(context, row.url),
         icon: const Icon(Icons.open_in_new),

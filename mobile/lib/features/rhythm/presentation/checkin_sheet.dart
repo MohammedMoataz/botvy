@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../application/rhythm_cubit.dart';
 import 'rhythm_problem.dart';
+import '../../../app/tokens.dart';
 
 /// How the day went.
 ///
@@ -30,7 +31,7 @@ Future<void> showCheckinSheet(
     context: context,
     isScrollControlled: true,
     builder: (_) => Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsetsDirectional.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: BlocProvider<RhythmCubit>.value(
         value: cubit,
         child: const _CheckinSheet(),
@@ -89,7 +90,7 @@ class _CheckinSheetState extends State<_CheckinSheet> {
 
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -99,7 +100,7 @@ class _CheckinSheetState extends State<_CheckinSheet> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 Text(state.date, style: Theme.of(context).textTheme.bodySmall),
-                const SizedBox(height: 16),
+                const SizedBox(height: BotvySpace.lg),
 
                 Text(t.rhythmMood, style: Theme.of(context).textTheme.bodySmall),
                 Slider(
@@ -119,12 +120,12 @@ class _CheckinSheetState extends State<_CheckinSheet> {
                         }),
                 ),
 
-                const SizedBox(height: 8),
+                const SizedBox(height: BotvySpace.sm),
                 Text(
                   t.rhythmFollowed,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: BotvySpace.xs),
                 SegmentedButton<int>(
                   showSelectedIcon: false,
                   segments: [
@@ -146,7 +147,7 @@ class _CheckinSheetState extends State<_CheckinSheet> {
                         }),
                 ),
 
-                const SizedBox(height: 16),
+                const SizedBox(height: BotvySpace.lg),
                 TextField(
                   controller: _note,
                   textCapitalization: TextCapitalization.sentences,
@@ -159,7 +160,7 @@ class _CheckinSheetState extends State<_CheckinSheet> {
                 if (state.problem != null)
                   RhythmProblem(problem: state.problem!),
 
-                const SizedBox(height: 12),
+                const SizedBox(height: BotvySpace.md),
                 FilledButton(
                   onPressed: state.busy
                       ? null

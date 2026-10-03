@@ -8,6 +8,8 @@ import '../../../core/db/database.dart';
 import '../application/chat_cubit.dart';
 import '../application/conversations_cubit.dart';
 import 'assistant_markdown.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// One conversation: its history, the answer as it is written, and the box.
 ///
@@ -17,7 +19,7 @@ import 'assistant_markdown.dart';
 /// quick-question chips scrolling from the leading edge, and the card rows and
 /// section labels following the same direction. `AlignmentDirectional` and
 /// `EdgeInsetsDirectional` are what do that; `Alignment.centerRight` and
-/// `EdgeInsets.only(left:)` are what would quietly not.
+/// `EdgeInsetsDirectional.only(start:)` are what would quietly not.
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key, required this.conversationId, this.onOpenChat});
 
@@ -111,7 +113,7 @@ class _ChatPageState extends State<ChatPage> {
             ],
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : Column(
                   children: [
                     if (state.moved != null)
@@ -215,7 +217,7 @@ class _Transcript extends StatelessWidget {
         state.streaming == null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
           child: Text(t.chatEmpty, textAlign: TextAlign.center),
         ),
       );
@@ -223,7 +225,7 @@ class _Transcript extends StatelessWidget {
 
     return ListView(
       controller: scroll,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md, vertical: BotvySpace.sm),
       children: [
         for (final message in state.messages)
           _Bubble(
@@ -248,7 +250,7 @@ class _Transcript extends StatelessWidget {
           _Bubble(content: state.streaming!, mine: false, markdown: true),
         if (state.streaming == null && state.awaiting)
           Padding(
-            padding: const EdgeInsetsDirectional.only(start: 8, top: 8),
+            padding: const EdgeInsetsDirectional.only(start: BotvySpace.sm, top: BotvySpace.sm),
             child: Row(
               children: [
                 const SizedBox(
@@ -256,7 +258,7 @@ class _Transcript extends StatelessWidget {
                   height: 14,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 Text(t.chatWriting),
               ],
             ),
@@ -299,13 +301,13 @@ class _Bubble extends StatelessWidget {
         constraints: BoxConstraints(
           maxWidth: MediaQuery.sizeOf(context).width * 0.82,
         ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.xs),
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md, vertical: BotvySpace.sm),
         decoration: BoxDecoration(
           color: mine
               ? theme.colorScheme.primaryContainer
               : theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(BotvyRadius.xl),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +318,7 @@ class _Bubble extends StatelessWidget {
               Text(content, textAlign: TextAlign.start),
             if (footnote != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsetsDirectional.only(top: BotvySpace.xs),
                 child: Text(
                   footnote!,
                   style: theme.textTheme.labelSmall,
@@ -341,17 +343,17 @@ class _CardAnswer extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final cubit = context.read<ChatCubit>();
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
             padding: const EdgeInsetsDirectional.only(
-              start: 16,
-              end: 16,
-              top: 12,
-              bottom: 4,
+              start: BotvySpace.lg,
+              end: BotvySpace.lg,
+              top: BotvySpace.md,
+              bottom: BotvySpace.xs,
             ),
             child: Text(
               _heading(t, card.kind),
@@ -404,7 +406,7 @@ class _CardAnswer extends StatelessWidget {
             ),
           if (card.items.isEmpty)
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
               child: Text(t.chatCardEmpty, textAlign: TextAlign.start),
             ),
         ],
@@ -464,14 +466,14 @@ class _QuickQuestions extends StatelessWidget {
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
     scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md, vertical: BotvySpace.xs),
     child: Row(
       children: [
         for (final question in questions)
           Padding(
             // Directional, so the gap falls between the chips rather than
             // outside the row's leading chip when the screen is right to left.
-            padding: const EdgeInsetsDirectional.only(end: 8),
+            padding: const EdgeInsetsDirectional.only(end: BotvySpace.sm),
             child: ActionChip(
               label: Text(question),
               onPressed: () => onPick(question),
@@ -502,7 +504,7 @@ class _Composer extends StatelessWidget {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.sm, vertical: BotvySpace.xs),
         child: Row(
           children: [
             Expanded(
@@ -522,7 +524,7 @@ class _Composer extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: BotvySpace.sm),
             // One button in two states rather than two buttons, because they
             // are never both useful and a stop that appears beside send is a
             // stop that gets pressed by mistake.

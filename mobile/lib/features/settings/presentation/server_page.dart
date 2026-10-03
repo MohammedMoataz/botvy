@@ -6,6 +6,8 @@ import '../../../app/di.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/socket_client.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// Where this installation lives.
 ///
@@ -115,10 +117,10 @@ class _ServerPageState extends State<ServerPage> {
     return Scaffold(
       appBar: AppBar(title: Text(t.serverTitle)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : SafeArea(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
@@ -128,7 +130,7 @@ class _ServerPageState extends State<ServerPage> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(t.serverExplain, style: Theme.of(context).textTheme.bodyMedium),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: BotvySpace.xl),
 
                           TextFormField(
                             controller: _url,
@@ -166,7 +168,7 @@ class _ServerPageState extends State<ServerPage> {
                             onFieldSubmitted: (_) => unawaited(_test()),
                           ),
 
-                          const SizedBox(height: 20),
+                          const SizedBox(height: BotvySpace.xl),
                           OutlinedButton.icon(
                             onPressed: _testing ? null : () => unawaited(_test()),
                             icon: _testing
@@ -180,11 +182,11 @@ class _ServerPageState extends State<ServerPage> {
                           ),
 
                           if (_probe != null) ...[
-                            const SizedBox(height: 12),
+                            const SizedBox(height: BotvySpace.md),
                             _ProbeResult(probe: _probe!),
                           ],
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: BotvySpace.md),
                           FilledButton(
                             // Savable without a successful test. A member
                             // setting this up before the tunnel is running has
@@ -195,7 +197,7 @@ class _ServerPageState extends State<ServerPage> {
                           ),
 
                           if (_saved) ...[
-                            const SizedBox(height: 12),
+                            const SizedBox(height: BotvySpace.md),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -204,7 +206,7 @@ class _ServerPageState extends State<ServerPage> {
                                   size: 18,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: BotvySpace.sm),
                                 Flexible(child: Text(t.serverSaved)),
                               ],
                             ),
@@ -265,15 +267,15 @@ class _ProbeResult extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsetsDirectional.all(BotvySpace.md),
       decoration: BoxDecoration(
         color: colour.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(BotvyRadius.lg),
       ),
       child: Row(
         children: [
           Icon(icon, size: 20, color: colour),
-          const SizedBox(width: 12),
+          const SizedBox(width: BotvySpace.md),
           Expanded(child: Text(message)),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app/tokens.dart';
 
 /// A list of short strings, added one at a time and removed by tapping.
 ///
@@ -57,17 +58,17 @@ class _TagEditorState extends State<TagEditor> {
     final help = widget.help;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsetsDirectional.only(bottom: BotvySpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(widget.label, style: Theme.of(context).textTheme.titleSmall),
           if (help != null)
             Padding(
-              padding: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsetsDirectional.only(top: BotvySpace.xxs),
               child: Text(help, style: Theme.of(context).textTheme.bodySmall),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: BotvySpace.sm),
 
           if (widget.values.isNotEmpty)
             Wrap(

@@ -8,6 +8,8 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/nutrition_cubit.dart';
 import '../../../ui/scroll_aware_fab.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The member's meals, and what today says about food (T841).
 ///
@@ -53,11 +55,11 @@ class _NutritionPageState extends State<NutritionPage> {
             onPressed: () => _editMeal(context, cubit, null),
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : RefreshIndicator(
                   onRefresh: cubit.refresh,
                   child: ListView(
-                    padding: const EdgeInsets.only(bottom: 96),
+                    padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
                     children: [
                       _TodayCard(state: state),
                       _KindFilter(state: state),
@@ -100,11 +102,11 @@ class _NutritionPageState extends State<NutritionPage> {
       context: context,
       isScrollControlled: true,
       builder: (sheet) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: MediaQuery.of(sheet).viewInsets.bottom + 16,
+        padding: EdgeInsetsDirectional.only(
+          start: BotvySpace.lg,
+          end: BotvySpace.lg,
+          top: BotvySpace.lg,
+          bottom: MediaQuery.of(sheet).viewInsets.bottom + BotvySpace.lg,
         ),
         child: StatefulBuilder(
           builder: (sheet, setSheetState) => Column(
@@ -116,7 +118,7 @@ class _NutritionPageState extends State<NutritionPage> {
                 autofocus: true,
                 decoration: InputDecoration(labelText: t.nutritionName),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: BotvySpace.md),
               TextField(
                 controller: ingredients,
                 decoration: InputDecoration(
@@ -129,7 +131,7 @@ class _NutritionPageState extends State<NutritionPage> {
                   helperMaxLines: 2,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: BotvySpace.md),
               Wrap(
                 spacing: 8,
                 children: [
@@ -141,7 +143,7 @@ class _NutritionPageState extends State<NutritionPage> {
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: BotvySpace.lg),
               FilledButton(
                 onPressed: () => Navigator.of(sheet).pop(true),
                 child: Text(t.nutritionSaveAction),
@@ -183,10 +185,10 @@ class _TodayCard extends StatelessWidget {
     final cubit = context.read<NutritionCubit>();
     final today = state.today;
 
-    return Card(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.fromSTEB(BotvySpace.md, BotvySpace.md, BotvySpace.md, BotvySpace.xs),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -194,7 +196,7 @@ class _TodayCard extends StatelessWidget {
               t.nutritionTodayTitle,
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Text(
               today.hasMeals
                   ? today.line!
@@ -203,12 +205,12 @@ class _TodayCard extends StatelessWidget {
                   // nobody has chosen rather than a day that was refused.
                   : t.nutritionWithheld(today.reason),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Text(
               state.mode == 'library' ? t.nutritionModeLibrary : t.nutritionModeLlm,
               style: Theme.of(context).textTheme.labelMedium,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Row(
               children: [
                 TextButton.icon(
@@ -293,12 +295,12 @@ class _KindFilter extends StatelessWidget {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md, vertical: BotvySpace.sm),
       child: Row(
         children: [
           for (final kind in mealKinds)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsetsDirectional.only(end: BotvySpace.sm),
               child: FilterChip(
                 label: Text(t.nutritionKind(kind)),
                 selected: state.kind == kind,
@@ -353,11 +355,11 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(32),
+    padding: const EdgeInsetsDirectional.all(BotvySpace.xxl),
     child: Column(
       children: [
         Text(t.nutritionEmptyTitle, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         Text(t.nutritionEmptyBody, textAlign: TextAlign.center),
       ],
     ),

@@ -12,6 +12,8 @@ import '../../../core/notifications/local_notifications.dart'
 import '../../auth/application/auth_cubit.dart';
 import '../data/profile_mirror.dart';
 import 'tag_editor.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The member's own facts.
 ///
@@ -94,9 +96,9 @@ class _ProfilePageState extends State<ProfilePage> {
         title: Text(t.profileTitle),
       ),
       body: profile == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingView()
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
               children: [
                 if (context.read<AuthCubit>().state.mustChangePassword)
                   _Notice(text: t.changeYourPassword, severity: _Severity.warn),
@@ -109,14 +111,14 @@ class _ProfilePageState extends State<ProfilePage> {
                   onSubmitted: (value) =>
                       unawaited(_save({'displayName': value.trim()})),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: BotvySpace.lg),
 
                 _TimezoneField(
                   value: profile.timezone,
                   saving: _saving,
                   onChanged: (zone) => unawaited(_save({'timezone': zone})),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: BotvySpace.lg),
 
                 _LanguageField(
                   value: profile.locale,
@@ -319,7 +321,7 @@ class _MetricsState extends State<_Metrics> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(t.bodyMetrics, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
 
         if (profile.bmi != null)
           Text('${t.bmi}: ${profile.bmi}',
@@ -328,28 +330,28 @@ class _MetricsState extends State<_Metrics> {
         Row(
           children: [
             Expanded(child: _number(_weight, t.weightKg)),
-            const SizedBox(width: 8),
+            const SizedBox(width: BotvySpace.sm),
             Expanded(child: _number(_height, t.heightCm)),
-            const SizedBox(width: 8),
+            const SizedBox(width: BotvySpace.sm),
             Expanded(child: _number(_fat, t.bodyFatPct)),
           ],
         ),
         if (_problem != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsetsDirectional.only(top: BotvySpace.sm),
             child: Text(
               _problem!,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         OutlinedButton.icon(
           icon: const Icon(Icons.add),
           label: Text(t.addMetric),
           onPressed: _submit,
         ),
 
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         if (metrics.isEmpty)
           Text(t.noMetricsYet, style: Theme.of(context).textTheme.bodySmall)
         else
@@ -405,11 +407,11 @@ class _Notice extends StatelessWidget {
         : colours.onTertiaryContainer;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsetsDirectional.only(bottom: BotvySpace.lg),
+      padding: const EdgeInsetsDirectional.all(BotvySpace.md),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(BotvyRadius.lg),
       ),
       child: Text(text, style: TextStyle(color: foreground)),
     );

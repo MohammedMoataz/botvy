@@ -12,6 +12,8 @@ import '../application/athlete_cubit.dart';
 import 'athlete_sheets.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The athlete's week (T651).
 ///
@@ -79,14 +81,14 @@ class AthletePage extends StatelessWidget {
             onPressed: () => unawaited(showSessionCreator(context, cubit)),
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : RefreshIndicator(
                   // Re-reads the *database*, not the network — the engine has
                   // its own triggers, and re-reading is the honest answer to a
                   // member who wants to be sure the screen is current.
                   onRefresh: cubit.refresh,
                   child: ListView(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsetsDirectional.all(BotvySpace.md),
                     children: [
                       NextPracticeCard(state: state),
                       // Story 1 scenario 3, verbatim: no slots at all invites
@@ -125,9 +127,9 @@ class NextPracticeCard extends StatelessWidget {
     final session = state.next.session;
 
     if (session == null) {
-      return Card(
+      return Card.filled(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -135,13 +137,13 @@ class NextPracticeCard extends StatelessWidget {
                 t.athleteNoneTitle,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: BotvySpace.xs),
               // "Says so plainly and offers to add one" — story 2 scenario 3.
               // The offer is the half that is easy to leave out, and a plain
               // sentence with nothing to do next is a dead end on the screen
               // the member opened to find out what is next.
               Text(t.athleteNoneBody),
-              const SizedBox(height: 12),
+              const SizedBox(height: BotvySpace.md),
               Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: FilledButton.icon(
@@ -168,11 +170,11 @@ class NextPracticeCard extends StatelessWidget {
       NextPracticeReason.noneScheduled => t.athleteNext,
     };
 
-    return Card(
+    return Card.filled(
       child: InkWell(
         onTap: () => context.push(Routes.session(session.id)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -187,14 +189,14 @@ class NextPracticeCard extends StatelessWidget {
                   Chip(label: Text(label), visualDensity: VisualDensity.compact),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: BotvySpace.xs),
               Text(
                 session.title.isEmpty
                     ? t.sportName(session.sport)
                     : session.title,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: BotvySpace.xs),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
@@ -205,7 +207,7 @@ class NextPracticeCard extends StatelessWidget {
                 ],
               ),
               if (session.focus != null && session.focus!.isNotEmpty) ...[
-                const SizedBox(height: 6),
+                const SizedBox(height: BotvySpace.xs),
                 Text(
                   session.focus!,
                   style: Theme.of(context).textTheme.bodySmall,
@@ -231,9 +233,9 @@ class _WeekCard extends StatelessWidget {
     final cubit = context.read<AthleteCubit>();
     final now = state.now ?? DateTime.now().toUtc();
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -296,7 +298,7 @@ class _DayRow extends StatelessWidget {
     final weekday = DateTime.parse(date).weekday;
 
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsetsDirectional.only(top: BotvySpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -334,7 +336,7 @@ class _DayRow extends StatelessWidget {
                         session.plannedAt.toLocal(),
                       ).format(context),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: BotvySpace.sm),
                     StatusText(session: session, now: now),
                   ],
                 ),
@@ -394,9 +396,9 @@ class _NoSlotsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -404,9 +406,9 @@ class _NoSlotsCard extends StatelessWidget {
               t.athleteNoSlotsTitle,
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: BotvySpace.xs),
             Text(t.athleteNoSlotsBody),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: FilledButton.icon(

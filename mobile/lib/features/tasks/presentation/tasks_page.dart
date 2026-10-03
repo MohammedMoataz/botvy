@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../ui/hex_color.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/recurrence.dart';
@@ -11,6 +12,8 @@ import 'label_editor.dart';
 import 'task_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The member's task lists.
 ///
@@ -91,7 +94,7 @@ class TasksPage extends StatelessWidget {
             onPressed: () => unawaited(showTaskSheet(context, cubit)),
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : Column(
                   children: [
                     if (state.labels.isNotEmpty) _LabelFilters(state: state),
@@ -129,12 +132,12 @@ class _LabelFilters extends StatelessWidget {
     final cubit = context.read<TasksCubit>();
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md, vertical: BotvySpace.sm),
       child: Row(
         children: [
           for (final label in state.labels)
             Padding(
-              padding: const EdgeInsetsDirectional.only(end: 8),
+              padding: const EdgeInsetsDirectional.only(end: BotvySpace.sm),
               child: FilterChip(
                 avatar: CircleAvatar(
                   backgroundColor: parseHexColor(label.color),
@@ -165,7 +168,7 @@ class _TaskList extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     if (state.tasks.isEmpty) {
-      return Center(child: Text(t.taskNothingHere));
+      return EmptyState(icon: Icons.task_alt, message: t.taskNothingHere);
     }
 
     // Today is the one view with headings, and they are the point of it:
@@ -189,7 +192,7 @@ class _TaskList extends StatelessWidget {
         if (entry is String) return _Heading(entry);
         if (entry is _Note) {
           return Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
             child: Text(entry.text),
           );
         }
@@ -231,7 +234,7 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+    padding: const EdgeInsetsDirectional.fromSTEB(BotvySpace.lg, BotvySpace.lg, BotvySpace.lg, BotvySpace.xs),
     child: Text(text, style: Theme.of(context).textTheme.titleSmall),
   );
 }
@@ -365,7 +368,7 @@ class _TaskRow extends StatelessWidget {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: BotvySpace.xs),
           Text(task.labelName!),
           if (pieces.isNotEmpty) const Text(' · '),
         ],
@@ -411,11 +414,11 @@ class _SwipeHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
+    padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.xl),
     alignment: alignment,
     child: Row(
       mainAxisSize: MainAxisSize.min,
-      children: [Icon(icon), const SizedBox(width: 8), Text(label)],
+      children: [Icon(icon), const SizedBox(width: BotvySpace.sm), Text(label)],
     ),
   );
 }
@@ -459,14 +462,3 @@ String _dateText(DateTime instant) {
 String _timeText(BuildContext context, DateTime instant) =>
     TimeOfDay.fromDateTime(instant.toLocal()).format(context);
 
-/// `#rrggbb` to a [Color].
-///
-/// A string rather than an index into the palette, because the palette is an
-/// operator setting and may change under a label that was already given one of
-/// its colours.
-Color parseHexColor(String? hex) {
-  final cleaned = (hex ?? '').replaceFirst('#', '');
-  final value = int.tryParse(cleaned, radix: 16);
-  if (value == null || cleaned.length != 6) return const Color(0xFF475569);
-  return Color(0xFF000000 | value);
-}
