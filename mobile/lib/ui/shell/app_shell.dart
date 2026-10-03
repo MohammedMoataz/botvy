@@ -82,6 +82,7 @@ class _AppShellState extends State<AppShell> {
       },
       child: _ShellScope(
         scaffold: _scaffold,
+        wide: wide,
         child: Scaffold(
           key: _scaffold,
           // The pages' own scaffolds handle the keyboard inset; doing it here
@@ -140,6 +141,15 @@ class _AppShellState extends State<AppShell> {
 class ShellMenuButton extends StatelessWidget {
   const ShellMenuButton({super.key});
 
+  /// For a tab root's `AppBar.leading`: the menu button on a phone; null on a
+  /// wide screen, where the rail already carries one; and null outside a
+  /// shell, so the app bar keeps its own back arrow.
+  static Widget? maybe(BuildContext context) {
+    final scope = context.dependOnInheritedWidgetOfExactType<_ShellScope>();
+    if (scope == null || scope.wide) return null;
+    return const ShellMenuButton();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<_ShellScope>();
@@ -153,12 +163,20 @@ class ShellMenuButton extends StatelessWidget {
 }
 
 class _ShellScope extends InheritedWidget {
-  const _ShellScope({required this.scaffold, required super.child});
+  const _ShellScope({
+    required this.scaffold,
+    required this.wide,
+    required super.child,
+  });
 
   final GlobalKey<ScaffoldState> scaffold;
 
+  /// The rail is showing, and with it a menu button.
+  final bool wide;
+
   @override
-  bool updateShouldNotify(_ShellScope old) => old.scaffold != scaffold;
+  bool updateShouldNotify(_ShellScope old) =>
+      old.scaffold != scaffold || old.wide != wide;
 }
 
 class _FadeThroughBranches extends StatefulWidget {
@@ -179,15 +197,22 @@ class _FadeThroughBranchesState extends State<_FadeThroughBranches> {
   /// The tab fading out, kept on stage until its fade ends; every other
   /// hidden tab is offstage, as the IndexedStack kept it — built and holding
   /// its state, but not laid out, painted, hit or read by a screen reader.
-  int? _leaving;
+  final _leaving = <int>{};
 
   @override
   void didUpdateWidget(_FadeThroughBranches old) {
     super.didUpdateWidget(old);
     // With animations off there is no fade to wait for: the old tab goes
     // offstage at once (and an `onEnd` would fire mid-build).
+    // Every tab still fading stays on stage until its own fade ends, so
+    // switching quickly never cuts one short.
     if (old.index != widget.index) {
-      _leaving = BotvyMotion.of(context).enabled ? old.index : null;
+      if (BotvyMotion.of(context).enabled) {
+        _leaving.add(old.index);
+      } else {
+        _leaving.clear();
+      }
+      _leaving.remove(widget.index);
     }
   }
 
@@ -206,7 +231,7 @@ class _FadeThroughBranchesState extends State<_FadeThroughBranches> {
   Widget _branch(int i, Duration duration, Widget child) {
     final shown = i == widget.index;
     return Offstage(
-      offstage: !shown && i != _leaving,
+      offstage: !shown && !_leaving.contains(i),
       child: IgnorePointer(
         ignoring: !shown,
         child: ExcludeSemantics(
@@ -214,13 +239,15 @@ class _FadeThroughBranchesState extends State<_FadeThroughBranches> {
           // A hidden tab's tickers stop, as they did in the IndexedStack —
           // once it has finished fading out.
           child: TickerMode(
-            enabled: shown || i == _leaving,
+            enabled: shown || _leaving.contains(i),
             child: AnimatedOpacity(
               opacity: shown ? 1 : 0,
               duration: duration,
               curve: shown ? _in : _out,
               onEnd: () {
-                if (i == _leaving && mounted) setState(() => _leaving = null);
+                if (!shown && _leaving.contains(i) && mounted) {
+                  setState(() => _leaving.remove(i));
+                }
               },
               child: AnimatedScale(
                 scale: shown ? 1 : 0.92,

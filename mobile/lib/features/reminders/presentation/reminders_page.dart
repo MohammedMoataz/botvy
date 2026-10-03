@@ -78,6 +78,7 @@ class RemindersPage extends StatelessWidget {
                       message: t.reminderNothingHere,
                     )
                   : DiffAnimatedList(
+                      padding: const EdgeInsetsDirectional.only(bottom: fabClearance),
                       items: state.reminders,
                       keyOf: (reminder) => reminder.id,
                       itemBuilder: (context, reminder) => _ReminderRow(

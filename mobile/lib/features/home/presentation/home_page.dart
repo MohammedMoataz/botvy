@@ -53,7 +53,7 @@ class HomePage extends StatelessWidget {
             ),
             // The menu opens the side drawer; the seven shortcuts that used to
             // crowd this bar are now the tabs and the drawer (030).
-            leading: const ShellMenuButton(),
+            leading: ShellMenuButton.maybe(context),
             actions: [
               IconButton(
                 icon: const Icon(Icons.account_circle_outlined),
