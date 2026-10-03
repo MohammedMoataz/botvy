@@ -257,11 +257,7 @@ class _Transcript extends StatelessWidget {
             padding: const EdgeInsetsDirectional.only(start: BotvySpace.sm, top: BotvySpace.sm),
             child: Row(
               children: [
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                const InlineSpinner(dense: true),
                 const SizedBox(width: BotvySpace.sm),
                 Text(t.chatWriting),
               ],

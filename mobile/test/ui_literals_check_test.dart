@@ -15,7 +15,9 @@ void main() {
     final result = _check('test/fixtures/ui_literals/bad');
     expect(result.exitCode, 1);
     final out = result.stdout as String;
-    for (var line = 1; line <= 8; line++) {
+    // One per single-line form, then three written over several lines,
+    // reported at the line the call starts on.
+    for (final line in [1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 15]) {
       expect(out, contains('screen.dart:$line:'), reason: 'line $line');
     }
   });

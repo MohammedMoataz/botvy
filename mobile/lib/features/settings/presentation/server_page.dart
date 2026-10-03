@@ -172,11 +172,7 @@ class _ServerPageState extends State<ServerPage> {
                           OutlinedButton.icon(
                             onPressed: _testing ? null : () => unawaited(_test()),
                             icon: _testing
-                                ? const SizedBox(
-                                    height: 18,
-                                    width: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
+                                ? const InlineSpinner()
                                 : const Icon(Icons.wifi_tethering),
                             label: Text(t.testConnection),
                           ),

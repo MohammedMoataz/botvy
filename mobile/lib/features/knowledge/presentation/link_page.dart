@@ -9,6 +9,9 @@ import '../application/knowledge_cubit.dart';
 import '../../../app/tokens.dart';
 import '../../../ui/states.dart';
 
+/// The link's images, as one horizontal strip of thumbnails.
+const double _mediaStripHeight = 140;
+
 /// One saved link: what Botvy read, so the member does not have to (FR-006).
 ///
 /// ## Local first, then the summary
@@ -138,7 +141,7 @@ class _LinkPageState extends State<LinkPage> {
         if ((doc['media'] as List? ?? const []).isNotEmpty) ...[
           const SizedBox(height: BotvySpace.lg),
           SizedBox(
-            height: 140,
+            height: _mediaStripHeight,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
