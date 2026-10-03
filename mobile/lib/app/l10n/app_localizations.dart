@@ -401,6 +401,7 @@ class AppLocalizations {
   String get knowledgeDone => _t('knowledgeDone');
   String get knowledgeFailed => _t('knowledgeFailed');
   String get knowledgeRetry => _t('knowledgeRetry');
+  String get retry => _t('retry');
   String get knowledgeRemove => _t('knowledgeRemove');
   String get knowledgeSummary => _t('knowledgeSummary');
   String get knowledgeKeyPoints => _t('knowledgeKeyPoints');
@@ -1045,6 +1046,7 @@ class AppLocalizations {
       'knowledgeDone': 'Done',
       'knowledgeFailed': 'Failed',
       'knowledgeRetry': 'Try again',
+    'retry': 'Try again',
       'knowledgeRemove': 'Remove',
       'knowledgeSummary': 'Summary',
       'knowledgeKeyPoints': 'Key points',
@@ -1566,6 +1568,7 @@ class AppLocalizations {
     'knowledgeDone': 'تم',
     'knowledgeFailed': 'فشل',
     'knowledgeRetry': 'حاول مرة أخرى',
+    'retry': 'حاول مرة أخرى',
     'knowledgeRemove': 'احذف',
     'knowledgeSummary': 'الملخص',
     'knowledgeKeyPoints': 'أهم النقاط',

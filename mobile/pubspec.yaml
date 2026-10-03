@@ -87,6 +87,7 @@ dev_dependencies:
   # The migration ladder test hand-builds a database before drift opens it.
   # Must track what drift itself requires; drift 2.34 needs sqlite3 ^3.4.
   sqlite3: ^3.4.0
+  alchemist: ^0.14.0
 
 flutter:
   uses-material-design: true
