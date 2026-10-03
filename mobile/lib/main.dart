@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'app/appearance/appearance_cubit.dart';
 import 'app/di.dart';
 import 'app/l10n/app_localizations.dart';
+import 'app/navigation.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 import 'core/api/api_client.dart';
@@ -65,7 +66,9 @@ Future<void> main() async {
   // navigating into a location the redirect is about to overrule.
   final pending = takePendingRoute();
   if (pending != null) {
-    WidgetsBinding.instance.addPostFrameCallback((_) => router.go(pending));
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => unawaited(openFromOutside(router, pending)),
+    );
   }
 
   runApp(BotvyApp(router: router));

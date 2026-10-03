@@ -471,6 +471,18 @@ void main() {
       await unmount(tester);
     });
 
+    // Spec 030 SC-002: the seven shortcuts became the tabs and the drawer.
+    testWidgets('the app bar carries at most two actions', (tester) async {
+      await seedMember();
+      await cubit.refresh();
+      await tester.pumpWidget(page());
+      await tester.pump();
+
+      final bar = tester.widget<AppBar>(find.byType(AppBar).first);
+      expect(bar.actions?.length ?? 0, lessThanOrEqualTo(2));
+      await unmount(tester);
+    });
+
     testWidgets('says a quiet day plainly and draws no ring', (tester) async {
       await seedMember();
       await seedPlan(date: dateOf(), taskIds: []);

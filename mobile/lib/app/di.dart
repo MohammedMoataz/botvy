@@ -31,6 +31,7 @@ import '../features/rhythm/application/rhythm_cubit.dart';
 import '../features/tasks/application/tasks_cubit.dart';
 import 'router.dart';
 import 'appearance/appearance_cubit.dart';
+import 'navigation.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -331,7 +332,7 @@ Future<void> handleAlertTap(String payload) async {
   }
 
   if (sl.isRegistered<GoRouter>()) {
-    sl<GoRouter>().go(route);
+    await openFromOutside(sl<GoRouter>(), route);
   } else {
     _pendingRoute = route;
   }

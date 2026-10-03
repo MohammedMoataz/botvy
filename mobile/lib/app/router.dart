@@ -38,7 +38,10 @@ import '../features/rhythm/presentation/confirm_plan_sheet.dart';
 import '../features/settings/presentation/server_page.dart';
 import '../features/tasks/application/tasks_cubit.dart';
 import '../features/tasks/presentation/tasks_page.dart';
+import '../ui/shell/app_shell.dart';
 import 'di.dart';
+import 'l10n/app_localizations.dart';
+import 'navigation.dart';
 
 abstract final class Routes {
   static const String home = '/home';
@@ -110,6 +113,10 @@ abstract final class Routes {
   /// Where the gateway's address is set. Reachable signed out, deliberately —
   /// see the redirect below.
   static const String server = '/server';
+
+  /// The settings hub (030). Preferences, appearance, the gateway and the
+  /// account, in sections.
+  static const String settings = '/settings';
 }
 
 /// The route one of the server's `deepLink` strings opens, or null.
@@ -151,8 +158,8 @@ String? routeForDeepLink(String deepLink) {
     // rhythm's own touches use in their deep links; `conversations` is the REST
     // path and is what a card row or a knowledge suggestion may carry. One
     // table for both rather than guessing which the gateway sends.
-    ['chat', final String id] || ['conversations', final String id] =>
-      Routes.chat(id),
+    ['chat', final String id] ||
+    ['conversations', final String id] => Routes.chat(id),
     ['chat', ...] || ['conversations', ...] => Routes.chats,
     // No per-row route exists for these yet, so the list is where a tap lands.
     // Better than nowhere, and it is the screen the member was going to have
@@ -161,20 +168,21 @@ String? routeForDeepLink(String deepLink) {
     // server plans a meeting's alerts with `meeting/<id>` deep links and a
     // preparation alert with the same one, so both land on the meeting rather
     // than on a list the member then has to search.
-    ['meeting', final String id] || ['meetings', final String id] =>
-      Routes.meeting(id),
+    ['meeting', final String id] ||
+    ['meetings', final String id] => Routes.meeting(id),
     ['meeting', ...] || ['meetings', ...] => Routes.meetings,
     // Both spellings the server may produce for a training session: `session`
     // is what a session's own alerts carry, `sessions` is the REST path and is
     // what a chat card of kind `sessions` may hold.
-    ['session', final String id] || ['sessions', final String id] =>
-      Routes.session(id),
+    ['session', final String id] ||
+    ['sessions', final String id] => Routes.session(id),
     // `botvy://knowledge/suggestions` is the `suggestion` alert's link, and it
     // lands on the list rather than on one card: the inbox is where the choice
     // is made, and a card whose session the member has since changed would be
     // the wrong thing to open cold.
-    ['knowledge', ...] || ['links', ...] || ['suggestions', ...] =>
-      Routes.knowledge,
+    ['knowledge', ...] ||
+    ['links', ...] ||
+    ['suggestions', ...] => Routes.knowledge,
     // `botvy://nutrition` and `botvy://meals` both land on the one screen: the
     // day's line and the library are two halves of it, and a deep link that
     // guessed wrong would leave the member one tap from where they meant.
@@ -256,44 +264,196 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     return null;
   },
   routes: [
-    GoRoute(
-      path: Routes.home,
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          // `.value` for both, as the tasks route does: they are singletons
-          // from the container and already listening to the sync engine.
-          // Letting `BlocProvider` construct one here would give this route a
-          // second instance with its own copy of the day, so a task ticked off
-          // on Home would still read as open on the list behind it.
-          BlocProvider<HomeCubit>.value(value: sl<HomeCubit>()),
-          BlocProvider<RhythmCubit>.value(value: sl<RhythmCubit>()),
-          // Today's training row watches the `sessions` table through this
-          // cubit, for the reason `training_row.dart` gives: the plan snapshot
-          // is the evening's summary and a session completed at seven in the
-          // morning has to change the row now, not tomorrow.
-          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
-        ],
-        child: const HomePage(),
+    // The five tabs (spec 030). Each branch has its own navigator, so a tab
+    // keeps its scroll and its pushed pages while the member is on another.
+    // The paths are the ones every deep link and notification already
+    // carries; only where the pages hang changed.
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, shell) => AppShell(
+        shell: shell,
+        destinations: shellDestinations(AppLocalizations.of(context)),
+        drawer: const BotvyDrawer(),
       ),
-    ),
-    // The rhythm sheets, for a notification tap. Both render Home and open
-    // their sheet over it, so the member lands somewhere they can stay when
-    // the sheet closes rather than on a blank route.
-    GoRoute(
-      path: '${Routes.rhythmPlan}/:date',
-      builder: (context, state) => _SheetOverHome(
-        open: (context, cubit) => showConfirmPlanSheet(
-          context,
-          cubit,
-          date: state.pathParameters['date'],
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: Routes.home,
+              builder: (context, state) => MultiBlocProvider(
+                providers: [
+                  // `.value` for both, as the tasks route does: they are singletons
+                  // from the container and already listening to the sync engine.
+                  // Letting `BlocProvider` construct one here would give this route a
+                  // second instance with its own copy of the day, so a task ticked off
+                  // on Home would still read as open on the list behind it.
+                  BlocProvider<HomeCubit>.value(value: sl<HomeCubit>()),
+                  BlocProvider<RhythmCubit>.value(value: sl<RhythmCubit>()),
+                  // Today's training row watches the `sessions` table through this
+                  // cubit, for the reason `training_row.dart` gives: the plan snapshot
+                  // is the evening's summary and a session completed at seven in the
+                  // morning has to change the row now, not tomorrow.
+                  BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
+                ],
+                child: const HomePage(),
+              ),
+            ),
+            // The rhythm sheets, for a notification tap. Both render Home and open
+            // their sheet over it, so the member lands somewhere they can stay when
+            // the sheet closes rather than on a blank route.
+            GoRoute(
+              path: '${Routes.rhythmPlan}/:date',
+              builder: (context, state) => _SheetOverHome(
+                open: (context, cubit) => showConfirmPlanSheet(
+                  context,
+                  cubit,
+                  date: state.pathParameters['date'],
+                ),
+              ),
+            ),
+            GoRoute(
+              path: Routes.rhythmCheckin,
+              builder: (context, state) =>
+                  _SheetOverHome(open: showCheckinSheet),
+            ),
+          ],
         ),
-      ),
+        StatefulShellBranch(
+          routes: [
+            // `.value`, as `main.dart` does for the session: both cubits are
+            // singletons from the container and already listening to the sync engine.
+            // Letting `BlocProvider` construct one here would give this route a second
+            // instance, with its own listener and its own copy of the list — so a task
+            // completed from a notification would still read as open on screen.
+            GoRoute(
+              path: Routes.tasks,
+              builder: (context, state) => BlocProvider<TasksCubit>.value(
+                value: sl<TasksCubit>(),
+                child: const TasksPage(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: Routes.calendar,
+              builder: (context, state) => MultiBlocProvider(
+                providers: [
+                  BlocProvider<CalendarCubit>.value(value: sl<CalendarCubit>()),
+                  // The calendar reads meetings through the cubit that owns that
+                  // table, so the `pendingOp` and `baseUpdatedAt` rules are written
+                  // down once — the same reason Home delegates ticking a task off.
+                  BlocProvider<MeetingsCubit>.value(value: sl<MeetingsCubit>()),
+                ],
+                child: const CalendarPage(),
+              ),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            // The chat list and one conversation. `.value` for both cubits, as
+            // everywhere else: the chat cubit owns the turn that is streaming, and a
+            // second instance built by the route would not recognise its `requestId`.
+            GoRoute(
+              path: Routes.chats,
+              builder: (context, state) => MultiBlocProvider(
+                providers: [
+                  BlocProvider<ConversationsCubit>.value(
+                    value: sl<ConversationsCubit>(),
+                  ),
+                  BlocProvider<ChatCubit>.value(value: sl<ChatCubit>()),
+                ],
+                child: ConversationsPage(
+                  onOpen: (id) => context.push(Routes.chat(id)),
+                ),
+              ),
+              routes: [
+                GoRoute(
+                  path: ':id',
+                  builder: (context, state) => MultiBlocProvider(
+                    providers: [
+                      BlocProvider<ConversationsCubit>.value(
+                        value: sl<ConversationsCubit>(),
+                      ),
+                      BlocProvider<ChatCubit>.value(value: sl<ChatCubit>()),
+                    ],
+                    child: ChatPage(
+                      conversationId: state.pathParameters['id'] ?? '',
+                      // `pushReplacement`, so following a moved answer does not leave the
+                      // chat it moved *out of* on the back stack: going back from there
+                      // would land the member in a conversation the message is no longer
+                      // in, which is the confusion the notice exists to prevent.
+                      onOpenChat: (id) =>
+                          context.pushReplacement(Routes.chat(id)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            // The athlete's week. `.value` for both cubits, as everywhere else: they
+            // are singletons from the container and already listening to the sync
+            // engine, and a second instance built by the route would hold its own copy
+            // of the week — so a session skipped from its own screen would still read
+            // as planned on the list behind it.
+            GoRoute(
+              path: Routes.athlete,
+              builder: (context, state) => MultiBlocProvider(
+                providers: [
+                  BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
+                  // The session screen's library picker reads it, and it is cheap to
+                  // provide here so the whole feature has one.
+                  BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
+                ],
+                child: const AthletePage(),
+              ),
+              routes: [
+                GoRoute(
+                  path: 'programs',
+                  builder: (context, state) => MultiBlocProvider(
+                    providers: [
+                      BlocProvider<ProgramsCubit>.value(
+                        value: sl<ProgramsCubit>(),
+                      ),
+                      BlocProvider<AthleteCubit>.value(
+                        value: sl<AthleteCubit>(),
+                      ),
+                    ],
+                    child: const ProgramsPage(),
+                  ),
+                ),
+                // One session, by id — the set logger. A page of its own rather than a
+                // sheet over the list, unlike the meeting: logging six exercises is not a
+                // thing to do in a sheet, and a notification tap that lands here has
+                // somewhere to go back to because `go_router` gives it the athlete route.
+                GoRoute(
+                  path: 'session/:id',
+                  builder: (context, state) => MultiBlocProvider(
+                    providers: [
+                      BlocProvider<AthleteCubit>.value(
+                        value: sl<AthleteCubit>(),
+                      ),
+                      BlocProvider<ProgramsCubit>.value(
+                        value: sl<ProgramsCubit>(),
+                      ),
+                    ],
+                    child: SessionPage(
+                      sessionId: state.pathParameters['id'] ?? '',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     ),
-    GoRoute(
-      path: Routes.rhythmCheckin,
-      builder: (context, state) =>
-          _SheetOverHome(open: showCheckinSheet),
-    ),
+    // Everything below sits above the shell: the drawer's pages, pushed over
+    // the tab the member was on, and the screens that come before a session.
     GoRoute(
       path: Routes.signIn,
       builder: (context, state) => const SignInPage(),
@@ -310,59 +470,15 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
       path: Routes.preferences,
       builder: (context, state) => const PreferencesPage(),
     ),
-    // `.value`, as `main.dart` does for the session: both cubits are
-    // singletons from the container and already listening to the sync engine.
-    // Letting `BlocProvider` construct one here would give this route a second
-    // instance, with its own listener and its own copy of the list — so a task
-    // completed from a notification would still read as open on screen.
     GoRoute(
-      path: Routes.tasks,
-      builder: (context, state) => BlocProvider<TasksCubit>.value(
-        value: sl<TasksCubit>(),
-        child: const TasksPage(),
-      ),
+      path: Routes.settings,
+      builder: (context, state) => const PreferencesPage(),
     ),
     GoRoute(
       path: Routes.reminders,
       builder: (context, state) => BlocProvider<RemindersCubit>.value(
         value: sl<RemindersCubit>(),
         child: const RemindersPage(),
-      ),
-    ),
-    // The chat list and one conversation. `.value` for both cubits, as
-    // everywhere else: the chat cubit owns the turn that is streaming, and a
-    // second instance built by the route would not recognise its `requestId`.
-    GoRoute(
-      path: Routes.chats,
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider<ConversationsCubit>.value(
-            value: sl<ConversationsCubit>(),
-          ),
-          BlocProvider<ChatCubit>.value(value: sl<ChatCubit>()),
-        ],
-        child: ConversationsPage(
-          onOpen: (id) => context.push(Routes.chat(id)),
-        ),
-      ),
-    ),
-    GoRoute(
-      path: '${Routes.chats}/:id',
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider<ConversationsCubit>.value(
-            value: sl<ConversationsCubit>(),
-          ),
-          BlocProvider<ChatCubit>.value(value: sl<ChatCubit>()),
-        ],
-        child: ChatPage(
-          conversationId: state.pathParameters['id'] ?? '',
-          // `pushReplacement`, so following a moved answer does not leave the
-          // chat it moved *out of* on the back stack: going back from there
-          // would land the member in a conversation the message is no longer
-          // in, which is the confusion the notice exists to prevent.
-          onOpenChat: (id) => context.pushReplacement(Routes.chat(id)),
-        ),
       ),
     ),
     // `.value` for both cubits, as everywhere else: they are singletons from
@@ -385,60 +501,6 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
       builder: (context, state) => BlocProvider<MeetingsCubit>.value(
         value: sl<MeetingsCubit>(),
         child: _MeetingOverList(meetingId: state.pathParameters['id'] ?? ''),
-      ),
-    ),
-    GoRoute(
-      path: Routes.calendar,
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider<CalendarCubit>.value(value: sl<CalendarCubit>()),
-          // The calendar reads meetings through the cubit that owns that
-          // table, so the `pendingOp` and `baseUpdatedAt` rules are written
-          // down once — the same reason Home delegates ticking a task off.
-          BlocProvider<MeetingsCubit>.value(value: sl<MeetingsCubit>()),
-        ],
-        child: const CalendarPage(),
-      ),
-    ),
-    // The athlete's week. `.value` for both cubits, as everywhere else: they
-    // are singletons from the container and already listening to the sync
-    // engine, and a second instance built by the route would hold its own copy
-    // of the week — so a session skipped from its own screen would still read
-    // as planned on the list behind it.
-    GoRoute(
-      path: Routes.athlete,
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
-          // The session screen's library picker reads it, and it is cheap to
-          // provide here so the whole feature has one.
-          BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
-        ],
-        child: const AthletePage(),
-      ),
-    ),
-    GoRoute(
-      path: Routes.programs,
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
-          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
-        ],
-        child: const ProgramsPage(),
-      ),
-    ),
-    // One session, by id — the set logger. A page of its own rather than a
-    // sheet over the list, unlike the meeting: logging six exercises is not a
-    // thing to do in a sheet, and a notification tap that lands here has
-    // somewhere to go back to because `go_router` gives it the athlete route.
-    GoRoute(
-      path: '${Routes.athlete}/session/:id',
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider<AthleteCubit>.value(value: sl<AthleteCubit>()),
-          BlocProvider<ProgramsCubit>.value(value: sl<ProgramsCubit>()),
-        ],
-        child: SessionPage(sessionId: state.pathParameters['id'] ?? ''),
       ),
     ),
     GoRoute(
@@ -513,7 +575,6 @@ class _SheetOverHomeState extends State<_SheetOverHome> {
     child: const HomePage(),
   );
 }
-
 
 /// The meetings list, with one meeting's actions opened over it.
 ///

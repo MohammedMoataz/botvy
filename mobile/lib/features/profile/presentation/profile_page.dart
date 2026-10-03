@@ -2,11 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../app/di.dart';
 import '../../../app/l10n/app_localizations.dart';
-import '../../../app/router.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/local_notifications.dart'
@@ -94,42 +92,6 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.profileTitle),
-        actions: [
-          // Tasks and reminders, from the screen the router lands on. Two
-          // buttons here rather than a bottom navigation bar, because the shell
-          // this app eventually wants — a tab bar with Today, chat and the
-          // agenda — belongs with the agenda phase that fills its third tab.
-          // Building it now would mean building it twice.
-          IconButton(
-            icon: const Icon(Icons.checklist),
-            tooltip: t.taskToday,
-            onPressed: () => context.push(Routes.tasks),
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            tooltip: t.remindersTitle,
-            onPressed: () => context.push(Routes.reminders),
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune),
-            tooltip: t.preferencesTitle,
-            onPressed: () => context.push(Routes.preferences),
-          ),
-          // Also reachable from the sign-in screen, which is where it matters
-          // most. Here too, because an address that worked can stop working -
-          // a tunnel hostname changes, a machine moves - and by then the
-          // member is signed in and would otherwise have to sign out to fix it.
-          IconButton(
-            icon: const Icon(Icons.dns_outlined),
-            tooltip: t.serverSettings,
-            onPressed: () => context.push(Routes.server),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: t.signOut,
-            onPressed: () => unawaited(context.read<AuthCubit>().signOut()),
-          ),
-        ],
       ),
       body: profile == null
           ? const Center(child: CircularProgressIndicator())

@@ -77,6 +77,17 @@ class AppLocalizations {
   String get offline => _t('offline');
   String get somethingWentWrong => _t('somethingWentWrong');
   String get signOut => _t('signOut');
+  String get navToday => _t('navToday');
+  String get navTasks => _t('navTasks');
+  String get navCalendar => _t('navCalendar');
+  String get navCoach => _t('navCoach');
+  String get navTraining => _t('navTraining');
+  String get menu => _t('menu');
+  String get drawerPlan => _t('drawerPlan');
+  String get drawerHealth => _t('drawerHealth');
+  String get drawerLearn => _t('drawerLearn');
+  String get settingsTitle => _t('settingsTitle');
+  String get signOutConfirm => _t('signOutConfirm');
   String get changeYourPassword => _t('changeYourPassword');
 
   // -- profile ---------------------------------------------------------------
@@ -840,6 +851,17 @@ class AppLocalizations {
       'offline': 'Cannot reach Botvy. Check the server address in settings.',
       'somethingWentWrong': 'That did not work. Please try again.',
       'signOut': 'Sign out',
+      'navToday': 'Today',
+      'navTasks': 'Tasks',
+      'navCalendar': 'Calendar',
+      'navCoach': 'Coach',
+      'navTraining': 'Training',
+      'menu': 'Menu',
+      'drawerPlan': 'Plan',
+      'drawerHealth': 'Health',
+      'drawerLearn': 'Learn',
+      'settingsTitle': 'Settings',
+      'signOutConfirm': 'Sign out of Botvy?',
       'changeYourPassword':
           'You signed in with the default password. Change it in Settings.',
       'profileTitle': 'Profile',
@@ -1300,6 +1322,17 @@ class AppLocalizations {
       'offline': 'تعذّر الوصول إلى بوتفي. تحقّق من عنوان الخادم في الإعدادات.',
       'somethingWentWrong': 'لم ينجح ذلك. حاول مرة أخرى.',
       'signOut': 'تسجيل الخروج',
+      'navToday': 'اليوم',
+      'navTasks': 'المهام',
+      'navCalendar': 'التقويم',
+      'navCoach': 'المدرب',
+      'navTraining': 'التدريب',
+      'menu': 'القائمة',
+      'drawerPlan': 'التخطيط',
+      'drawerHealth': 'الصحة',
+      'drawerLearn': 'التعلّم',
+      'settingsTitle': 'الإعدادات',
+      'signOutConfirm': 'تسجيل الخروج من Botvy؟',
       'changeYourPassword':
           'سجّلت الدخول بكلمة المرور الافتراضية. غيّرها من الإعدادات.',
       'profileTitle': 'الملف الشخصي',
