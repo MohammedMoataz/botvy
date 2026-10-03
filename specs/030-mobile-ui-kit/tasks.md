@@ -13,22 +13,22 @@ they start with `packages/` or `.github/`.
 
 ## Phase 1 — Tokens and theme (FR-008)
 
-- [ ] T3001 `packages/tokens/tokens.json`: add `space` (2/4/8/12/16/24/32),
+- [x] T3001 `packages/tokens/tokens.json`: add `space` (2/4/8/12/16/24/32),
   `radius.xl 16`, `radius.xxl 28`, `motion` (150/250/400); existing keys
   unchanged. `check:` `node packages/tokens/build.mjs` emits them; web admin
   and extension builds unchanged
-- [ ] T3002 `test/tokens_parity_test.dart`: reads `../packages/tokens/tokens.json`
+- [x] T3002 `test/tokens_parity_test.dart`: reads `../packages/tokens/tokens.json`
   and fails on any colour/radius/space/motion that `lib/app/tokens.dart`
   disagrees with. `spec:` fails today on dark bg, dark accent, radius (A-9)
-- [ ] T3003 `lib/app/tokens.dart`: per-mode accent and `accentText`,
+- [x] T3003 `lib/app/tokens.dart`: per-mode accent and `accentText`,
   `up/down/unknown`, corrected dark values; `BotvySpace`, `BotvyRadius`,
   `BotvyMotion` as `abstract final class` constants. `check:` T3002 green
-- [ ] T3004 `lib/app/theme.dart`: both mode columns; `FlexSubThemesData`
+- [x] T3004 `lib/app/theme.dart`: both mode columns; `FlexSubThemesData`
   per plan §1; `BotvyStatusColors extends ThemeExtension` with `lerp`.
   `check:` app builds; existing tests green
-- [ ] T3005 [P] `lib/features/calendar/presentation/calendar_page.dart:358`:
+- [x] T3005 [P] `lib/features/calendar/presentation/calendar_page.dart:358`:
   the one `Colors.` becomes a scheme role
-- [ ] T3006 `tool/check_ui_literals.sh` + `.github/workflows/ci.yml` mobile
+- [x] T3006 `tool/check_ui_literals.sh` + `.github/workflows/ci.yml` mobile
   job: the grep of plan §9, **warning only**. `spec:` a fixture file with one
   line per banned form — `EdgeInsets.all(8)`, `EdgeInsetsDirectional.only(start: 8)`,
   `SizedBox(height: 8)`, `SizedBox.square(dimension: 8)`,
@@ -38,13 +38,13 @@ they start with `packages/` or `.github/`.
 
 ## Phase 2 — Appearance (FR-007, US4 scenarios 2-3)
 
-- [ ] T3011 `test/appearance_cubit_test.dart`: restore with nothing stored →
+- [x] T3011 `test/appearance_cubit_test.dart`: restore with nothing stored →
   system/system/haptics on; set dark + ar → stored → restore returns them;
   unreadable stored value → defaults, no throw
-- [ ] T3012 `lib/app/appearance/appearance_store.dart`,
+- [x] T3012 `lib/app/appearance/appearance_store.dart`,
   `appearance_cubit.dart`: `flutter_secure_storage` keys `appearance.theme`,
   `appearance.locale`, `appearance.haptics`. `check:` T3011 green
-- [ ] T3013 `lib/app/di.dart`, `lib/main.dart`: register and `restore()`
+- [x] T3013 `lib/app/di.dart`, `lib/main.dart`: register and `restore()`
   before `runApp`; `MultiBlocProvider` with `AuthCubit` and
   `AppearanceCubit`; `MaterialApp.router` reads `themeMode` and `locale`.
   `check:` widget test pumps `BotvyApp` with `ar` stored and finds
@@ -52,78 +52,78 @@ they start with `packages/` or `.github/`.
 
 ## Phase 3 — Kit (FR-009, US5)
 
-- [ ] T3021 `pubspec.yaml`: `alchemist` under `dev_dependencies`;
+- [x] T3021 `pubspec.yaml`: `alchemist` under `dev_dependencies`;
   `test/flutter_test_config.dart` with CI golden config. `check:` `flutter pub get`
-- [ ] T3022 [P] `lib/ui/section.dart`, `lib/ui/settings_tiles.dart`
+- [x] T3022 [P] `lib/ui/section.dart`, `lib/ui/settings_tiles.dart`
   (`NavTile`, `SwitchTile`, `ChoiceTile`, `DangerTile`) +
   `test/ui/section_golden_test.dart` (light/dark × en/ar)
-- [ ] T3023 [P] `lib/ui/empty_state.dart`, `error_state.dart`,
+- [x] T3023 [P] `lib/ui/empty_state.dart`, `error_state.dart`,
   `loading_view.dart` + goldens
-- [ ] T3024 [P] `lib/ui/status_chip.dart` + golden for up/down/unknown in
+- [x] T3024 [P] `lib/ui/status_chip.dart` + golden for up/down/unknown in
   both modes; `test/ui/card_golden_test.dart` pins a `Card.filled` under the
   theme (light/dark × en/ar)
-- [ ] T3025 [P] `lib/ui/confirm_dialog.dart` + widget test (confirm returns
+- [x] T3025 [P] `lib/ui/confirm_dialog.dart` + widget test (confirm returns
   true, cancel and barrier return false)
-- [ ] T3026 [P] `lib/ui/scroll_aware_fab.dart` + widget test (collapses on
+- [x] T3026 [P] `lib/ui/scroll_aware_fab.dart` + widget test (collapses on
   downward scroll, expands at top; tooltip required)
-- [ ] T3027 `analysis_options.yaml` or review rule: `lib/ui/**` imports no
+- [x] T3027 `analysis_options.yaml` or review rule: `lib/ui/**` imports no
   `features/**`. `check:` grep in `tool/check_ui_literals.sh`
 
 ## Phase 4 — Shell (FR-001…FR-004, US1, US2)
 
-- [ ] T3031 `test/router_deep_links_test.dart`: every input
+- [x] T3031 `test/router_deep_links_test.dart`: every input
   `routeForDeepLink` accepts today, both spellings, returns the same route;
   unknown → null. Written first, green before and after T3033
-- [ ] T3032 `test/app_shell_test.dart`: five destinations; switching
+- [x] T3032 `test/app_shell_test.dart`: five destinations; switching
   preserves a pushed child and scroll; re-tap pops to root; cold start on
   `/chats/<id>` shows Coach selected with the bar; `/meetings/<id>` shows no
   bar and back lands on Today; width 840 shows `NavigationRail`; signed-out
   `/server` has no shell
-- [ ] T3033 `lib/ui/shell/destinations.dart`, `app_shell.dart`;
+- [x] T3033 `lib/ui/shell/destinations.dart`, `app_shell.dart`;
   `lib/app/router.dart`: `StatefulShellRoute.indexedStack`, five branches,
   children moved with their parents; drawer and auth routes on the root
   navigator; redirect untouched; `Routes.settings = '/settings'`.
   `check:` T3031, T3032 green
-- [ ] T3034 `lib/ui/shell/app_drawer.dart`: sections per plan §3; header from
+- [x] T3034 `lib/ui/shell/app_drawer.dart`: sections per plan §3; header from
   the profile mirror; Sign out via `showConfirmDialog` then
   `AuthCubit.signOut` (`auth_cubit.dart:181`). `spec:` drawer opens from the
   start edge in `ar`; cancel keeps the session
-- [ ] T3035 `lib/features/home/presentation/home_page.dart`: app bar = menu +
+- [x] T3035 `lib/features/home/presentation/home_page.dart`: app bar = menu +
   title + avatar; the seven actions go; `'Calendar'` literal gone (A-13).
   `check:` SC-002 by widget test
-- [ ] T3036 `lib/features/profile/presentation/profile_page.dart`: app-bar
+- [x] T3036 `lib/features/profile/presentation/profile_page.dart`: app-bar
   shortcuts go (`profile_page.dart:100-135`); sign-out moves to drawer and
   Settings
-- [ ] T3037 `lib/app/l10n/app_localizations.dart`: labels for the five
+- [x] T3037 `lib/app/l10n/app_localizations.dart`: labels for the five
   destinations, the drawer sections and items, en + ar.
   `check:` `test/localisation_parity_test.dart` green
 - [ ] T3038 `pubspec.yaml`: bump the build number for the release that
-  carries this phase
+  carries this phase — **deferred to the release**: the version name is shared with the tag, images and extension
 
 ## Phase 5 — FAB pass (FR-005, US3)
 
-- [ ] T3041 [P] `tasks_page.dart:84`, `reminders_page.dart:64`,
+- [x] T3041 [P] `tasks_page.dart:84`, `reminders_page.dart:64`,
   `meetings_page.dart:34`, `calendar_page.dart:126`, `athlete_page.dart:72`,
   `conversations_page.dart:65`, `knowledge_page.dart:71`,
   `nutrition_page.dart:48`, `label_editor.dart:32`: switch to
   `ScrollAwareFab` with a localised label and tooltip; actions unchanged
-- [ ] T3042 `lib/app/theme.dart`: `floatingActionButtonTheme` from the
+- [x] T3042 `lib/app/theme.dart`: `floatingActionButtonTheme` from the
   sub-themes (radius.xl, primaryContainer). `check:` golden of one FAB in
   both modes
 
 ## Phase 6 — Settings hub (FR-006, US4)
 
-- [ ] T3051 `test/settings_page_test.dart`: seven section headers in order;
+- [x] T3051 `test/settings_page_test.dart`: seven section headers in order;
   each existing preference row present and calls the same cubit method it
   calls today; theme segment changes `AppearanceCubit`; Connection row opens
   `/server`; `/preferences` redirects to `/settings`
-- [ ] T3052 `lib/features/settings/presentation/settings_page.dart`: plan
+- [x] T3052 `lib/features/settings/presentation/settings_page.dart`: plan
   §5; rows moved from `preferences_page.dart`, which is deleted along with
   its `_Heading` / `_TimeRow`. `check:` T3051 green
-- [ ] T3053 About: the pubspec version injected at build with
+- [x] T3053 About: the pubspec version injected at build with
   `--dart-define=BOTVY_VERSION` (no `package_info_plus` dependency), shown as
   "dev" when absent; licences via `showLicensePage`
-- [ ] T3054 `lib/app/l10n/app_localizations.dart`: section and row labels,
+- [x] T3054 `lib/app/l10n/app_localizations.dart`: section and row labels,
   en + ar; parity test green
 
 ## Phase 7 — Screen pass (SC-003, US5)
@@ -132,17 +132,17 @@ One commit per feature; each: literals → tokens, directional insets, kit
 states, `SliverAppBar.large` on tab roots, `Card.filled` items,
 `selectionClick` on switches (plan §8).
 
-- [ ] T3061 [P] home
-- [ ] T3062 [P] tasks (+ labels)
-- [ ] T3063 [P] reminders
-- [ ] T3064 [P] calendar + meetings
-- [ ] T3065 [P] chat (conversations, conversation)
-- [ ] T3066 [P] athlete (+ programs, session)
-- [ ] T3067 [P] nutrition
-- [ ] T3068 [P] knowledge
-- [ ] T3069 [P] profile, onboarding (optional: per-step accent from scheme
+- [x] T3061 [P] home
+- [x] T3062 [P] tasks (+ labels)
+- [x] T3063 [P] reminders
+- [x] T3064 [P] calendar + meetings
+- [x] T3065 [P] chat (conversations, conversation)
+- [x] T3066 [P] athlete (+ programs, session)
+- [x] T3067 [P] nutrition
+- [x] T3068 [P] knowledge
+- [x] T3069 [P] profile, onboarding (optional: per-step accent from scheme
   roles, research B-2), sign-in, server
-- [ ] T3071 `tool/check_ui_literals.sh`: warning → failure in CI.
+- [x] T3071 `tool/check_ui_literals.sh`: warning → failure in CI.
   `check:` CI red on each T3006 fixture form placed in `lib/features/`, green
   without it
 
@@ -152,48 +152,48 @@ Plan §7 is the table this phase implements. Every task's `spec:` also runs
 with `disableAnimations: true` and asserts the end state is reached in one
 frame.
 
-- [ ] T3081 `pubspec.yaml`: `animations: ^2.2.0`. `check:` `flutter pub get`;
+- [x] T3081 `pubspec.yaml`: `animations: ^2.2.0`. `check:` `flutter pub get`;
   `flutter analyze`
-- [ ] T3082 `lib/app/tokens.dart`: `BotvyMotion.of(context)` returning the
+- [x] T3082 `lib/app/tokens.dart`: `BotvyMotion.of(context)` returning the
   token durations, or `Duration.zero` under `disableAnimations`; curves
   `Easing.emphasizedDecelerate` / `emphasizedAccelerate` / `standard`.
   `spec:` both branches (`test/motion_test.dart`)
-- [ ] T3083 `lib/app/theme.dart`: `PageTransitionsTheme` with
-  `SharedAxisPageTransitionsBuilder(transitionType: horizontal)` for Android
+- [x] T3083 `lib/app/theme.dart`: `PageTransitionsTheme` with
+  `SharedAxisPageTransitionsBuilder(transitionType: scaled)` (ruling: Z, not X — the package's X axis ignores text direction) for Android
   and iOS. `spec:` a pushed route pumps a `SharedAxisTransition`; in `ar` it
   enters from the left
-- [ ] T3084 `lib/ui/shell/app_shell.dart`: `FadeThroughTransition` keyed on
+- [x] T3084 `lib/ui/shell/app_shell.dart`: `FadeThroughTransition` keyed on
   `currentIndex`. `spec:` switching tabs pumps one; with reduce-motion none
-- [ ] T3085 [P] `OpenContainer` list → detail on conversations, meetings,
+- [x] T3085 [P] `OpenContainer` list → detail on conversations, meetings,
   athlete sessions, knowledge links; `openBuilder` returns the route's page.
   `spec:` tap opens with transform and exactly one route on the stack; the
-  same deep link opens without it (US6 scenario 2)
-- [ ] T3086 [P] `SliverAnimatedList` for tasks, reminders, meetings: insert,
+  same deep link opens without it (US6 scenario 2) — **partial**: a Hero title (conversation → chat) instead; OpenContainer pushes pageless routes beside go_router (breaks `pushReplacement` in ChatPage and the URL)
+- [x] T3086 [P] `SliverAnimatedList` for tasks, reminders, meetings: insert,
   remove, reorder from the cubit's list diff (`lib/ui/motion/list_diff.dart`).
   `spec:` diff of before/after lists yields the right insert/remove indices,
   including duplicates and a move
-- [ ] T3087 [P] `lib/ui/motion/animated_check.dart`: check morph,
+- [x] T3087 [P] `lib/ui/motion/animated_check.dart`: check morph,
   strike-through, `lightImpact` when haptics on; used by task and reminder
   rows. `spec:` haptics off → no `HapticFeedback` call (mock the platform
   channel)
-- [ ] T3088 [P] `lib/ui/motion/stagger.dart` on Today: first build only.
+- [x] T3088 [P] `lib/ui/motion/stagger.dart` on Today: first build only.
   `spec:` refresh does not restart the controller
-- [ ] T3089 [P] `home_dials.dart`: `TweenAnimationBuilder` around
+- [x] T3089 [P] `home_dials.dart`: `TweenAnimationBuilder` around
   `CompletionRing` and `AdherenceStrip`; dialogs via `showModal` +
   `FadeScaleTransition` in `confirm_dialog.dart`; `LoadingView` 300 ms delay.
   `spec:` a load that answers in under 300 ms never shows the spinner
 
 ## Phase 9 — Verify (SC-001…SC-006)
 
-- [ ] T3091 `flutter analyze`, `flutter test`, `flutter build apk --debug
+- [x] T3091 `flutter analyze`, `flutter test`, `flutter build apk --debug
   --flavor dev` — output in the PR
 - [ ] T3092 Manual walk on a device: every screen in en and ar, light and
   dark, text scale 1.0 and 2.0, animations on and with "remove animations";
   screen recording of the US6 transitions attached; any clip, unmirrored icon
   or janky frame (profile mode, `flutter run --profile`, no frame over 16 ms
-  on the transitions) filed and fixed before merge
+  on the transitions) filed and fixed before merge — **open**: needs a device; not done in the implementation session
 - [ ] T3093 TalkBack pass on the shell, drawer and settings: every control
-  announced, every target ≥ 48 dp
-- [ ] T3094 `docs/` and `CLAUDE.md`: the kit's rule (tokens only, `lib/ui/`
+  announced, every target ≥ 48 dp — **open**: needs a device; not done in the implementation session
+- [x] T3094 `docs/` and `CLAUDE.md`: the kit's rule (tokens only, `lib/ui/`
   imports no feature), `BotvyMotion.of` as the only source of durations, and
   the literal check, in the mobile gotchas
