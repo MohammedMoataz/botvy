@@ -269,4 +269,13 @@ void main() {
     await tester.pump();
     expect(opacityOf(tester, '/tasks row 0'), 1);
   });
+
+  testWidgets('back on another tab returns to Today first', (tester) async {
+    await _pump(tester);
+    await _tab(tester, 'Tasks');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final bar = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(bar.selectedIndex, 0);
+  });
 }

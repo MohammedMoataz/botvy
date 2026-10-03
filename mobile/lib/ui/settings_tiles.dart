@@ -72,11 +72,15 @@ class ChoiceTile<T> extends StatelessWidget {
     required this.value,
     required this.options,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final IconData icon;
   final String title;
   final T value;
+
+  /// False while a change is being saved, so a second cannot overlap it.
+  final bool enabled;
 
   /// Value → label, in display order.
   final Map<T, String> options;
@@ -111,6 +115,7 @@ class ChoiceTile<T> extends StatelessWidget {
     title: Text(title),
     subtitle: Text(options[value] ?? ''),
     trailing: const Icon(Icons.chevron_right),
+    enabled: enabled,
     onTap: () => _pick(context),
   );
 }

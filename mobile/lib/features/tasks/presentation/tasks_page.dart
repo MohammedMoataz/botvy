@@ -294,6 +294,7 @@ class _TaskRow extends StatelessWidget {
       leading: AnimatedCheck(
         done: task.status != 'open',
         tooltip: t.taskComplete,
+        doneTooltip: t.taskReopen,
         onPressed: () => unawaited(
           task.status == 'open'
               ? cubit.complete(task.id)

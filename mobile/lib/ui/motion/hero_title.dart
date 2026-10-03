@@ -16,6 +16,7 @@ class HeroTitle extends StatelessWidget {
     // with the debug yellow underline.
     child: Material(
       type: MaterialType.transparency,
+      textStyle: DefaultTextStyle.of(context).style,
       child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
     ),
   );

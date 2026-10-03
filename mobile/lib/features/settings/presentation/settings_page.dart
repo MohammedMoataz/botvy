@@ -226,6 +226,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         'sunday': t.sunday,
                         'saturday': t.saturday,
                       },
+                      enabled: enabled,
                       onChanged: (v) => unawaited(_patch({'weekStartsOn': v})),
                     ),
                     _MeetingLength(
@@ -242,6 +243,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         'llm': t.mealModeLlm,
                         'library': t.mealModeLibrary,
                       },
+                      enabled: enabled,
                       onChanged: (v) => unawaited(_patch({'mealMode': v})),
                     ),
                     SwitchTile(

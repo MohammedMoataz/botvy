@@ -72,52 +72,61 @@ class _AppShellState extends State<AppShell> {
     final typing = media.viewInsets.bottom > 0;
     final destinations = widget.destinations;
 
-    return _ShellScope(
-      scaffold: _scaffold,
-      child: Scaffold(
-        key: _scaffold,
-        // The pages' own scaffolds handle the keyboard inset; doing it here
-        // too would squeeze them twice.
-        resizeToAvoidBottomInset: false,
-        drawer: widget.drawer,
-        body: wide
-            ? Row(
-                children: [
-                  SafeArea(
-                    child: NavigationRail(
-                      selectedIndex: widget.shell.currentIndex,
-                      onDestinationSelected: _select,
-                      labelType: NavigationRailLabelType.all,
-                      leading: const ShellMenuButton(),
-                      destinations: [
-                        for (final d in destinations)
-                          NavigationRailDestination(
-                            icon: Icon(d.icon),
-                            selectedIcon: Icon(d.selectedIcon),
-                            label: Text(d.label),
-                          ),
-                      ],
+    // Android back on another tab's root goes to the first tab before it
+    // leaves the app, as Material navigation expects. A tab with pages pushed
+    // pops those first; go_router asks the branch navigator before this.
+    return PopScope(
+      canPop: widget.shell.currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _select(0);
+      },
+      child: _ShellScope(
+        scaffold: _scaffold,
+        child: Scaffold(
+          key: _scaffold,
+          // The pages' own scaffolds handle the keyboard inset; doing it here
+          // too would squeeze them twice.
+          resizeToAvoidBottomInset: false,
+          drawer: widget.drawer,
+          body: wide
+              ? Row(
+                  children: [
+                    SafeArea(
+                      child: NavigationRail(
+                        selectedIndex: widget.shell.currentIndex,
+                        onDestinationSelected: _select,
+                        labelType: NavigationRailLabelType.all,
+                        leading: const ShellMenuButton(),
+                        destinations: [
+                          for (final d in destinations)
+                            NavigationRailDestination(
+                              icon: Icon(d.icon),
+                              selectedIcon: Icon(d.selectedIcon),
+                              label: Text(d.label),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const VerticalDivider(width: 1),
-                  Expanded(child: widget.shell),
-                ],
-              )
-            : widget.shell,
-        bottomNavigationBar: wide || typing
-            ? null
-            : NavigationBar(
-                selectedIndex: widget.shell.currentIndex,
-                onDestinationSelected: _select,
-                destinations: [
-                  for (final d in destinations)
-                    NavigationDestination(
-                      icon: Icon(d.icon),
-                      selectedIcon: Icon(d.selectedIcon),
-                      label: d.label,
-                    ),
-                ],
-              ),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: widget.shell),
+                  ],
+                )
+              : widget.shell,
+          bottomNavigationBar: wide || typing
+              ? null
+              : NavigationBar(
+                  selectedIndex: widget.shell.currentIndex,
+                  onDestinationSelected: _select,
+                  destinations: [
+                    for (final d in destinations)
+                      NavigationDestination(
+                        icon: Icon(d.icon),
+                        selectedIcon: Icon(d.selectedIcon),
+                        label: d.label,
+                      ),
+                  ],
+                ),
+        ),
       ),
     );
   }
