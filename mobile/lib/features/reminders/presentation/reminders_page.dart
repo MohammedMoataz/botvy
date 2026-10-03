@@ -8,6 +8,7 @@ import '../../../core/db/database.dart';
 import '../application/reminders_cubit.dart';
 import 'reminder_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
+import '../../../ui/motion/diff_animated_list.dart';
 import '../../../ui/states.dart';
 
 /// The member's reminders.
@@ -76,14 +77,13 @@ class RemindersPage extends StatelessWidget {
                       icon: Icons.notifications_off_outlined,
                       message: t.reminderNothingHere,
                     )
-                  : ListView.builder(
-                      itemCount: state.reminders.length,
-                      itemBuilder: (context, index) => _ReminderRow(
-                        reminder: state.reminders[index],
+                  : DiffAnimatedList(
+                      items: state.reminders,
+                      keyOf: (reminder) => reminder.id,
+                      itemBuilder: (context, reminder) => _ReminderRow(
+                        reminder: reminder,
                         view: state.view,
-                        blocked: state.blocked.contains(
-                          state.reminders[index].id,
-                        ),
+                        blocked: state.blocked.contains(reminder.id),
                       ),
                     ),
         );

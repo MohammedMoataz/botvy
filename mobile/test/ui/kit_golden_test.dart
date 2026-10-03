@@ -117,8 +117,17 @@ void main() {
     ),
   );
 
-  testWidgets('loading is one centred indicator', (tester) async {
+  testWidgets('a load that answers quickly never shows a spinner', (
+    tester,
+  ) async {
     await tester.pumpWidget(const MaterialApp(home: LoadingView()));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('a slow one shows one centred indicator', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoadingView()));
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
   });
 }

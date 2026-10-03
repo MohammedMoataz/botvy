@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'motion/haptics.dart';
+
 /// The four rows a settings screen is made of. Each is a whole-row tap
 /// target (≥ 48 dp, Material's `ListTile` minimum) with a leading icon.
 
@@ -52,7 +54,12 @@ class SwitchTile extends StatelessWidget {
     title: Text(title),
     subtitle: subtitle == null ? null : Text(subtitle!),
     value: value,
-    onChanged: onChanged,
+    onChanged: onChanged == null
+        ? null
+        : (v) {
+            Haptics.selection(context);
+            onChanged!(v);
+          },
   );
 }
 

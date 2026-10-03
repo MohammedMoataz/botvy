@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../application/home_cubit.dart';
+import '../../../app/tokens.dart';
 
 /// Two hand-drawn dials: the completion ring and the week's adherence strip.
 ///
@@ -43,15 +44,23 @@ class CompletionRing extends StatelessWidget {
       // Without this the arc is an unlabelled box and the only thing announced
       // is the "3/5" glyph, which reads as a fraction rather than as progress.
       label: AppLocalizations.of(context).homeDoneOfTotal(done, total),
-      child: CustomPaint(
-        size: Size.square(diameter),
-        painter: _RingPainter(
-          // `total == 0` is a real state — a day with training and no tasks —
-          // and dividing by it would paint a NaN arc, which on some backends
-          // is a blank card rather than an exception anybody sees.
-          fraction: total == 0 ? 0 : done / total,
-          track: scheme.surfaceContainerHighest,
-          fill: scheme.primary,
+      // The arc grows to its value, from empty on first paint and from the
+      // old value when a task is ticked off (030, US6).
+      child: TweenAnimationBuilder<double>(
+        // `total == 0` is a real state — a day with training and no tasks —
+        // and dividing by it would paint a NaN arc, which on some backends
+        // is a blank card rather than an exception anybody sees.
+        tween: Tween(end: total == 0 ? 0 : done / total),
+        duration: BotvyMotion.of(context).long,
+        curve: BotvyMotion.enter,
+        builder: (context, fraction, child) => CustomPaint(
+          size: Size.square(diameter),
+          painter: _RingPainter(
+            fraction: fraction,
+            track: scheme.surfaceContainerHighest,
+            fill: scheme.primary,
+          ),
+          child: child,
         ),
         child: SizedBox.square(
           dimension: diameter,

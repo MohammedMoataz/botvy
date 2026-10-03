@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../../../app/router.dart';
+import '../../../ui/motion/stagger.dart';
 import '../../../ui/shell/app_shell.dart';
 import '../../calendar/application/agenda.dart';
 import '../../rhythm/application/rhythm_cubit.dart';
@@ -69,21 +70,32 @@ class HomePage extends StatelessWidget {
                   // for is the member who wants to be sure the screen is
                   // current, and re-reading is the honest answer to that.
                   onRefresh: () => context.read<HomeCubit>().refresh(),
-                  child: ListView(
-                    padding: const EdgeInsetsDirectional.all(BotvySpace.md),
-                    children: [
-                      if (state.draft != null) const _PlanTomorrowCard(),
-                      if (state.awaitingCheckin) const _CheckinCard(),
-                      _TodayCard(state: state),
-                      // Today's training, as its own kind of row and never as
-                      // a task (FR-010, story 6 scenario 1). It draws itself
-                      // from the phone's `sessions` table rather than from the
-                      // plan snapshot, so completing or skipping a session
-                      // offline changes it at once — see [TrainingRow].
-                      TrainingRow(date: state.today, timezone: state.timezone),
-                      if (state.agenda.isNotEmpty) _ScheduleCard(state: state),
-                      _StreakCard(state: state),
-                    ],
+                  // The cards enter one after another on the first paint,
+                  // and only then: a refresh is not an arrival (030, US6).
+                  child: StaggerScope(
+                    child: ListView(
+                      padding: const EdgeInsetsDirectional.all(BotvySpace.md),
+                      children: [
+                        for (final (i, card) in <Widget>[
+                          if (state.draft != null) const _PlanTomorrowCard(),
+                          if (state.awaitingCheckin) const _CheckinCard(),
+                          _TodayCard(state: state),
+                          // Today's training, as its own kind of row and never as
+                          // a task (FR-010, story 6 scenario 1). It draws itself
+                          // from the phone's `sessions` table rather than from the
+                          // plan snapshot, so completing or skipping a session
+                          // offline changes it at once — see [TrainingRow].
+                          TrainingRow(
+                            date: state.today,
+                            timezone: state.timezone,
+                          ),
+                          if (state.agenda.isNotEmpty)
+                            _ScheduleCard(state: state),
+                          _StreakCard(state: state),
+                        ].indexed)
+                          StaggerItem(index: i, child: card),
+                      ],
+                    ),
                   ),
                 ),
         );
@@ -141,9 +153,8 @@ class _TodayCard extends StatelessWidget {
             for (final task in state.planTasks)
               CheckboxListTile(
                 value: task.done,
-                onChanged: (on) => unawaited(
-                  cubit.toggleTask(task.id, done: on ?? false),
-                ),
+                onChanged: (on) =>
+                    unawaited(cubit.toggleTask(task.id, done: on ?? false)),
                 title: Text(
                   task.title,
                   style: task.done
@@ -168,9 +179,8 @@ class _TodayCard extends StatelessWidget {
                 value: [
                   state.training!.title,
                   if (state.training!.startAt != null)
-                    TimeOfDay.fromDateTime(
-                      state.training!.startAt!.toLocal(),
-                    ).format(context),
+                    TimeOfDay.fromDateTime(state.training!.startAt!.toLocal())
+                        .format(context),
                 ].where((part) => part.isNotEmpty).join(' · '),
               ),
 
@@ -230,10 +240,7 @@ class _ScheduleCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    t.taskToday,
-                    style: theme.textTheme.titleMedium,
-                  ),
+                  child: Text(t.taskToday, style: theme.textTheme.titleMedium),
                 ),
                 // `go`: the calendar is a tab, so this switches to it.
                 TextButton(
@@ -257,9 +264,8 @@ class _ScheduleCard extends StatelessWidget {
                 subtitle: Text(
                   item.allDay
                       ? 'All day'
-                      : TimeOfDay.fromDateTime(
-                          item.startAt.toLocal(),
-                        ).format(context),
+                      : TimeOfDay.fromDateTime(item.startAt.toLocal())
+                            .format(context),
                 ),
                 // A meeting opens its own screen, where the joining link and
                 // the map are one tap away (story 1, scenarios 1 and 2).

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/l10n/app_localizations.dart';
@@ -51,13 +53,44 @@ class ErrorState extends StatelessWidget {
 }
 
 /// Waiting. Rare in a local-first app — the cache answers before a frame —
-/// which is why it is one centred indicator and not a skeleton.
-class LoadingView extends StatelessWidget {
+/// which is why it is one centred indicator and not a skeleton, and why it
+/// waits 300 ms before appearing: an answer that comes sooner never flashes a
+/// spinner, then fades in when it does come.
+class LoadingView extends StatefulWidget {
   const LoadingView({super.key});
 
+  static const Duration delay = Duration(milliseconds: 300);
+
   @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator());
+  State<LoadingView> createState() => _LoadingViewState();
+}
+
+class _LoadingViewState extends State<LoadingView> {
+  Timer? _timer;
+  bool _shown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(LoadingView.delay, () {
+      if (mounted) setState(() => _shown = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+    opacity: _shown ? 1 : 0,
+    duration: BotvyMotion.of(context).short,
+    child: _shown
+        ? const Center(child: CircularProgressIndicator())
+        : const SizedBox.shrink(),
+  );
 }
 
 class _Centred extends StatelessWidget {
