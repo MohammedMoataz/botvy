@@ -12,6 +12,7 @@ import '../../../core/recurrence/expander.dart';
 import '../../../core/recurrence/rule_words.dart';
 import '../application/meetings_cubit.dart';
 import 'meeting_sheet.dart';
+import '../../../ui/scroll_aware_fab.dart';
 
 /// The member's meetings, as a list.
 ///
@@ -31,9 +32,11 @@ class MeetingsPage extends StatelessWidget {
     return BlocBuilder<MeetingsCubit, MeetingsState>(
       builder: (context, state) => Scaffold(
         appBar: AppBar(title: Text(l10n.meetingsTitle)),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: ScrollAwareFab(
+          icon: Icons.add,
+          label: l10n.meetingNew,
+          tooltip: l10n.meetingNew,
           onPressed: () => unawaited(showMeetingSheet(context, cubit)),
-          child: const Icon(Icons.add),
         ),
         body: Column(
           children: [

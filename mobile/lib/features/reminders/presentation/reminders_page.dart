@@ -7,6 +7,7 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/reminders_cubit.dart';
 import 'reminder_sheet.dart';
+import '../../../ui/scroll_aware_fab.dart';
 
 /// The member's reminders.
 ///
@@ -61,9 +62,11 @@ class RemindersPage extends StatelessWidget {
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add_alert_outlined,
+            label: t.reminderNew,
+            tooltip: t.reminderNew,
             onPressed: () => unawaited(showReminderSheet(context, cubit)),
-            child: const Icon(Icons.add),
           ),
           body: state.loading
               ? const Center(child: CircularProgressIndicator())

@@ -10,6 +10,8 @@ import '../../../core/db/database.dart';
 import '../application/athlete.dart';
 import '../application/athlete_cubit.dart';
 import 'athlete_sheets.dart';
+import '../../../ui/scroll_aware_fab.dart';
+import '../../../ui/shell/app_shell.dart';
 
 /// The athlete's week (T651).
 ///
@@ -41,6 +43,7 @@ class AthletePage extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
+            leading: const ShellMenuButton(),
             title: Text(t.athleteTitle),
             actions: [
               IconButton(
@@ -69,10 +72,11 @@ class AthletePage extends StatelessWidget {
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add,
+            label: t.athleteAddSession,
             tooltip: t.athleteAddSession,
             onPressed: () => unawaited(showSessionCreator(context, cubit)),
-            child: const Icon(Icons.add),
           ),
           body: state.loading
               ? const Center(child: CircularProgressIndicator())

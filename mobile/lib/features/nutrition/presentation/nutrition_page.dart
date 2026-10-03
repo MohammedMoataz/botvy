@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/nutrition_cubit.dart';
+import '../../../ui/scroll_aware_fab.dart';
 
 /// The member's meals, and what today says about food (T841).
 ///
@@ -45,10 +46,11 @@ class _NutritionPageState extends State<NutritionPage> {
 
         return Scaffold(
           appBar: AppBar(title: Text(t.nutritionTitle)),
-          floatingActionButton: FloatingActionButton.extended(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add,
+            label: t.nutritionAdd,
+            tooltip: t.nutritionAdd,
             onPressed: () => _editMeal(context, cubit, null),
-            icon: const Icon(Icons.add),
-            label: Text(t.nutritionAdd),
           ),
           body: state.loading
               ? const Center(child: CircularProgressIndicator())

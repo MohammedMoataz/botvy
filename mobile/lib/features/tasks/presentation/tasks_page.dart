@@ -9,6 +9,8 @@ import '../application/recurrence.dart';
 import '../application/tasks_cubit.dart';
 import 'label_editor.dart';
 import 'task_sheet.dart';
+import '../../../ui/scroll_aware_fab.dart';
+import '../../../ui/shell/app_shell.dart';
 
 /// The member's task lists.
 ///
@@ -40,6 +42,7 @@ class TasksPage extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
+            leading: const ShellMenuButton(),
             title: Text(_viewTitle(t, state)),
             actions: [
               PopupMenuButton<TaskView>(
@@ -81,9 +84,11 @@ class TasksPage extends StatelessWidget {
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add_task,
+            label: t.taskNew,
+            tooltip: t.taskNew,
             onPressed: () => unawaited(showTaskSheet(context, cubit)),
-            child: const Icon(Icons.add),
           ),
           body: state.loading
               ? const Center(child: CircularProgressIndicator())

@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/conversations_cubit.dart';
+import '../../../ui/scroll_aware_fab.dart';
+import '../../../ui/shell/app_shell.dart';
 
 /// The member's chats, in two sections.
 ///
@@ -61,11 +63,15 @@ class ConversationsPage extends StatelessWidget {
         final cubit = context.read<ConversationsCubit>();
 
         return Scaffold(
-          appBar: AppBar(title: Text(t.chatsTitle)),
-          floatingActionButton: FloatingActionButton(
+          appBar: AppBar(
+            leading: const ShellMenuButton(),
+            title: Text(t.chatsTitle),
+          ),
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.add_comment_outlined,
+            label: t.chatNewChat,
             tooltip: t.chatNewChat,
             onPressed: state.busy ? null : () => unawaited(cubit.create()),
-            child: const Icon(Icons.add_comment_outlined),
           ),
           body: state.loading
               ? const Center(child: CircularProgressIndicator())

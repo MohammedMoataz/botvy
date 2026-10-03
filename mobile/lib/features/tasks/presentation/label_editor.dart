@@ -7,6 +7,7 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/tasks_cubit.dart';
 import 'tasks_page.dart' show parseHexColor;
+import '../../../ui/scroll_aware_fab.dart';
 
 /// The member's labels, with their open counts.
 ///
@@ -29,9 +30,11 @@ class LabelEditorPage extends StatelessWidget {
         final cubit = context.read<TasksCubit>();
         return Scaffold(
           appBar: AppBar(title: Text(t.labels)),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: ScrollAwareFab(
+            icon: Icons.new_label_outlined,
+            label: t.labelNew,
+            tooltip: t.labelNew,
             onPressed: () => unawaited(_showLabelSheet(context, cubit, state)),
-            child: const Icon(Icons.add),
           ),
           body: state.labels.isEmpty
               ? Center(child: Text(t.labelNoneYet))

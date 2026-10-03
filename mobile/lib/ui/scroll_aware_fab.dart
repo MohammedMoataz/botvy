@@ -5,11 +5,12 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 /// list and opens again on the way back up — the label is for the first
 /// look, the icon is enough once they are reading.
 ///
-/// The FAB is a sibling of the list in the `Scaffold`, not its ancestor, so
-/// it cannot hear the list scroll. [FabScrollScope] goes above the `Scaffold`,
-/// hears the scroll notifications bubbling up from the body, and tells the
-/// FAB. With no scope above it the FAB stays extended.
-class ScrollAwareFab extends StatelessWidget {
+/// It follows the route's [PrimaryScrollController]: on a phone a page's
+/// vertical list attaches to it by itself (Flutter's
+/// `automaticallyInheritForPlatforms`), and the FAB lives in the same route,
+/// so no page has to wire the two together. A page with no such list keeps
+/// the FAB extended.
+class ScrollAwareFab extends StatefulWidget {
   const ScrollAwareFab({
     super.key,
     required this.icon,
@@ -27,66 +28,49 @@ class ScrollAwareFab extends StatelessWidget {
   final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    final extended = FabScrollScope.extendedOf(context);
-    return FloatingActionButton.extended(
-      onPressed: onPressed,
-      tooltip: tooltip,
-      isExtended: extended,
-      icon: Icon(icon),
-      label: Text(label),
-    );
-  }
+  State<ScrollAwareFab> createState() => _ScrollAwareFabState();
 }
 
-class FabScrollScope extends StatefulWidget {
-  const FabScrollScope({super.key, required this.child});
-
-  final Widget child;
-
-  static bool extendedOf(BuildContext context) =>
-      context
-          .dependOnInheritedWidgetOfExactType<_FabExtended>()
-          ?.notifier
-          ?.value ??
-      true;
+class _ScrollAwareFabState extends State<ScrollAwareFab> {
+  ScrollController? _controller;
+  bool _extended = true;
 
   @override
-  State<FabScrollScope> createState() => _FabScrollScopeState();
-}
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = PrimaryScrollController.maybeOf(context);
+    if (controller == _controller) return;
+    _controller?.removeListener(_onScroll);
+    _controller = controller?..addListener(_onScroll);
+  }
 
-class _FabScrollScopeState extends State<FabScrollScope> {
-  final _extended = ValueNotifier<bool>(true);
-
-  bool _onScroll(ScrollNotification n) {
-    // Only the page's own vertical list: a horizontal carousel or a nested
-    // list inside a card is not the member scrolling the page.
-    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
-    if (n is UserScrollNotification) {
-      // Checked alone: the notification that says "going down" still
-      // reports the top offset, and the at-top rule below would undo it.
-      if (n.direction == ScrollDirection.reverse) _extended.value = false;
-      if (n.direction == ScrollDirection.forward) _extended.value = true;
-    } else if (n.metrics.pixels <= n.metrics.minScrollExtent) {
-      _extended.value = true;
-    }
-    return false;
+  void _onScroll() {
+    final controller = _controller;
+    // More than one list on the route gives no single direction to follow;
+    // leave the FAB as it is.
+    if (controller == null || controller.positions.length != 1) return;
+    final position = controller.position;
+    final extended = switch (position.userScrollDirection) {
+      ScrollDirection.reverse => false,
+      ScrollDirection.forward => true,
+      ScrollDirection.idle =>
+        position.pixels <= position.minScrollExtent || _extended,
+    };
+    if (extended != _extended) setState(() => _extended = extended);
   }
 
   @override
   void dispose() {
-    _extended.dispose();
+    _controller?.removeListener(_onScroll);
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) =>
-      NotificationListener<ScrollNotification>(
-        onNotification: _onScroll,
-        child: _FabExtended(notifier: _extended, child: widget.child),
-      );
-}
-
-class _FabExtended extends InheritedNotifier<ValueNotifier<bool>> {
-  const _FabExtended({required super.notifier, required super.child});
+  Widget build(BuildContext context) => FloatingActionButton.extended(
+    onPressed: widget.onPressed,
+    tooltip: widget.tooltip,
+    isExtended: _extended,
+    icon: Icon(widget.icon),
+    label: Text(widget.label),
+  );
 }

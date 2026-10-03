@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart'
     show memberDate, memberZone;
@@ -20,6 +21,8 @@ import '../../meetings/presentation/meetings_page.dart'
 import '../application/agenda.dart';
 import '../application/calendar_cubit.dart';
 import 'event_sheet.dart';
+import '../../../ui/scroll_aware_fab.dart';
+import '../../../ui/shell/app_shell.dart';
 
 /// One calendar: a month, a week and a day (story 3).
 ///
@@ -42,7 +45,8 @@ class CalendarPage extends StatelessWidget {
         final zone = memberZone(state.timezone);
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Calendar'),
+            leading: const ShellMenuButton(),
+            title: Text(AppLocalizations.of(context).navCalendar),
             actions: [
               IconButton(
                 icon: const Icon(Icons.today),
@@ -123,7 +127,10 @@ class _AddButton extends StatelessWidget {
   final MeetingsCubit meetings;
 
   @override
-  Widget build(BuildContext context) => FloatingActionButton(
+  Widget build(BuildContext context) => ScrollAwareFab(
+    icon: Icons.add,
+    label: AppLocalizations.of(context).calendarAdd,
+    tooltip: AppLocalizations.of(context).calendarAdd,
     onPressed: () => showModalBottomSheet<void>(
       context: context,
       builder: (sheetContext) => SafeArea(
@@ -162,7 +169,6 @@ class _AddButton extends StatelessWidget {
         ),
       ),
     ),
-    child: const Icon(Icons.add),
   );
 }
 
