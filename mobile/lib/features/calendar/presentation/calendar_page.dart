@@ -353,9 +353,7 @@ class _WeekColumn extends StatelessWidget {
             onTap: onSelect,
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              color: selected
-                  ? theme.colorScheme.primaryContainer
-                  : Colors.transparent,
+              color: selected ? theme.colorScheme.primaryContainer : null,
               child: Column(
                 children: [
                   Text(
