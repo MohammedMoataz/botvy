@@ -6,6 +6,9 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/recurrence/rule_words.dart';
 import '../../../app/tokens.dart';
 
+/// The "after N times" field: three digits and the field's own padding.
+const double _countFieldWidth = 72;
+
 /// The repeat picker, in the member's own words (FR-004).
 ///
 /// Opened by a meeting's editor and by a personal event's, which is why it
@@ -233,7 +236,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
               Row(
                 children: [
                   SizedBox(
-                    width: 72,
+                    width: _countFieldWidth,
                     child: TextField(
                       controller: _count,
                       keyboardType: TextInputType.number,

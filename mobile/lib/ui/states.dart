@@ -138,3 +138,17 @@ class _Centred extends StatelessWidget {
     );
   }
 }
+
+/// Busy, inside something small: a button while it submits, a status line.
+/// [dense] for beside body text.
+class InlineSpinner extends StatelessWidget {
+  const InlineSpinner({super.key, this.dense = false});
+
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: dense ? 14 : 18,
+    child: const CircularProgressIndicator(strokeWidth: 2),
+  );
+}

@@ -9,6 +9,7 @@ import '../../../app/router.dart';
 import '../../../core/notifications/local_notifications.dart' show deviceTimezone;
 import '../application/auth_cubit.dart';
 import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// Sign in, or create an account.
 ///
@@ -170,11 +171,7 @@ class _SignInPageState extends State<SignInPage> {
                       FilledButton(
                         onPressed: state.isBusy ? null : () => unawaited(_submit()),
                         child: state.isBusy
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
+                            ? const InlineSpinner()
                             : Text(
                                 _registering ? t.registerAction : t.signInAction,
                               ),

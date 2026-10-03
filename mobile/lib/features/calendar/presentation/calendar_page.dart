@@ -27,6 +27,10 @@ import '../../../ui/shell/app_shell.dart';
 import '../../../app/tokens.dart';
 import '../../../ui/states.dart';
 
+/// One day of the week view: wide enough for a meeting title and its time on
+/// two lines, narrow enough that two days show at once on a phone.
+const double _weekColumnWidth = 168;
+
 /// One calendar: a month, a week and a day (story 3).
 ///
 /// Everything on it comes from drift and is expanded on the device (FR-010).
@@ -312,7 +316,7 @@ class _WeekView extends StatelessWidget {
               children: [
                 for (final date in dates)
                   SizedBox(
-                    width: 168,
+                    width: _weekColumnWidth,
                     child: _WeekColumn(
                       date: date,
                       items: state.byDay[date] ?? const [],
