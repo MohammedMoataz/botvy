@@ -77,6 +77,22 @@ class AppLocalizations {
   String get offline => _t('offline');
   String get somethingWentWrong => _t('somethingWentWrong');
   String get signOut => _t('signOut');
+  String get sectionAccount => _t('sectionAccount');
+  String get sectionAppearance => _t('sectionAppearance');
+  String get sectionDailyRhythm => _t('sectionDailyRhythm');
+  String get sectionNotifications => _t('sectionNotifications');
+  String get sectionPlanning => _t('sectionPlanning');
+  String get sectionConnection => _t('sectionConnection');
+  String get sectionAbout => _t('sectionAbout');
+  String get theme => _t('theme');
+  String get themeSystem => _t('themeSystem');
+  String get themeLight => _t('themeLight');
+  String get themeDark => _t('themeDark');
+  String get languageSystem => _t('languageSystem');
+  String get haptics => _t('haptics');
+  String get appVersion => _t('appVersion');
+  String get licences => _t('licences');
+  String minutes(int n) => _f('minutes', {'n': '$n'});
   String get taskNew => _t('taskNew');
   String get reminderNew => _t('reminderNew');
   String get calendarAdd => _t('calendarAdd');
@@ -855,6 +871,22 @@ class AppLocalizations {
       'offline': 'Cannot reach Botvy. Check the server address in settings.',
       'somethingWentWrong': 'That did not work. Please try again.',
       'signOut': 'Sign out',
+      'sectionAccount': 'Account',
+      'sectionAppearance': 'Appearance',
+      'sectionDailyRhythm': 'Daily rhythm',
+      'sectionNotifications': 'Notifications',
+      'sectionPlanning': 'Planning',
+      'sectionConnection': 'Connection',
+      'sectionAbout': 'About',
+      'theme': 'Theme',
+      'themeSystem': 'System',
+      'themeLight': 'Light',
+      'themeDark': 'Dark',
+      'languageSystem': 'Same as the phone',
+      'haptics': 'Haptic feedback',
+      'appVersion': 'Version',
+      'licences': 'Open-source licences',
+      'minutes': '{n} min',
       'taskNew': 'New task',
       'reminderNew': 'New reminder',
       'calendarAdd': 'Add',
@@ -1330,6 +1362,22 @@ class AppLocalizations {
       'offline': 'تعذّر الوصول إلى بوتفي. تحقّق من عنوان الخادم في الإعدادات.',
       'somethingWentWrong': 'لم ينجح ذلك. حاول مرة أخرى.',
       'signOut': 'تسجيل الخروج',
+      'sectionAccount': 'الحساب',
+      'sectionAppearance': 'المظهر',
+      'sectionDailyRhythm': 'إيقاع اليوم',
+      'sectionNotifications': 'الإشعارات',
+      'sectionPlanning': 'التخطيط',
+      'sectionConnection': 'الاتصال',
+      'sectionAbout': 'حول',
+      'theme': 'السمة',
+      'themeSystem': 'النظام',
+      'themeLight': 'فاتح',
+      'themeDark': 'داكن',
+      'languageSystem': 'مثل الهاتف',
+      'haptics': 'الاهتزاز عند اللمس',
+      'appVersion': 'الإصدار',
+      'licences': 'تراخيص البرمجيات المفتوحة',
+      'minutes': '{n} دقيقة',
       'taskNew': 'مهمة جديدة',
       'reminderNew': 'تذكير جديد',
       'calendarAdd': 'إضافة',
