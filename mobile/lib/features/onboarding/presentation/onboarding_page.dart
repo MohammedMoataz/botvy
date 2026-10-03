@@ -9,6 +9,7 @@ import '../../../core/api/api_client.dart';
 import '../../auth/application/auth_cubit.dart';
 import '../../profile/data/profile_mirror.dart';
 import '../application/onboarding_steps.dart';
+import '../../../app/tokens.dart';
 
 /// The first-run walkthrough.
 ///
@@ -104,12 +105,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
           // questions in it should not be shown at all.
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(t.welcomeBody, textAlign: TextAlign.center),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: BotvySpace.xl),
                     FilledButton(
                       onPressed: _working ? null : () => unawaited(_finish()),
                       child: Text(t.finish),
@@ -125,13 +126,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 ),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
                     child: _steps[_at].build(context, _advance),
                   ),
                 ),
                 if (_problem != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.xl),
                     child: Text(
                       _problem!,
                       style: TextStyle(
@@ -140,7 +141,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     ),
                   ),
                 Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
                   child: Row(
                     children: [
                       if (_at > 0)

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/recurrence/rule_words.dart';
+import '../../../app/tokens.dart';
 
 /// The repeat picker, in the member's own words (FR-004).
 ///
@@ -72,12 +73,12 @@ class _RepeatPickerState extends State<_RepeatPicker> {
     final lang = Localizations.localeOf(context).languageCode;
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.repeatTitle, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
 
             SegmentedButton<RepeatFreq>(
               segments: [
@@ -99,11 +100,11 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                   setState(() => _spec = _spec.copyWith(freq: choice.first)),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Row(
               children: [
                 Text(l10n.repeatEvery),
-                const SizedBox(width: 12),
+                const SizedBox(width: BotvySpace.md),
                 DropdownButton<int>(
                   value: _spec.interval,
                   items: [
@@ -114,7 +115,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                     () => _spec = _spec.copyWith(interval: every ?? 1),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 // The noun alone, agreeing with the number in the dropdown
                 // beside it — `يوم` for one and `يومين` for two, which is the
                 // difference a plural-only label cannot say.
@@ -127,7 +128,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
             ),
 
             if (_spec.freq == RepeatFreq.weekly) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: BotvySpace.lg),
               Wrap(
                 spacing: 6,
                 children: [
@@ -157,7 +158,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
             ],
 
             if (_spec.freq == RepeatFreq.monthly) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: BotvySpace.lg),
               // Two rules, said out loud. See the class note — this choice is
               // the reason the picker is a screen rather than a dropdown of
               // canned rules.
@@ -180,7 +181,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                   ),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: BotvySpace.xs),
               Text(
                 _spec.monthly == MonthlyMode.lastDay
                     ? l10n.repeatLastDayInFebruary
@@ -193,7 +194,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
 
             const Divider(height: 32),
             Text(l10n.repeatEnds, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             SegmentedButton<RepeatEnd>(
               segments: [
                 ButtonSegment(
@@ -228,7 +229,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
             ),
 
             if (_spec.end == RepeatEnd.afterCount) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: BotvySpace.md),
               Row(
                 children: [
                   SizedBox(
@@ -245,7 +246,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                       }),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: BotvySpace.md),
                   // The caveat in E-015: a counted noun, not a fixed plural.
                   // The digits are in the field, so this is the word alone and
                   // `arabicCounted` still chooses which of the four it is.
@@ -255,7 +256,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
             ],
 
             if (_spec.end == RepeatEnd.onDate) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: BotvySpace.md),
               OutlinedButton.icon(
                 icon: const Icon(Icons.event),
                 label: Text(
@@ -275,7 +276,7 @@ class _RepeatPickerState extends State<_RepeatPicker> {
                 color: theme.colorScheme.primary,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Row(
               children: [
                 // "Does not repeat" is a null answer and not a fourth

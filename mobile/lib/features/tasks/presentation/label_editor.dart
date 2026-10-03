@@ -6,8 +6,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/tasks_cubit.dart';
-import 'tasks_page.dart' show parseHexColor;
+import '../../../ui/hex_color.dart';
 import '../../../ui/scroll_aware_fab.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The member's labels, with their open counts.
 ///
@@ -37,7 +39,10 @@ class LabelEditorPage extends StatelessWidget {
             onPressed: () => unawaited(_showLabelSheet(context, cubit, state)),
           ),
           body: state.labels.isEmpty
-              ? Center(child: Text(t.labelNoneYet))
+              ? EmptyState(
+                  icon: Icons.label_outline,
+                  message: t.labelNoneYet,
+                )
               : ListView.builder(
                   itemCount: state.labels.length,
                   itemBuilder: (context, index) {
@@ -80,7 +85,7 @@ Future<void> _showLabelSheet(
   context: context,
   isScrollControlled: true,
   builder: (_) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+    padding: EdgeInsetsDirectional.only(bottom: MediaQuery.of(context).viewInsets.bottom),
     child: _LabelSheet(cubit: cubit, palette: state.palette, label: label),
   ),
 );
@@ -125,7 +130,7 @@ class _LabelSheetState extends State<_LabelSheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -135,7 +140,7 @@ class _LabelSheetState extends State<_LabelSheet> {
               autofocus: true,
               decoration: InputDecoration(labelText: t.labelName),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             if (widget.palette.isEmpty)
               // No palette to offer: the registry read is admin-only, so a
               // member without that role never learns the key. Said plainly
@@ -168,7 +173,7 @@ class _LabelSheetState extends State<_LabelSheet> {
                     ),
                 ],
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             TextField(
               controller: _freeColor,
               decoration: InputDecoration(
@@ -184,15 +189,15 @@ class _LabelSheetState extends State<_LabelSheet> {
                 }
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Row(
               children: [
                 CircleAvatar(backgroundColor: parseHexColor(_color), radius: 14),
-                const SizedBox(width: 12),
+                const SizedBox(width: BotvySpace.md),
                 Expanded(child: Text(_color)),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             FilledButton(onPressed: _save, child: Text(t.save)),
           ],
         ),

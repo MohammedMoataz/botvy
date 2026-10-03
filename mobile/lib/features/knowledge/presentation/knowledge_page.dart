@@ -8,6 +8,8 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/knowledge_cubit.dart';
 import '../../../ui/scroll_aware_fab.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// What the member saved to read, and what Botvy proposed from it (T741, T742).
 ///
@@ -104,11 +106,11 @@ Future<void> _saveSheet(BuildContext context, KnowledgeCubit cubit) async {
     context: context,
     isScrollControlled: true,
     builder: (sheet) => Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(sheet).viewInsets.bottom + 16,
+      padding: EdgeInsetsDirectional.only(
+        start: BotvySpace.lg,
+        end: BotvySpace.lg,
+        top: BotvySpace.lg,
+        bottom: MediaQuery.of(sheet).viewInsets.bottom + BotvySpace.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -120,12 +122,12 @@ Future<void> _saveSheet(BuildContext context, KnowledgeCubit cubit) async {
             keyboardType: TextInputType.url,
             decoration: InputDecoration(labelText: t.knowledgeUrl),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: BotvySpace.md),
           TextField(
             controller: tags,
             decoration: InputDecoration(labelText: t.knowledgeTags),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: BotvySpace.lg),
           FilledButton(
             onPressed: () async {
               final saved = await cubit.save(
@@ -158,13 +160,13 @@ class _LinkList extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     if (state.loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const LoadingView();
     }
 
     return RefreshIndicator(
       onRefresh: cubit.refresh,
       child: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.md),
         children: [
           // The filter is by the member's three words, not the server's six
           // states: `fetching` and `extracting` are one thing from outside.
@@ -179,7 +181,7 @@ class _LinkList extends StatelessWidget {
                 ),
                 for (final phase in LinkPhase.values)
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 8),
+                    padding: const EdgeInsetsDirectional.only(start: BotvySpace.sm),
                     child: ChoiceChip(
                       label: Text(_phaseLabel(t, phase)),
                       selected: state.filter == phase,
@@ -189,17 +191,17 @@ class _LinkList extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: BotvySpace.md),
           if (state.links.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
+              padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.xxl),
               child: Column(
                 children: [
                   Text(
                     t.knowledgeEmptyTitle,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: BotvySpace.sm),
                   Text(t.knowledgeEmptyBody, textAlign: TextAlign.center),
                 ],
               ),
@@ -229,7 +231,7 @@ class _LinkTile extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final phase = phaseOf(link.status);
 
-    return Card(
+    return Card.filled(
       child: ListTile(
         leading: Icon(_kindIcon(link.kind)),
         title: Text(link.title ?? link.url, maxLines: 2),
@@ -244,7 +246,7 @@ class _LinkTile extends StatelessWidget {
                 ),
                 if (link.skippedCount != null && link.skippedCount! > 0)
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 8),
+                    padding: const EdgeInsetsDirectional.only(start: BotvySpace.sm),
                     child: Text(t.knowledgeSkipped(link.skippedCount!)),
                   ),
               ],
@@ -253,7 +255,7 @@ class _LinkTile extends StatelessWidget {
             // a retry that works. A red chip with no sentence is a dead end.
             if (phase == LinkPhase.failed && link.failReason != null)
               Padding(
-                padding: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsetsDirectional.only(top: BotvySpace.xs),
                 child: Text(
                   '${link.failReason!}  (${link.attempts})',
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
@@ -291,7 +293,7 @@ class _SuggestionList extends StatelessWidget {
     if (state.suggestions.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsetsDirectional.all(BotvySpace.xxl),
           child: Text(t.knowledgeSuggestionsEmpty, textAlign: TextAlign.center),
         ),
       );
@@ -300,7 +302,7 @@ class _SuggestionList extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: cubit.loadSuggestions,
       child: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.md),
         children: [
           for (final card in state.suggestions)
             _SuggestionCard(card: card, cubit: cubit, busy: state.busy),
@@ -330,9 +332,9 @@ class _SuggestionCard extends StatelessWidget {
     final sources = card['sources'] as List? ?? const [];
     final working = busy.contains(id);
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -341,26 +343,26 @@ class _SuggestionCard extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             Text('${card['sport']} · ${card['forDate']}'),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             for (final raw in exercises)
               Text('• ${(raw as Map)['name']}'),
             if (card['rationale'] is String &&
                 (card['rationale'] as String).isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: BotvySpace.sm),
               Text(card['rationale'] as String),
             ],
             // The citation, and it is not decoration: nothing here is Botvy's
             // own claim about training, it is a reading of things the member
             // chose to save (FR-007, story 3).
             if (sources.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: BotvySpace.sm),
               Text(
                 '${t.knowledgeSources}: '
                 '${[for (final s in sources) (s as Map)['title'] ?? s['url']].join(', ')}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -368,7 +370,7 @@ class _SuggestionCard extends StatelessWidget {
                   onPressed: working ? null : () => unawaited(cubit.dismiss(id)),
                   child: Text(t.knowledgeDismiss),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 FilledButton(
                   onPressed: working ? null : () => unawaited(cubit.accept(id)),
                   child: Text(t.knowledgeAccept),

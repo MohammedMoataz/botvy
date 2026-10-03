@@ -8,6 +8,7 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../app/router.dart';
 import '../../../core/notifications/local_notifications.dart' show deviceTimezone;
 import '../application/auth_cubit.dart';
+import '../../../app/tokens.dart';
 
 /// Sign in, or create an account.
 ///
@@ -84,7 +85,7 @@ class _SignInPageState extends State<SignInPage> {
         child: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, state) => Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsetsDirectional.all(BotvySpace.xl),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Form(
@@ -96,7 +97,7 @@ class _SignInPageState extends State<SignInPage> {
                         _registering ? t.registerTitle : t.signInTitle,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: BotvySpace.xl),
 
                       if (_registering) ...[
                         TextFormField(
@@ -104,7 +105,7 @@ class _SignInPageState extends State<SignInPage> {
                           textInputAction: TextInputAction.next,
                           decoration: InputDecoration(labelText: t.displayName),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: BotvySpace.md),
                       ],
 
                       TextFormField(
@@ -116,7 +117,7 @@ class _SignInPageState extends State<SignInPage> {
                         validator: (v) =>
                             (v == null || v.trim().isEmpty) ? t.emailRequired : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: BotvySpace.md),
 
                       TextFormField(
                         controller: _password,
@@ -148,7 +149,7 @@ class _SignInPageState extends State<SignInPage> {
                       ),
 
                       if (_registering) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: BotvySpace.md),
                         TextFormField(
                           controller: _confirm,
                           obscureText: _obscure,
@@ -165,7 +166,7 @@ class _SignInPageState extends State<SignInPage> {
                         ),
                       ],
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: BotvySpace.xl),
                       FilledButton(
                         onPressed: state.isBusy ? null : () => unawaited(_submit()),
                         child: state.isBusy
@@ -179,7 +180,7 @@ class _SignInPageState extends State<SignInPage> {
                               ),
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: BotvySpace.sm),
                       TextButton(
                         // The typed address survives the switch: somebody who
                         // started on the wrong form should not retype it.
@@ -190,11 +191,11 @@ class _SignInPageState extends State<SignInPage> {
                       ),
 
                       if (state.failure != null) ...[
-                        const SizedBox(height: 16),
+                        const SizedBox(height: BotvySpace.lg),
                         _Failure(message: _describe(t, state.failure!)),
                       ],
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: BotvySpace.xl),
                       // On the sign-in screen because this is where a wrong
                       // address shows up, and it shows up as a failed sign-in
                       // that looks exactly like a wrong password. A member who
@@ -245,15 +246,15 @@ class _Failure extends StatelessWidget {
   Widget build(BuildContext context) {
     final colours = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsetsDirectional.all(BotvySpace.md),
       decoration: BoxDecoration(
         color: colours.errorContainer,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(BotvyRadius.lg),
       ),
       child: Row(
         children: [
           Icon(Icons.error_outline, color: colours.onErrorContainer),
-          const SizedBox(width: 8),
+          const SizedBox(width: BotvySpace.sm),
           Expanded(
             child: Text(
               message,

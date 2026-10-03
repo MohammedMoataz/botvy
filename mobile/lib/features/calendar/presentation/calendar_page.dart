@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../../ui/hex_color.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart'
@@ -23,6 +24,8 @@ import '../application/calendar_cubit.dart';
 import 'event_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// One calendar: a month, a week and a day (story 3).
 ///
@@ -59,7 +62,7 @@ class CalendarPage extends StatelessWidget {
           body: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.md),
                 child: SegmentedButton<CalendarMode>(
                   segments: const [
                     ButtonSegment(
@@ -89,7 +92,7 @@ class CalendarPage extends StatelessWidget {
                 ),
               Expanded(
                 child: state.loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const LoadingView()
                     : switch (state.mode) {
                         CalendarMode.month => _MonthView(
                           state: state,
@@ -351,14 +354,14 @@ class _WeekColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsetsDirectional.symmetric(horizontal: BotvySpace.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: onSelect,
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.sm),
               color: selected ? theme.colorScheme.primaryContainer : null,
               child: Column(
                 children: [
@@ -378,13 +381,13 @@ class _WeekColumn extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: BotvySpace.xs),
           // Already in time order: `localAgenda` sorts the whole window once
           // and this is a slice of it, so a column never re-sorts and never
           // re-expands.
           for (final item in items)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsetsDirectional.only(bottom: BotvySpace.xs),
               child: _ItemChip(item: item, zone: zone, onTap: () => onOpen(item)),
             ),
         ],
@@ -460,7 +463,10 @@ class _Agenda extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const Center(child: Text('Nothing on this day.'));
+      return EmptyState(
+        icon: Icons.event_available,
+        message: AppLocalizations.of(context).calendarNothingOnDay,
+      );
     }
 
     final allDay = [for (final item in items) if (item.allDay) item];
@@ -552,10 +558,10 @@ class _ItemChip extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.xs),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(BotvyRadius.md),
           border: Border(
             left: BorderSide(color: _tintFor(context, item), width: 3),
           ),
@@ -749,11 +755,8 @@ IconData _iconFor(AgendaItem item) => switch (item.kind) {
 /// a literal, so both light and dark are legible without a second palette.
 Color _tintFor(BuildContext context, AgendaItem item) {
   final scheme = Theme.of(context).colorScheme;
-  if (item.color != null) {
-    final cleaned = item.color!.replaceFirst('#', '');
-    final value = int.tryParse(cleaned, radix: 16);
-    if (value != null && cleaned.length == 6) return Color(0xFF000000 | value);
-  }
+  final own = tryParseHexColor(item.color);
+  if (own != null) return own;
   return switch (item.kind) {
     AgendaKind.meeting => scheme.primary,
     AgendaKind.preparation => scheme.tertiary,

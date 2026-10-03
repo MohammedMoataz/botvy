@@ -387,9 +387,8 @@ jobs:
         run: flutter analyze
       - name: No raw spacing, radii or colours in features
         working-directory: mobile
-        # 030 FR-010. A warning until the screen pass (T3071) has migrated
-        # every feature; then this line goes and the step fails the job.
-        continue-on-error: true
+        # 030 FR-010: spacing, radii and colours come from the tokens and the
+        # theme. The contract is test/ui_literals_check_test.dart.
         run: bash tool/check_ui_literals.sh
       - name: Test
         working-directory: mobile

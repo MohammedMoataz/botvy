@@ -11,6 +11,7 @@ import '../../../core/recurrence/expander.dart';
 import '../../../core/recurrence/rule_words.dart';
 import '../application/meetings_cubit.dart';
 import 'repeat_picker.dart';
+import '../../../app/tokens.dart';
 
 /// Where a meeting is. At least one half is required (FR-001), and both are
 /// allowed — a room that is also dialled into is one meeting, not two.
@@ -35,7 +36,7 @@ Future<void> showMeetingSheet(
   builder: (_) => Padding(
     // The keyboard's own inset. Without it the title field is under the
     // keyboard on every phone smaller than the one it was built on.
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+    padding: EdgeInsetsDirectional.only(bottom: MediaQuery.of(context).viewInsets.bottom),
     child: _MeetingSheet(cubit: cubit, meeting: meeting),
   ),
 );
@@ -175,7 +176,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
     final l10n = AppLocalizations.of(context);
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -183,7 +184,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               widget.meeting == null ? l10n.meetingNew : l10n.meetingEdit,
               style: theme.textTheme.titleLarge,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
 
             TextField(
               controller: _title,
@@ -191,7 +192,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(labelText: l10n.meetingName),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             TextField(
               controller: _description,
               maxLines: 3,
@@ -200,7 +201,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               decoration: InputDecoration(labelText: l10n.meetingDescription),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Row(
               children: [
                 Expanded(
@@ -210,7 +211,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
                     onPressed: () => unawaited(_pickDate()),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 Expanded(
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.schedule),
@@ -221,11 +222,11 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               ],
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             Row(
               children: [
                 Text(l10n.meetingLength),
-                const SizedBox(width: 12),
+                const SizedBox(width: BotvySpace.md),
                 DropdownButton<int>(
                   value: _durationLengths.contains(_durationMin)
                       ? _durationMin
@@ -247,7 +248,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
 
             const Divider(height: 32),
             Text(l10n.meetingWhere, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             SegmentedButton<_Where>(
               segments: [
                 ButtonSegment(
@@ -268,7 +269,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
                   setState(() => _where = choice.first),
             ),
             if (_where != _Where.place) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: BotvySpace.sm),
               TextField(
                 controller: _link,
                 keyboardType: TextInputType.url,
@@ -279,7 +280,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               ),
             ],
             if (_where != _Where.online) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: BotvySpace.sm),
               TextField(
                 controller: _address,
                 textCapitalization: TextCapitalization.sentences,
@@ -289,11 +290,11 @@ class _MeetingSheetState extends State<_MeetingSheet> {
 
             const Divider(height: 32),
             Text(l10n.meetingPreparation, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Row(
               children: [
                 Text(l10n.meetingTimeNeeded),
-                const SizedBox(width: 12),
+                const SizedBox(width: BotvySpace.md),
                 DropdownButton<int>(
                   value: _prepLengths.contains(_prepMinutes)
                       ? _prepMinutes
@@ -326,7 +327,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
 
             const Divider(height: 32),
             Text(l10n.meetingRemindMe, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Wrap(
               spacing: 6,
               children: [
@@ -355,7 +356,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
             ),
             if (_rawRule != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsetsDirectional.only(bottom: BotvySpace.sm),
                 child: Text(
                   l10n.repeatSetElsewhere,
                   style: theme.textTheme.bodySmall,
@@ -386,7 +387,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
             ),
 
             if (_error != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: BotvySpace.sm),
               Text(
                 _error!,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -395,7 +396,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
               ),
             ],
 
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Row(
               children: [
                 TextButton(
@@ -583,7 +584,7 @@ class _MeetingSheetState extends State<_MeetingSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.meetingDiscardBody(orphans.length)),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             for (final moment in orphans.take(5))
               Text('· ${_dateText(moment.toLocal())}'),
             if (orphans.length > 5)

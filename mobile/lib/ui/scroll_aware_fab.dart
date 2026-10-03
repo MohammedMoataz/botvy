@@ -74,3 +74,7 @@ class _ScrollAwareFabState extends State<ScrollAwareFab> {
     label: Text(widget.label),
   );
 }
+
+/// Bottom padding for a list under a FAB: the extended FAB's height, its
+/// margin, and a gap, so the last row can scroll clear of it.
+const double fabClearance = 96;

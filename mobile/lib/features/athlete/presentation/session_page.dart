@@ -10,6 +10,7 @@ import '../application/athlete.dart';
 import '../application/athlete_cubit.dart';
 import '../application/programs_cubit.dart';
 import 'athlete_page.dart' show StatusText;
+import '../../../app/tokens.dart';
 
 const Uuid _uuid = Uuid();
 
@@ -168,11 +169,11 @@ class _SessionPageState extends State<SessionPage> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.md),
         children: [
-          Card(
+          Card.filled(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsetsDirectional.all(BotvySpace.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -183,7 +184,7 @@ class _SessionPageState extends State<SessionPage> {
                           session.plannedAt.toLocal(),
                         ).format(context),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: BotvySpace.sm),
                       Text(t.athleteMinutes(session.durationMin)),
                       const Spacer(),
                       StatusText(session: session, now: now),
@@ -194,7 +195,7 @@ class _SessionPageState extends State<SessionPage> {
                   // outcome, so there is nothing to correct before logging it
                   // late (FR-018).
                   if (isMissed(session, now)) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: BotvySpace.xs),
                     Text(
                       t.sessionMissedStillLoggable,
                       style: Theme.of(context).textTheme.bodySmall,
@@ -207,7 +208,7 @@ class _SessionPageState extends State<SessionPage> {
 
           if (_exercises.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
+              padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.xl),
               child: Center(child: Text(t.sessionNoExercises)),
             )
           else
@@ -254,7 +255,7 @@ class _SessionPageState extends State<SessionPage> {
               ],
             ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: BotvySpace.sm),
           Row(
             children: [
               TextButton.icon(
@@ -271,7 +272,7 @@ class _SessionPageState extends State<SessionPage> {
             ],
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: BotvySpace.sm),
           TextField(
             controller: _notes,
             decoration: InputDecoration(
@@ -412,10 +413,10 @@ class _ExerciseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: BotvySpace.sm),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.sm),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -427,7 +428,7 @@ class _ExerciseCard extends StatelessWidget {
                 ReorderableDragStartListener(
                   index: index,
                   child: const Padding(
-                    padding: EdgeInsets.only(right: 8),
+                    padding: EdgeInsetsDirectional.only(end: BotvySpace.sm),
                     child: Icon(Icons.drag_handle),
                   ),
                 ),
@@ -528,10 +529,10 @@ class _SetRow extends StatelessWidget {
     final t = AppLocalizations.of(context);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.xxs),
       child: Row(
         children: [
-          SizedBox(width: 20, child: Text('$ordinal')),
+          SizedBox(width: BotvySpace.xl, child: Text('$ordinal')),
           ...switch (shape) {
             SetShape.reps => [
               _Stepper(

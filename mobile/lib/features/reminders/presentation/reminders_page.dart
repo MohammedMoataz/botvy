@@ -8,6 +8,7 @@ import '../../../core/db/database.dart';
 import '../application/reminders_cubit.dart';
 import 'reminder_sheet.dart';
 import '../../../ui/scroll_aware_fab.dart';
+import '../../../ui/states.dart';
 
 /// The member's reminders.
 ///
@@ -69,9 +70,12 @@ class RemindersPage extends StatelessWidget {
             onPressed: () => unawaited(showReminderSheet(context, cubit)),
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : state.reminders.isEmpty
-                  ? Center(child: Text(t.reminderNothingHere))
+                  ? EmptyState(
+                      icon: Icons.notifications_off_outlined,
+                      message: t.reminderNothingHere,
+                    )
                   : ListView.builder(
                       itemCount: state.reminders.length,
                       itemBuilder: (context, index) => _ReminderRow(

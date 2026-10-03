@@ -7,6 +7,7 @@ import '../../athlete/application/athlete.dart';
 import '../../athlete/application/athlete_cubit.dart';
 import '../../athlete/presentation/athlete_sheets.dart';
 import 'onboarding_steps.dart';
+import '../../../app/tokens.dart';
 
 /// Where P6's step sits in the walkthrough.
 ///
@@ -74,9 +75,9 @@ class _AthleteStepState extends State<_AthleteStep> {
           t.onboardingSports,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         Text(t.onboardingSportsBody),
-        const SizedBox(height: 16),
+        const SizedBox(height: BotvySpace.lg),
 
         // The seven, inline rather than behind the sheet: this is the first
         // question and a step that opens a modal to be answered reads as a
@@ -101,7 +102,7 @@ class _AthleteStepState extends State<_AthleteStep> {
                 ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: BotvySpace.sm),
         TextButton.icon(
           onPressed: () async {
             await showSportsPicker(context, widget.cubit);
@@ -113,9 +114,9 @@ class _AthleteStepState extends State<_AthleteStep> {
 
         const Divider(height: 32),
         Text(t.athleteSlots, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
+        const SizedBox(height: BotvySpace.xs),
         Text(t.onboardingSlotsBody),
-        const SizedBox(height: 12),
+        const SizedBox(height: BotvySpace.md),
         // The slot editor is the same sheet the Athlete screen uses, and
         // deliberately not a second simplified copy: the two would disagree
         // about what a slot is the first time one of them changed.

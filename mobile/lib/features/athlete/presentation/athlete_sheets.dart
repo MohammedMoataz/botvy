@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../application/athlete.dart';
 import '../application/athlete_cubit.dart';
+import '../../../app/tokens.dart';
 
 const Uuid _uuid = Uuid();
 
@@ -52,12 +53,12 @@ class _SportsSheetState extends State<_SportsSheet> {
     final t = AppLocalizations.of(context);
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
+      padding: EdgeInsetsDirectional.only(
+        start: BotvySpace.lg,
+        end: BotvySpace.lg,
+        top: BotvySpace.lg,
         // The keyboard's own height, so the text field is not covered by it.
-        bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+        bottom: BotvySpace.lg + MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -67,7 +68,7 @@ class _SportsSheetState extends State<_SportsSheet> {
             t.athleteChooseSports,
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: BotvySpace.md),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -92,7 +93,7 @@ class _SportsSheetState extends State<_SportsSheet> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: BotvySpace.md),
           TextField(
             controller: _custom,
             decoration: InputDecoration(
@@ -105,7 +106,7 @@ class _SportsSheetState extends State<_SportsSheet> {
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _addOwn(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: BotvySpace.lg),
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: FilledButton(
@@ -182,13 +183,13 @@ class _SlotSheetState extends State<_SlotSheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(t.athleteSlots, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
@@ -201,7 +202,7 @@ class _SlotSheetState extends State<_SlotSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Row(
               children: [
                 TextButton.icon(
@@ -256,10 +257,10 @@ class _SlotRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    return Card.filled(
+      margin: const EdgeInsetsDirectional.only(bottom: BotvySpace.sm),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.sm),
         child: Column(
           children: [
             Row(
@@ -279,7 +280,7 @@ class _SlotRow extends StatelessWidget {
                         onChanged(slot.copyWith(weekday: day ?? slot.weekday)),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 Expanded(
                   child: TextButton(
                     // The member's *wall clock*, stored as `HH:mm` and never as
@@ -330,7 +331,7 @@ class _SlotRow extends StatelessWidget {
                         onChanged(slot.copyWith(sport: sport ?? slot.sport)),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: BotvySpace.sm),
                 Expanded(
                   child: DropdownButtonFormField<int>(
                     initialValue: _lengths.contains(slot.durationMin)
@@ -417,11 +418,11 @@ class _SessionCreatorState extends State<_SessionCreator> {
     ];
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+      padding: EdgeInsetsDirectional.only(
+        start: BotvySpace.lg,
+        end: BotvySpace.lg,
+        top: BotvySpace.lg,
+        bottom: BotvySpace.lg + MediaQuery.viewInsetsOf(context).bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -431,12 +432,12 @@ class _SessionCreatorState extends State<_SessionCreator> {
             t.athleteAddSession,
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: BotvySpace.md),
           TextField(
             controller: _title,
             decoration: InputDecoration(labelText: t.sessionExerciseName),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: BotvySpace.sm),
           DropdownButtonFormField<String>(
             initialValue: _sport,
             decoration: InputDecoration(labelText: t.athleteSports),
@@ -497,7 +498,7 @@ class _SessionCreatorState extends State<_SessionCreator> {
             onChanged: (minutes) =>
                 setState(() => _durationMin = minutes ?? _durationMin),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: BotvySpace.lg),
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: FilledButton(

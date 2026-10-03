@@ -7,6 +7,7 @@ import '../../../app/router.dart';
 import '../../../core/db/database.dart';
 import '../../athlete/application/athlete_cubit.dart';
 import '../../athlete/presentation/athlete_page.dart' show StatusText;
+import '../../../app/tokens.dart';
 
 /// Today's training, as its own kind of row (T642, FR-010).
 ///
@@ -62,7 +63,7 @@ class TrainingRow extends StatelessWidget {
         // broken screen.
         if (sessions.isEmpty) return const SizedBox.shrink();
 
-        return Card(
+        return Card.filled(
           child: Column(
             children: [
               for (final session in sessions)
@@ -102,9 +103,9 @@ class _SessionRow extends StatelessWidget {
           Text(
             TimeOfDay.fromDateTime(session.plannedAt.toLocal()).format(context),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: BotvySpace.sm),
           Text(t.sportName(session.sport)),
-          const SizedBox(width: 8),
+          const SizedBox(width: BotvySpace.sm),
           // Including the derived "missed" reading, which is the same function
           // the card and the week view ask — three screens, one answer.
           StatusText(session: session, now: now),

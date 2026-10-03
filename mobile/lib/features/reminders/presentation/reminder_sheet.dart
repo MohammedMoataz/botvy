@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/reminders_cubit.dart';
+import '../../../app/tokens.dart';
 
 /// The lead times a reminder can carry of its own.
 ///
@@ -25,7 +26,7 @@ Future<void> showReminderSheet(
   context: context,
   isScrollControlled: true,
   builder: (_) => Padding(
-    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+    padding: EdgeInsetsDirectional.only(bottom: MediaQuery.of(context).viewInsets.bottom),
     child: _ReminderSheet(cubit: cubit, reminder: reminder),
   ),
 );
@@ -83,7 +84,7 @@ class _ReminderSheetState extends State<_ReminderSheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
@@ -95,7 +96,7 @@ class _ReminderSheetState extends State<_ReminderSheet> {
               decoration: InputDecoration(labelText: t.reminderTitle),
               onSubmitted: (_) => unawaited(_save()),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             OutlinedButton.icon(
               icon: const Icon(Icons.event, size: 18),
               label: Text(_momentLabel(context, _moment)),
@@ -104,13 +105,13 @@ class _ReminderSheetState extends State<_ReminderSheet> {
                 if (picked != null) setState(() => _moment = picked);
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: BotvySpace.lg),
             Text(t.leadTimes, style: Theme.of(context).textTheme.bodySmall),
             Text(
               t.reminderLeadsHelp,
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Wrap(
               spacing: 8,
               children: [
@@ -128,7 +129,7 @@ class _ReminderSheetState extends State<_ReminderSheet> {
                   ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: BotvySpace.xl),
             FilledButton(onPressed: _save, child: Text(t.save)),
           ],
         ),

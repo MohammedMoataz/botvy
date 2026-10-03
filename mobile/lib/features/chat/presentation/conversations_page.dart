@@ -8,6 +8,8 @@ import '../../../core/db/database.dart';
 import '../application/conversations_cubit.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../ui/shell/app_shell.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// The member's chats, in two sections.
 ///
@@ -74,7 +76,7 @@ class ConversationsPage extends StatelessWidget {
             onPressed: state.busy ? null : () => unawaited(cubit.create()),
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : ListView(
                   children: [
                     if (state.pinned.isNotEmpty) _SectionHeader(t.chatPinned),
@@ -94,12 +96,9 @@ class ConversationsPage extends StatelessWidget {
                         onOpen: () => onOpen(row.id),
                       ),
                     if (state.pinned.isEmpty && state.others.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          t.chatNoneYet,
-                          textAlign: TextAlign.center,
-                        ),
+                      EmptyState(
+                        icon: Icons.forum_outlined,
+                        message: t.chatNoneYet,
                       ),
                   ],
                 ),
@@ -165,10 +164,10 @@ class _SectionHeader extends StatelessWidget {
     // Directional so the inset is on the leading edge in both languages: a
     // hard `left` here indents an Arabic heading away from the text it heads.
     padding: const EdgeInsetsDirectional.only(
-      start: 16,
-      end: 16,
-      top: 16,
-      bottom: 4,
+      start: BotvySpace.lg,
+      end: BotvySpace.lg,
+      top: BotvySpace.lg,
+      bottom: BotvySpace.xs,
     ),
     child: Text(
       label,

@@ -9,6 +9,8 @@ import '../../../core/api/api_client.dart';
 import '../../../core/db/database.dart';
 import '../application/athlete.dart';
 import '../application/programs_cubit.dart';
+import '../../../app/tokens.dart';
+import '../../../ui/states.dart';
 
 /// Programs and the workout library (T653).
 ///
@@ -55,16 +57,19 @@ class ProgramsPage extends StatelessWidget {
             ],
           ),
           body: state.loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const LoadingView()
               : RefreshIndicator(
                   onRefresh: cubit.refresh,
                   child: ListView(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsetsDirectional.all(BotvySpace.md),
                     children: [
                       if (state.programs.isEmpty)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Center(child: Text(t.programsNone)),
+                          padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.xl),
+                          child: EmptyState(
+                            icon: Icons.list_alt,
+                            message: t.programsNone,
+                          ),
                         )
                       else
                         for (final program in state.programs)
@@ -80,7 +85,7 @@ class ProgramsPage extends StatelessWidget {
                       ),
                       if (state.workouts.isEmpty)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.lg),
                           child: Text(t.workoutsNone),
                         )
                       else
@@ -107,14 +112,14 @@ class _ProgramCard extends StatelessWidget {
     final cubit = context.read<ProgramsCubit>();
     final weeks = _weekCount(program.weeksJson);
 
-    return Card(
+    return Card.filled(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsetsDirectional.all(BotvySpace.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(program.title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
+            const SizedBox(height: BotvySpace.xs),
             Wrap(
               spacing: 8,
               children: [
@@ -131,7 +136,7 @@ class _ProgramCard extends StatelessWidget {
                   Text('${t.programApplyFrom} ${program.appliedStartDate}'),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: BotvySpace.sm),
             Row(
               children: [
                 if (!archived)
@@ -206,7 +211,7 @@ class _ProgramCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(t.programReplaceBody),
-            const SizedBox(height: 12),
+            const SizedBox(height: BotvySpace.md),
             // Named, not counted. "3 sessions would be replaced" tells the
             // member nothing they can weigh; the titles and the days are what
             // they decide on.
