@@ -12,7 +12,7 @@
 //        export 'package:botvy_tokens/tokens.dart';
 // The short-name scales under it (`BotvySpace` and friends) stay: they read
 // the generated members, they do not repeat their values.
-import 'package:flutter/painting.dart' show Color;
+import 'package:flutter/material.dart';
 
 abstract final class BotvyTokens {
   static const Color lightBg = Color(0xFFF6F7F9);
@@ -79,9 +79,12 @@ abstract final class BotvyRadius {
   static const double full = BotvyTokens.radiusFull;
 }
 
-/// Durations. Screens never read these directly for an animation they run:
-/// `BotvyMotion.of(context)` (the motion phase) returns zero under the
-/// handset's remove-animations setting, which these constants cannot know.
+/// Durations and curves for every animation in the app.
+///
+/// Screens read [BotvyMotion.of], never the constants: it answers zero when
+/// the handset asks for no animations, which the constants cannot know.
+/// Curves are Material 3's emphasised easing — the "expressive" feel comes
+/// from these and the `long` duration on big transitions, not from physics.
 abstract final class BotvyMotion {
   static const Duration short = Duration(
     milliseconds: BotvyTokens.motionShortMs,
@@ -90,4 +93,39 @@ abstract final class BotvyMotion {
     milliseconds: BotvyTokens.motionMediumMs,
   );
   static const Duration long = Duration(milliseconds: BotvyTokens.motionLongMs);
+
+  /// Something arriving.
+  static const Curve enter = Easing.emphasizedDecelerate;
+
+  /// Something leaving.
+  static const Curve exit = Easing.emphasizedAccelerate;
+
+  /// Something changing in place.
+  static const Curve change = Easing.standard;
+
+  static MotionDurations of(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false
+      ? MotionDurations.off
+      : MotionDurations.on;
+}
+
+class MotionDurations {
+  const MotionDurations._(this.short, this.medium, this.long);
+
+  static const on = MotionDurations._(
+    BotvyMotion.short,
+    BotvyMotion.medium,
+    BotvyMotion.long,
+  );
+  static const off = MotionDurations._(
+    Duration.zero,
+    Duration.zero,
+    Duration.zero,
+  );
+
+  final Duration short;
+  final Duration medium;
+  final Duration long;
+
+  bool get enabled => long > Duration.zero;
 }

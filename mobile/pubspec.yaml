@@ -74,6 +74,10 @@ dependencies:
   rrule: ^0.2.18
   table_calendar: ^3.2.1
   url_launcher: ^6.3.2
+  # Material motion (030): shared-axis page transitions and the container
+  # transform. Google's own package; hand-rolling a container transform is
+  # hundreds of lines.
+  animations: ^2.2.0
 
 dev_dependencies:
   flutter_test:

@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/material.dart';
 
@@ -11,33 +12,41 @@ import 'tokens.dart';
 /// radii rather than a package: rounder cards, fields and FABs (`xl`), sheets
 /// and dialogs rounder still (`xxl`), buttons left at Material's own stadium.
 abstract final class AppTheme {
-  static ThemeData get light => FlexThemeData.light(
-    colors: FlexSchemeColor.from(
-      primary: BotvyTokens.lightAccent,
-      error: BotvyTokens.lightDown,
-      brightness: Brightness.light,
-    ),
-    scaffoldBackground: BotvyTokens.lightBg,
-    surface: BotvyTokens.lightSurface,
-    useMaterial3: true,
-    subThemesData: _subThemes,
-    textTheme: _textTheme,
-    extensions: const [BotvyStatusColors.light],
-  ).copyWith(dividerColor: BotvyTokens.lightLine);
+  static ThemeData get light =>
+      FlexThemeData.light(
+        colors: FlexSchemeColor.from(
+          primary: BotvyTokens.lightAccent,
+          error: BotvyTokens.lightDown,
+          brightness: Brightness.light,
+        ),
+        scaffoldBackground: BotvyTokens.lightBg,
+        surface: BotvyTokens.lightSurface,
+        useMaterial3: true,
+        subThemesData: _subThemes,
+        textTheme: _textTheme,
+        extensions: const [BotvyStatusColors.light],
+      ).copyWith(
+        dividerColor: BotvyTokens.lightLine,
+        pageTransitionsTheme: _transitions,
+      );
 
-  static ThemeData get dark => FlexThemeData.dark(
-    colors: FlexSchemeColor.from(
-      primary: BotvyTokens.darkAccent,
-      error: BotvyTokens.darkDown,
-      brightness: Brightness.dark,
-    ),
-    scaffoldBackground: BotvyTokens.darkBg,
-    surface: BotvyTokens.darkSurface,
-    useMaterial3: true,
-    subThemesData: _subThemes,
-    textTheme: _textTheme,
-    extensions: const [BotvyStatusColors.dark],
-  ).copyWith(dividerColor: BotvyTokens.darkLine);
+  static ThemeData get dark =>
+      FlexThemeData.dark(
+        colors: FlexSchemeColor.from(
+          primary: BotvyTokens.darkAccent,
+          error: BotvyTokens.darkDown,
+          brightness: Brightness.dark,
+        ),
+        scaffoldBackground: BotvyTokens.darkBg,
+        surface: BotvyTokens.darkSurface,
+        useMaterial3: true,
+        subThemesData: _subThemes,
+        textTheme: _textTheme,
+        extensions: const [BotvyStatusColors.dark],
+      ).copyWith(
+        dividerColor: BotvyTokens.darkLine,
+        pageTransitionsTheme: _transitions,
+      );
 
   static const FlexSubThemesData _subThemes = FlexSubThemesData(
     cardRadius: BotvyRadius.xl,
@@ -53,6 +62,16 @@ abstract final class AppTheme {
     navigationBarIndicatorSchemeColor: SchemeColor.secondaryContainer,
     navigationRailIndicatorSchemeColor: SchemeColor.secondaryContainer,
     useM2StyleDividerInM3: false,
+  );
+
+  // Opening a screen is going down a level, which Material motion draws on
+  // the Z axis — and Z has no left or right, so it reads the same in Arabic
+  // (the package's X axis always enters from the right).
+  static const PageTransitionsTheme _transitions = PageTransitionsTheme(
+    builders: {
+      TargetPlatform.android: _SharedAxisZ(),
+      TargetPlatform.iOS: _SharedAxisZ(),
+    },
   );
 
   // Emphasised titles: the weight, not the size, is what reads as current.
@@ -108,6 +127,32 @@ class BotvyStatusColors extends ThemeExtension<BotvyStatusColors> {
       up: Color.lerp(up, other.up, t)!,
       down: Color.lerp(down, other.down, t)!,
       unknown: Color.lerp(unknown, other.unknown, t)!,
+    );
+  }
+}
+
+/// Shared-axis Z, or no transition when the handset removes animations.
+class _SharedAxisZ extends SharedAxisPageTransitionsBuilder {
+  const _SharedAxisZ() : super(transitionType: SharedAxisTransitionType.scaled);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T>? route,
+    BuildContext? context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (context != null &&
+        (MediaQuery.maybeDisableAnimationsOf(context) ?? false)) {
+      return child;
+    }
+    return super.buildTransitions(
+      route,
+      context,
+      animation,
+      secondaryAnimation,
+      child,
     );
   }
 }

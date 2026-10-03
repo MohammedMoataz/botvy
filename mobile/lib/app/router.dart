@@ -270,7 +270,8 @@ GoRouter buildRouter(AuthCubit auth) => GoRouter(
     // keeps its scroll and its pushed pages while the member is on another.
     // The paths are the ones every deep link and notification already
     // carries; only where the pages hang changed.
-    StatefulShellRoute.indexedStack(
+    StatefulShellRoute(
+      navigatorContainerBuilder: AppShell.branches,
       builder: (context, state, shell) => AppShell(
         shell: shell,
         destinations: shellDestinations(AppLocalizations.of(context)),
