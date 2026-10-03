@@ -762,3 +762,27 @@ in the commit — never filed away.
   walking up from `import.meta.url` to the one named `@botvy/backend` rather
   than counting `..`, and proven against the compiled output: the hop count
   agrees between `src/` and `dist/` only by accident of the build layout.
+- **The phone's screens take every inset, gap and radius from the tokens, and
+  CI refuses a number.** `mobile/tool/check_ui_literals.sh` fails the mobile job
+  on `EdgeInsets.*(` (non-directional, wrong in Arabic), a numeric
+  `EdgeInsetsDirectional`, `SizedBox(height: 8)`, `BorderRadius.circular(8)`,
+  `Color(0x…)`, `fontSize:` or `Colors.` anywhere in `lib/features/`. Use
+  `BotvySpace`/`BotvyRadius` from `lib/app/tokens.dart` and the theme's
+  scheme. The kit in `lib/ui/` may hold the few named numbers (a FAB clearance,
+  the label fallback colour) and imports no feature —
+  `test/ui/kit_boundary_test.dart` says so. `tokens_parity_test.dart` fails
+  when `tokens.dart` and `packages/tokens/tokens.json` disagree.
+- **Every animation reads `BotvyMotion.of(context)`, never a `Duration`.** It
+  answers zero under the handset's remove-animations setting, which is the
+  only way that setting is honoured app-wide. Two traps found on the way: a
+  widget's `AnimatedOpacity` under `TickerMode(enabled: false)` never finishes
+  (the shell's leaving tab froze), and an animated list's inserted rows start
+  at zero height, so a bulk change built 860 rows — `DiffAnimatedList`
+  rebuilds instead of animating past ten changes.
+- **The signed-in app is a `StatefulShellRoute`; a tab is gone to, a drawer
+  page is pushed.** `context.push` across branches is undefined in go_router,
+  so a link from Home into Calendar or a training session is `context.go`. A
+  notification opens through `openFromOutside` (`lib/app/navigation.dart`),
+  which pushes a drawer page over Today so back does not close the app. Paths
+  never change: `router_deep_links_test.dart` pins every spelling and
+  `router_config_test.dart` pins which locations are tabs.

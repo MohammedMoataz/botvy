@@ -34,6 +34,7 @@ Future<List<String>> _tapCheck(WidgetTester tester, {required bool on}) async {
           builder: (context, setState) => AnimatedCheck(
             done: done,
             tooltip: 'Complete',
+            doneTooltip: 'Mark as not done',
             onPressed: () => setState(() => done = !done),
           ),
         ),

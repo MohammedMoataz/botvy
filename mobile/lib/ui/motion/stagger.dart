@@ -57,7 +57,7 @@ class _Stagger extends InheritedWidget {
   bool updateShouldNotify(_Stagger old) => old.animation != animation;
 }
 
-class StaggerItem extends StatelessWidget {
+class StaggerItem extends StatefulWidget {
   const StaggerItem({super.key, required this.index, required this.child});
 
   final int index;
@@ -67,14 +67,58 @@ class StaggerItem extends StatelessWidget {
   static const double _step = 0.1;
 
   @override
-  Widget build(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<_Stagger>();
-    if (scope == null) return child;
-    final start = (index * _step).clamp(0.0, 0.6);
-    final animation = CurvedAnimation(
-      parent: scope.animation,
+  State<StaggerItem> createState() => _StaggerItemState();
+}
+
+class _StaggerItemState extends State<StaggerItem> {
+  // Held and disposed here: a CurvedAnimation registers a listener on the
+  // scope's controller, and one built per `build` would add another on every
+  // rebuild of the page — Home rebuilds on every cubit emit.
+  CurvedAnimation? _animation;
+  Animation<double>? _parent;
+  int? _index;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(StaggerItem old) {
+    super.didUpdateWidget(old);
+    _sync();
+  }
+
+  void _sync() {
+    final parent = context
+        .dependOnInheritedWidgetOfExactType<_Stagger>()
+        ?.animation;
+    if (parent == _parent && widget.index == _index) return;
+    _animation?.dispose();
+    _parent = parent;
+    _index = widget.index;
+    if (parent == null) {
+      _animation = null;
+      return;
+    }
+    final start = (widget.index * StaggerItem._step).clamp(0.0, 0.6);
+    _animation = CurvedAnimation(
+      parent: parent,
       curve: Interval(start, start + 0.4, curve: BotvyMotion.enter),
     );
+  }
+
+  @override
+  void dispose() {
+    _animation?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = _animation;
+    if (animation == null) return widget.child;
     return FadeTransition(
       opacity: animation,
       child: SlideTransition(
@@ -82,7 +126,7 @@ class StaggerItem extends StatelessWidget {
           begin: const Offset(0, 0.04),
           end: Offset.zero,
         ).animate(animation),
-        child: child,
+        child: widget.child,
       ),
     );
   }

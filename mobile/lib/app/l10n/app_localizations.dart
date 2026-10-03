@@ -77,6 +77,7 @@ class AppLocalizations {
   String get offline => _t('offline');
   String get somethingWentWrong => _t('somethingWentWrong');
   String get signOut => _t('signOut');
+  String get taskReopen => _t('taskReopen');
   String get calendarNothingOnDay => _t('calendarNothingOnDay');
   String get sectionAccount => _t('sectionAccount');
   String get sectionAppearance => _t('sectionAppearance');
@@ -872,6 +873,7 @@ class AppLocalizations {
       'offline': 'Cannot reach Botvy. Check the server address in settings.',
       'somethingWentWrong': 'That did not work. Please try again.',
       'signOut': 'Sign out',
+      'taskReopen': 'Mark as not done',
       'calendarNothingOnDay': 'Nothing on this day.',
       'sectionAccount': 'Account',
       'sectionAppearance': 'Appearance',
@@ -1364,6 +1366,7 @@ class AppLocalizations {
       'offline': 'تعذّر الوصول إلى بوتفي. تحقّق من عنوان الخادم في الإعدادات.',
       'somethingWentWrong': 'لم ينجح ذلك. حاول مرة أخرى.',
       'signOut': 'تسجيل الخروج',
+      'taskReopen': 'وضع علامة غير منجزة',
       'calendarNothingOnDay': 'لا شيء في هذا اليوم.',
       'sectionAccount': 'الحساب',
       'sectionAppearance': 'المظهر',

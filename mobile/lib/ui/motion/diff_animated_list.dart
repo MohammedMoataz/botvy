@@ -77,13 +77,19 @@ class _DiffAnimatedListState<T> extends State<DiffAnimatedList<T>> {
       );
 
   @override
-  Widget build(BuildContext context) => AnimatedList(
-    key: _list,
-    padding: widget.padding,
-    initialItemCount: widget.items.length,
-    itemBuilder: (context, index, animation) => _transition(
-      animation,
-      widget.itemBuilder(context, widget.items[index]),
+  Widget build(BuildContext context) => KeyedSubtree(
+    // A bulk change swaps in a new AnimatedList; this key is what lets the
+    // new one pick up the old one's scroll offset from the route's
+    // PageStorage instead of jumping to the top.
+    key: const PageStorageKey<String>('DiffAnimatedList'),
+    child: AnimatedList(
+      key: _list,
+      padding: widget.padding,
+      initialItemCount: widget.items.length,
+      itemBuilder: (context, index, animation) => _transition(
+        animation,
+        widget.itemBuilder(context, widget.items[index]),
+      ),
     ),
   );
 }
