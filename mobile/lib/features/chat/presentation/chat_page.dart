@@ -263,7 +263,10 @@ class _Transcript extends StatelessWidget {
               ],
             ),
           ),
-        if (state.card != null) _CardAnswer(card: state.card!),
+        if (state.card?.isConfirm ?? false)
+          _ConfirmCard(card: state.card!)
+        else if (state.card != null)
+          _CardAnswer(card: state.card!),
       ],
     );
   }
@@ -422,6 +425,89 @@ class _CardAnswer extends StatelessWidget {
     'sessions' => t.chatCardSessions,
     _ => t.chatCardOther,
   };
+}
+
+/// A change the chat has proposed, with Yes and No (032).
+///
+/// The row is named as the server stored it, and nothing changes until the
+/// member answers. Answering needs the server, so offline the buttons are off
+/// and say why rather than queueing a Yes that could land after it expired.
+class _ConfirmCard extends StatelessWidget {
+  const _ConfirmCard({required this.card});
+
+  final ChatCard card;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final cubit = context.read<ChatCubit>();
+    final online = cubit.canAnswerProposal;
+    final enabled = online && !card.answered;
+
+    return Card.filled(
+      key: const ValueKey('confirm-card'),
+      margin: const EdgeInsetsDirectional.symmetric(vertical: BotvySpace.sm),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              t.chatConfirmTitle,
+              textAlign: TextAlign.start,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: BotvySpace.sm),
+            for (final item in card.items)
+              Text(item.title, textAlign: TextAlign.start),
+            const SizedBox(height: BotvySpace.md),
+            if (card.answered)
+              Text(
+                t.chatConfirmAnswered,
+                textAlign: TextAlign.start,
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else ...[
+              if (!online)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    bottom: BotvySpace.sm,
+                  ),
+                  child: Text(
+                    t.chatConfirmOffline,
+                    textAlign: TextAlign.start,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      key: const ValueKey('confirm-no'),
+                      onPressed: enabled
+                          ? () => cubit.answerProposal(accept: false)
+                          : null,
+                      child: Text(t.chatConfirmNo),
+                    ),
+                  ),
+                  const SizedBox(width: BotvySpace.md),
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('confirm-yes'),
+                      onPressed: enabled
+                          ? () => cubit.answerProposal(accept: true)
+                          : null,
+                      child: Text(t.chatConfirmYes),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// "That went somewhere else, and here is where."

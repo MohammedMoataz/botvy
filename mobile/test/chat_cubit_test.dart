@@ -577,6 +577,66 @@ void main() {
     // still in the outbox where the member can see it.
     expect(await db.select(db.pendingMessages).get(), hasLength(1));
   });
+
+  test('a confirm card is answered once, over the socket, and the answer is followed as a turn (032)',
+      () async {
+    await seedConversation('planner-1', kind: ChatKinds.planner, pinned: true);
+    chat.listen();
+    await chat.open('planner-1');
+    await chat.send('move the dentist to 5pm');
+    final requestId = requestIdOf(socket);
+
+    socket.deliver(ChatFrames.card, {
+      'requestId': requestId,
+      'kind': 'confirm',
+      'items': [
+        {'id': 'm1', 'title': 'For "Dentist": move it to Fri 17:00'},
+      ],
+      'proposal': {
+        'id': 'p1',
+        'action': 'edit',
+        'target': 'meeting',
+        'expiresAt': DateTime.now().add(const Duration(minutes: 15)).toIso8601String(),
+      },
+    });
+
+    expect(chat.state.card?.isConfirm, isTrue);
+    expect(chat.canAnswerProposal, isTrue);
+
+    chat.answerProposal(accept: true);
+    chat.answerProposal(accept: true);
+
+    final confirms = socket.sent.where((f) => f.event == ChatFrames.confirm).toList();
+    expect(confirms, hasLength(1), reason: 'a second tap sends nothing');
+    final frame = confirms.single.data! as Map;
+    expect(frame['proposalId'], 'p1');
+    expect(frame['accept'], isTrue);
+    expect(chat.state.card?.answered, isTrue);
+    expect(chat.state.awaiting, isTrue);
+  });
+
+  test('offline, a proposal cannot be answered', () async {
+    await seedConversation('planner-1', kind: ChatKinds.planner, pinned: true);
+    chat.listen();
+    await chat.open('planner-1');
+    await chat.send('delete the bins reminder');
+    final requestId = requestIdOf(socket);
+    socket.deliver(ChatFrames.card, {
+      'requestId': requestId,
+      'kind': 'confirm',
+      'items': [
+        {'id': 'r1', 'title': 'Delete "Bins"'},
+      ],
+      'proposal': {'id': 'p2', 'action': 'delete', 'target': 'reminder'},
+    });
+
+    socket.connected = false;
+    chat.answerProposal(accept: true);
+
+    expect(chat.canAnswerProposal, isFalse);
+    expect(socket.sent.where((f) => f.event == ChatFrames.confirm), isEmpty);
+    expect(chat.state.card?.answered, isFalse);
+  });
 }
 
 /// One frame this socket was asked to send.

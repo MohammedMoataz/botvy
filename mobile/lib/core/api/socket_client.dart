@@ -167,6 +167,9 @@ abstract final class ChatFrames {
   static const String send = 'chat.send';
   static const String cancel = 'chat.cancel';
 
+  /// Yes or No to a change the chat proposed (032).
+  static const String confirm = 'chat.confirm';
+
   // -- server -> client, one turn, in order ---------------------------------
 
   /// The member's own message was stored, with the `seq` it took.

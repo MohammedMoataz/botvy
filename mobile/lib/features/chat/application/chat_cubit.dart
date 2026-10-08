@@ -58,9 +58,47 @@ class ChatCardItem {
   bool get isSettled => status == 'completed' || status == 'done';
 }
 
+/// A change the chat has offered and the member has not yet answered (032).
+///
+/// Edits, cancels and deletes are only proposed; the card carries this, and
+/// Yes or No sends `chat.confirm`. It lives on the server, so answering needs a
+/// connection.
+class ChatProposal {
+  const ChatProposal({
+    required this.id,
+    required this.action,
+    required this.target,
+    this.expiresAt,
+  });
+
+  static ChatProposal? fromFrame(Object? raw) {
+    if (raw is! Map) return null;
+    final id = raw['id'];
+    if (id is! String || id.isEmpty) return null;
+    return ChatProposal(
+      id: id,
+      action: raw['action'] as String? ?? '',
+      target: raw['target'] as String? ?? '',
+      expiresAt: _instant(raw['expiresAt']),
+    );
+  }
+
+  final String id;
+
+  /// `edit` | `complete` | `cancel` | `delete`.
+  final String action;
+  final String target;
+  final DateTime? expiresAt;
+}
+
 /// A structured list answer (`chat.card`).
 class ChatCard {
-  const ChatCard({required this.kind, required this.items});
+  const ChatCard({
+    required this.kind,
+    required this.items,
+    this.proposal,
+    this.answered = false,
+  });
 
   factory ChatCard.fromFrame(Map<String, dynamic> frame) => ChatCard(
     kind: frame['kind'] as String? ?? 'tasks',
@@ -68,13 +106,26 @@ class ChatCard {
         .whereType<Map>()
         .map((raw) => ChatCardItem.fromFrame(Map<String, dynamic>.from(raw)))
         .toList(),
+    proposal: ChatProposal.fromFrame(frame['proposal']),
   );
 
-  /// `tasks` | `reminders` | `meetings` | `plan` | `sessions`. Decides the
-  /// heading and, for a tap on the tick, which context owns the item.
+  /// `tasks` | `reminders` | `meetings` | `plan` | `sessions` |
+  /// `confirm`. Decides the heading and, for a tap on the tick, which context
+  /// owns the item.
   final String kind;
 
   final List<ChatCardItem> items;
+
+  /// Present on a `confirm` card (032).
+  final ChatProposal? proposal;
+
+  /// True once Yes or No has been sent, so the buttons cannot be pressed twice.
+  final bool answered;
+
+  bool get isConfirm => kind == 'confirm' && proposal != null;
+
+  ChatCard markAnswered() =>
+      ChatCard(kind: kind, items: items, proposal: proposal, answered: true);
 }
 
 /// The answer went somewhere else, and the member has to be told.
@@ -507,6 +558,42 @@ class ChatCubit extends Cubit<ChatState> {
     // updates it, so the tick is re-read from the next pass rather than
     // guessed at here.
     _sync.kick();
+  }
+
+  /// Whether a proposal can be answered right now: it lives on the server.
+  bool get canAnswerProposal => _socket.isConnected;
+
+  /// Yes or No to a proposed change (032).
+  ///
+  /// The answer comes back as an ordinary turn under a fresh request id —
+  /// `chat.token` then `chat.done` — so it is followed exactly like a reply to
+  /// a sent message. Offline the buttons are disabled by the page; this guards
+  /// the same thing for any other caller.
+  void answerProposal({required bool accept}) {
+    final card = state.card;
+    final proposal = card?.proposal;
+    if (card == null || proposal == null || card.answered) return;
+    if (!_socket.isConnected) return;
+
+    final requestId = _uuid.v7();
+    _turn = _Turn(
+      requestId: requestId,
+      conversationId: state.conversationId,
+      clientId: '',
+    );
+    emit(
+      state.copyWith(
+        card: card.markAnswered(),
+        awaiting: true,
+        clearStreaming: true,
+        clearProblem: true,
+      ),
+    );
+    _socket.emit(ChatFrames.confirm, {
+      'requestId': requestId,
+      'proposalId': proposal.id,
+      'accept': accept,
+    });
   }
 
   void clearProblem() => emit(state.copyWith(clearProblem: true));

@@ -381,6 +381,11 @@ class AppLocalizations {
   String get chatMovedOpen => _t('chatMovedOpen');
   String get chatCardComplete => _t('chatCardComplete');
   String get chatCardEmpty => _t('chatCardEmpty');
+  String get chatConfirmTitle => _t('chatConfirmTitle');
+  String get chatConfirmYes => _t('chatConfirmYes');
+  String get chatConfirmNo => _t('chatConfirmNo');
+  String get chatConfirmOffline => _t('chatConfirmOffline');
+  String get chatConfirmAnswered => _t('chatConfirmAnswered');
   String get chatCardMeetings => _t('chatCardMeetings');
   String get chatCardSessions => _t('chatCardSessions');
   String get chatCardOther => _t('chatCardOther');
@@ -1078,6 +1083,11 @@ class AppLocalizations {
       'chatMovedOpen': 'Open it',
       'chatCardComplete': 'Mark as done',
       'chatCardEmpty': 'Nothing to show.',
+      'chatConfirmTitle': 'Confirm this change',
+      'chatConfirmYes': 'Yes',
+      'chatConfirmNo': 'No',
+      'chatConfirmOffline': 'Connect to the internet to answer.',
+      'chatConfirmAnswered': 'Answered.',
       'chatCardMeetings': 'Meetings',
       'chatCardSessions': 'Training',
       'chatCardOther': 'Results',
@@ -1635,6 +1645,11 @@ class AppLocalizations {
     'chatMovedOpen': 'افتحها',
     'chatCardComplete': 'تحديدها كمنجزة',
     'chatCardEmpty': 'لا يوجد ما يُعرض.',
+    'chatConfirmTitle': 'تأكيد التغيير',
+    'chatConfirmYes': 'نعم',
+    'chatConfirmNo': 'لا',
+    'chatConfirmOffline': 'اتصل بالإنترنت علشان ترد.',
+    'chatConfirmAnswered': 'تم الرد.',
     'chatCardMeetings': 'الاجتماعات',
     'chatCardSessions': 'التدريب',
     'chatCardOther': 'النتائج',
