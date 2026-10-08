@@ -184,8 +184,9 @@
     "id": "C03",
     "text": "delete the buy milk task",
     "expect": {
-      "name": "cancel",
-      "scope": "planning"
+      "name": "delete",
+      "scope": "planning",
+      "target": "task"
     }
   },
   {
@@ -513,6 +514,257 @@
     "expect": {
       "name": "update_profile",
       "scope": "coaching"
+    }
+  },
+  {
+    "id": "E01",
+    "text": "move my dentist appointment to tomorrow at 4pm",
+    "expect": {
+      "name": "edit",
+      "scope": "planning",
+      "target": "meeting",
+      "when": "TOMORROW_FOUR_PM"
+    }
+  },
+  {
+    "id": "E02",
+    "text": "rename the groceries task to weekly shopping",
+    "expect": {
+      "name": "edit",
+      "scope": "planning",
+      "target": "task"
+    }
+  },
+  {
+    "id": "E03",
+    "text": "push the tax filing task to tomorrow at 9am",
+    "expect": {
+      "name": "edit",
+      "scope": "planning",
+      "target": "task",
+      "when": "TOMORROW_NINE"
+    }
+  },
+  {
+    "id": "E04",
+    "text": "خلي ميعاد الدكتور بكرة الساعة ٤ العصر",
+    "expect": {
+      "name": "edit",
+      "scope": "planning",
+      "when": "TOMORROW_FOUR_PM"
+    }
+  },
+  {
+    "id": "E05",
+    "text": "change my reminder about the plants to 6pm tomorrow",
+    "expect": {
+      "name": "edit",
+      "scope": "planning",
+      "target": "reminder",
+      "when": "TOMORROW_SIX_PM"
+    }
+  },
+  {
+    "id": "E06",
+    "text": "make the team sync an hour and a half long",
+    "expect": {
+      "name": "edit",
+      "scope": "planning",
+      "target": "meeting"
+    }
+  },
+  {
+    "id": "E07",
+    "text": "swap today's lunch for a tuna salad",
+    "expect": {
+      "name": "edit",
+      "scope": "coaching",
+      "target": "meal"
+    }
+  },
+  {
+    "id": "E08",
+    "text": "بدّل عشا النهاردة بكشري",
+    "expect": {
+      "name": "edit",
+      "scope": "coaching",
+      "target": "meal"
+    }
+  },
+  {
+    "id": "E09",
+    "text": "reschedule leg day to tomorrow at 9",
+    "expect": {
+      "name": "edit",
+      "scope": "coaching",
+      "target": "session",
+      "when": "TOMORROW_NINE"
+    }
+  },
+  {
+    "id": "K01",
+    "text": "tick off the passport renewal task",
+    "expect": {
+      "name": "complete",
+      "scope": "planning",
+      "target": "task"
+    }
+  },
+  {
+    "id": "K02",
+    "text": "I paid the internet bill, mark that task as done",
+    "expect": {
+      "name": "complete",
+      "scope": "planning"
+    }
+  },
+  {
+    "id": "K03",
+    "text": "خلصت مهمة تقرير الشغل، علّمها",
+    "expect": {
+      "name": "complete",
+      "scope": "planning"
+    }
+  },
+  {
+    "id": "K04",
+    "text": "the call with the landlord happened, mark it done",
+    "expect": {
+      "name": "complete",
+      "scope": "planning"
+    }
+  },
+  {
+    "id": "D02",
+    "text": "remove pancakes from my meal list",
+    "expect": {
+      "name": "delete",
+      "scope": "coaching",
+      "target": "meal"
+    }
+  },
+  {
+    "id": "D03",
+    "text": "امسح تذكير الغسيل",
+    "expect": {
+      "name": "delete",
+      "scope": "planning",
+      "target": "reminder"
+    }
+  },
+  {
+    "id": "D04",
+    "text": "get rid of my wednesday cycling slot",
+    "expect": {
+      "name": "delete",
+      "scope": "coaching",
+      "target": "slot"
+    }
+  },
+  {
+    "id": "D05",
+    "text": "delete the budget review meeting",
+    "expect": {
+      "name": "delete",
+      "scope": "planning",
+      "target": "meeting"
+    }
+  },
+  {
+    "id": "C04",
+    "text": "call off tomorrow's meeting with the accountant",
+    "expect": {
+      "name": "cancel",
+      "scope": "planning",
+      "target": "meeting"
+    }
+  },
+  {
+    "id": "C05",
+    "text": "cancel today's yoga session",
+    "expect": {
+      "name": "cancel",
+      "scope": "coaching",
+      "target": "session"
+    }
+  },
+  {
+    "id": "C06",
+    "text": "الغي اجتماع الخميس",
+    "expect": {
+      "name": "cancel",
+      "scope": "planning",
+      "target": "meeting"
+    }
+  },
+  {
+    "id": "Z01",
+    "text": "when is my dentist appointment?",
+    "expect": {
+      "name": "chat",
+      "scope": "planning"
+    }
+  },
+  {
+    "id": "Z02",
+    "text": "what time is my session tomorrow?",
+    "expect": {
+      "name": "chat",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "Z03",
+    "text": "should I move my workout to the evening?",
+    "expect": {
+      "name": "chat",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "Z04",
+    "text": "is it better to cancel a gym day or do a short one?",
+    "expect": {
+      "name": "chat",
+      "scope": "coaching"
+    }
+  },
+  {
+    "id": "Z05",
+    "text": "امتى اجتماعي الجاي؟",
+    "expect": {
+      "name": "chat",
+      "scope": "planning"
+    }
+  },
+  {
+    "id": "Z06",
+    "text": "I finished a great book today",
+    "expect": {
+      "name": "chat"
+    }
+  },
+  {
+    "id": "Z07",
+    "text": "I deleted the app from my laptop yesterday",
+    "expect": {
+      "name": "chat"
+    }
+  },
+  {
+    "id": "Z08",
+    "text": "can you explain how to edit a pdf?",
+    "expect": {
+      "name": "chat",
+      "scope": "other"
+    }
+  },
+  {
+    "id": "Z09",
+    "text": "did I already finish the report task?",
+    "expect": {
+      "name": "chat",
+      "scope": "planning"
     }
   }
 ]

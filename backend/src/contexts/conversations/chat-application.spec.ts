@@ -15,7 +15,7 @@ import {
 } from '../../shared/time/time.js';
 import { AllergenGuard } from './application/allergen-guard.js';
 import { IntentExecutor } from './application/intent-executor.js';
-import { IntentExtractor } from './application/intent-extractor.js';
+import { IntentExtractor, isQuestion } from './application/intent-extractor.js';
 import { PromptAssembler } from './application/prompt-assembler.js';
 import {
   renderPrompt,
@@ -48,6 +48,7 @@ import {
   type ChatTarget,
   type Intent,
 } from './domain/intent.js';
+import { afternoonHour } from './domain/relative-time.js';
 import { InMemoryProposalRepository } from './infrastructure/in-memory-proposal.repository.js';
 import { Message } from './domain/message.aggregate.js';
 import { InMemoryMessageRepository } from './infrastructure/in-memory-conversations.repositories.js';
@@ -2734,5 +2735,57 @@ describe('AllergenGuard', () => {
   it('folds diacritics and tatweel in the answer', () => {
     const scan = guard.forMember(['فول سوداني']);
     expect(scan.push('الفـول السودانى ممنوع')).toBe('فول سوداني');
+  });
+});
+
+describe('isQuestion (032)', () => {
+  it.each([
+    ['did I already finish the tax form?', true],
+    ['when is the plumber coming?', true],
+    ['امتى ميعاد الجيم؟', true],
+    ['should I skip leg day?', true],
+    // Requests wearing a question mark are instructions.
+    ['can you move the plumber to 5?', false],
+    ['could you delete the bins reminder?', false],
+    ['ممكن تلغي اجتماع بكرة؟', false],
+    // No question mark, no question.
+    ['move the plumber to 5', false],
+  ])('%s → %s', (text, expected) => {
+    expect(isQuestion(text)).toBe(expected);
+  });
+
+  it('turns a change the model read into a question back into chat', async () => {
+    const { llm } = stubLlm({
+      name: 'complete',
+      scope: 'planning',
+      args: { match: 'tax form' },
+    });
+    const extractor = new IntentExtractor(llm, settingsService());
+
+    const result = await extractor.extract({
+      text: 'did I already finish the tax form?',
+      now: new Date(),
+      timezone: ZONE,
+    });
+
+    expect(result.name).toBe('chat');
+  });
+});
+
+describe('afternoonHour (032)', () => {
+  it.each([
+    ['2026-10-09T04:00', 'بكرة الساعة ٤ العصر', '2026-10-09T16:00'],
+    ['2026-10-09T07:00', 'at 7 in the evening', '2026-10-09T19:00'],
+    ['2026-10-09T09:00', 'remind me at 9pm', '2026-10-09T21:00'],
+    // The model's 14:00 for "٤ العصر": the sentence states the hour.
+    ['2026-10-09T14:00', 'بكرة الساعة ٤ العصر', '2026-10-09T16:00'],
+    // Already past noon, or twelve, or no afternoon word: unchanged.
+    ['2026-10-09T16:00', 'at 4pm', '2026-10-09T16:00'],
+    ['2026-10-09T12:00', 'الساعة ١٢ بالليل', '2026-10-09T12:00'],
+    ['2026-10-09T04:00', 'at 4 in the morning', '2026-10-09T04:00'],
+    // "spam" is not "pm".
+    ['2026-10-09T04:00', 'clear the spam folder at 4', '2026-10-09T04:00'],
+  ])('%s + "%s" → %s', (wallClock, message, expected) => {
+    expect(afternoonHour(wallClock, message)).toBe(expected);
   });
 });

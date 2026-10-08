@@ -340,3 +340,39 @@ export function preferSoonestDay(
 
   return candidate;
 }
+
+/** Words that put an hour after noon, in either language (032). */
+const AFTERNOON = new RegExp(
+  String.raw`(?<![a-z])p\.?m\.?(?![a-z])|afternoon|evening|tonight` +
+    String.raw`|العصر|المغرب|المسا|المساء|مساء|مساءً|بالليل|بليل|بعد\s*الظهر|بعد\s*الضهر`,
+  'iu',
+);
+
+/**
+ * "٤ العصر" is 16:00, not 04:00 or 14:00 (032).
+ *
+ * The model reads a bare Arabic digit hour as written and drops the period
+ * word beside it — measured: "بكرة الساعة ٤ العصر" came back as 14:00, a silent
+ * time error. So when the sentence names an afternoon or evening and the wall
+ * clock's hour is 1 to 11, the hour moves past noon. Twelve is left alone:
+ * "12 at night" and "12 noon" are both written that way and neither is a
+ * mistake to correct by arithmetic.
+ */
+export function afternoonHour(wallClock: string, message: string): string {
+  if (!AFTERNOON.test(message)) return wallClock;
+  const match = /^(\d{4}-\d{2}-\d{2}T)(\d{2})(:\d{2})/.exec(wallClock);
+  if (!match) return wallClock;
+  /*
+   * The sentence's own hour wins over the model's when the sentence states
+   * one ("at 4", "الساعة ٤"): measured, "٤ العصر" also came back as 14:00,
+   * which no amount of adding twelve repairs.
+   */
+  const stated = STATED_HOUR.exec(message);
+  const hour = stated ? toNumber(stated[1]!) : Number(match[2]);
+  if (!Number.isInteger(hour) || hour < 1 || hour > 11) return wallClock;
+  return `${match[1]}${String(hour + 12).padStart(2, '0')}${match[3]}`;
+}
+
+/** "at 4", "الساعة ٤", "الساعه 4" — an hour the sentence states outright. */
+const STATED_HOUR =
+  /(?:\bat|الساعة|الساعه)\s*([0-9\u0660-\u0669]{1,2})(?![0-9\u0660-\u0669:])/iu;

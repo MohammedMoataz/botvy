@@ -14,6 +14,7 @@ import {
   type ListKind,
 } from '../domain/intent.js';
 import {
+  afternoonHour,
   mentionsAMoment,
   preferSoonestDay,
   resolveRelativePhrase,
@@ -221,9 +222,21 @@ export class IntentExtractor extends IntentExtractorPort {
   ): Intent {
     const body = (raw ?? {}) as Record<string, unknown>;
 
-    const name: IntentName = NAMES.has(body.name as string)
+    const named: IntentName = NAMES.has(body.name as string)
       ? (body.name as IntentName)
       : 'chat';
+    /*
+     * A question about something the member has is never a change to it
+     * (032). "Did I already finish the report task?" came back as `complete`
+     * and "when is my dentist?" as `edit` on the 3B model; the confirmation
+     * would have caught both, but a question answered with a Yes/No card is
+     * the product not listening. Asked over the sentence, like the time
+     * guards, because the grammar cannot express it — and a polite request
+     * ("can you move it to five?") is an instruction, so it is not a question
+     * here.
+     */
+    const name: IntentName =
+      CHANGES.has(named) && isQuestion(text) ? 'chat' : named;
     /*
      * An unreadable scope becomes `coaching`, not `other`.
      *
@@ -438,7 +451,9 @@ export class IntentExtractor extends IntentExtractorPort {
 
     // Normalise the `YYYY-MM-DD HH:mm` variant to the `T` form the rest of the
     // platform stores, so downstream regexes see one shape.
-    const wallClock = modelWhen.replace(' ', 'T');
+    // And an afternoon word moves a morning-looking hour past noon (032):
+    // "٤ العصر" came back as 14:00.
+    const wallClock = afternoonHour(modelWhen.replace(' ', 'T'), text);
     return preferSoonestDay(wallClock, text, now, timezone);
   }
 }
@@ -505,4 +520,22 @@ function asMetric(value: unknown): 'weightKg' | 'heightCm' | undefined {
   if (WEIGHT.includes(folded)) return 'weightKg';
   if (HEIGHT.includes(folded)) return 'heightCm';
   return undefined;
+}
+
+/** The intents that change something the member already has (032). */
+const CHANGES = new Set<IntentName>(['edit', 'complete', 'cancel', 'delete']);
+
+/**
+ * Whether a sentence asks rather than instructs: an interrogative opening and
+ * a question mark, in either language. "Can you / could you / would you …"
+ * is a request wearing a question mark, and is not counted.
+ */
+export function isQuestion(text: string): boolean {
+  const trimmed = text.trim().toLowerCase();
+  if (!/[?؟]\s*$/.test(trimmed)) return false;
+  if (/^(please\s+)?(can|could|would|will)\s+you\b/.test(trimmed)) return false;
+  if (/^(ممكن|لو سمحت|من فضلك)/.test(trimmed)) return false;
+  return /^(when|what|what's|whats|which|did|do|does|is|are|was|were|should|shall|where|why|how|have|has|امتى|إمتى|ايه|إيه|هل|فين|ليه|إزاي|ازاي|عملت|خلصت)(?=[\s?؟,]|$)/.test(
+    trimmed,
+  );
 }

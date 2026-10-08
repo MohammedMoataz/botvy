@@ -39,6 +39,8 @@ rebuild — constitution XII:
 | `llm.numCtx` | `8192` | **one** context size for every call |
 | `llm.keepAlive` | `-1` | seconds a model stays loaded after a call (`-1`: for ever), sent on every call |
 | `llm.chatMaxTokens` | `512` | ceiling on one chat answer (`num_predict`) |
+| `llm.extractMaxTokens` | `300` | ceiling on one intent extraction; without it a constrained call can run until the context is full |
+| `chat.readViewItems` | `6` | lines per section of the member's own data shown to the model each turn (`0` turns it off) |
 
 Change them in the admin portal under Settings, or
 `PATCH /api/v1/admin/settings/llm.chatModel`. The defaults are declared in

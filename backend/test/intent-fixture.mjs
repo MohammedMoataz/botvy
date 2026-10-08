@@ -73,6 +73,8 @@ let resolveRelativePhrase;
 let preferSoonestDay;
 let mentionsAMoment;
 let mentionsAClock;
+let isQuestion;
+let afternoonHour;
 const OLLAMA = process.env.OLLAMA_URL ?? 'http://127.0.0.1:11434';
 
 /**
@@ -234,7 +236,12 @@ async function extract({
   if (resolved) {
     intent.args = { ...intent.args, when: resolved };
   } else if (intent.args?.when) {
-    intent.args.when = preferSoonestDay(intent.args.when, text, now, ZONE);
+    intent.args.when = preferSoonestDay(
+      afternoonHour(intent.args.when, text),
+      text,
+      now,
+      ZONE,
+    );
   }
 
   /*
@@ -260,6 +267,15 @@ async function extract({
         ? mentionsAClock(text)
         : mentionsAMoment(text);
     if (!namesATime) delete intent.args.when;
+  }
+
+  // 032's guard: a question about something the member has is never a change
+  // to it. Applied here because the extractor applies it.
+  if (
+    ['edit', 'complete', 'cancel', 'delete'].includes(intent.name) &&
+    isQuestion(text)
+  ) {
+    intent.name = 'chat';
   }
 
   return { ok: true, ms, intent };
@@ -311,7 +327,16 @@ function grade(expected, actual, times) {
     );
   }
   // 032: which kind of row an edit, complete, cancel or delete is about.
-  if (expected.target && actual.args?.target !== expected.target) {
+  // A wrong target is a miss: the executor then searches only that kind. A
+  // missing one is a miss only for a meal or a slot, which it cannot find
+  // without being told; for the other four it searches all of them.
+  const target = actual.args?.target;
+  if (
+    expected.target &&
+    (target
+      ? target !== expected.target
+      : expected.target === 'meal' || expected.target === 'slot')
+  ) {
     problems.push(`target=${actual.args?.target} want ${expected.target}`);
   }
   if (expected.metric && actual.args?.metric !== expected.metric) {
@@ -373,7 +398,21 @@ async function main() {
     preferSoonestDay,
     mentionsAMoment,
     mentionsAClock,
+    afternoonHour,
   } = helpers);
+  ({ isQuestion } = await import(
+    pathToFileURL(
+      join(
+        HERE,
+        '..',
+        'dist',
+        'contexts',
+        'conversations',
+        'application',
+        'intent-extractor.js',
+      ),
+    ).href
+  ));
   /*
    * Named rather than trusted, because a missing export from a *compiled*
    * module is `undefined` at the call site and nothing here would say so —
@@ -386,6 +425,8 @@ async function main() {
     preferSoonestDay,
     mentionsAMoment,
     mentionsAClock,
+    isQuestion,
+    afternoonHour,
   })) {
     if (typeof fn !== 'function') {
       throw new Error(

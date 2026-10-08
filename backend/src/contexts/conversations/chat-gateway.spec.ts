@@ -94,6 +94,25 @@ class FakeRunner {
     await this.behaviour(request, events);
   }
 
+  readonly confirms: Array<{
+    userId: string;
+    requestId: string;
+    proposalId: string;
+    accept: boolean;
+  }> = [];
+
+  async confirm(input: {
+    userId: string;
+    requestId: string;
+    proposalId: string;
+    accept: boolean;
+  }): Promise<{ ok: boolean; error?: 'forbidden' | 'answered' | 'expired' }> {
+    this.confirms.push(input);
+    return input.proposalId === 'gone'
+      ? { ok: false, error: 'expired' }
+      : { ok: true };
+  }
+
   get port(): TurnRunner {
     return this as unknown as TurnRunner;
   }
@@ -704,5 +723,60 @@ describe('the nudge after a turn', () => {
     await settle();
 
     expect(harness.rooms.frames).toEqual([]);
+  });
+});
+
+describe('chat.confirm (032)', () => {
+  it('passes the member and the answer to the runner, and acks its verdict', async () => {
+    const { gateway, runner } = bench();
+    const client = socket({
+      kind: 'user',
+      id: 'member-1',
+      role: 'user',
+    } as Principal);
+
+    const ok = await gateway.confirm(
+      { requestId: 'r1', proposalId: 'p1', accept: true },
+      client,
+    );
+    const late = await gateway.confirm(
+      { requestId: 'r2', proposalId: 'gone', accept: false },
+      client,
+    );
+
+    expect(ok).toEqual({ ok: true });
+    expect(late).toEqual({ ok: false, error: 'expired' });
+    expect(runner.confirms).toEqual([
+      { userId: 'member-1', requestId: 'r1', proposalId: 'p1', accept: true },
+      {
+        userId: 'member-1',
+        requestId: 'r2',
+        proposalId: 'gone',
+        accept: false,
+      },
+    ]);
+  });
+
+  it('refuses a body without a boolean answer, and an unauthenticated socket', async () => {
+    const { gateway, runner } = bench();
+    const member = socket({
+      kind: 'user',
+      id: 'member-1',
+      role: 'user',
+    } as Principal);
+
+    expect(
+      await gateway.confirm(
+        { requestId: 'r', proposalId: 'p', accept: 'yes' },
+        member,
+      ),
+    ).toEqual({ ok: false, error: 'bad_request' });
+    expect(
+      await gateway.confirm(
+        { requestId: 'r', proposalId: 'p', accept: true },
+        socket(),
+      ),
+    ).toEqual({ ok: false, error: 'unauthorized' });
+    expect(runner.confirms).toEqual([]);
   });
 });

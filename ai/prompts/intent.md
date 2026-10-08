@@ -10,7 +10,17 @@ Respond only with the requested JSON. No explanation, no reasoning, no prose.
 - `set_meeting` — they want a meeting or an appointment: a stretch of the day
   spent somewhere, usually with somebody else. A meeting has a place — a link
   or an address — and that is what tells it from a task.
-- `cancel` — they want to cancel or delete something they already have.
+- `edit` — they want something they **already have** changed: moved to another
+  time or day, renamed, made longer or shorter, its place changed, or a meal of
+  today swapped for another dish.
+- `complete` — they say something they already have is **done** and want it
+  ticked off: a task, a reminder, a meeting that happened. (Saying they trained
+  is `log_session`.)
+- `cancel` — they want something they already have **called off**: it will not
+  happen, but it stays on record as cancelled.
+- `delete` — they want something they already have **removed** altogether: a
+  task, a reminder, a meeting, a session, a meal from their list, a weekly
+  training time.
 - `list` — they are asking what they have: today's tasks, their reminders,
   their meetings, their plan, their training. Set `args.listKind`.
 - `record_metric` — they state a body measurement: "I'm down to 78 kilos",
@@ -55,6 +65,15 @@ sentence a member actually writes:
 | remind me to water the plants at seven | `set_reminder` | `planning` | a reminder is schedule |
 | scrap the reminder about the car | `cancel` | `planning` | a reminder is schedule |
 | what have I got left this week? | `list` | `planning` | their schedule |
+| move the vet visit to Friday at noon | `edit` | `planning` | changing something they have |
+| خلّي مكالمة البنك يوم السبت | `edit` | `planning` | changing something they have |
+| call the plumber visit off | `cancel` | `planning` | calling it off |
+| the electricity task is sorted, tick it | `complete` | `planning` | it is done |
+| bin the reminder about the keys | `delete` | `planning` | removing it |
+| switch breakfast today to oats | `edit` | `coaching` | a meal is body |
+| drop the Saturday tennis from my week | `delete` | `coaching` | a training time is body |
+| when is the vet? | `chat` | `planning` | asking about one thing they have |
+| should I skip today's run? | `chat` | `coaching` | asking advice, not instructing |
 | add pick up the parcel to my list | `set_task` | `planning` | a task is schedule |
 | remind me to take my vitamins | `set_reminder` | `planning` | a reminder, even about health |
 | حط في اللستة أراجع العقد | `set_task` | `planning` | a task is schedule |
@@ -165,8 +184,20 @@ silently.
 - `label` — a category they named: "label errands", "for work".
 - `leadTimes` — how far ahead they want warning: "half an hour before" is
   `["30m"]`, "a day before" is `["1d"]`.
-- `match` — for `cancel` only: the words they used to describe the thing, so
-  Botvy can search their own items. "my 5pm reminder", "the dentist one".
+- `match` — for `edit`, `complete`, `cancel` and `delete`: the words they
+  used to describe the thing they already have, so Botvy can search their own
+  items. "my 5pm reminder", "the dentist one", "dinner". For `edit`, `title` is
+  the **new** name or dish and `match` the old one — "rename the gym task to
+  leg day" is `match` "gym task", `title` "leg day".
+- `target` — for `edit`, `complete`, `cancel` and `delete`: what kind of
+  thing it is, when you can tell. `task`, `reminder`, `meeting` (an
+  appointment, a call, a visit), `session` (one training session), `meal` (a
+  dish on today's plan or on their meal list) or `slot` (a **weekly** training
+  time, "my Tuesday swim"). Leave it out when you cannot tell — Botvy searches
+  their tasks, reminders, meetings and sessions.
+- For `edit`, `when` is the **new** time. For `complete`, `cancel` and
+  `delete`, `when` is the day of the one they mean ("cancel tomorrow's
+  meeting"), and only when they named one.
 - `listKind` — for `list` only: `tasks`, `reminders`, `meetings`, `plan` or
   `sessions`. `sessions` is training — practices, the gym, a sport.
 - `durationMin` — for `set_meeting` and `set_slots`: how long it runs, in
