@@ -125,6 +125,7 @@ function expectedTimes(now) {
     IN_THIRTY_AR: plus(30),
     TOMORROW_NINE: `${tomorrow}T09:00`,
     TOMORROW_SIX_PM: `${tomorrow}T18:00`,
+    TOMORROW_FOUR_PM: `${tomorrow}T16:00`,
     TOMORROW_DATE: tomorrow,
   };
 }
@@ -169,7 +170,15 @@ async function loadSchema() {
   return Function(`"use strict"; return (${literal});`)();
 }
 
-async function extract({ prompt, schema, model, numCtx, text, now }) {
+async function extract({
+  prompt,
+  schema,
+  model,
+  numCtx,
+  maxTokens,
+  text,
+  now,
+}) {
   const filled = prompt
     .replace('{{now}}', wallClock(now))
     .replace('{{timezone}}', ZONE)
@@ -185,9 +194,11 @@ async function extract({ prompt, schema, model, numCtx, text, now }) {
       messages: [{ role: 'user', content: filled }],
       stream: false,
       format: schema,
-      options: { num_ctx: numCtx, temperature: 0 },
+      options: { num_ctx: numCtx, temperature: 0, num_predict: maxTokens },
     }),
-  });
+    // A case that hangs is a failed case, not a failed run.
+    signal: AbortSignal.timeout(120_000),
+  }).catch((error) => ({ ok: false, status: error.name }));
   const ms = Date.now() - started;
 
   if (!response.ok) {
@@ -299,6 +310,10 @@ function grade(expected, actual, times) {
       `listKind=${actual.args?.listKind} want ${expected.listKind}`,
     );
   }
+  // 032: which kind of row an edit, complete, cancel or delete is about.
+  if (expected.target && actual.args?.target !== expected.target) {
+    problems.push(`target=${actual.args?.target} want ${expected.target}`);
+  }
   if (expected.metric && actual.args?.metric !== expected.metric) {
     problems.push(`metric=${actual.args?.metric} want ${expected.metric}`);
   }
@@ -319,15 +334,40 @@ async function settings() {
    * would report a hit rate for a model nobody uses — and "which model" is the
    * single biggest determinant of the number this file prints.
    */
-  const model = process.env.BOTVY_CHAT_EXTRACT_MODEL ?? 'qwen2.5:3b-instruct';
-  const numCtx = Number(process.env.BOTVY_NUM_CTX ?? 4096);
-  return { model, numCtx };
+  /*
+   * The defaults are the registry's own, read from the compiled registry.
+   * This used to say 4096 here while the registry said 8192, so once 032 grew
+   * `intent.md` past 4,096 tokens every call in this run was truncated and
+   * re-read from scratch — the fixture graded a prompt production never sends.
+   */
+  const compiled = join(
+    HERE,
+    '..',
+    'dist',
+    'shared',
+    'settings',
+    'settings.registry.js',
+  );
+  const { SETTINGS_REGISTRY } = await import(pathToFileURL(compiled).href);
+  const model =
+    process.env.BOTVY_CHAT_EXTRACT_MODEL ??
+    SETTINGS_REGISTRY['llm.extractModel'].default;
+  const numCtx = Number(
+    process.env.BOTVY_NUM_CTX ?? SETTINGS_REGISTRY['llm.numCtx'].default,
+  );
+  const maxTokens = SETTINGS_REGISTRY['llm.extractMaxTokens'].default;
+  return { model, numCtx, maxTokens };
 }
 
 async function main() {
-  const [prompt, cases, schema, { model, numCtx }, helpers] = await Promise.all(
-    [loadPrompt(), loadCases(), loadSchema(), settings(), loadTimeHelpers()],
-  );
+  const [prompt, cases, schema, { model, numCtx, maxTokens }, helpers] =
+    await Promise.all([
+      loadPrompt(),
+      loadCases(),
+      loadSchema(),
+      settings(),
+      loadTimeHelpers(),
+    ]);
   ({
     resolveRelativePhrase,
     preferSoonestDay,
@@ -375,6 +415,7 @@ async function main() {
       schema,
       model,
       numCtx,
+      maxTokens,
       text: testCase.text,
       now,
     });
@@ -433,7 +474,9 @@ async function main() {
 }
 
 await main().catch((error) => {
-  console.error(`the fixture could not run: ${error.message}`);
+  console.error(
+    `the fixture could not run: ${error.message}${error.cause ? ` (${error.cause.code ?? error.cause.message})` : ''}`,
+  );
   console.error('Is Ollama reachable, and is the extract model pulled?');
   process.exit(1);
 });

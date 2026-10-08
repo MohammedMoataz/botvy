@@ -243,6 +243,12 @@ export const SETTINGS_REGISTRY = {
     description:
       'Seconds Ollama keeps a model loaded after a call; -1 is for ever. Sent on every call, so the host environment does not decide it.',
   }),
+  'llm.extractMaxTokens': define({
+    schema: z.number().int().min(64).max(4096),
+    default: 300,
+    description:
+      'Ceiling on one intent extraction. A grammar-constrained call can otherwise run on until the context is full, which takes minutes on a small GPU.',
+  }),
   'llm.chatMaxTokens': define({
     schema: z.number().int().min(64).max(8192),
     default: 512,

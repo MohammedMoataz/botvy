@@ -132,9 +132,10 @@ export class IntentExtractor extends IntentExtractorPort {
     const { text, now, timezone } = input;
 
     try {
-      const [model, numCtx] = await Promise.all([
+      const [model, numCtx, maxTokens] = await Promise.all([
         this.settings.get('llm.extractModel'),
         this.settings.get('llm.numCtx'),
+        this.settings.get('llm.extractMaxTokens'),
       ]);
 
       const today = localDate(now, timezone);
@@ -163,7 +164,7 @@ export class IntentExtractor extends IntentExtractorPort {
       const raw = await this.llm.extract<unknown>(
         [{ role: 'user', content: prompt }],
         INTENT_SCHEMA,
-        { model, numCtx },
+        { model, numCtx, maxTokens },
       );
 
       if (raw === null) {

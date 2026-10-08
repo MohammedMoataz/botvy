@@ -296,3 +296,24 @@ describe('keeping the model warm (031)', () => {
     });
   });
 });
+
+describe('extraction ceiling (032)', () => {
+  it('sends num_predict when given one, so a constrained call cannot run on', async () => {
+    const { bodies, fetchImpl } = capturing(() =>
+      jsonResponse({ message: { content: '{}' } }),
+    );
+    const client = new OllamaClient('http://ollama:11434', fetchImpl);
+
+    await client.extract(
+      [],
+      { type: 'object' },
+      { ...options, maxTokens: 300 },
+    );
+
+    expect(bodies[0]!.options).toEqual({
+      num_ctx: 8192,
+      temperature: 0,
+      num_predict: 300,
+    });
+  });
+});

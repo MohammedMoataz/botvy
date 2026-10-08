@@ -218,7 +218,11 @@ export class OllamaClient {
           format: schema,
           ...(await this.keepAliveField()),
           // Extraction is not a place for creativity.
-          options: { num_ctx: options.numCtx, temperature: 0 },
+          options: {
+            num_ctx: options.numCtx,
+            temperature: 0,
+            ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),
+          },
         }),
         ...(options.signal ? { signal: options.signal } : {}),
       });
