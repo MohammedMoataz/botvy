@@ -132,6 +132,8 @@ class AppLocalizations {
   String get addTagHint => _t('addTagHint');
   String get save => _t('save');
   String get saved => _t('saved');
+  String get unsavedTitle => _t('unsavedTitle');
+  String get discard => _t('discard');
 
   // -- preferences -----------------------------------------------------------
   String get preferencesTitle => _t('preferencesTitle');
@@ -927,6 +929,8 @@ class AppLocalizations {
       'addTagHint': 'Type and press enter',
       'save': 'Save',
       'saved': 'Saved.',
+      'unsavedTitle': 'Discard your unsaved changes?',
+      'discard': 'Discard',
       'preferencesTitle': 'Preferences',
       'dailyTimes': 'Daily times',
       'planTomorrowTime': 'Plan tomorrow at',
@@ -1420,6 +1424,8 @@ class AppLocalizations {
       'addTagHint': 'اكتب ثم اضغط إدخال',
       'save': 'حفظ',
       'saved': 'تم الحفظ.',
+      'unsavedTitle': 'هل تتجاهل التغييرات غير المحفوظة؟',
+      'discard': 'تجاهل',
       'preferencesTitle': 'التفضيلات',
       'dailyTimes': 'المواعيد اليومية',
       'planTomorrowTime': 'التخطيط للغد في',

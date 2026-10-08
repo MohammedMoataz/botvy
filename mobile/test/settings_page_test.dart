@@ -120,14 +120,58 @@ void main() {
     }
   });
 
-  testWidgets('a switch writes the same field it always did', (tester) async {
+  FilledButton saveButton(WidgetTester tester) =>
+      tester.widget<FilledButton>(find.byKey(const ValueKey('save-bar')));
+
+  testWidgets(
+      'a change waits for Save, then writes the same field it always did',
+      (tester) async {
     await pump(tester);
+    expect(saveButton(tester).onPressed, isNull, reason: 'nothing to save yet');
+
     await tester.tap(
       find.text(AppLocalizations(const Locale('en')).aiSuggestions),
     );
     await tester.pumpAndSettle();
+    expect(mirror.patches, isEmpty, reason: 'nothing leaves before Save');
+    expect(saveButton(tester).onPressed, isNotNull);
+
+    await tester.tap(find.byKey(const ValueKey('save-bar')));
+    await tester.pumpAndSettle();
     expect(mirror.patches, [
       {'aiSuggestions': false},
+    ]);
+    expect(find.text('Saved.'), findsOneWidget);
+    expect(saveButton(tester).onPressed, isNull, reason: 'saved, clean again');
+  });
+
+  testWidgets('a change undone is not a change', (tester) async {
+    await pump(tester);
+    final label = find.text(
+      AppLocalizations(const Locale('en')).aiSuggestions,
+    );
+    await tester.tap(label);
+    await tester.pumpAndSettle();
+    await tester.tap(label);
+    await tester.pumpAndSettle();
+    expect(saveButton(tester).onPressed, isNull);
+  });
+
+  testWidgets('several changes go in one patch', (tester) async {
+    await pump(tester);
+    final t = AppLocalizations(const Locale('en'));
+    await tester.tap(find.text(t.aiSuggestions));
+    await tester.tap(find.text(t.checkinEnabled));
+    await tester.tap(find.text('30m'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save-bar')));
+    await tester.pumpAndSettle();
+    expect(mirror.patches, [
+      {
+        'aiSuggestions': false,
+        'checkinEnabled': false,
+        'leadTimes': ['0m', '30m', '1h'],
+      },
     ]);
   });
 

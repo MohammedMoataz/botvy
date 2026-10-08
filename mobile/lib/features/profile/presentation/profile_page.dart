@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -13,6 +14,7 @@ import '../../auth/application/auth_cubit.dart';
 import '../data/profile_mirror.dart';
 import 'tag_editor.dart';
 import '../../../app/tokens.dart';
+import '../../../ui/save_bar.dart';
 import '../../../ui/states.dart';
 
 /// The member's own facts.
@@ -23,6 +25,20 @@ import '../../../ui/states.dart';
 /// typed: the server trims the name and lower-cases the tag lists, and a screen
 /// showing `Peanuts` over a stored `peanuts` would report a change on the next
 /// save that is not one.
+///
+/// ## One form, one Save (031)
+///
+/// Edits collect in a draft and go to the server in one patch when the member
+/// presses Save. Before 031 each field saved on its own, and the name and the
+/// time zone only when the keyboard's done key was pressed — a member who
+/// typed a name and pressed back lost it without a word. One patch is also
+/// what the server is built for: it raises a single `ProfileUpdated` naming
+/// the fields that moved, and that event reschedules the member's day, so
+/// field-by-field saves rescheduled it once per field. Leaving with unsaved
+/// edits asks first.
+///
+/// Body metrics are not part of the draft. A reading is a new record with its
+/// own Add button, not a field to edit.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -33,54 +49,91 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final _mirror = sl<ProfileMirror>();
   final _name = TextEditingController();
+  final _zone = TextEditingController();
 
   Profile? _profile;
+  String _locale = 'en';
+  List<String> _likes = const [];
+  List<String> _dislikes = const [];
+  List<String> _allergies = const [];
+  List<String> _symptoms = const [];
+
   bool _saving = false;
   String? _problem;
 
   @override
   void initState() {
     super.initState();
+    // Typing changes whether there is anything to save.
+    _name.addListener(_touch);
+    _zone.addListener(_touch);
     unawaited(_load());
   }
 
   @override
   void dispose() {
     _name.dispose();
+    _zone.dispose();
     super.dispose();
   }
+
+  void _touch() => setState(() {});
 
   Future<void> _load() async {
     final profile = await _mirror.readProfile();
     if (!mounted) return;
-    setState(() {
-      _profile = profile;
-      _name.text = profile?.displayName ?? '';
-    });
+    setState(() => _reset(profile));
   }
 
-  /// One save for the whole form.
-  ///
-  /// The server raises a single `ProfileUpdated` naming the fields that moved,
-  /// and a screen that saved field by field would raise several — rescheduling
-  /// the member's day once per keystroke group rather than once per visit.
-  Future<void> _save(Map<String, dynamic> patch) async {
+  /// The draft, set back to what is stored.
+  void _reset(Profile? profile) {
+    _profile = profile;
+    if (profile == null) return;
+    _name.text = profile.displayName ?? '';
+    _zone.text = profile.timezone;
+    _locale = profile.locale;
+    _likes = profile.foodLikes;
+    _dislikes = profile.foodDislikes;
+    _allergies = profile.allergies;
+    _symptoms = profile.symptoms;
+  }
+
+  /// Only the fields that differ from what is stored.
+  Map<String, dynamic> get _changes {
+    final p = _profile;
+    if (p == null) return const {};
+    final name = _name.text.trim();
+    final zone = _zone.text.trim();
+    return {
+      if (name != (p.displayName ?? '')) 'displayName': name,
+      if (zone.isNotEmpty && zone != p.timezone) 'timezone': zone,
+      if (_locale != p.locale) 'locale': _locale,
+      if (!listEquals(_likes, p.foodLikes)) 'foodLikes': _likes,
+      if (!listEquals(_dislikes, p.foodDislikes)) 'foodDislikes': _dislikes,
+      if (!listEquals(_allergies, p.allergies)) 'allergies': _allergies,
+      if (!listEquals(_symptoms, p.symptoms)) 'symptoms': _symptoms,
+    };
+  }
+
+  Future<void> _save() async {
+    final changes = _changes;
+    if (changes.isEmpty) return;
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     setState(() {
       _saving = true;
       _problem = null;
     });
     try {
-      final updated = await _mirror.patchProfile(patch);
+      final updated = await _mirror.patchProfile(changes);
       if (!mounted) return;
-      setState(() {
-        _profile = updated;
-        _name.text = updated?.displayName ?? '';
-      });
+      setState(() => _reset(updated));
+      messenger.showSnackBar(SnackBar(content: Text(t.saved)));
     } on ApiException catch (e) {
+      // The draft stays as typed, so a refused save can be fixed and retried
+      // rather than typed again.
       if (!mounted) return;
-      setState(() => _problem = e.isOffline
-          ? AppLocalizations.of(context).offline
-          : AppLocalizations.of(context).somethingWentWrong);
+      setState(() => _problem = e.isOffline ? t.offline : t.somethingWentWrong);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -90,78 +143,80 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final profile = _profile;
+    final dirty = _changes.isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.profileTitle),
+    return UnsavedChangesGuard(
+      dirty: dirty,
+      child: Scaffold(
+        appBar: AppBar(title: Text(t.profileTitle)),
+        bottomNavigationBar: profile == null
+            ? null
+            : SaveBar(
+                dirty: dirty,
+                saving: _saving,
+                onSave: () => unawaited(_save()),
+              ),
+        body: profile == null
+            ? const LoadingView()
+            : ListView(
+                padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
+                children: [
+                  if (context.read<AuthCubit>().state.mustChangePassword)
+                    _Notice(
+                      text: t.changeYourPassword,
+                      severity: _Severity.warn,
+                    ),
+                  if (_problem != null)
+                    _Notice(text: _problem!, severity: _Severity.error),
+                  TextField(
+                    key: const ValueKey('profile-name'),
+                    controller: _name,
+                    decoration: InputDecoration(labelText: t.displayName),
+                  ),
+                  const SizedBox(height: BotvySpace.lg),
+                  _TimezoneField(controller: _zone, enabled: !_saving),
+                  const SizedBox(height: BotvySpace.lg),
+                  _LanguageField(
+                    value: _locale,
+                    onChanged: (locale) => setState(() => _locale = locale),
+                  ),
+                  const Divider(height: 32),
+                  _Metrics(
+                    profile: profile,
+                    onAdd: (metric) => unawaited(_addMetric(metric)),
+                  ),
+                  const Divider(height: 32),
+                  TagEditor(
+                    label: t.foodLikes,
+                    hint: t.addTagHint,
+                    values: _likes,
+                    onChanged: (v) => setState(() => _likes = v),
+                  ),
+                  TagEditor(
+                    label: t.foodDislikes,
+                    hint: t.addTagHint,
+                    values: _dislikes,
+                    onChanged: (v) => setState(() => _dislikes = v),
+                  ),
+                  TagEditor(
+                    label: t.allergies,
+                    hint: t.addTagHint,
+                    // Spelled out, because this list is a safety input rather
+                    // than a preference: meal suggestions withhold anything on
+                    // it, and a member who does not know that will not fill it in.
+                    help: t.allergiesHelp,
+                    values: _allergies,
+                    onChanged: (v) => setState(() => _allergies = v),
+                  ),
+                  TagEditor(
+                    label: t.symptoms,
+                    hint: t.addTagHint,
+                    values: _symptoms,
+                    onChanged: (v) => setState(() => _symptoms = v),
+                  ),
+                ],
+              ),
       ),
-      body: profile == null
-          ? const LoadingView()
-          : ListView(
-              padding: const EdgeInsetsDirectional.all(BotvySpace.lg),
-              children: [
-                if (context.read<AuthCubit>().state.mustChangePassword)
-                  _Notice(text: t.changeYourPassword, severity: _Severity.warn),
-                if (_problem != null)
-                  _Notice(text: _problem!, severity: _Severity.error),
-
-                TextField(
-                  controller: _name,
-                  decoration: InputDecoration(labelText: t.displayName),
-                  onSubmitted: (value) =>
-                      unawaited(_save({'displayName': value.trim()})),
-                ),
-                const SizedBox(height: BotvySpace.lg),
-
-                _TimezoneField(
-                  value: profile.timezone,
-                  saving: _saving,
-                  onChanged: (zone) => unawaited(_save({'timezone': zone})),
-                ),
-                const SizedBox(height: BotvySpace.lg),
-
-                _LanguageField(
-                  value: profile.locale,
-                  onChanged: (locale) => unawaited(_save({'locale': locale})),
-                ),
-
-                const Divider(height: 32),
-                _Metrics(
-                  profile: profile,
-                  onAdd: (metric) => unawaited(_addMetric(metric)),
-                ),
-
-                const Divider(height: 32),
-                TagEditor(
-                  label: t.foodLikes,
-                  hint: t.addTagHint,
-                  values: profile.foodLikes,
-                  onChanged: (v) => unawaited(_save({'foodLikes': v})),
-                ),
-                TagEditor(
-                  label: t.foodDislikes,
-                  hint: t.addTagHint,
-                  values: profile.foodDislikes,
-                  onChanged: (v) => unawaited(_save({'foodDislikes': v})),
-                ),
-                TagEditor(
-                  label: t.allergies,
-                  hint: t.addTagHint,
-                  // Spelled out, because this list is a safety input rather
-                  // than a preference: meal suggestions withhold anything on
-                  // it, and a member who does not know that will not fill it in.
-                  help: t.allergiesHelp,
-                  values: profile.allergies,
-                  onChanged: (v) => unawaited(_save({'allergies': v})),
-                ),
-                TagEditor(
-                  label: t.symptoms,
-                  hint: t.addTagHint,
-                  values: profile.symptoms,
-                  onChanged: (v) => unawaited(_save({'symptoms': v})),
-                ),
-              ],
-            ),
     );
   }
 
@@ -169,10 +224,12 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _saving = true);
     try {
       final updated = await _mirror.recordMetric(metric);
+      // The reading only: the rest of the draft is the member's and unsaved.
       if (mounted) setState(() => _profile = updated);
     } on ApiException {
       if (mounted) {
-        setState(() => _problem = AppLocalizations.of(context).somethingWentWrong);
+        setState(
+            () => _problem = AppLocalizations.of(context).somethingWentWrong);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -188,15 +245,10 @@ class _ProfilePageState extends State<ProfilePage> {
 /// has to be able to fix it. Every reminder they ever get is resolved against
 /// this value, which is why it is on the profile and not a device setting.
 class _TimezoneField extends StatelessWidget {
-  const _TimezoneField({
-    required this.value,
-    required this.saving,
-    required this.onChanged,
-  });
+  const _TimezoneField({required this.controller, required this.enabled});
 
-  final String value;
-  final bool saving;
-  final void Function(String) onChanged;
+  final TextEditingController controller;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -205,20 +257,18 @@ class _TimezoneField extends StatelessWidget {
       children: [
         Expanded(
           child: TextField(
-            key: ValueKey(value),
-            controller: TextEditingController(text: value),
+            controller: controller,
             decoration: InputDecoration(labelText: t.timezone),
-            onSubmitted: onChanged,
           ),
         ),
         IconButton(
           icon: const Icon(Icons.my_location),
           tooltip: t.timezone,
-          onPressed: saving
+          onPressed: !enabled
               ? null
               : () async {
                   final detected = await deviceTimezoneOrNull();
-                  if (detected != null && detected != value) onChanged(detected);
+                  if (detected != null) controller.text = detected;
                 },
         ),
       ],
@@ -248,6 +298,9 @@ class _LanguageField extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     return DropdownButtonFormField<String>(
+      // Keyed on the value, so a save or a reset that changes it redraws the
+      // field rather than leaving the old initial value showing.
+      key: ValueKey(value),
       initialValue: value,
       decoration: InputDecoration(labelText: t.language),
       items: const [
@@ -322,11 +375,9 @@ class _MetricsState extends State<_Metrics> {
       children: [
         Text(t.bodyMetrics, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: BotvySpace.sm),
-
         if (profile.bmi != null)
           Text('${t.bmi}: ${profile.bmi}',
               style: Theme.of(context).textTheme.bodyLarge),
-
         Row(
           children: [
             Expanded(child: _number(_weight, t.weightKg)),
@@ -350,42 +401,41 @@ class _MetricsState extends State<_Metrics> {
           label: Text(t.addMetric),
           onPressed: _submit,
         ),
-
         const SizedBox(height: BotvySpace.sm),
         if (metrics.isEmpty)
           Text(t.noMetricsYet, style: Theme.of(context).textTheme.bodySmall)
         else
           // Newest first: the last reading is the one somebody came to see.
           ...metrics.reversed.take(10).map(
-            (row) => ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                [
-                  if (row['weightKg'] != null) '${row['weightKg']} kg',
-                  if (row['heightCm'] != null) '${row['heightCm']} cm',
-                  if (row['bodyFatPct'] != null) '${row['bodyFatPct']}%',
-                ].join('  ·  '),
+                (row) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    [
+                      if (row['weightKg'] != null) '${row['weightKg']} kg',
+                      if (row['heightCm'] != null) '${row['heightCm']} cm',
+                      if (row['bodyFatPct'] != null) '${row['bodyFatPct']}%',
+                    ].join('  ·  '),
+                  ),
+                  subtitle: Text(
+                    DateTime.tryParse('${row['recordedAt']}')
+                            ?.toLocal()
+                            .toString()
+                            .split('.')
+                            .first ??
+                        '',
+                  ),
+                ),
               ),
-              subtitle: Text(
-                DateTime.tryParse('${row['recordedAt']}')
-                        ?.toLocal()
-                        .toString()
-                        .split('.')
-                        .first ??
-                    '',
-              ),
-            ),
-          ),
       ],
     );
   }
 
   Widget _number(TextEditingController controller, String label) => TextField(
-    controller: controller,
-    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-    decoration: InputDecoration(labelText: label),
-  );
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(labelText: label),
+      );
 }
 
 enum _Severity { warn, error }

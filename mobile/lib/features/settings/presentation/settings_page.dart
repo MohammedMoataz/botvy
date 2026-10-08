@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals, mapEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +12,7 @@ import '../../../app/tokens.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/db/database.dart';
 import '../../../ui/confirm_dialog.dart';
+import '../../../ui/save_bar.dart';
 import '../../../ui/section.dart';
 import '../../../ui/settings_tiles.dart';
 import '../../../ui/states.dart';
@@ -25,16 +27,18 @@ const String _version = String.fromEnvironment(
 
 /// Every setting a member may change, in one place and in sections (030).
 ///
-/// The member's preferences are the ones `PreferencesPage` used to hold, and
-/// they behave as they did: every control writes immediately rather than
-/// collecting into a Save button — these are independent settings, not one
-/// form, and the server reports which fields moved so a single-field patch is
-/// the cheap case. Each value is validated by the server against the schema of
-/// its own `settings.defaults.*` entry, so this screen offers controls that
-/// cannot express an invalid value and shows the server's refusal if one gets
-/// through anyway.
+/// The member's preferences are the ones `PreferencesPage` used to hold. Since
+/// 031 they collect in a draft and go to the server in one patch when the
+/// member presses Save. Writing each control as it moved left nothing on the
+/// screen saying anything had been saved, and members went looking for a
+/// button that was not there. Leaving with unsaved edits asks first. Each
+/// value is validated by the server against the schema of its own
+/// `settings.defaults.*` entry, so this screen offers controls that cannot
+/// express an invalid value and shows the server's refusal if one gets through
+/// anyway.
 ///
-/// Appearance is the phone's own and applies at once; see [AppearanceCubit].
+/// Appearance is the phone's own and still applies at once (you see the theme
+/// change as you pick it); see [AppearanceCubit]. It is not part of the draft.
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
@@ -60,6 +64,11 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _saving = false;
   String? _problem;
 
+  /// Edits not yet saved, keyed by the server's field name. A control that is
+  /// moved back to the stored value drops out, so Save is only enabled when
+  /// something would actually change.
+  final Map<String, Object> _draft = {};
+
   @override
   void initState() {
     super.initState();
@@ -71,24 +80,41 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) setState(() => _prefs = prefs);
   }
 
-  Future<void> _patch(Map<String, dynamic> patch) async {
+  /// The value a control shows: the draft's if it has one, else the stored one.
+  T _value<T extends Object>(String field, T stored) =>
+      (_draft[field] as T?) ?? stored;
+
+  void _edit(String field, Object value, Object stored) => setState(() {
+        if (_same(value, stored)) {
+          _draft.remove(field);
+        } else {
+          _draft[field] = value;
+        }
+      });
+
+  Future<void> _save() async {
+    if (_draft.isEmpty) return;
+    final t = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     setState(() {
       _saving = true;
       _problem = null;
     });
     try {
-      final updated = await widget.mirror.patchPreferences(patch);
-      if (mounted) setState(() => _prefs = updated);
+      final updated = await widget.mirror.patchPreferences(Map.of(_draft));
+      if (!mounted) return;
+      setState(() {
+        _prefs = updated;
+        _draft.clear();
+      });
+      messenger.showSnackBar(SnackBar(content: Text(t.saved)));
     } on ApiException catch (e) {
       if (!mounted) return;
-      final t = AppLocalizations.of(context);
       // The server's refusal, shown as its own message: "endOfDayTime: a
       // wall-clock time as HH:mm" names the field and the rule, and a generic
-      // "something went wrong" would throw both away.
+      // "something went wrong" would throw both away. The draft stays, so the
+      // member fixes the one field rather than redoing all of them.
       setState(() => _problem = e.isOffline ? t.offline : e.message);
-      // And re-read, so a refused control snaps back to what is actually
-      // stored rather than sitting on the value that was rejected.
-      await _load();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -110,191 +136,233 @@ class _SettingsPageState extends State<SettingsPage> {
     final t = AppLocalizations.of(context);
     final prefs = _prefs;
     final enabled = !_saving;
+    final dirty = _draft.isNotEmpty;
+    final quietStored = prefs == null
+        ? const <String, String>{}
+        : {'from': prefs.quietFrom, 'to': prefs.quietTo};
+    final quiet = _value<Map<String, String>>('quietHours', quietStored);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar.large(title: Text(t.settingsTitle)),
-          if (_problem != null) SliverToBoxAdapter(child: _Problem(_problem!)),
-          SliverList.list(
-            children: [
-              Section(
-                title: t.sectionAccount,
-                children: [
-                  NavTile(
-                    icon: Icons.person_outline,
-                    title: t.profileTitle,
-                    onTap: () => context.push(Routes.profile),
-                  ),
-                  DangerTile(
-                    icon: Icons.logout,
-                    title: t.signOut,
-                    onTap: () => unawaited(_signOut()),
-                  ),
-                ],
+    return UnsavedChangesGuard(
+      dirty: dirty,
+      child: Scaffold(
+        bottomNavigationBar: prefs == null
+            ? null
+            : SaveBar(
+                dirty: dirty,
+                saving: _saving,
+                onSave: () => unawaited(_save()),
               ),
-              const _AppearanceSection(),
-              if (prefs == null)
-                const Padding(
-                  padding: EdgeInsetsDirectional.all(BotvySpace.xl),
-                  child: LoadingView(),
-                )
-              else ...[
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar.large(title: Text(t.settingsTitle)),
+            if (_problem != null)
+              SliverToBoxAdapter(child: _Problem(_problem!)),
+            SliverList.list(
+              children: [
                 Section(
-                  title: t.sectionDailyRhythm,
+                  title: t.sectionAccount,
                   children: [
-                    for (final (label, field, value) in [
-                      (
-                        t.planTomorrowTime,
-                        'planTomorrowTime',
-                        prefs.planTomorrowTime,
+                    NavTile(
+                      icon: Icons.person_outline,
+                      title: t.profileTitle,
+                      onTap: () => context.push(Routes.profile),
+                    ),
+                    DangerTile(
+                      icon: Icons.logout,
+                      title: t.signOut,
+                      onTap: () => unawaited(_signOut()),
+                    ),
+                  ],
+                ),
+                const _AppearanceSection(),
+                if (prefs == null)
+                  const Padding(
+                    padding: EdgeInsetsDirectional.all(BotvySpace.xl),
+                    child: LoadingView(),
+                  )
+                else ...[
+                  Section(
+                    title: t.sectionDailyRhythm,
+                    children: [
+                      for (final (label, field, value) in [
+                        (
+                          t.planTomorrowTime,
+                          'planTomorrowTime',
+                          prefs.planTomorrowTime,
+                        ),
+                        (t.endOfDayTime, 'endOfDayTime', prefs.endOfDayTime),
+                        (
+                          t.morningBriefingTime,
+                          'morningBriefingTime',
+                          prefs.morningBriefingTime,
+                        ),
+                        (
+                          t.nextPracticeCutoff,
+                          'nextPracticeCutoff',
+                          prefs.nextPracticeCutoff,
+                        ),
+                      ])
+                        _TimeTile(
+                          icon: Icons.schedule,
+                          label: label,
+                          value: _value(field, value),
+                          enabled: enabled,
+                          onChanged: (v) => _edit(field, v, value),
+                        ),
+                      SwitchTile(
+                        icon: Icons.nightlight_outlined,
+                        title: t.checkinEnabled,
+                        value: _value('checkinEnabled', prefs.checkinEnabled),
+                        onChanged: enabled
+                            ? (v) => _edit(
+                                  'checkinEnabled',
+                                  v,
+                                  prefs.checkinEnabled,
+                                )
+                            : null,
                       ),
-                      (t.endOfDayTime, 'endOfDayTime', prefs.endOfDayTime),
-                      (
-                        t.morningBriefingTime,
-                        'morningBriefingTime',
-                        prefs.morningBriefingTime,
-                      ),
-                      (
-                        t.nextPracticeCutoff,
-                        'nextPracticeCutoff',
-                        prefs.nextPracticeCutoff,
-                      ),
-                    ])
+                    ],
+                  ),
+                  Section(
+                    title: t.sectionNotifications,
+                    children: [
+                      // Both halves of quiet hours together: the server's schema
+                      // is one object, and sending half of it would fail
+                      // validation rather than patching one field.
                       _TimeTile(
-                        icon: Icons.schedule,
-                        label: label,
-                        value: value,
+                        icon: Icons.bedtime_outlined,
+                        label: t.quietFrom,
+                        help: t.quietHoursHelp,
+                        value: quiet['from']!,
                         enabled: enabled,
-                        onChanged: (v) => unawaited(_patch({field: v})),
+                        onChanged: (v) => _edit(
+                            'quietHours',
+                            {
+                              'from': v,
+                              'to': quiet['to']!,
+                            },
+                            quietStored),
                       ),
-                    SwitchTile(
-                      icon: Icons.nightlight_outlined,
-                      title: t.checkinEnabled,
-                      value: prefs.checkinEnabled,
-                      onChanged: enabled
-                          ? (v) => unawaited(_patch({'checkinEnabled': v}))
-                          : null,
+                      _TimeTile(
+                        icon: Icons.wb_sunny_outlined,
+                        label: t.quietTo,
+                        value: quiet['to']!,
+                        enabled: enabled,
+                        onChanged: (v) => _edit(
+                            'quietHours',
+                            {
+                              'from': quiet['from']!,
+                              'to': v,
+                            },
+                            quietStored),
+                      ),
+                      _LeadTimes(
+                        values: _value('leadTimes', prefs.leadTimes),
+                        enabled: enabled,
+                        onChanged: (v) =>
+                            _edit('leadTimes', v, prefs.leadTimes),
+                      ),
+                    ],
+                  ),
+                  Section(
+                    title: t.sectionPlanning,
+                    children: [
+                      ChoiceTile<String>(
+                        icon: Icons.view_week_outlined,
+                        title: t.weekStartsOn,
+                        value: _value('weekStartsOn', prefs.weekStartsOn),
+                        options: {
+                          'monday': t.monday,
+                          'sunday': t.sunday,
+                          'saturday': t.saturday,
+                        },
+                        enabled: enabled,
+                        onChanged: (v) =>
+                            _edit('weekStartsOn', v, prefs.weekStartsOn),
+                      ),
+                      _MeetingLength(
+                        minutes: _value(
+                          'meetingDurationMin',
+                          prefs.meetingDurationMin,
+                        ),
+                        enabled: enabled,
+                        onChanged: (v) => _edit(
+                          'meetingDurationMin',
+                          v,
+                          prefs.meetingDurationMin,
+                        ),
+                      ),
+                      ChoiceTile<String>(
+                        icon: Icons.restaurant_menu,
+                        title: t.mealMode,
+                        value: _value('mealMode', prefs.mealMode),
+                        options: {
+                          'llm': t.mealModeLlm,
+                          'library': t.mealModeLibrary,
+                        },
+                        enabled: enabled,
+                        onChanged: (v) => _edit('mealMode', v, prefs.mealMode),
+                      ),
+                      SwitchTile(
+                        icon: Icons.auto_awesome_outlined,
+                        title: t.aiSuggestions,
+                        value: _value('aiSuggestions', prefs.aiSuggestions),
+                        onChanged: enabled
+                            ? (v) =>
+                                _edit('aiSuggestions', v, prefs.aiSuggestions)
+                            : null,
+                      ),
+                    ],
+                  ),
+                ],
+                Section(
+                  title: t.sectionConnection,
+                  children: [
+                    NavTile(
+                      icon: Icons.dns_outlined,
+                      title: t.serverSettings,
+                      subtitle: widget.serverOrigin,
+                      onTap: () => context.push(Routes.server),
                     ),
                   ],
                 ),
                 Section(
-                  title: t.sectionNotifications,
+                  title: t.sectionAbout,
                   children: [
-                    // Both halves of quiet hours together: the server's schema
-                    // is one object, and sending half of it would fail
-                    // validation rather than patching one field.
-                    _TimeTile(
-                      icon: Icons.bedtime_outlined,
-                      label: t.quietFrom,
-                      help: t.quietHoursHelp,
-                      value: prefs.quietFrom,
-                      enabled: enabled,
-                      onChanged: (v) => unawaited(
-                        _patch({
-                          'quietHours': {'from': v, 'to': prefs.quietTo},
-                        }),
-                      ),
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: Text(t.appVersion),
+                      subtitle: const Text(_version),
                     ),
-                    _TimeTile(
-                      icon: Icons.wb_sunny_outlined,
-                      label: t.quietTo,
-                      value: prefs.quietTo,
-                      enabled: enabled,
-                      onChanged: (v) => unawaited(
-                        _patch({
-                          'quietHours': {'from': prefs.quietFrom, 'to': v},
-                        }),
+                    NavTile(
+                      icon: Icons.description_outlined,
+                      title: t.licences,
+                      onTap: () => showLicensePage(
+                        context: context,
+                        applicationName: t.appTitle,
+                        applicationVersion: _version,
                       ),
-                    ),
-                    _LeadTimes(
-                      values: prefs.leadTimes,
-                      enabled: enabled,
-                      onChanged: (v) => unawaited(_patch({'leadTimes': v})),
                     ),
                   ],
                 ),
-                Section(
-                  title: t.sectionPlanning,
-                  children: [
-                    ChoiceTile<String>(
-                      icon: Icons.view_week_outlined,
-                      title: t.weekStartsOn,
-                      value: prefs.weekStartsOn,
-                      options: {
-                        'monday': t.monday,
-                        'sunday': t.sunday,
-                        'saturday': t.saturday,
-                      },
-                      enabled: enabled,
-                      onChanged: (v) => unawaited(_patch({'weekStartsOn': v})),
-                    ),
-                    _MeetingLength(
-                      minutes: prefs.meetingDurationMin,
-                      enabled: enabled,
-                      onChanged: (v) =>
-                          unawaited(_patch({'meetingDurationMin': v})),
-                    ),
-                    ChoiceTile<String>(
-                      icon: Icons.restaurant_menu,
-                      title: t.mealMode,
-                      value: prefs.mealMode,
-                      options: {
-                        'llm': t.mealModeLlm,
-                        'library': t.mealModeLibrary,
-                      },
-                      enabled: enabled,
-                      onChanged: (v) => unawaited(_patch({'mealMode': v})),
-                    ),
-                    SwitchTile(
-                      icon: Icons.auto_awesome_outlined,
-                      title: t.aiSuggestions,
-                      value: prefs.aiSuggestions,
-                      onChanged: enabled
-                          ? (v) => unawaited(_patch({'aiSuggestions': v}))
-                          : null,
-                    ),
-                  ],
-                ),
+                const SizedBox(height: BotvySpace.xxl),
               ],
-              Section(
-                title: t.sectionConnection,
-                children: [
-                  NavTile(
-                    icon: Icons.dns_outlined,
-                    title: t.serverSettings,
-                    subtitle: widget.serverOrigin,
-                    onTap: () => context.push(Routes.server),
-                  ),
-                ],
-              ),
-              Section(
-                title: t.sectionAbout,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: Text(t.appVersion),
-                    subtitle: const Text(_version),
-                  ),
-                  NavTile(
-                    icon: Icons.description_outlined,
-                    title: t.licences,
-                    onTap: () => showLicensePage(
-                      context: context,
-                      applicationName: t.appTitle,
-                      applicationVersion: _version,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: BotvySpace.xxl),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+
+/// Equal as the server would store them: lists and the quiet-hours object by
+/// content, everything else by value.
+bool _same(Object a, Object b) => switch ((a, b)) {
+      (final List<Object?> x, final List<Object?> y) => listEquals(x, y),
+      (final Map<Object?, Object?> x, final Map<Object?, Object?> y) =>
+        mapEquals(x, y),
+      _ => a == b,
+    };
 
 class _AppearanceSection extends StatelessWidget {
   const _AppearanceSection();
@@ -402,27 +470,26 @@ class _TimeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon),
-    title: Text(label),
-    subtitle: help == null ? null : Text(help!),
-    trailing: Text(value, style: Theme.of(context).textTheme.titleMedium),
-    enabled: enabled,
-    onTap: () async {
-      final parts = value.split(':');
-      final picked = await showTimePicker(
-        context: context,
-        initialTime: TimeOfDay(
-          hour: int.tryParse(parts.first) ?? 8,
-          minute: int.tryParse(parts.last) ?? 0,
-        ),
+        leading: Icon(icon),
+        title: Text(label),
+        subtitle: help == null ? null : Text(help!),
+        trailing: Text(value, style: Theme.of(context).textTheme.titleMedium),
+        enabled: enabled,
+        onTap: () async {
+          final parts = value.split(':');
+          final picked = await showTimePicker(
+            context: context,
+            initialTime: TimeOfDay(
+              hour: int.tryParse(parts.first) ?? 8,
+              minute: int.tryParse(parts.last) ?? 0,
+            ),
+          );
+          if (picked == null) return;
+          final formatted = '${picked.hour.toString().padLeft(2, '0')}:'
+              '${picked.minute.toString().padLeft(2, '0')}';
+          if (formatted != value) onChanged(formatted);
+        },
       );
-      if (picked == null) return;
-      final formatted =
-          '${picked.hour.toString().padLeft(2, '0')}:'
-          '${picked.minute.toString().padLeft(2, '0')}';
-      if (formatted != value) onChanged(formatted);
-    },
-  );
 }
 
 /// The default meeting length. 5 to 480 on the server; the slider cannot leave
