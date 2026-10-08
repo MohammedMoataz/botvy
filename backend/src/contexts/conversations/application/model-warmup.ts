@@ -29,7 +29,9 @@ export const WARMUP_EVERY_MS = 60_000;
  * minute competing with real turns.
  */
 @Injectable()
-export class ModelWarmup implements OnApplicationBootstrap, OnApplicationShutdown {
+export class ModelWarmup
+  implements OnApplicationBootstrap, OnApplicationShutdown
+{
   private readonly logger = new Logger(ModelWarmup.name);
   private timer: NodeJS.Timeout | undefined;
   private running = false;
@@ -66,11 +68,17 @@ export class ModelWarmup implements OnApplicationBootstrap, OnApplicationShutdow
 
       if (!(await this.llm.isLoaded(extractModel))) {
         await this.extractor.warm();
-        this.logger.log(`loaded ${extractModel} and read the extraction prompt`);
+        this.logger.log(
+          `loaded ${extractModel} and read the extraction prompt`,
+        );
       }
       // The same model by default, in which case the line above loaded it.
       if (chatModel !== extractModel && !(await this.llm.isLoaded(chatModel))) {
-        await this.llm.warm(chatModel, [{ role: 'user', content: 'hi' }], numCtx);
+        await this.llm.warm(
+          chatModel,
+          [{ role: 'user', content: 'hi' }],
+          numCtx,
+        );
         this.logger.log(`loaded ${chatModel}`);
       }
     } catch (error) {

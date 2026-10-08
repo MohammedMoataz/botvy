@@ -225,7 +225,11 @@ describe('keeping the model warm (031)', () => {
           json: async () => ({ message: { content: '{}' } }),
         }) as unknown as Response,
     );
-    const client = new OllamaClient('http://ollama:11434', fetchImpl, async () => 600);
+    const client = new OllamaClient(
+      'http://ollama:11434',
+      fetchImpl,
+      async () => 600,
+    );
 
     const stream = client.chat([{ role: 'user', content: 'hi' }], {
       ...options,
@@ -271,9 +275,17 @@ describe('keeping the model warm (031)', () => {
     const { bodies, fetchImpl } = capturing(
       () => ({ ok: true, status: 200, body: null }) as unknown as Response,
     );
-    const client = new OllamaClient('http://ollama:11434', fetchImpl, async () => -1);
+    const client = new OllamaClient(
+      'http://ollama:11434',
+      fetchImpl,
+      async () => -1,
+    );
 
-    await client.warm('qwen2.5:3b-instruct', [{ role: 'user', content: 'x' }], 8192);
+    await client.warm(
+      'qwen2.5:3b-instruct',
+      [{ role: 'user', content: 'x' }],
+      8192,
+    );
 
     expect(bodies[0]).toEqual({
       model: 'qwen2.5:3b-instruct',
