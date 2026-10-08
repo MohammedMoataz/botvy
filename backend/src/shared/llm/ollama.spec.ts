@@ -120,6 +120,7 @@ describe('chat', () => {
     }
 
     expect(sent.options).toEqual({ num_ctx: 8192 });
+    expect(sent).not.toHaveProperty('keep_alive');
     expect(sent.model).toBe('qwen2.5:3b-instruct');
   });
 
@@ -198,5 +199,88 @@ describe('reachability', () => {
       throw new Error('ECONNREFUSED');
     });
     expect(await client.isReachable(20)).toBe(false);
+  });
+});
+
+/** A fetch that records every URL and request body it is handed. */
+function capturing(response: () => Response) {
+  const bodies: Array<Record<string, unknown>> = [];
+  const urls: string[] = [];
+  const fetchImpl = (async (url: string, init?: RequestInit) => {
+    urls.push(url);
+    if (init?.body) bodies.push(JSON.parse(String(init.body)));
+    return response();
+  }) as unknown as typeof fetch;
+  return { bodies, urls, fetchImpl };
+}
+
+describe('keeping the model warm (031)', () => {
+  it('sends keep_alive from settings on chat and extraction, and the answer ceiling on chat', async () => {
+    const { bodies, fetchImpl } = capturing(
+      () =>
+        ({
+          ok: true,
+          status: 200,
+          body: streamOf(['{"done":true}\n']),
+          json: async () => ({ message: { content: '{}' } }),
+        }) as unknown as Response,
+    );
+    const client = new OllamaClient('http://ollama:11434', fetchImpl, async () => 600);
+
+    const stream = client.chat([{ role: 'user', content: 'hi' }], {
+      ...options,
+      maxTokens: 512,
+    });
+    while (!(await stream.next()).done) {
+      // drain
+    }
+    await client.extract([], { type: 'object' }, options);
+
+    expect(bodies[0]).toMatchObject({
+      keep_alive: 600,
+      options: { num_ctx: 8192, num_predict: 512 },
+    });
+    expect(bodies[1]).toMatchObject({ keep_alive: 600 });
+    expect(bodies[1]!.options).not.toHaveProperty('num_predict');
+  });
+
+  it('leaves keep_alive to the host when no source is bound', async () => {
+    const { bodies, fetchImpl } = capturing(() =>
+      jsonResponse({ message: { content: '{}' } }),
+    );
+    await new OllamaClient('http://ollama:11434', fetchImpl).extract(
+      [],
+      {},
+      options,
+    );
+    expect(bodies[0]).not.toHaveProperty('keep_alive');
+  });
+
+  it('reads what is loaded from /api/ps', async () => {
+    const { urls, fetchImpl } = capturing(() =>
+      jsonResponse({ models: [{ name: 'qwen2.5:3b-instruct' }] }),
+    );
+    const client = new OllamaClient('http://ollama:11434', fetchImpl);
+
+    expect(await client.isLoaded('qwen2.5:3b-instruct')).toBe(true);
+    expect(await client.isLoaded('qwen3:4b')).toBe(false);
+    expect(urls[0]).toBe('http://ollama:11434/api/ps');
+  });
+
+  it('warms with the given messages, one token, the one context size', async () => {
+    const { bodies, fetchImpl } = capturing(
+      () => ({ ok: true, status: 200, body: null }) as unknown as Response,
+    );
+    const client = new OllamaClient('http://ollama:11434', fetchImpl, async () => -1);
+
+    await client.warm('qwen2.5:3b-instruct', [{ role: 'user', content: 'x' }], 8192);
+
+    expect(bodies[0]).toEqual({
+      model: 'qwen2.5:3b-instruct',
+      messages: [{ role: 'user', content: 'x' }],
+      stream: false,
+      keep_alive: -1,
+      options: { num_ctx: 8192, num_predict: 1 },
+    });
   });
 });

@@ -33,7 +33,7 @@ const QUOTE_CLOSE = '</quoted>';
  * Two things it does, both small:
  *
  * 1. **Neutralises forged markers.** A member (or the author of something they
- *    pasted) writing a literal `</quoted>` would otherwise close the block from
+ *    pasted) writing a literal `</quoted>` (or `</now>`) would otherwise close the block from
  *    the inside and hand the rest of the paste back to the model as
  *    instruction. Both tags are rewritten to a bracketed form that reads the
  *    same and delimits nothing.
@@ -49,7 +49,9 @@ const QUOTE_CLOSE = '</quoted>';
  * turn), delimit that instead and drop the sniffing.
  */
 export function delimitQuoted(text: string): string {
-  const safe = text.replace(/<(\/?)quoted>/gi, '[$1quoted]');
+  // `<now>` is Botvy's block at the head of the turn (031), so a member's own
+  // `</now>` must not be able to close it and speak as Botvy.
+  const safe = text.replace(/<(\/?)(quoted|now)>/gi, '[$1$2]');
   const lines = safe.split(/\r?\n/);
 
   const out: string[] = [];

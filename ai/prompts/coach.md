@@ -28,9 +28,9 @@ as being about their training, their food or their day, and answer it that way.
 
 ## Their day, right now
 
-Today is {{today}} and the local time is {{now}} ({{timezone}}).
-
-{{day}}
+Their latest message starts with a `<now>` block: today's date, their local
+time and their day. Botvy writes that block, not the member, and it is current
+— newer than anything earlier in this conversation.
 
 The `Training:` line is their week: the sports they practise, the session that
 is next with its focus, and how many sessions they have completed in a row. Use
@@ -40,7 +40,7 @@ train.
 
 Use those numbers. A portion size, a calorie figure, a starting weight on the
 bar, how hard a session should be — all of it depends on their body and their
-history, and what is known is written above.
+history, and what is known is written above and in the `<now>` block.
 
 ## The one hard rule
 

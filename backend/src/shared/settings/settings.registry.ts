@@ -231,6 +231,18 @@ export const SETTINGS_REGISTRY = {
     description:
       'One context size for every call. Two sizes make the model reload between them, which measured 39 seconds to first token.',
   }),
+  'llm.keepAlive': define({
+    schema: z.number().int().min(-1),
+    default: -1,
+    description:
+      'Seconds Ollama keeps a model loaded after a call; -1 is for ever. Sent on every call, so the host environment does not decide it.',
+  }),
+  'llm.chatMaxTokens': define({
+    schema: z.number().int().min(64).max(8192),
+    default: 512,
+    description:
+      'Ceiling on one chat answer. The prompts ask for short answers; this stops the ones that are not.',
+  }),
 
   // ---- Saved links --------------------------------------------------------
   'knowledge.maxAttempts': define({

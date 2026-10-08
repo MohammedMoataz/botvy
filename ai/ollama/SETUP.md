@@ -12,7 +12,17 @@ common Botvy setup failure:
   `ollama false` and every chat turn fails with nothing in the model server's log
   — because the request never arrived.
 - **`OLLAMA_KEEP_ALIVE=-1`.** Keeps the model resident so the first request
-  after an idle period does not pay a cold load.
+  after an idle period does not pay a cold load. Since 031 the API also sends
+  `keep_alive` from `llm.keepAlive` on every call, and reloads the model
+  itself after a reboot (`ModelWarmup`: it checks `/api/ps` every minute), so
+  the variable is now a second line of defence.
+
+On a GTX 1050 (4 GB), qwen2.5:3b reads a prompt at about **115 tokens/s** and
+writes at about **23 tokens/s**, so reading is what makes a turn slow. Ollama
+keeps what it has read and skips any prefix it has seen before: a cold
+`intent.md` measured 31 s, the same prompt warm 0.5 s. Everything the chat
+sends is arranged so that the prefix stays the same from one turn to the next
+(see `ai/README.md`).
 
 ---
 
@@ -26,7 +36,7 @@ common Botvy setup failure:
    ```powershell
    [Environment]::SetEnvironmentVariable('OLLAMA_HOST','0.0.0.0:11434','User')
    [Environment]::SetEnvironmentVariable('OLLAMA_KEEP_ALIVE','-1','User')
-   Stop-Process -Name "ollama app","ollama" -Force
+   Stop-Process -Name "ollama app","ollama","llama-server" -Force
    Start-Process "$env:LOCALAPPDATA\Programs\Ollama\ollama app.exe"
    ```
 
@@ -108,7 +118,9 @@ Then `curl -s http://localhost:${EDGE_PORT:-80}/health` and look for
 | Symptom | Cause |
 |---|---|
 | `/health` says `ollama false`, `curl localhost:11434` from the host works | `OLLAMA_HOST` is still loopback, or the app was not restarted after setting it |
-| First token takes tens of seconds, every time | two different context sizes in play — `llm.numCtx` is one key for every call, so this means something is bypassing it |
+| First token takes tens of seconds, every time | two different context sizes in play — `llm.numCtx` is one key for every call, so this means something is bypassing it — or a prompt that changes above the transcript, which keeps Ollama from reusing what it already read (031) |
+| The first turn after a reboot takes about 40 s | the API could not reach Ollama to warm it; look for `ModelWarmup` in the backend log |
 | Answers arrive at a few tokens per second | the model spilled to the CPU; check `/api/ps`, then use a smaller model |
+| `ollama ps` shows `CPU/GPU` split for a model that used to fit | an orphaned `llama-server.exe` from a previous Ollama still holds VRAM; stop it as well as `ollama` (031) |
 | Extraction returns a `thinking` field, or never returns | a thinking model (`qwen3`) in `llm.extractModel`; use an **instruct** model |
 | `model 'x' not found` | nobody pulled it on this host after the registry key changed |

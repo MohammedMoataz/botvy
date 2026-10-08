@@ -12,6 +12,8 @@ export interface ChatOptions {
   signal?: AbortSignal;
   /** How long a single chunk may take before the stream is treated as dead. */
   idleTimeoutMs?: number;
+  /** Ceiling on the answer, sent as `num_predict`; absent means the model's own. */
+  maxTokens?: number;
 }
 
 /** A chunk is not a token count; the client reports what the server told it. */
@@ -42,7 +44,67 @@ export class OllamaClient {
   constructor(
     private readonly baseUrl: string,
     private readonly fetchImpl: typeof fetch = fetch,
+    /**
+     * `llm.keepAlive`, read per call so a change in settings takes effect
+     * without a restart. Absent, the request leaves it to the host's
+     * `OLLAMA_KEEP_ALIVE`, and a host without that variable unloads the model
+     * after five idle minutes and makes the next turn pay to load it (031).
+     */
+    private readonly keepAlive?: () => Promise<number>,
   ) {}
+
+  /** `keep_alive` for a request body, or nothing when no source was bound. */
+  private async keepAliveField(): Promise<{ keep_alive?: number }> {
+    return this.keepAlive ? { keep_alive: await this.keepAlive() } : {};
+  }
+
+  /** Is this model loaded right now? `/api/ps` lists what is in memory. */
+  async isLoaded(model: string, timeoutMs = 2_000): Promise<boolean> {
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}/api/ps`, {
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!response.ok) return false;
+      const body = (await response.json()) as {
+        models?: Array<{ name?: string; model?: string }>;
+      };
+      return (body.models ?? []).some(
+        (loaded) => loaded.name === model || loaded.model === model,
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Loads a model and has it read `messages`, writing a single token.
+   *
+   * What it reads stays in Ollama's prompt cache, so the first real request
+   * that starts the same way skips reading it. The extraction prompt is 3,700
+   * tokens and took 31 s to read cold on the Owner's GPU (031). Throws when
+   * Ollama refuses; the caller decides whether that matters.
+   */
+  async warm(
+    model: string,
+    messages: ChatMessage[],
+    numCtx: number,
+  ): Promise<void> {
+    const response = await this.fetchImpl(`${this.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        ...(await this.keepAliveField()),
+        options: { num_ctx: numCtx, num_predict: 1 },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Ollama refused the warm-up: HTTP ${response.status}`);
+    }
+    await response.body?.cancel();
+  }
 
   /** Is the model server there? Used by health, with a short timeout. */
   async isReachable(timeoutMs = 2_000): Promise<boolean> {
@@ -76,7 +138,11 @@ export class OllamaClient {
         model: options.model,
         messages,
         stream: true,
-        options: { num_ctx: options.numCtx },
+        ...(await this.keepAliveField()),
+        options: {
+          num_ctx: options.numCtx,
+          ...(options.maxTokens ? { num_predict: options.maxTokens } : {}),
+        },
       }),
       ...(options.signal ? { signal: options.signal } : {}),
     });
@@ -150,6 +216,7 @@ export class OllamaClient {
           messages,
           stream: false,
           format: schema,
+          ...(await this.keepAliveField()),
           // Extraction is not a place for creativity.
           options: { num_ctx: options.numCtx, temperature: 0 },
         }),

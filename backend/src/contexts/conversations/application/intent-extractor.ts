@@ -97,6 +97,29 @@ export class IntentExtractor extends IntentExtractorPort {
     super();
   }
 
+  /**
+   * Has the extraction model read `intent.md`'s fixed part, so the first turn
+   * after a restart does not (031).
+   *
+   * The real template with an empty message, rather than a copy of its text:
+   * the cache only helps a request whose prefix matches token for token, and
+   * everything above `{{now}}` is the same on every turn.
+   */
+  async warm(now = new Date()): Promise<void> {
+    const [model, numCtx] = await Promise.all([
+      this.settings.get('llm.extractModel'),
+      this.settings.get('llm.numCtx'),
+    ]);
+    const today = localDate(now, 'UTC');
+    const prompt = renderPrompt('intent.md', {
+      message: '',
+      now: `${today} ${localHhMm(now, 'UTC')}`,
+      today,
+      timezone: 'UTC',
+    });
+    await this.llm.warm(model, [{ role: 'user', content: prompt }], numCtx);
+  }
+
   override async extract(input: {
     text: string;
     now: Date;

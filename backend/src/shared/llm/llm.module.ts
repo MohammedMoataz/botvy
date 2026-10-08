@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.schema.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { OllamaClient } from './ollama.client.js';
 
 /**
@@ -32,8 +33,12 @@ import { OllamaClient } from './ollama.client.js';
   providers: [
     {
       provide: OllamaClient,
-      inject: [ENV],
-      useFactory: (env: Env) => new OllamaClient(env.OLLAMA_BASE_URL),
+      // `SettingsService` comes from the global `PlatformModule`.
+      inject: [ENV, SettingsService],
+      useFactory: (env: Env, settings: SettingsService) =>
+        new OllamaClient(env.OLLAMA_BASE_URL, fetch, () =>
+          settings.get('llm.keepAlive'),
+        ),
     },
   ],
   exports: [OllamaClient],

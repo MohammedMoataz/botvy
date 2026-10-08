@@ -162,10 +162,14 @@ export class TurnRunner {
 
     try {
       // ---- 0. the conversation, and whose it is -------------------------
-      let conversation = await this.conversations.findById(
-        userId,
-        request.conversationId,
-      );
+      // Two independent reads, each a round trip to the store, so neither
+      // waits on the other (031). A foreign conversation then wastes one facts
+      // read, and the refusal below is still the first thing anybody sees.
+      const [found, memberFacts] = await Promise.all([
+        this.conversations.findById(userId, request.conversationId),
+        this.facts.forMember(userId),
+      ]);
+      let conversation = found;
       if (!conversation || conversation.deletedAt) {
         /*
          * `forbidden` and never `not_found`, for both cases.
@@ -184,8 +188,6 @@ export class TurnRunner {
         });
         return;
       }
-
-      const memberFacts = await this.facts.forMember(userId);
 
       const allowance = await this.checkAllowance(userId, memberFacts, now);
       if (allowance) {
@@ -412,9 +414,10 @@ export class TurnRunner {
     events: TurnEvents,
     now: Date,
   ): Promise<void> {
-    const [model, numCtx] = await Promise.all([
+    const [model, numCtx, maxTokens] = await Promise.all([
       this.settings.get('llm.chatModel'),
       this.settings.get('llm.numCtx'),
+      this.settings.get('llm.chatMaxTokens'),
     ]);
 
     const messages = await this.prompts.build({
@@ -441,6 +444,7 @@ export class TurnRunner {
       const stream = this.llm.chat(messages, {
         model,
         numCtx,
+        maxTokens,
         ...(request.signal ? { signal: request.signal } : {}),
       });
 

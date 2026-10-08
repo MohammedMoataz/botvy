@@ -92,6 +92,9 @@ import { QuickQuestionRepository } from './domain/quick-question.repository.js';
 import { AllergenGuard } from './application/allergen-guard.js';
 import { IntentExecutor } from './application/intent-executor.js';
 import { IntentExtractor } from './application/intent-extractor.js';
+import { ModelWarmup } from './application/model-warmup.js';
+import { ENV } from '../../shared/config/config.module.js';
+import type { Env } from '../../shared/config/env.schema.js';
 import { PromptAssembler } from './application/prompt-assembler.js';
 import { TurnRunner } from './application/turn-runner.js';
 import { ArchiveConversationHandler } from './features/archive/archive-conversation.handler.js';
@@ -455,10 +458,27 @@ import {
 
     // ---- the turn's four collaborators ----------------------------------
     {
-      provide: IntentExtractorPort,
+      provide: IntentExtractor,
       inject: [OllamaClient, SettingsService],
       useFactory: (llm: OllamaClient, settings: SettingsService) =>
         new IntentExtractor(llm, settings),
+    },
+    { provide: IntentExtractorPort, useExisting: IntentExtractor },
+    {
+      provide: ModelWarmup,
+      inject: [OllamaClient, IntentExtractor, SettingsService, ENV],
+      useFactory: (
+        llm: OllamaClient,
+        extractor: IntentExtractor,
+        settings: SettingsService,
+        env: Env,
+      ) =>
+        new ModelWarmup(
+          llm,
+          extractor,
+          settings,
+          env.BOTVY_ROLE === 'backend' && !process.env.BOTVY_GEN,
+        ),
     },
     {
       provide: IntentExecutorPort,

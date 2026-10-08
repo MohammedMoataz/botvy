@@ -37,6 +37,8 @@ rebuild — constitution XII:
 | `llm.extractModel` | `qwen2.5:3b-instruct` | schema-constrained intent extraction |
 | `llm.summarizeModel` | `qwen2.5:3b-instruct` | summarising a saved link |
 | `llm.numCtx` | `8192` | **one** context size for every call |
+| `llm.keepAlive` | `-1` | seconds a model stays loaded after a call (`-1`: for ever), sent on every call |
+| `llm.chatMaxTokens` | `512` | ceiling on one chat answer (`num_predict`) |
 
 Change them in the admin portal under Settings, or
 `PATCH /api/v1/admin/settings/llm.chatModel`. The defaults are declared in
@@ -51,6 +53,14 @@ Three things that have already cost time here:
   field before its answer, which is exactly what schema-constrained output
   exists to prevent, and such a call does not return in reasonable time. A
   bigger extraction model means a bigger **instruct** model.
+- **Nothing that changes per turn goes above the transcript.** Ollama skips
+  reading the part of a prompt that matches the start of one it has already
+  read, and on a small GPU reading is the slow part. A 20-message coach turn
+  measured 12.2 s of reading with `{{now}}` in the system prompt and 0.2 s
+  without it. The clock and the day ride in a `<now>` block on the member's
+  latest message (`prompt-assembler.ts`), and a second `system` message does
+  not do the same job: qwen2.5's template moves every system message to the
+  top. The history window moves in half-limit steps for the same reason.
 - **Residency beats size.** `/api/ps` must show `size_vram` equal to `size`. A
   4B that spills to the CPU is an order of magnitude slower than a 3B that fits.
 

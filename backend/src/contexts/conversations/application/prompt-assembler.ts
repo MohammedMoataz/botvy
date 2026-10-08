@@ -93,9 +93,10 @@ export class PromptAssembler extends PromptAssemblerPort {
   > {
     const { userId, kind, text, conversationId, floorSeq, now, facts } = input;
 
-    const [day, historyLimit] = await Promise.all([
+    const historyLimit = await this.settings.get('chat.historyLimit');
+    const [day, history] = await Promise.all([
       this.day.forMember(userId, now),
-      this.settings.get('chat.historyLimit'),
+      this.history(userId, conversationId, floorSeq, historyLimit, text),
     ]);
 
     /*
@@ -109,22 +110,29 @@ export class PromptAssembler extends PromptAssemblerPort {
      * single turn. The API's own `TZ` is never consulted — reading it once
      * shifted every extracted reminder by three hours.
      */
-    const today = localDate(now, facts.timezone);
-    const system = renderPrompt(templateFor(kind), {
-      profile: profileBlock(facts),
-      day: dayBlock(day),
-      today,
-      now: localHhMm(now, facts.timezone),
-      timezone: facts.timezone,
-    });
+    const template = templateFor(kind);
+    const system = renderPrompt(template, { profile: profileBlock(facts) });
 
-    const history = await this.history(
-      userId,
-      conversationId,
-      floorSeq,
-      historyLimit,
-      text,
-    );
+    /*
+     * The clock and the day ride in the latest message, never in the system
+     * prompt (031).
+     *
+     * Ollama skips reading whatever prefix of a request matches one it has
+     * already read, and on the Owner's GPU reading is the slow part — a
+     * 20-message coach turn measured 12.2 s of it when the minute had changed
+     * and 0.2 s when it had not. A `{{now}}` above the transcript changes that
+     * prefix every minute. A second `system` message near the end does not
+     * help: qwen2.5's chat template gathers every system message into one
+     * block at the top. So the block goes into the member's turn, fenced as
+     * Botvy's, and the history it follows stays byte-identical turn to turn.
+     */
+    const today = localDate(now, facts.timezone);
+    const moment = [
+      `Today is ${today} and the local time is ` +
+        `${localHhMm(now, facts.timezone)} (${facts.timezone}).`,
+      // The free chat never carried the day; only the two pinned voices do.
+      ...(template === 'chat.md' ? [] : ['', dayBlock(day)]),
+    ].join('\n');
 
     return [
       { role: 'system', content: system },
@@ -132,7 +140,10 @@ export class PromptAssembler extends PromptAssemblerPort {
       // Delimited on the way in, so a paste inside it is subject matter rather
       // than instruction (FR-014, T414). The extraction call never sees this
       // form — it reads the member's raw sentence and only that.
-      { role: 'user', content: delimitQuoted(text) },
+      {
+        role: 'user',
+        content: `<now>\n${moment}\n</now>\n\n${delimitQuoted(text)}`,
+      },
     ];
   }
 
@@ -178,20 +189,36 @@ export class PromptAssembler extends PromptAssemblerPort {
         ? rows.slice(0, -1)
         : rows;
 
-    return (
-      transcript
-        // A stored `system` row is a note about the turn rather than a thing
-        // anybody said; replaying it as a system message would put a second set
-        // of instructions after the first.
-        .filter((row) => row.role === 'user' || row.role === 'assistant')
-        .slice(-limit)
-        .map((row) => ({
-          role: row.role as 'user' | 'assistant',
-          content:
-            row.role === 'user' ? delimitQuoted(row.content) : row.content,
-        }))
-    );
+    return stableWindow(
+      // A stored `system` row is a note about the turn rather than a thing
+      // anybody said; replaying it as a system message would put a second set
+      // of instructions after the first.
+      transcript.filter(
+        (row) => row.role === 'user' || row.role === 'assistant',
+      ),
+      limit,
+    ).map((row) => ({
+      role: row.role as 'user' | 'assistant',
+      content: row.role === 'user' ? delimitQuoted(row.content) : row.content,
+    }));
   }
+}
+
+/**
+ * The tail of a transcript, at most `limit` long, whose first row moves in
+ * steps of half the limit rather than one row per turn (031).
+ *
+ * `slice(-limit)` drops the oldest row on every turn once a chat is longer
+ * than the limit, which shifts everything after the system prompt and leaves
+ * Ollama nothing to reuse from the turn before. Anchored to the start of the
+ * rows, the window holds still for half a limit's worth of rows, so most turns
+ * read only what is new; the price is that it sometimes carries fewer than
+ * `limit` rows (never fewer than half).
+ */
+export function stableWindow<T>(rows: T[], limit: number): T[] {
+  if (rows.length <= limit) return rows;
+  const step = Math.max(1, Math.floor(limit / 2));
+  return rows.slice(Math.ceil((rows.length - limit) / step) * step);
 }
 
 /**
