@@ -5,13 +5,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../app/di.dart';
 import '../../../app/l10n/app_localizations.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/db/database.dart';
 import '../../../core/notifications/alert_plan.dart' show memberZone;
 import '../../../core/recurrence/expander.dart';
 import '../../../core/recurrence/rule_words.dart';
+import '../application/link_preview.dart';
+import '../application/location_link.dart';
 import '../application/meetings_cubit.dart';
 import 'meeting_sheet.dart';
+import '../../../ui/link_preview_card.dart';
 import '../../../ui/scroll_aware_fab.dart';
 import '../../../app/tokens.dart';
 import '../../../ui/motion/diff_animated_list.dart';
@@ -183,7 +188,9 @@ Future<void> showMeetingActions(
   builder: (sheetContext) {
     final l10n = AppLocalizations.of(sheetContext);
     return SafeArea(
-      child: Column(
+      // Scrolls since 032: a preview card and a map can outgrow a short phone.
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
         ListTile(
@@ -240,6 +247,7 @@ Future<void> showMeetingActions(
           },
         ),
         ],
+        ),
       ),
     );
   },
@@ -265,23 +273,54 @@ List<Widget> _locationTiles(BuildContext context, LocalMeeting meeting) {
     );
   }
 
+  final scheme = Theme.of(context).colorScheme;
+  // 032: an address that is a link reads as one — the member should see that
+  // the tap opens a page, not a map search.
+  final addressIsLink =
+      location.address != null && isLinkShaped(location.address!);
+  final linkStyle = TextStyle(
+    color: scheme.primary,
+    decoration: TextDecoration.underline,
+  );
+  final api = sl<ApiClient>();
+
   return [
-    if (location.onlineLink != null)
+    if (location.onlineLink != null) ...[
       ListTile(
         leading: const Icon(Icons.videocam),
         title: Text(l10n.meetingsJoin),
-        subtitle: Text(location.onlineLink!, maxLines: 1),
+        subtitle: Text(location.onlineLink!, maxLines: 1, style: linkStyle),
         onTap: () => unawaited(
           open(MeetingLocation(onlineLink: location.onlineLink)),
         ),
       ),
-    if (location.address != null)
+      LinkPreviewCard(
+        load: () => fetchLinkPreview(api, url: location.onlineLink),
+        onTap: () => unawaited(
+          open(MeetingLocation(onlineLink: location.onlineLink)),
+        ),
+      ),
+    ],
+    if (location.address != null) ...[
       ListTile(
-        leading: const Icon(Icons.map),
+        leading: Icon(addressIsLink ? Icons.link : Icons.map),
         title: Text(l10n.meetingsOpenInMap),
-        subtitle: Text(location.address!, maxLines: 2),
+        subtitle: Text(
+          location.address!,
+          maxLines: 2,
+          style: addressIsLink ? linkStyle : null,
+        ),
         onTap: () => unawaited(open(MeetingLocation(address: location.address))),
       ),
+      LinkPreviewCard(
+        load: () => fetchLinkPreview(
+          api,
+          url: addressIsLink ? linkUriOf(location.address!)?.toString() : null,
+          address: addressIsLink ? null : location.address,
+        ),
+        onTap: () => unawaited(open(MeetingLocation(address: location.address))),
+      ),
+    ],
     if (!location.isEmpty) const Divider(height: 1),
   ];
 }
@@ -421,15 +460,24 @@ Future<void> deleteMeetingWithUndo(
 /// Android map handler registers for; the web fallback is what an iPhone and a
 /// desktop answer.
 ///
+/// 032: an address that is itself a link — a pasted `maps.app.goo.gl/…` —
+/// opens as that link. Sent into a map *search* it looked for the URL as a
+/// place name. Only `http(s)` opens; a scheme-less link gets `https://`.
+///
 /// Returns false when nothing could open it, so the caller can say so rather
-/// than leaving a tap that appears not to work.
-Future<bool> openMeetingLocation(MeetingLocation location) async {
+/// than leaving a tap that appears not to work. [launch] is the seam a test
+/// replaces.
+Future<bool> openMeetingLocation(
+  MeetingLocation location, {
+  Future<bool> Function(Uri uri)? launch,
+}) async {
   /// One attempt. `launchUrl` answers false on some platforms and *throws* a
   /// `PlatformException` on others when nothing can handle the intent, so both
   /// are the same answer here — the caller's job is to say "nothing on this
   /// phone can open that", not to distinguish two ways of being told.
   Future<bool> tryOpen(Uri uri) async {
     try {
+      if (launch != null) return await launch(uri);
       return await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
       return false;
@@ -438,12 +486,19 @@ Future<bool> openMeetingLocation(MeetingLocation location) async {
 
   final link = location.onlineLink;
   if (link != null) {
-    final uri = Uri.tryParse(link);
+    final uri = linkUriOf(link);
     if (uri != null && await tryOpen(uri)) return true;
   }
 
   final address = location.address;
   if (address == null) return false;
+
+  // A link-shaped address is a link, whatever it opens to; a refused scheme is
+  // not handed to a map search either.
+  if (isLinkShaped(address)) {
+    final uri = linkUriOf(address);
+    return uri != null && await tryOpen(uri);
+  }
 
   final query = Uri.encodeComponent(address);
   for (final candidate in [
