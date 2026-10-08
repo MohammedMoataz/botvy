@@ -216,6 +216,20 @@ enum LinkKind {
   website
 }
 
+type LinkPreview {
+  image: String
+  place: LinkPreviewPlace
+  siteName: String
+  title: String
+  url: String
+}
+
+type LinkPreviewPlace {
+  label: String
+  lat: Float!
+  lng: Float!
+}
+
 enum LinkStatus {
   done
   extracting
@@ -453,6 +467,7 @@ type Query {
 
   """One saved link with its summary and, for a playlist, its videos."""
   link(id: ID!): Link
+  linkPreview(address: String, url: String): LinkPreview
 
   """The member’s saved links, newest first."""
   links(after: String, first: Int = 50, kind: LinkKind, status: LinkStatus): LinkConnection!

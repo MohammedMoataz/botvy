@@ -1421,6 +1421,47 @@ export const MealSuggestionSchema = new Schema(
   { collection: 'meal_suggestions', versionKey: false, _id: false },
 );
 
+/**
+ * A meeting link's or address's preview (032), cached server-side.
+ *
+ * Shared across members and keyed by a sha256 of the URL or the lower-cased
+ * address, with no `userId`: a member only ever reads back the preview of a
+ * string they supplied, and a link fetched once serves everybody who saved it.
+ * The address itself is not stored — the key is its hash — though the
+ * geocoder's label for it is, and a link's own URL is. Every row leaves on its
+ * own when `expiresAt` passes (TTL index, migration `20261008000000`), and is
+ * not purged with a member, since nothing ties it to one.
+ * `preview: null` records a failure.
+ */
+export const LinkPreviewSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    preview: {
+      type: {
+        _id: false,
+        url: { type: String, default: null },
+        title: { type: String, default: null },
+        siteName: { type: String, default: null },
+        image: { type: String, default: null },
+        place: {
+          type: {
+            _id: false,
+            lat: { type: Number, required: true },
+            lng: { type: Number, required: true },
+            label: { type: String, default: null },
+          },
+          default: null,
+        },
+      },
+      default: null,
+    },
+    fetchedAt: { type: Date, required: true },
+    expiresAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+  },
+  { collection: 'link_previews', versionKey: false, _id: false },
+);
+
 export const MODEL_NAMES = {
   outbox: 'Outbox',
   relayState: 'RelayState',
@@ -1453,4 +1494,5 @@ export const MODEL_NAMES = {
   suggestion: 'Suggestion',
   meal: 'Meal',
   mealSuggestion: 'MealSuggestion',
+  linkPreview: 'LinkPreview',
 } as const;

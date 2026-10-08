@@ -388,6 +388,23 @@ Two other things about outbound fetching worth knowing:
   member is. It needs `MEDIA_SIGNING_SECRET` set, which the environment contract
   already requires; without it the pictures are simply absent.
 
+### Meeting previews and the geocoder (032)
+
+A meeting's link shows a small preview — site, title, picture — and a place
+shows a map. Links are fetched through the same guard as above. The place
+comes from the link itself when it is a map link; a **plain-text address is
+sent to a geocoder**, by default OpenStreetMap's public Nominatim, at most once
+a second and cached. That means the address text leaves your installation.
+Turn it off with the `meetings.geocodeEnabled` setting, or point
+`meetings.geocodeUrl` at a Nominatim of your own. The map pictures on the phone
+are OpenStreetMap tiles, loaded by the phone directly. Previews are cached in
+`link_previews` (30 days, 7 for a link that gave nothing; both are settings)
+and expire on their own.
+
+Unlike the preview fetch, the geocoder's URL is *not* put through the guard:
+it is your own setting, and a Nominatim on your own network is exactly where
+an Owner who wants addresses kept at home would point it.
+
 ## Where things are
 
 `README.md` has the map of the repository. The rules every change is held to

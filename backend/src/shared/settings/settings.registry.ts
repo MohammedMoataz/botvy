@@ -483,6 +483,31 @@ export const SETTINGS_REGISTRY = {
     description:
       'Which domain events the relay forwards to automation, and where. Deliveries are signed and carry an event id, because delivery is at-least-once and a subscriber must discard a repeat. Empty by default: a subscription names a webhook, and one that nothing serves is a failed delivery on every event.',
   }),
+  // ---- 032: meeting link previews ----------------------------------------
+  'meetings.geocodeEnabled': define({
+    schema: z.boolean(),
+    default: true,
+    description:
+      "Whether a meeting's plain-text address is sent to the geocoder (meetings.geocodeUrl) to put a pin on a map. The address text leaves this installation when it is on — to OpenStreetMap's public Nominatim by default. Links never need it: coordinates in a map link are read from the link itself.",
+  }),
+  'meetings.geocodeUrl': define({
+    schema: z.string().url(),
+    default: 'https://nominatim.openstreetmap.org',
+    description:
+      'The Nominatim server addresses are geocoded against. The public one allows one request a second and asks for a descriptive user agent, both of which Botvy keeps; point this at your own Nominatim to keep addresses at home.',
+  }),
+  'meetings.previewTtlDays': define({
+    schema: z.number().int().min(1).max(365),
+    default: 30,
+    description:
+      'How long a link or address preview is kept before it is fetched again.',
+  }),
+  'meetings.previewFailureTtlDays': define({
+    schema: z.number().int().min(1).max(90),
+    default: 7,
+    description:
+      'How long a link that gave no preview — dead, refused, or with nothing to show — is left alone before it is tried again.',
+  }),
   'labels.palette': define({
     schema: z.array(hexColour).min(1).max(24),
     default: [
