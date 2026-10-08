@@ -23,6 +23,7 @@ io(BASE, { path: '/ws', auth: { token: '<accessToken>', installId: '<uuid>' }, t
 | Event | Payload | Ack |
 |---|---|---|
 | `chat.send` | `{ requestId: uuid, conversationId: uuid, clientId: uuid, text: string, composedAt: ISO }` | `{ ok: true, seq }` (user message stored) or `{ ok: false, error }` |
+| `chat.confirm` | `{ requestId: uuid, proposalId: string, accept: boolean }` | `{ ok: true }` or `{ ok: false, error: 'expired'\|'applied'\|'forbidden'\|'changed' }`; the outcome then arrives as an ordinary turn (`chat.token` + `chat.done`) under the same `requestId` (032) |
 | `chat.cancel` | `{ requestId }` | `{ ok }` — aborts the model stream; partial answer is persisted with `intent: { cancelled: true }` |
 | `sync.subscribe` | `{ entities: string[] }` | `{ ok }` — which entity names to nudge for (default: all) |
 | `presence.ping` | `{}` | `{ serverTime }` — optional keepalive; extension uses it to extend its service-worker life |
@@ -37,7 +38,7 @@ Rate limit: `chat.send` ≤ `settings.chat.ratePerMin` per user; excess → `cha
 | `chat.intent` | `{ requestId, intent: 'chat'\|'set_task'\|'set_reminder'\|'set_meeting'\|'list'\|'cancel'\|'record_metric'\|'update_profile'\|'add_meal'\|'set_slots'\|'log_session'\|'checkin', args }` | emitted once the grammar-constrained extraction returns; `chat` = plain conversation. `update_profile` covers foods, allergies, goal, symptoms; `add_meal`, `set_slots`, `log_session` arrive with P8/P6 |
 | `chat.moved` | `{ requestId, fromConversationId, toConversationId, title }` | a turn started in `coach`/`planner` that is off-topic is moved to a new `free` conversation **before** the reply streams |
 | `chat.token` | `{ requestId, text }` | one token or chunk; leading spaces preserved |
-| `chat.card` | `{ requestId, kind: 'tasks'\|'reminders'\|'meetings'\|'plan'\|'sessions', items: [{ id, title, at?, priority?, status?, deepLink? }] }` | emitted for list intents before `chat.done`; clients render a tappable list (complete, open) instead of prose |
+| `chat.card` | `{ requestId, kind: 'tasks'\|'reminders'\|'meetings'\|'plan'\|'sessions'\|'confirm', items: [{ id, title, at?, priority?, status?, deepLink? }], proposal?: { id, action: 'edit'\|'complete'\|'cancel'\|'delete', target, expiresAt } }` | emitted for list intents before `chat.done`; clients render a tappable list (complete, open) instead of prose. `confirm` (032): `items` holds the one row the proposal would change, as stored, `title` states the change in words, and clients render Yes/No that send `chat.confirm`. `at` is always ISO-8601 |
 | `chat.heartbeat` | `{ requestId }` | every 15 s while the model is silent |
 | `chat.done` | `{ requestId, assistantSeq, usage: { model, promptTokens, completionTokens, ms }, actions: [{ type, id }] }` | `actions` lists commands executed in code (task/reminder/meeting ids) |
 | `chat.error` | `{ requestId, code: 'model_unavailable'\|'rate_limited'\|'quota'\|'protected'\|'forbidden'\|'internal', message }` | user message is kept; no assistant message stored except for `model_unavailable` (a system note) |
