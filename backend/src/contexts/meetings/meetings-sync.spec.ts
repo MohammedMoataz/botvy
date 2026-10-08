@@ -272,6 +272,27 @@ describe('a meeting push against the conflict rule', () => {
     expect(outcome.rejection.reason).toBe('invalid');
     expect(h.meetings.rows.has(MEETING_ID)).toBe(false);
   });
+
+  it('refuses a javascript: link as invalid, never stale (032)', async () => {
+    const outcome = await h.meetingSync.apply(
+      USER,
+      change({
+        id: MEETING_ID,
+        op: 'create',
+        updatedAt: new Date(),
+        fields: {
+          ...validMeetingFields(),
+          location: { onlineLink: 'javascript:alert(1)', address: null },
+        },
+      }),
+      new Date(),
+    );
+
+    expect(outcome.applied).toBe(false);
+    if (outcome.applied) return;
+    expect(outcome.rejection.reason).toBe('invalid');
+    expect(h.meetings.rows.has(MEETING_ID)).toBe(false);
+  });
 });
 
 describe('a meeting push that is accepted', () => {
