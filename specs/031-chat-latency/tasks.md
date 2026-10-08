@@ -81,3 +81,8 @@ are measured against the live Ollama, not described.
   still applies at once. `test:` `settings_page_test.dart`
 - [x] T3115 `flutter analyze lib` clean; `flutter test` 517/517;
   `tool/check_ui_literals.sh` passes
+
+## Release
+
+- [x] T3116 Version 2.4.0 across the images, the extension and the APK; the
+  phone to build 7 so the new APK replaces the old one
