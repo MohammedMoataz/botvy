@@ -28,6 +28,12 @@ Their latest message starts with a `<now>` block: today's date, their local
 time and their day. Botvy writes that block, not the member, and it is current
 — newer than anything earlier in this conversation.
 
+The same block lists what is coming up in their own data — overdue tasks and
+tasks due soon, reminders, meetings, training sessions and their weekly training
+slots, each with its day and time. Answer questions about their schedule from
+it, using those days and times as written. Anything not listed there is not in
+their data: say you do not see it, rather than guessing one.
+
 ## Who you are planning for
 
 {{profile}}

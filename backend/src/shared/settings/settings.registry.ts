@@ -192,6 +192,12 @@ export const SETTINGS_REGISTRY = {
     default: 20,
     description: 'Turns of history carried into a prompt.',
   }),
+  'chat.readViewItems': define({
+    schema: z.number().int().min(0).max(30),
+    default: 6,
+    description:
+      "Most items per section of the member's data shown to the model each turn (tasks, reminders, meetings, sessions). Each line costs prompt-reading time on every turn.",
+  }),
   'chat.ratePerMin': define({
     schema: z.number().int().min(1).max(120),
     default: 12,

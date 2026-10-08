@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { SettingsService } from '../../../shared/settings/settings.service.js';
 import { localDate, localHhMm } from '../../../shared/time/time.js';
 import {
+  MemberAgendaPort,
   MemberDayPort,
   PromptAssemblerPort,
+  type MemberAgenda,
   type MemberDay,
   type MemberFacts,
 } from '../domain/chat.ports.js';
@@ -76,6 +78,7 @@ export class PromptAssembler extends PromptAssemblerPort {
     private readonly day: MemberDayPort,
     private readonly messages: MessageRepository,
     private readonly settings: SettingsService,
+    private readonly agenda: MemberAgendaPort,
   ) {
     super();
   }
@@ -93,10 +96,14 @@ export class PromptAssembler extends PromptAssemblerPort {
   > {
     const { userId, kind, text, conversationId, floorSeq, now, facts } = input;
 
-    const historyLimit = await this.settings.get('chat.historyLimit');
-    const [day, history] = await Promise.all([
+    const [historyLimit, viewItems] = await Promise.all([
+      this.settings.get('chat.historyLimit'),
+      this.settings.get('chat.readViewItems'),
+    ]);
+    const [day, history, agenda] = await Promise.all([
       this.day.forMember(userId, now),
       this.history(userId, conversationId, floorSeq, historyLimit, text),
+      this.agenda.forMember(userId, now, viewItems),
     ]);
 
     /*
@@ -127,11 +134,18 @@ export class PromptAssembler extends PromptAssemblerPort {
      * Botvy's, and the history it follows stays byte-identical turn to turn.
      */
     const today = localDate(now, facts.timezone);
+    const weekday = new Intl.DateTimeFormat('en-GB', {
+      timeZone: facts.timezone,
+      weekday: 'long',
+    }).format(now);
     const moment = [
-      `Today is ${today} and the local time is ` +
+      `Today is ${weekday} ${today} and the local time is ` +
         `${localHhMm(now, facts.timezone)} (${facts.timezone}).`,
       // The free chat never carried the day; only the two pinned voices do.
       ...(template === 'chat.md' ? [] : ['', dayBlock(day)]),
+      // Every chat gets what is coming up (032): "when is my dentist?" is a
+      // fair question in any of them, and the answer is the member's own data.
+      ...agendaBlock(agenda),
     ].join('\n');
 
     return [
@@ -298,6 +312,30 @@ function dayBlock(day: MemberDay): string {
   );
 
   return lines.join('\n');
+}
+
+/**
+ * What is coming up, as sections of short lines (032).
+ *
+ * An empty section is left out rather than written as "none": the templates
+ * tell the model that what is not listed is not there, and a heading with
+ * nothing under it is tokens read on every turn to say nothing.
+ */
+function agendaBlock(agenda: MemberAgenda): string[] {
+  const sections: Array<[string, string[]]> = [
+    ['Overdue tasks', agenda.overdueTasks],
+    ['Tasks in the next 3 days', agenda.upcomingTasks],
+    ['Reminders in the next 2 days', agenda.reminders],
+    ['Meetings in the next 7 days', agenda.meetings],
+    ['Training sessions in the next 7 days', agenda.sessions],
+    ['Weekly training slots', agenda.slots],
+  ];
+  const lines: string[] = [];
+  for (const [heading, items] of sections) {
+    if (items.length === 0) continue;
+    lines.push('', `${heading}:`, ...items.map((item) => `- ${item}`));
+  }
+  return lines;
 }
 
 /**

@@ -102,6 +102,39 @@ export abstract class MemberDayPort {
 }
 
 /**
+ * What is coming up in the member's own data, for the prompt (032, US3).
+ *
+ * The day block answers "what is today"; this answers "what have I got": the
+ * tasks that are overdue or due soon, the next two days of reminders, the next
+ * week of meetings and sessions, and the training week. Without it the model
+ * could not answer "when is my dentist?" — it had never been told, and a model
+ * asked about a thing it was not told invents one.
+ *
+ * Every line is rendered in the member's own zone by the adapter, because the
+ * strings go straight into a prompt and a model handed a UTC instant quotes it
+ * back. Each section is capped (`chat.readViewItems`) because each line is read
+ * by the model on every turn — 031 measured that reading at ~115 tokens/s on
+ * the Owner's GPU.
+ */
+export interface MemberAgenda {
+  overdueTasks: string[];
+  upcomingTasks: string[];
+  reminders: string[];
+  meetings: string[];
+  sessions: string[];
+  slots: string[];
+}
+
+export abstract class MemberAgendaPort {
+  /** `limit` is the most lines per section; 0 turns the view off. */
+  abstract forMember(
+    userId: string,
+    now: Date,
+    limit: number,
+  ): Promise<MemberAgenda>;
+}
+
+/**
  * The member's training week, for the prompt (FR-017).
  *
  * Bound to Training's `TrainingSummaryQueryHandler` — the sibling of Profile's

@@ -24,6 +24,7 @@ import {
 import { delimitQuoted } from './application/prompt-files.js';
 import {
   MeetingActionsPort,
+  MemberAgendaPort,
   MemberDayPort,
   NutritionActionsPort,
   PlannerActionsPort,
@@ -33,6 +34,7 @@ import {
   type CardItem,
   type ChatTrainingSlot,
   type CreatedItem,
+  type MemberAgenda,
   type MemberDay,
   type MemberFacts,
   type TrainingSessionRef,
@@ -334,6 +336,28 @@ class FakeDay extends MemberDayPort {
 
   async forMember(): Promise<MemberDay> {
     return this.day;
+  }
+}
+
+/** What is coming up (032): one line per section the spec cares about. */
+class FakeAgenda extends MemberAgendaPort {
+  agenda: MemberAgenda = {
+    overdueTasks: ['File the tax return (was due Mon 5 Oct)'],
+    upcomingTasks: [],
+    reminders: [],
+    meetings: ['Thu 15 Oct 17:00 Dentist, 30 min at 12 Tahrir St'],
+    sessions: [],
+    slots: ['Mon 18:00 gym, 60 min'],
+  };
+  limits: number[] = [];
+
+  async forMember(
+    _userId: string,
+    _now: Date,
+    limit: number,
+  ): Promise<MemberAgenda> {
+    this.limits.push(limit);
+    return this.agenda;
   }
 }
 
@@ -2094,6 +2118,7 @@ describe('PromptAssembler', () => {
   let uow: InMemoryUnitOfWork;
   let messages: InMemoryMessageRepository;
   let day: FakeDay;
+  let agenda: FakeAgenda;
   let settings: SettingsService;
   let assembler: PromptAssembler;
 
@@ -2102,8 +2127,32 @@ describe('PromptAssembler', () => {
     uow = new InMemoryUnitOfWork();
     messages = new InMemoryMessageRepository(uow);
     day = new FakeDay();
+    agenda = new FakeAgenda();
     settings = settingsService();
-    assembler = new PromptAssembler(day, messages, settings);
+    assembler = new PromptAssembler(day, messages, settings, agenda);
+  });
+
+  it('tells the model what is coming up, in the latest message only (032)', async () => {
+    const built = await assembler.build(request({ kind: 'free' }));
+
+    const last = built.at(-1)!.content;
+    expect(last).toContain(
+      'Meetings in the next 7 days:\n- Thu 15 Oct 17:00 Dentist',
+    );
+    expect(last).toContain('Overdue tasks:\n- File the tax return');
+    expect(last).toContain('Weekly training slots:\n- Mon 18:00 gym');
+    // Empty sections are left out, not written as "none".
+    expect(last).not.toContain('Reminders in the next 2 days');
+    // The system prompt stays free of anything that changes (031).
+    expect(built[0]!.content).not.toContain('Dentist');
+    // The operator's cap reaches the adapter.
+    expect(agenda.limits).toEqual([6]);
+  });
+
+  it('turns the view off when the operator sets the cap to zero', async () => {
+    await settings.set('chat.readViewItems', 0, OWNER);
+    await assembler.build(request());
+    expect(agenda.limits).toEqual([0]);
   });
 
   async function seed(
@@ -2287,7 +2336,7 @@ describe('PromptAssembler', () => {
     const firsts: string[] = [];
     for (const count of [6, 7, 8, 9]) {
       messages = new InMemoryMessageRepository(uow);
-      assembler = new PromptAssembler(day, messages, settings);
+      assembler = new PromptAssembler(day, messages, settings, agenda);
       await seed(rows.slice(0, count));
       const history = (await assembler.build(request({ text: 'next' }))).slice(
         1,

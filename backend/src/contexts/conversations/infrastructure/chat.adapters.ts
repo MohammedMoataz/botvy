@@ -35,6 +35,7 @@ import {
   CheckinPort,
   LatestCheckinPort,
   MeetingActionsPort,
+  MemberAgendaPort,
   MemberDayPort,
   MemberFactsPort,
   NutritionActionsPort,
@@ -48,6 +49,7 @@ import {
   type ChatTrainingSlot,
   type CheckinCapture,
   type CreatedItem,
+  type MemberAgenda,
   type MemberDay,
   type MemberFacts,
   type TrainingSessionRef,
@@ -162,6 +164,131 @@ export class RhythmMemberDay extends MemberDayPort {
       today,
     };
   }
+}
+
+/**
+ * What is coming up across the platform, for the prompt's `<now>` block (032).
+ *
+ * Five published queries and no repository — the rule every adapter in this
+ * file follows. Each line is rendered here, in the member's zone, with the
+ * weekday and the date, because "Thursday" is how the member will ask and a
+ * model handed only a date has to work the weekday out, which a 3B model gets
+ * wrong.
+ *
+ * The windows are fixed by the question each section answers — tasks due in
+ * the next three days, reminders in the next two, meetings and sessions in the
+ * next week — and the *count* is the operator's (`chat.readViewItems`), because
+ * the count is what costs prompt-reading time.
+ */
+@Injectable()
+export class PlatformAgenda extends MemberAgendaPort {
+  constructor(
+    private readonly tasks: TasksQueryHandler,
+    private readonly reminders: RemindersQueryHandler,
+    private readonly occurrences: MeetingOccurrencesQueryHandler,
+    private readonly sessions: SessionsQueryHandler,
+    private readonly athletes: AthleteProfileQueryHandler,
+    private readonly member: MemberContextPort,
+  ) {
+    super();
+  }
+
+  async forMember(
+    userId: string,
+    now: Date,
+    limit: number,
+  ): Promise<MemberAgenda> {
+    const empty: MemberAgenda = {
+      overdueTasks: [],
+      upcomingTasks: [],
+      reminders: [],
+      meetings: [],
+      sessions: [],
+      slots: [],
+    };
+    if (limit <= 0) return empty;
+
+    const { timezone } = await this.member.clock(userId);
+    const day = 86_400_000;
+    const [overdue, upcoming, reminders, meetings, sessions, profile] =
+      await Promise.all([
+        this.tasks.page(userId, { view: 'overdue', limit }, now),
+        this.tasks.page(userId, { view: 'upcoming', limit: limit * 2 }, now),
+        this.reminders.page(
+          userId,
+          { view: 'upcoming', limit: limit * 2 },
+          now,
+        ),
+        this.occurrences.forMember(
+          userId,
+          now,
+          new Date(now.getTime() + 7 * day),
+        ),
+        this.sessions.between(
+          userId,
+          now,
+          new Date(now.getTime() + 7 * day),
+          now,
+        ),
+        this.athletes.handle(userId),
+      ]);
+
+    const when = (at: Date, allDay = false): string =>
+      allDay
+        ? dayName(at, timezone)
+        : `${dayName(at, timezone)} ${localHhMm(at, timezone)}`;
+    const within = (at: Date | null, days: number): boolean =>
+      at !== null && at.getTime() <= now.getTime() + days * day;
+
+    return {
+      overdueTasks: overdue.nodes
+        .slice(0, limit)
+        .map(
+          (task) => `${task.title} (was due ${when(task.dueAt!, task.allDay)})`,
+        ),
+      upcomingTasks: upcoming.nodes
+        .filter((task) => within(task.dueAt, 3))
+        .slice(0, limit)
+        .map((task) => `${when(task.dueAt!, task.allDay)} ${task.title}`),
+      reminders: reminders.nodes
+        .filter((reminder) => within(reminder.effectiveAt, 2))
+        .slice(0, limit)
+        .map((reminder) => `${when(reminder.effectiveAt!)} ${reminder.title}`),
+      meetings: meetings.slice(0, limit).map((occurrence) => {
+        const where = occurrence.location.address
+          ? ` at ${occurrence.location.address}`
+          : occurrence.location.onlineLink
+            ? ' (online)'
+            : '';
+        return `${when(occurrence.startAt)} ${occurrence.title}, ${occurrence.durationMin} min${where}`;
+      }),
+      sessions: sessions
+        .filter((session) => session.status === 'planned')
+        .slice(0, limit)
+        .map(
+          (session) =>
+            `${when(session.plannedAt)} ${session.title} (${session.sport})`,
+        ),
+      slots: [...profile.slots]
+        .sort((a, b) => a.weekday - b.weekday || a.start.localeCompare(b.start))
+        .map(
+          (slot) =>
+            `${WEEKDAY_NAMES[slot.weekday - 1] ?? slot.weekday} ${slot.start} ${slot.sport}, ${slot.durationMin} min`,
+        ),
+    };
+  }
+}
+
+const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** "Thu 15 Oct" in the member's zone. */
+function dayName(at: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  }).format(at);
 }
 
 /**

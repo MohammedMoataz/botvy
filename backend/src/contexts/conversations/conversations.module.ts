@@ -77,6 +77,7 @@ import {
   IntentExecutorPort,
   IntentExtractorPort,
   LatestCheckinPort,
+  MemberAgendaPort,
   MemberDayPort,
   MeetingActionsPort,
   MemberFactsPort,
@@ -122,6 +123,7 @@ import {
   RhythmCheckins,
   RhythmLatestCheckin,
   RhythmMemberDay,
+  PlatformAgenda,
 } from './infrastructure/chat.adapters.js';
 import {
   MongoQuickQuestionRepository,
@@ -338,6 +340,37 @@ import {
      */
     { provide: TrainingSummaryPort, useClass: TrainingWeekSummary },
     /*
+     * What is coming up, for the prompt (032). Five published queries, read
+     * on every turn; see `PlatformAgenda`.
+     */
+    {
+      provide: MemberAgendaPort,
+      inject: [
+        TasksQueryHandler,
+        RemindersQueryHandler,
+        MeetingOccurrencesQueryHandler,
+        SessionsQueryHandler,
+        AthleteProfileQueryHandler,
+        MemberContextPort,
+      ],
+      useFactory: (
+        tasks: TasksQueryHandler,
+        reminders: RemindersQueryHandler,
+        occurrences: MeetingOccurrencesQueryHandler,
+        sessions: SessionsQueryHandler,
+        athletes: AthleteProfileQueryHandler,
+        member: MemberContextPort,
+      ) =>
+        new PlatformAgenda(
+          tasks,
+          reminders,
+          occurrences,
+          sessions,
+          athletes,
+          member,
+        ),
+    },
+    /*
      * `set_slots` and `log_session`, which until P6 did not exist.
      *
      * Seven handlers, and that is the honest cost of a chat that can set a
@@ -499,12 +532,18 @@ import {
     },
     {
       provide: PromptAssemblerPort,
-      inject: [MemberDayPort, MessageRepository, SettingsService],
+      inject: [
+        MemberDayPort,
+        MessageRepository,
+        SettingsService,
+        MemberAgendaPort,
+      ],
       useFactory: (
         day: MemberDayPort,
         messages: MessageRepository,
         settings: SettingsService,
-      ) => new PromptAssembler(day, messages, settings),
+        agenda: MemberAgendaPort,
+      ) => new PromptAssembler(day, messages, settings, agenda),
     },
     { provide: AllergenGuardPort, useClass: AllergenGuard },
 
