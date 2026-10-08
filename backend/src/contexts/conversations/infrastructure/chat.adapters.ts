@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { newId } from '../../../shared/cqrs/ids.js';
 import { MemberContextPort } from '../../../shared/member/member-context.port.js';
 import {
-  formatInTz,
   localDate,
   localHhMm,
   wallClockToUtc,
@@ -441,11 +440,10 @@ export class MeetingsChatActions extends MeetingActionsPort {
    * calendar and the alert reconciliation read — so the chat cannot tell a
    * member about a meeting on a day their calendar does not show it.
    *
-   * `at` is a wall-clock string in the member's zone, because that is what
-   * `CardItem.at` is: the client renders the row as given, and a card carrying
-   * an instant would be rendered against the *device's* zone. The occurrence
-   * query already resolves the window in the member's zone, so the formatting
-   * is the only thing left to do here.
+   * `at` is ISO-8601, as for tasks and reminders (032). It used to be a display
+   * string meant to be rendered as given, and the phone — which parses `at` for
+   * every kind — could not read it, so meeting cards showed no time. The
+   * executor renders the words beside the card in the member's zone.
    */
   async listUpcoming(
     userId: string,
@@ -454,12 +452,11 @@ export class MeetingsChatActions extends MeetingActionsPort {
   ): Promise<CardItem[]> {
     const to = new Date(now.getTime() + days * 86_400_000);
     const occurrences = await this.occurrences.forMember(userId, now, to);
-    const { timezone } = await this.member.clock(userId);
 
     return occurrences.map((occurrence) => ({
       id: occurrence.meetingId,
       title: occurrence.title,
-      at: formatInTz(occurrence.startAt, timezone),
+      at: occurrence.startAt.toISOString(),
       deepLink: `botvy://meetings/${occurrence.meetingId}`,
     }));
   }
@@ -626,10 +623,7 @@ export class TrainingChatActions extends TrainingActionsPort {
   /**
    * What training is coming, for `chat.card { kind: 'sessions' }`.
    *
-   * `at` is a wall-clock string in the member's zone for the reason
-   * `MeetingsChatActions.listUpcoming` gives: `CardItem.at` is rendered as
-   * given, so a card carrying an instant is rendered against the *device's*
-   * zone.
+   * `at` is ISO-8601 for the reason `MeetingsChatActions.listUpcoming` gives.
    *
    * `planned` only, and that is the difference from the week view. The card
    * answers "what is coming", and a session the member has already cancelled or
@@ -641,7 +635,6 @@ export class TrainingChatActions extends TrainingActionsPort {
     now: Date,
     days: number,
   ): Promise<CardItem[]> {
-    const { timezone } = await this.member.clock(userId);
     const to = new Date(now.getTime() + days * 86_400_000);
     const views = await this.sessions.between(userId, now, to, now);
 
@@ -650,7 +643,7 @@ export class TrainingChatActions extends TrainingActionsPort {
       .map((view) => ({
         id: view.id,
         title: view.title,
-        at: formatInTz(view.plannedAt, timezone),
+        at: view.plannedAt.toISOString(),
         status: view.status,
         deepLink: `botvy://sessions/${view.id}`,
       }));

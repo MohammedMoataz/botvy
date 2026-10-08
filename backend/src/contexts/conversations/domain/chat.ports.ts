@@ -360,8 +360,7 @@ export abstract class TrainingActionsPort {
    *
    * The same shape as `MeetingActionsPort.listUpcoming` and for the same
    * reasons: rows from the published query, so the chat and the week view
-   * cannot disagree, and `at` a wall-clock string in the member's zone, because
-   * a card carrying an instant is rendered against the *device's* zone.
+   * cannot disagree, and `at` ISO-8601 like every other card (032).
    */
   abstract listUpcoming(
     userId: string,
@@ -374,6 +373,7 @@ export abstract class TrainingActionsPort {
 export interface CardItem {
   id: string;
   title: string;
+  /** ISO-8601, for every kind (032). The reply text formats it in the member's zone. */
   at: string | null;
   priority?: number;
   status?: string;

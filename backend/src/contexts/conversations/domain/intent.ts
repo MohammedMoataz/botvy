@@ -224,6 +224,14 @@ const ACTIONS = new Set<IntentName>([
   'update_profile',
   'set_slots',
   'log_session',
+  /*
+   * Missing until 032: the schema and the executor both had it, so the
+   * extractor produced it and the executor's spec passed, and `TurnRunner` sent
+   * "add koshari to my meals" to the coach — which is told it cannot add
+   * anything. `chat-application.spec.ts` now checks every schema name but
+   * `chat` is in this set.
+   */
+  'add_meal',
 ]);
 
 export function isAction(intent: Intent): boolean {

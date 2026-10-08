@@ -423,7 +423,7 @@ export class IntentExecutor extends IntentExecutorPort {
 
         const shown = items.slice(0, 10);
         const lines = shown
-          .map((item) => `- ${item.title}${item.at ? ` (${item.at})` : ''}`)
+          .map((item) => `- ${item.title}${cardAt(item.at, zone)}`)
           .join('\n');
         const more = items.length - shown.length;
 
@@ -927,6 +927,23 @@ function ask(reply: string): ExecutionResult {
   // `asking` is the flag the turn branches on: a question means nothing was
   // stored and the member's next message is the answer to it.
   return { reply, actions: [], asking: true };
+}
+
+/**
+ * A card row's time for the reply text: " (Tue 2 Sep, 17:00)" in the member's
+ * zone, or nothing.
+ *
+ * `CardItem.at` is ISO-8601 for every kind since 032 — meetings and sessions
+ * used to send a display string, which the phone could not parse, so their
+ * cards showed no time — and the words beside the card are rendered here, so
+ * the transcript never quotes an ISO instant at the member.
+ */
+function cardAt(at: string | null, zone: string): string {
+  if (!at) return '';
+  const instant = new Date(at);
+  return Number.isNaN(instant.getTime())
+    ? ''
+    : ` (${formatInTz(instant, zone)})`;
 }
 
 /** ", at Tue 2 Sep, 17:00" — or nothing, for an item with no time. */

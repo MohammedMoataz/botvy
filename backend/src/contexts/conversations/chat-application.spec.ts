@@ -37,7 +37,7 @@ import {
   type MemberFacts,
   type TrainingSessionRef,
 } from './domain/chat.ports.js';
-import { isAction, type Intent } from './domain/intent.js';
+import { INTENT_SCHEMA, isAction, type Intent } from './domain/intent.js';
 import { Message } from './domain/message.aggregate.js';
 import { InMemoryMessageRepository } from './infrastructure/in-memory-conversations.repositories.js';
 
@@ -748,6 +748,17 @@ describe('IntentExtractor', () => {
      */
     expect(isAction(result)).toBe(true);
     expect(isAction({ ...result, name: 'log_session' })).toBe(true);
+  });
+
+  it('routes every name the grammar can produce, except chat, to the executor', () => {
+    // `add_meal` was in the schema and the executor and not here, so the turn
+    // sent it to the coach (032). Checked over the schema, so the next name
+    // added there cannot be forgotten in the same way.
+    for (const name of INTENT_SCHEMA.properties.name.enum) {
+      expect(isAction({ name, scope: 'coaching', args: {} }), name).toBe(
+        name !== 'chat',
+      );
+    }
   });
 
   it('leaves weekdays absent when nothing usable arrived, rather than guessing one', async () => {
