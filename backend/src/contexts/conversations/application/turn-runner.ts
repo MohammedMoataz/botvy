@@ -11,6 +11,7 @@ import {
   PromptAssemblerPort,
   UsagePort,
   type CardItem,
+  type ProposalRef,
   type MemberFacts,
 } from '../domain/chat.ports.js';
 import {
@@ -23,6 +24,10 @@ import { isAction, titleFromMessage, type Intent } from '../domain/intent.js';
 import { newId } from '../../../shared/cqrs/ids.js';
 import { UnitOfWork } from '../../../shared/persistence/ports/unit-of-work.js';
 import { AppendMessageHandler } from '../features/append-message/append-message.handler.js';
+import {
+  ProposalRepository,
+  type Proposal,
+} from '../domain/proposal.repository.js';
 
 /** What a turn tells its caller, as it happens. */
 export interface TurnEvents {
@@ -39,7 +44,13 @@ export interface TurnEvents {
     title: string;
   }): void;
   token(payload: { requestId: string; text: string }): void;
-  card(payload: { requestId: string; kind: string; items: CardItem[] }): void;
+  card(payload: {
+    requestId: string;
+    kind: string;
+    items: CardItem[];
+    /** Present on a `confirm` card (032). */
+    proposal?: ProposalRef;
+  }): void;
   done(payload: {
     requestId: string;
     conversationId: string;
@@ -151,6 +162,7 @@ export class TurnRunner {
     private readonly allergens: AllergenGuardPort,
     private readonly llm: OllamaClient,
     private readonly settings: SettingsService,
+    private readonly proposals: ProposalRepository,
   ) {}
 
   async run(
@@ -231,6 +243,24 @@ export class TurnRunner {
        */
       const asOf = request.composedAt ?? now;
 
+      // ---- 1b. an answer to a change the chat proposed (032) ------------
+      /*
+       * Before the check-in, deliberately. A proposal was asked at most fifteen
+       * minutes ago in *this* conversation, so a short "yes" here answers it;
+       * the check-in question is the evening's and keeps waiting. Only a short
+       * message counts, and only whole words: "yes, and add milk" is a new
+       * instruction, and "cancel" is never read as a No because "cancel my
+       * meeting" is the sentence most likely to follow a proposal.
+       */
+      const answer = yesOrNo(request.text);
+      if (answer !== null) {
+        const open = await this.proposals.openIn(userId, conversation.id, now);
+        if (open) {
+          await this.answer(open, answer, conversation, requestId, events, now);
+          return;
+        }
+      }
+
       // ---- 2. the evening check-in, if one is awaited --------------------
       if (PINNED_KINDS.includes(conversation.kind)) {
         const capture = await this.checkins.capture({
@@ -281,12 +311,14 @@ export class TurnRunner {
           text: request.text,
           now: asOf,
           facts: memberFacts,
+          conversationId: conversation.id,
         });
         if (result.card) {
           events.card({
             requestId,
             kind: result.card.kind,
             items: result.card.items,
+            ...(result.card.proposal ? { proposal: result.card.proposal } : {}),
           });
         }
         await this.reply(conversation, result.reply, requestId, events, now, {
@@ -320,6 +352,96 @@ export class TurnRunner {
         message: 'Something went wrong answering that. Your message was kept.',
       });
     }
+  }
+
+  /**
+   * `chat.confirm` — the member tapped Yes or No on a proposal (032).
+   *
+   * The answer becomes an ordinary assistant message in the proposal's own
+   * conversation, through `reply`, so every client renders one path. The
+   * refusals are codes the client can branch on: `forbidden` for an id that is
+   * not theirs (or does not exist — the two are indistinguishable on purpose,
+   * FR-020's rule), `answered` for one already applied or declined, and
+   * `expired`.
+   */
+  async confirm(
+    input: {
+      userId: string;
+      requestId: string;
+      proposalId: string;
+      accept: boolean;
+    },
+    events: TurnEvents,
+    now = new Date(),
+  ): Promise<{ ok: boolean; error?: 'forbidden' | 'answered' | 'expired' }> {
+    const proposal = await this.proposals.find(input.userId, input.proposalId);
+    if (!proposal) return { ok: false, error: 'forbidden' };
+    if (proposal.status !== 'open') return { ok: false, error: 'answered' };
+    if (proposal.expiresAt.getTime() <= now.getTime()) {
+      return { ok: false, error: 'expired' };
+    }
+    const conversation = await this.conversations.findById(
+      input.userId,
+      proposal.conversationId,
+    );
+    if (!conversation || conversation.deletedAt) {
+      return { ok: false, error: 'forbidden' };
+    }
+
+    const answered = await this.answer(
+      proposal,
+      input.accept,
+      conversation,
+      input.requestId,
+      events,
+      now,
+    );
+    return answered ? { ok: true } : { ok: false, error: 'answered' };
+  }
+
+  /**
+   * Claim, then apply — or decline. False when another answer got there first.
+   *
+   * The claim is atomic and comes before any write, so a tap and a typed
+   * "yes" landing together apply the change once; the loser is told it was
+   * already answered.
+   */
+  private async answer(
+    proposal: Proposal,
+    accept: boolean,
+    conversation: Conversation,
+    requestId: string,
+    events: TurnEvents,
+    now: Date,
+  ): Promise<boolean> {
+    const settled = accept
+      ? await this.proposals.claim(proposal.userId, proposal.id, now)
+      : await this.proposals.decline(proposal.userId, proposal.id, now);
+    if (!settled) {
+      await this.reply(
+        conversation,
+        proposal.arabic
+          ? 'السؤال ده اتجاوب عليه أو خلص وقته.'
+          : 'That was already answered, or it has expired.',
+        requestId,
+        events,
+        now,
+      );
+      return false;
+    }
+
+    const result = accept
+      ? await this.executor.applyProposal(settled, now)
+      : this.executor.declined(settled);
+    await this.reply(conversation, result.reply, requestId, events, now, {
+      intent: {
+        name: 'confirm',
+        accepted: accept,
+        proposalId: proposal.id,
+      },
+      actions: result.actions,
+    });
+    return true;
   }
 
   // ------------------------------------------------------------------ steps
@@ -615,6 +737,74 @@ export class TurnRunner {
     });
   }
 }
+
+/**
+ * A short Yes or No, in either language — or null for anything else (032).
+ *
+ * Whole words over a short message only, the check-in classifier's rule: "not"
+ * inside a sentence is not an answer, and neither is a yes followed by a new
+ * instruction. "cancel" is deliberately not a No — "cancel my meeting" is the
+ * sentence most likely to arrive while a proposal is open.
+ */
+export function yesOrNo(text: string): boolean | null {
+  const words = text
+    .toLowerCase()
+    .replace(/[.!?,؟،]+/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+  if (words.length === 0 || words.length > 4) return null;
+  const phrase = words.join(' ');
+  if (YES.has(phrase) || (words.length <= 2 && words.some((w) => YES.has(w)))) {
+    return true;
+  }
+  if (NO.has(phrase) || (words.length <= 2 && words.some((w) => NO.has(w)))) {
+    return false;
+  }
+  return null;
+}
+
+const YES = new Set([
+  'yes',
+  'yeah',
+  'yep',
+  'yup',
+  'y',
+  'ok',
+  'okay',
+  'sure',
+  'confirm',
+  'confirmed',
+  'do it',
+  'go ahead',
+  'yes please',
+  'نعم',
+  'ايوه',
+  'أيوه',
+  'ايوة',
+  'أيوة',
+  'اه',
+  'آه',
+  'تمام',
+  'موافق',
+  'اكيد',
+  'أكيد',
+]);
+
+const NO = new Set([
+  'no',
+  'nope',
+  'nah',
+  'n',
+  "don't",
+  'dont',
+  'no thanks',
+  'leave it',
+  'لا',
+  'لأ',
+  'لاء',
+  'بلاش',
+  'سيبها',
+]);
 
 /** Calendar arithmetic, not millisecond arithmetic — a local day is not 24 h twice a year. */
 function nextLocalDate(date: string): string {

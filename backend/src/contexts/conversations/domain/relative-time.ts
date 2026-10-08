@@ -255,6 +255,18 @@ export function mentionsAClock(text: string): boolean {
 }
 
 /**
+ * Does the sentence name a *day* — a weekday, a date, "tomorrow"?
+ *
+ * The other half of `mentionsAMoment`, for 032's edits: "move the dentist to
+ * 5pm" names a clock and no day, and means 17:00 on the dentist's own day — not
+ * on whatever date the model wrote beside the hour. Asked over the same
+ * vocabulary rather than a second copy of it.
+ */
+export function mentionsADay(text: string): boolean {
+  return RELATIVE.test(text) || DATE_WORDS.test(text);
+}
+
+/**
  * Anything a clock time could be written as, beyond the two tables above.
  *
  * Digits in both scripts carry most of it — a member who names an hour almost

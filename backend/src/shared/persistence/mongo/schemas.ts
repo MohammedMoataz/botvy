@@ -715,6 +715,41 @@ export const QuickQuestionSchema = new Schema(
 );
 
 /**
+ * A change the chat has offered and the member has not yet answered (032).
+ *
+ * `item` and `change` are stored as the executor built them — the row as it
+ * was when proposed and the fields the member named — because applying
+ * compares the row against `item` and refuses if it moved since. Indexes and
+ * the week-long TTL on `expiresAt` are in the migration, as for every
+ * collection (constitution IV).
+ */
+export const ChatProposalSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    userId: { type: String, required: true },
+    conversationId: { type: String, required: true },
+    action: { type: String, required: true },
+    item: { type: Schema.Types.Mixed, required: true },
+    change: { type: Schema.Types.Mixed, required: true },
+    arabic: { type: Boolean, required: true, default: false },
+    timezone: { type: String, required: true },
+    /** `open`, `applied` or `declined`. Expiry is computed, never stored. */
+    status: { type: String, required: true },
+    expiresAt: { type: Date, required: true },
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date, required: true },
+    version: { type: Number, required: true, default: 1 },
+    schemaVersion: { type: Number, default: 1 },
+  },
+  {
+    collection: 'chat_proposals',
+    versionKey: false,
+    _id: false,
+    minimize: false,
+  },
+);
+
+/**
  * The repeat, shared by both of Meetings' collections.
  *
  * A rule, the dates the member removed and the occurrences they moved — never
@@ -1442,6 +1477,7 @@ export const MODEL_NAMES = {
   counter: 'Counter',
   usageLog: 'UsageLog',
   quickQuestion: 'QuickQuestion',
+  chatProposal: 'ChatProposal',
   meeting: 'Meeting',
   calendarEvent: 'CalendarEvent',
   athleteProfile: 'AthleteProfile',

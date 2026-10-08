@@ -1,4 +1,5 @@
-import type { Intent } from './intent.js';
+import type { ChatTarget, Intent } from './intent.js';
+import type { Proposal } from './proposal.repository.js';
 
 /**
  * Everything a turn needs that this context does not own, plus the four
@@ -175,14 +176,6 @@ export interface CreatedItem {
   label?: string;
 }
 
-/** A candidate for a `cancel` the member described in words. */
-export interface CancellableItem {
-  id: string;
-  kind: 'task' | 'reminder';
-  title: string;
-  at: Date | null;
-}
-
 export abstract class PlannerActionsPort {
   abstract createTask(input: {
     userId: string;
@@ -200,21 +193,6 @@ export abstract class PlannerActionsPort {
     remindAt: Date;
     leadTimes?: string[];
   }): Promise<CreatedItem>;
-
-  /**
-   * Everything open that the member's words could mean.
-   *
-   * The *matching* happens in the executor, not here, and not in the model:
-   * "cancel my 5pm reminder" is a search over the member's own rows, and a
-   * model asked to pick an id would pick one that does not exist. Two matches
-   * is a question, never a guess — FR-006 again.
-   */
-  abstract findCancellable(
-    userId: string,
-    now: Date,
-  ): Promise<CancellableItem[]>;
-
-  abstract cancel(userId: string, item: CancellableItem): Promise<boolean>;
 
   /** The `list` intent's answer, as structured items for `chat.card`. */
   abstract list(
@@ -402,6 +380,93 @@ export abstract class TrainingActionsPort {
   ): Promise<CardItem[]>;
 }
 
+// ------------------------------------------------ changing what exists (032)
+
+/** What the member can ask the chat to do to something that already exists. */
+export type ChatAction = 'edit' | 'complete' | 'cancel' | 'delete';
+
+/**
+ * One of the member's own rows, as a sentence can be matched against it.
+ *
+ * One shape for every target rather than six, because the executor's job is
+ * the same for all of them — search the member's own rows by their words, ask
+ * when two match, propose, apply — and the differences are fields a target
+ * either has or does not. The adapter fills what it knows.
+ */
+export interface TargetItem {
+  target: ChatTarget;
+  id: string;
+  title: string;
+  /** The instant it happens or is due. Null for an undated task, a slot, a meal. */
+  at: Date | null;
+  allDay?: boolean;
+  durationMin?: number;
+  /**
+   * A meeting's occurrence, by the moment its rule generated — the key
+   * `move-occurrence` and `skip-occurrence` take. Present only for a series.
+   */
+  occurrenceStart?: Date | null;
+  recurring?: boolean;
+  /** A slot's weekday (1 = Monday), start and sport. */
+  weekday?: number;
+  start?: string;
+  sport?: string;
+  /** A row of today's meal plan: the member's date and its position. */
+  date?: string;
+  index?: number;
+}
+
+/** What an `edit` changes. Only the fields the member named are present. */
+export interface ItemChange {
+  title?: string;
+  at?: Date;
+  allDay?: boolean;
+  durationMin?: number;
+  priority?: number;
+  onlineLink?: string;
+  address?: string;
+  /** A slot's new start, `HH:mm` on the member's own clock. */
+  start?: string;
+  /** Today's meal row, swapped for the member's own meal of this name. */
+  mealName?: string;
+}
+
+/**
+ * Finding and changing the member's existing rows, across the contexts that
+ * own them (032).
+ *
+ * One port for every target, bound once in `infrastructure/` to each owning
+ * context's published query and command handlers — the same seam
+ * `PlannerActionsPort` and the others use, collected because the executor's
+ * flow is one flow. The imports of that adapter are the coupling surface, and
+ * they sit in one file.
+ *
+ * Every method returns what is **stored**: `apply` reads the row back after
+ * writing, so the confirmation names the values the store now holds (FR-004).
+ * `null` from `apply` means the owning context refused or the row is gone; the
+ * adapter logs the reason, because the codes are that context's vocabulary.
+ */
+export abstract class ChatItemsPort {
+  /** The member's rows of this kind that an `action` could apply to. */
+  abstract find(
+    userId: string,
+    target: ChatTarget,
+    action: ChatAction,
+    now: Date,
+  ): Promise<TargetItem[]>;
+
+  /** The same row, read again — to tell whether it changed since it was proposed. */
+  abstract reread(userId: string, item: TargetItem): Promise<TargetItem | null>;
+
+  abstract apply(
+    userId: string,
+    action: ChatAction,
+    item: TargetItem,
+    change: ItemChange,
+    now: Date,
+  ): Promise<TargetItem | null>;
+}
+
 /** One row of a structured list answer, as `ws-chat.md` types it. */
 export interface CardItem {
   id: string;
@@ -563,7 +628,7 @@ export interface ExecutionResult {
   /** The reply text. Always present — every branch says something. */
   reply: string;
   /** A structured list, for `chat.card`. */
-  card?: { kind: string; items: CardItem[] };
+  card?: { kind: string; items: CardItem[]; proposal?: ProposalRef };
   /** What actually happened, for `chat.done`'s `actions`. */
   actions: Array<{ kind: string; id?: string }>;
   /**
@@ -576,6 +641,14 @@ export interface ExecutionResult {
   asking: boolean;
 }
 
+/** What a `confirm` card carries about the change it is asking about (032). */
+export interface ProposalRef {
+  id: string;
+  action: ChatAction;
+  target: ChatTarget;
+  expiresAt: string;
+}
+
 export abstract class IntentExecutorPort {
   abstract execute(input: {
     userId: string;
@@ -583,7 +656,17 @@ export abstract class IntentExecutorPort {
     text: string;
     now: Date;
     facts: MemberFacts;
+    conversationId?: string;
   }): Promise<ExecutionResult>;
+
+  /** A proposal the member said Yes to, already claimed (032). */
+  abstract applyProposal(
+    proposal: Proposal,
+    now: Date,
+  ): Promise<ExecutionResult>;
+
+  /** A proposal the member said No to (032). */
+  abstract declined(proposal: Proposal): ExecutionResult;
 }
 
 /** Builds the messages a chat turn sends to the model. */

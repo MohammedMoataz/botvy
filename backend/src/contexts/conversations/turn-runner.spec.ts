@@ -14,6 +14,7 @@ import { localDate, wallClockToUtc } from '../../shared/time/time.js';
 import { NudgeService } from '../../ws/nudge.service.js';
 import {
   TurnRunner,
+  yesOrNo,
   type TurnEvents,
   type TurnRequest,
 } from './application/turn-runner.js';
@@ -35,6 +36,8 @@ import {
   type ConversationKind,
 } from './domain/conversation.aggregate.js';
 import { PLAIN_CHAT, type Intent, type IntentScope } from './domain/intent.js';
+import type { Proposal } from './domain/proposal.repository.js';
+import { InMemoryProposalRepository } from './infrastructure/in-memory-proposal.repository.js';
 import { AppendMessageHandler } from './features/append-message/append-message.handler.js';
 import {
   InMemoryConversationRepository,
@@ -292,6 +295,25 @@ class Executor extends IntentExecutorPort {
     this.calls.push(input);
     return this.result;
   }
+
+  readonly appliedProposals: string[] = [];
+
+  async applyProposal(proposal: Proposal): Promise<ExecutionResult> {
+    this.appliedProposals.push(proposal.id);
+    return {
+      reply: `Done — "${proposal.item.title}".`,
+      actions: [{ kind: 'task.edited', id: proposal.item.id }],
+      asking: false,
+    };
+  }
+
+  declined(proposal: Proposal): ExecutionResult {
+    return {
+      reply: `OK, I've left "${proposal.item.title}" as it is.`,
+      actions: [],
+      asking: false,
+    };
+  }
 }
 
 class Prompts extends PromptAssemblerPort {
@@ -418,6 +440,7 @@ interface Bench {
   prompts: Prompts;
   allergens: Allergens;
   llm: StubLlm;
+  proposals: InMemoryProposalRepository;
   runner: TurnRunner;
 }
 
@@ -455,8 +478,10 @@ function bench(): Bench {
   const prompts = new Prompts();
   const allergens = new Allergens();
   const llm = new StubLlm();
+  const proposals = new InMemoryProposalRepository();
 
   return {
+    proposals,
     uow,
     conversations,
     messages,
@@ -482,6 +507,7 @@ function bench(): Bench {
       allergens,
       llm,
       settings,
+      proposals,
     ),
   };
 }
@@ -1318,5 +1344,153 @@ describe('a turn: when it is understood as of', () => {
     );
 
     expect(harness.extractor.calls[0]?.now).toEqual(now);
+  });
+});
+
+// ------------------------------------------------------------------ 032
+
+describe('a turn: answering a proposed change (032)', () => {
+  let harness: Bench;
+
+  beforeEach(() => {
+    harness = bench();
+  });
+
+  function proposal(
+    conversationId: string,
+    overrides: Partial<Proposal> = {},
+  ): Proposal {
+    const now = new Date();
+    return {
+      id: newId(),
+      userId: MEMBER,
+      conversationId,
+      action: 'edit',
+      item: { target: 'task', id: 't1', title: 'Report', at: null },
+      change: { title: 'Quarterly report' },
+      arabic: false,
+      timezone: 'Africa/Cairo',
+      status: 'open',
+      expiresAt: new Date(now.getTime() + 15 * 60_000),
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    };
+  }
+
+  it('applies the open proposal when the member types "yes" in the same chat', async () => {
+    const chat = await seed(harness, 'planner');
+    const open = proposal(chat.id);
+    await harness.proposals.create(open);
+    const events = recorder();
+
+    await harness.runner.run(
+      request({ conversationId: chat.id, text: 'Yes!' }),
+      events.events,
+    );
+
+    expect(harness.executor.appliedProposals).toEqual([open.id]);
+    // Nothing went to the extractor: a "yes" here is an answer, not a request.
+    expect(harness.executor.calls).toEqual([]);
+    expect(stored(harness, 'assistant').at(-1)?.content).toContain('Done');
+    expect((await harness.proposals.find(MEMBER, open.id))?.status).toBe(
+      'applied',
+    );
+  });
+
+  it('leaves it alone when "no" is typed, and says so', async () => {
+    const chat = await seed(harness, 'planner');
+    const open = proposal(chat.id);
+    await harness.proposals.create(open);
+    const events = recorder();
+
+    await harness.runner.run(
+      request({ conversationId: chat.id, text: 'no' }),
+      events.events,
+    );
+
+    expect(harness.executor.appliedProposals).toEqual([]);
+    expect((await harness.proposals.find(MEMBER, open.id))?.status).toBe(
+      'declined',
+    );
+  });
+
+  it('does nothing with a "yes" typed in a different chat', async () => {
+    const planner = await seed(harness, 'planner');
+    const other = await seed(harness, 'free');
+    await harness.proposals.create(proposal(planner.id));
+    const events = recorder();
+
+    await harness.runner.run(
+      request({ conversationId: other.id, text: 'yes' }),
+      events.events,
+    );
+
+    expect(harness.executor.appliedProposals).toEqual([]);
+    expect(harness.executor.calls.length + harness.llm.calls.length).toBe(1);
+  });
+
+  it('applies a tapped Yes once, and answers a second tap as already answered', async () => {
+    const chat = await seed(harness, 'planner');
+    const open = proposal(chat.id);
+    await harness.proposals.create(open);
+
+    const first = await harness.runner.confirm(
+      { userId: MEMBER, requestId: 'r1', proposalId: open.id, accept: true },
+      recorder().events,
+    );
+    const second = await harness.runner.confirm(
+      { userId: MEMBER, requestId: 'r2', proposalId: open.id, accept: true },
+      recorder().events,
+    );
+
+    expect(first).toEqual({ ok: true });
+    expect(second).toEqual({ ok: false, error: 'answered' });
+    expect(harness.executor.appliedProposals).toEqual([open.id]);
+  });
+
+  it('answers forbidden for somebody else’s proposal, and expired for a stale one', async () => {
+    const chat = await seed(harness, 'planner');
+    const theirs = proposal(chat.id, { userId: OTHER });
+    const stale = proposal(chat.id, {
+      expiresAt: new Date(Date.now() - 1_000),
+    });
+    await harness.proposals.create(theirs);
+    await harness.proposals.create(stale);
+
+    expect(
+      await harness.runner.confirm(
+        { userId: MEMBER, requestId: 'r', proposalId: theirs.id, accept: true },
+        recorder().events,
+      ),
+    ).toEqual({ ok: false, error: 'forbidden' });
+    expect(
+      await harness.runner.confirm(
+        { userId: MEMBER, requestId: 'r', proposalId: stale.id, accept: true },
+        recorder().events,
+      ),
+    ).toEqual({ ok: false, error: 'expired' });
+    expect(harness.executor.appliedProposals).toEqual([]);
+  });
+});
+
+describe('yesOrNo (032)', () => {
+  it.each([
+    ['yes', true],
+    ['Yes please', true],
+    ['ok', true],
+    ['أيوه', true],
+    ['تمام', true],
+    ['no', false],
+    ['لا', false],
+    ['nope.', false],
+    // A new instruction is not an answer, and "cancel" is never a No.
+    ['yes and add milk to my list', null],
+    ['cancel my meeting', null],
+    ['cancel', null],
+    ['is it not today?', null],
+    ['', null],
+  ])('%s → %s', (text, expected) => {
+    expect(yesOrNo(text)).toBe(expected);
   });
 });

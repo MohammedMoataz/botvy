@@ -10,12 +10,28 @@ import { MeetingQueryHandler } from '../../meetings/features/meeting/meeting.que
 import { MeetingOccurrencesQueryHandler } from '../../meetings/features/meeting-occurrences/meeting-occurrences.query.js';
 import { CreateMeetingHandler } from '../../meetings/features/create-meeting/create-meeting.handler.js';
 import { CancelTaskHandler } from '../../planning/features/cancel-task/cancel-task.handler.js';
+import { CompleteTaskHandler } from '../../planning/features/complete-task/complete-task.handler.js';
+import { DeleteTaskHandler } from '../../planning/features/delete-task/delete-task.handler.js';
+import { UpdateTaskHandler } from '../../planning/features/update-task/update-task.handler.js';
+import { CancelMeetingHandler } from '../../meetings/features/cancel-meeting/cancel-meeting.handler.js';
+import { CompleteMeetingHandler } from '../../meetings/features/complete-meeting/complete-meeting.handler.js';
+import { DeleteMeetingHandler } from '../../meetings/features/delete-meeting/delete-meeting.handler.js';
+import { MoveMeetingOccurrenceHandler } from '../../meetings/features/move-occurrence/move-occurrence.handler.js';
+import { SkipMeetingOccurrenceHandler } from '../../meetings/features/skip-occurrence/skip-occurrence.handler.js';
+import { UpdateMeetingHandler } from '../../meetings/features/update-meeting/update-meeting.handler.js';
+import { CancelSessionHandler } from '../../training/features/cancel-session/cancel-session.handler.js';
+import { DeleteSessionHandler } from '../../training/features/delete-session/delete-session.handler.js';
+import { MealsQueryHandler } from '../../nutrition/features/meals/meals.query.js';
+import { ReplaceTodayMealHandler } from '../../nutrition/features/replace-today-meal/replace-today-meal.handler.js';
 import { CreateTaskHandler } from '../../planning/features/create-task/create-task.handler.js';
 import { TasksQueryHandler } from '../../planning/features/tasks-query/tasks.query.js';
 import { ManageReminderHandler } from '../../reminders/features/manage-reminder/manage-reminder.handler.js';
 import { ReminderLifecycleHandler } from '../../reminders/features/reminder-lifecycle/reminder-lifecycle.handler.js';
 import { RemindersQueryHandler } from '../../reminders/features/reminders-query/reminders.query.js';
-import { AddMealHandler } from '../../nutrition/features/add-meal/add-meal.handler.js';
+import {
+  AddMealHandler,
+  DeleteMealHandler,
+} from '../../nutrition/features/add-meal/add-meal.handler.js';
 import { ProfileQueryHandler } from '../../profile/features/profile-query/profile.query.js';
 import { UpdateProfileHandler } from '../../profile/features/update-profile/update-profile.handler.js';
 import { AthleteProfileQueryHandler } from '../../training/features/athlete-profile/athlete-profile.query.js';
@@ -25,13 +41,17 @@ import { SessionQueryHandler } from '../../training/features/session/session.que
 import { SessionsQueryHandler } from '../../training/features/sessions/sessions.query.js';
 import { SetSlotsHandler } from '../../training/features/set-slots/set-slots.handler.js';
 import { TrainingSummaryQueryHandler } from '../../training/features/training-summary/training-summary.query.js';
-import { SessionNotFound } from '../../training/features/update-session/update-session.handler.js';
+import {
+  SessionNotFound,
+  UpdateSessionHandler,
+} from '../../training/features/update-session/update-session.handler.js';
 import { StreakQueryHandler } from '../../rhythm/features/streak/streak.query.js';
 import { TodayPlanQueryHandler } from '../../rhythm/features/today-plan/today-plan.query.js';
 import { CaptureCheckinReplyHandler } from '../../rhythm/features/capture-checkin-reply/capture-checkin-reply.handler.js';
 import { CheckinsQueryHandler } from '../../rhythm/features/checkins/checkins.query.js';
 import { UsageTodayQueryHandler } from '../../operations/features/usage-today/usage-today.query.js';
 import {
+  ChatItemsPort,
   CheckinPort,
   LatestCheckinPort,
   MeetingActionsPort,
@@ -44,8 +64,10 @@ import {
   TrainingActionsPort,
   TrainingSummaryPort,
   UsagePort,
-  type CancellableItem,
   type CardItem,
+  type ChatAction,
+  type ItemChange,
+  type TargetItem,
   type ChatTrainingSlot,
   type CheckinCapture,
   type CreatedItem,
@@ -54,6 +76,8 @@ import {
   type MemberFacts,
   type TrainingSessionRef,
 } from '../domain/chat.ports.js';
+import type { ChatTarget } from '../domain/intent.js';
+import { fold } from '../application/allergen-guard.js';
 
 /**
  * Where the chat learns about the rest of the platform.
@@ -325,10 +349,8 @@ export class PlanningReminderActions extends PlannerActionsPort {
   constructor(
     private readonly tasks: CreateTaskHandler,
     private readonly taskQueries: TasksQueryHandler,
-    private readonly cancelTask: CancelTaskHandler,
     private readonly reminders: ManageReminderHandler,
     private readonly reminderQueries: RemindersQueryHandler,
-    private readonly reminderLifecycle: ReminderLifecycleHandler,
   ) {
     super();
   }
@@ -394,51 +416,6 @@ export class PlanningReminderActions extends PlannerActionsPort {
       at: stored?.effectiveAt ?? input.remindAt,
       allDay: false,
     };
-  }
-
-  /**
-   * Everything still open that a `cancel` could mean.
-   *
-   * Both kinds in one list, because the member said "cancel the dentist one"
-   * and does not know or care whether they made it a task or a reminder. The
-   * matching happens in the executor over these rows — never in the model,
-   * which would pick an id that does not exist.
-   */
-  async findCancellable(userId: string, now: Date): Promise<CancellableItem[]> {
-    const [upcomingTasks, overdueTasks, reminders] = await Promise.all([
-      this.taskQueries.page(userId, { view: 'upcoming', limit: 50 }, now),
-      this.taskQueries.page(userId, { view: 'overdue', limit: 50 }, now),
-      this.reminderQueries.page(userId, { view: 'upcoming', limit: 50 }, now),
-    ]);
-
-    return [
-      ...[...upcomingTasks.nodes, ...overdueTasks.nodes].map((task) => ({
-        id: task.id,
-        kind: 'task' as const,
-        title: task.title,
-        at: task.dueAt,
-      })),
-      ...reminders.nodes.map((reminder) => ({
-        id: reminder.id,
-        kind: 'reminder' as const,
-        title: reminder.title,
-        at: reminder.effectiveAt,
-      })),
-    ];
-  }
-
-  async cancel(userId: string, item: CancellableItem): Promise<boolean> {
-    try {
-      if (item.kind === 'task') await this.cancelTask.handle(userId, item.id);
-      else await this.reminderLifecycle.cancel(userId, item.id);
-      return true;
-    } catch {
-      // Gone between the search and the cancel — the member completed it on
-      // another device, which is a race and not an error. `false` lets the
-      // executor say so rather than reporting a cancellation that did not
-      // happen.
-      return false;
-    }
   }
 
   async list(
@@ -988,4 +965,450 @@ export class NutritionChatActions extends NutritionActionsPort {
     });
     return { id: added.id, name: input.name, alreadyThere: added.replayed };
   }
+}
+
+/**
+ * Finding and changing the member's existing rows, for the chat (032).
+ *
+ * Every target goes through its owning context's published query to find and
+ * re-read, and through the same command handler the app's own screens use to
+ * change — so a chat edit cannot skip a rule an edit on the phone enforces,
+ * and every event those handlers raise (a meeting's alerts re-planned, a
+ * task's reminder moved) is raised exactly as it would be from the app.
+ *
+ * **Errors.** A refusal or a row that has gone is the owning context's
+ * vocabulary — `TaskRuleError`, `MeetingNotFound`, `NoSuchSlot` and the rest —
+ * which `chat.ports.ts` may not import. They are recognised by name here,
+ * logged, and become `null`; the executor tells the member nothing changed.
+ * Anything else is rethrown, because a store that is down is not a sentence
+ * the member typed wrongly.
+ */
+export interface PlatformItemHandlers {
+  tasks: TasksQueryHandler;
+  updateTask: UpdateTaskHandler;
+  completeTask: CompleteTaskHandler;
+  cancelTask: CancelTaskHandler;
+  deleteTask: DeleteTaskHandler;
+  reminders: RemindersQueryHandler;
+  manageReminder: ManageReminderHandler;
+  reminderLifecycle: ReminderLifecycleHandler;
+  meetings: MeetingQueryHandler;
+  occurrences: MeetingOccurrencesQueryHandler;
+  updateMeeting: UpdateMeetingHandler;
+  cancelMeeting: CancelMeetingHandler;
+  completeMeeting: CompleteMeetingHandler;
+  deleteMeeting: DeleteMeetingHandler;
+  moveOccurrence: MoveMeetingOccurrenceHandler;
+  skipOccurrence: SkipMeetingOccurrenceHandler;
+  sessions: SessionsQueryHandler;
+  session: SessionQueryHandler;
+  updateSession: UpdateSessionHandler;
+  completeSession: CompleteSessionHandler;
+  cancelSession: CancelSessionHandler;
+  deleteSession: DeleteSessionHandler;
+  athletes: AthleteProfileQueryHandler;
+  setSlots: SetSlotsHandler;
+  meals: MealsQueryHandler;
+  addMeal: AddMealHandler;
+  replaceMeal: ReplaceTodayMealHandler;
+  deleteMeal: DeleteMealHandler;
+  member: MemberContextPort;
+}
+
+/** The refusals another context raises, by class name. */
+const REFUSALS =
+  /NotFound$|RuleError$|^NoSuchSlot$|^NoMealsOnThatDay$|^PastDayIsSettled$/;
+
+@Injectable()
+export class PlatformItems extends ChatItemsPort {
+  private readonly logger = new Logger(PlatformItems.name);
+
+  constructor(private readonly h: PlatformItemHandlers) {
+    super();
+  }
+
+  async find(
+    userId: string,
+    target: ChatTarget,
+    action: ChatAction,
+    now: Date,
+  ): Promise<TargetItem[]> {
+    const day = 86_400_000;
+    switch (target) {
+      case 'task': {
+        const pages = await Promise.all(
+          (['overdue', 'today', 'upcoming'] as const).map((view) =>
+            this.h.tasks.page(userId, { view, limit: 50 }, now),
+          ),
+        );
+        const seen = new Map<string, TargetItem>();
+        for (const task of pages.flatMap((page) => page.nodes)) {
+          seen.set(task.id, {
+            target,
+            id: task.id,
+            title: task.title,
+            at: task.dueAt,
+            allDay: task.allDay,
+          });
+        }
+        return [...seen.values()];
+      }
+      case 'reminder': {
+        const page = await this.h.reminders.page(
+          userId,
+          { view: 'upcoming', limit: 50 },
+          now,
+        );
+        return page.nodes.map((reminder) => reminderItem(reminder));
+      }
+      case 'meeting': {
+        // A day back as well as a month ahead: "mark this morning's standup
+        // done" is about an occurrence that has already started.
+        const occurrences = await this.h.occurrences.forMember(
+          userId,
+          new Date(now.getTime() - day),
+          new Date(now.getTime() + 30 * day),
+        );
+        const recurring = new Map<string, boolean>();
+        for (const id of new Set(occurrences.map((o) => o.meetingId))) {
+          const meeting = await this.h.meetings.byId(userId, id, now);
+          recurring.set(id, Boolean(meeting?.recurrence));
+        }
+        return occurrences.map((occurrence) => {
+          const series = recurring.get(occurrence.meetingId) ?? false;
+          return {
+            target,
+            id: occurrence.meetingId,
+            title: occurrence.title,
+            at: occurrence.startAt,
+            durationMin: occurrence.durationMin,
+            recurring: series,
+            occurrenceStart: series ? occurrence.originalStart : null,
+          };
+        });
+      }
+      case 'session': {
+        const views = await this.h.sessions.between(
+          userId,
+          new Date(now.getTime() - day),
+          new Date(now.getTime() + 21 * day),
+          now,
+        );
+        return views
+          .filter((view) => view.status === 'planned')
+          .map((view) => ({
+            target,
+            id: view.id,
+            title: view.title,
+            at: view.plannedAt,
+            durationMin: view.durationMin,
+            sport: view.sport,
+          }));
+      }
+      case 'meal': {
+        // An edit swaps a row of today's plan; a delete removes one of the
+        // member's own meals from their list. Different rows, one target.
+        if (action === 'edit') {
+          const { timezone } = await this.h.member.clock(userId);
+          const date = localDate(now, timezone);
+          const today = await this.h.meals.forDate(userId, date);
+          return (today?.meals ?? []).map((meal, index) => ({
+            target,
+            id: `${date}:${index}`,
+            title: `${meal.kind} ${meal.name}`,
+            at: null,
+            date,
+            index,
+          }));
+        }
+        const library = await this.h.meals.list(userId);
+        return library.map((meal) => ({
+          target,
+          id: meal.id,
+          title: meal.name,
+          at: null,
+        }));
+      }
+      case 'slot': {
+        const profile = await this.h.athletes.handle(userId);
+        return profile.slots.map((slot) => ({
+          target,
+          id: slot.id,
+          title: `${slot.sport} ${WEEKDAY_NAMES[slot.weekday - 1] ?? slot.weekday} ${slot.start}`,
+          at: null,
+          durationMin: slot.durationMin,
+          weekday: slot.weekday,
+          start: slot.start,
+          sport: slot.sport,
+        }));
+      }
+    }
+  }
+
+  async reread(userId: string, item: TargetItem): Promise<TargetItem | null> {
+    switch (item.target) {
+      case 'task': {
+        const task = await this.h.tasks.byId(userId, item.id);
+        if (!task || task.status !== 'open' || task.deletedAt) return null;
+        return {
+          target: 'task',
+          id: task.id,
+          title: task.title,
+          at: task.dueAt,
+          allDay: task.allDay,
+        };
+      }
+      case 'reminder': {
+        const reminder = await this.h.reminders.byId(userId, item.id);
+        return reminder && !reminder.deletedAt ? reminderItem(reminder) : null;
+      }
+      case 'meeting': {
+        const meeting = await this.h.meetings.byId(userId, item.id);
+        if (!meeting) return null;
+        // A series is compared by its title and length — the occurrence's own
+        // moment is the proposal's key — and a one-off by its start too.
+        return {
+          ...item,
+          title: meeting.title,
+          at: item.recurring ? item.at : meeting.startAt,
+          durationMin: item.recurring ? item.durationMin : meeting.durationMin,
+        };
+      }
+      case 'session': {
+        const session = await this.h.session.byId(userId, item.id);
+        if (!session || session.status !== 'planned') return null;
+        return {
+          ...item,
+          title: session.title,
+          at: session.plannedAt,
+          durationMin: session.durationMin,
+        };
+      }
+      case 'meal':
+      case 'slot': {
+        const rows = await this.find(
+          userId,
+          item.target,
+          item.date ? 'edit' : 'delete',
+          new Date(),
+        );
+        return rows.find((row) => row.id === item.id) ?? null;
+      }
+    }
+  }
+
+  async apply(
+    userId: string,
+    action: ChatAction,
+    item: TargetItem,
+    change: ItemChange,
+    now: Date,
+  ): Promise<TargetItem | null> {
+    try {
+      await this.write(userId, action, item, change, now);
+    } catch (error) {
+      const name = (error as Error).name;
+      if (!REFUSALS.test(name)) throw error;
+      this.logger.debug(
+        `${action} ${item.target} ${item.id} refused: ${name} ${(error as Error).message}`,
+      );
+      return null;
+    }
+
+    // Read back, so the confirmation names what is stored. A completed,
+    // cancelled or deleted row no longer reads back as open, so for those the
+    // proposal's own copy is what the confirmation names.
+    if (action !== 'edit') return item;
+    return (await this.reread(userId, item)) ?? item;
+  }
+
+  private async write(
+    userId: string,
+    action: ChatAction,
+    item: TargetItem,
+    change: ItemChange,
+    now: Date,
+  ): Promise<void> {
+    const { h } = this;
+    switch (item.target) {
+      case 'task': {
+        if (action === 'complete') {
+          await h.completeTask.handle(userId, item.id, now);
+        } else if (action === 'cancel') {
+          await h.cancelTask.handle(userId, item.id);
+        } else if (action === 'delete') {
+          await h.deleteTask.handle(userId, item.id, now);
+        } else {
+          await h.updateTask.handle(userId, item.id, {
+            ...(change.title ? { title: change.title } : {}),
+            ...(change.at
+              ? { dueAt: change.at, allDay: change.allDay === true }
+              : {}),
+            ...(change.priority
+              ? { priority: change.priority as 1 | 2 | 3 | 4 }
+              : {}),
+          });
+        }
+        return;
+      }
+      case 'reminder': {
+        if (action === 'complete') {
+          await h.reminderLifecycle.complete(userId, item.id, now);
+        } else if (action === 'cancel') {
+          await h.reminderLifecycle.cancel(userId, item.id, now);
+        } else if (action === 'delete') {
+          await h.reminderLifecycle.remove(userId, item.id, now);
+        } else {
+          await h.manageReminder.update(
+            userId,
+            item.id,
+            {
+              ...(change.title ? { title: change.title } : {}),
+              ...(change.at ? { remindAt: change.at } : {}),
+            },
+            now,
+          );
+        }
+        return;
+      }
+      case 'meeting': {
+        const occurrence =
+          item.recurring && item.occurrenceStart
+            ? new Date(item.occurrenceStart)
+            : null;
+        if (action === 'complete') {
+          await h.completeMeeting.handle(userId, item.id, now);
+          return;
+        }
+        if (action === 'delete') {
+          await h.deleteMeeting.handle(userId, item.id, now);
+          return;
+        }
+        if (action === 'cancel') {
+          // One occurrence of a series is skipped; a one-off is cancelled.
+          if (occurrence) {
+            await h.skipOccurrence.handle(userId, item.id, occurrence, now);
+          } else {
+            await h.cancelMeeting.handle(userId, item.id, now);
+          }
+          return;
+        }
+        // Moving one occurrence of a series is an override, never an edit to
+        // the series (CLAUDE.md, recurrence); everything else edits the meeting.
+        if (change.at && occurrence) {
+          await h.moveOccurrence.handle(
+            userId,
+            item.id,
+            occurrence,
+            change.at,
+            change.durationMin ?? null,
+            now,
+          );
+        }
+        const patch = {
+          ...(change.title ? { title: change.title } : {}),
+          ...(change.at && !occurrence ? { startAt: change.at } : {}),
+          ...(change.durationMin && !(change.at && occurrence)
+            ? { durationMin: change.durationMin }
+            : {}),
+          ...(change.onlineLink !== undefined || change.address !== undefined
+            ? {
+                location: {
+                  onlineLink: change.onlineLink ?? null,
+                  address: change.address ?? null,
+                },
+              }
+            : {}),
+        };
+        if (Object.keys(patch).length > 0) {
+          await h.updateMeeting.handle(userId, item.id, patch);
+        }
+        return;
+      }
+      case 'session': {
+        if (action === 'complete') {
+          await h.completeSession.handle(userId, item.id, now);
+        } else if (action === 'cancel') {
+          await h.cancelSession.handle(userId, item.id, now);
+        } else if (action === 'delete') {
+          await h.deleteSession.handle(userId, item.id, now);
+        } else {
+          await h.updateSession.handle(
+            userId,
+            item.id,
+            {
+              ...(change.title ? { title: change.title } : {}),
+              ...(change.at ? { plannedAt: change.at } : {}),
+              ...(change.durationMin
+                ? { durationMin: change.durationMin }
+                : {}),
+            },
+            now,
+          );
+        }
+        return;
+      }
+      case 'meal': {
+        if (action === 'delete') {
+          await h.deleteMeal.handle(userId, item.id, now);
+          return;
+        }
+        if (!change.mealName || item.index === undefined || !item.date) return;
+        // The member's own meal of that name, or a new one: swapping in a dish
+        // they named but never saved is a create, and creates happen at once.
+        const wanted = fold(change.mealName);
+        const library = await h.meals.list(userId);
+        const found = library.find((row) => fold(row.name) === wanted);
+        const mealId =
+          found?.id ??
+          (
+            await h.addMeal.handle(userId, {
+              id: newId(),
+              name: change.mealName,
+            })
+          ).id;
+        await h.replaceMeal.handle(
+          userId,
+          { date: item.date, index: item.index, mealId },
+          now,
+        );
+        return;
+      }
+      case 'slot': {
+        const profile = await h.athletes.handle(userId);
+        const slots =
+          action === 'edit'
+            ? profile.slots.map((slot) =>
+                slot.id === item.id
+                  ? {
+                      ...slot,
+                      ...(change.start ? { start: change.start } : {}),
+                      ...(change.durationMin
+                        ? { durationMin: change.durationMin }
+                        : {}),
+                    }
+                  : slot,
+              )
+            : profile.slots.filter((slot) => slot.id !== item.id);
+        await h.setSlots.handle(
+          userId,
+          slots.map((slot) => ({ ...slot, location: slot.location ?? null })),
+        );
+        return;
+      }
+    }
+  }
+}
+
+function reminderItem(reminder: {
+  id: string;
+  title: string;
+  effectiveAt: Date;
+}): TargetItem {
+  return {
+    target: 'reminder',
+    id: reminder.id,
+    title: reminder.title,
+    at: reminder.effectiveAt,
+  };
 }

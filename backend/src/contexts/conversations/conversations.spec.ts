@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { InMemoryProposalRepository } from './infrastructure/in-memory-proposal.repository.js';
 import type { DomainEvent } from '../../shared/cqrs/domain-event.js';
 import { newId } from '../../shared/cqrs/ids.js';
 import { InMemoryUnitOfWork } from '../../shared/persistence/memory/in-memory-unit-of-work.js';
@@ -119,6 +120,7 @@ function bench(): Bench {
       messages,
       seq,
       questions,
+      new InMemoryProposalRepository(),
     ),
     closeOnBanned: new CloseOnBannedHandler(nudges),
   };

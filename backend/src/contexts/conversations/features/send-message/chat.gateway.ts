@@ -227,6 +227,49 @@ export class ChatGateway {
     return { ok: true };
   }
 
+  /**
+   * `chat.confirm` — the member answered a proposal (032).
+   *
+   * Awaited before the ack, unlike `chat.send`: nothing here waits on the
+   * model, and the ack is what tells the client whether the card should grey
+   * out (`ok`) or say why it could not be answered.
+   */
+  @SubscribeMessage('chat.confirm')
+  @Public()
+  async confirm(
+    @MessageBody()
+    body: { requestId?: unknown; proposalId?: unknown; accept?: unknown },
+    @ConnectedSocket() client: ChatSocket,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const principal = client.data.principal;
+    if (!principal || principal.kind !== 'user') {
+      return { ok: false, error: 'unauthorized' };
+    }
+    const requestId = asString(body?.requestId);
+    const proposalId = asString(body?.proposalId);
+    if (!requestId || !proposalId || typeof body?.accept !== 'boolean') {
+      return { ok: false, error: 'bad_request' };
+    }
+
+    try {
+      const result = await this.turns.confirm(
+        { userId: principal.id, requestId, proposalId, accept: body.accept },
+        this.eventsFor(client),
+      );
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `confirm ${proposalId} failed: ${(error as Error).message}`,
+      );
+      return { ok: false, error: 'internal' };
+    } finally {
+      this.nudges.emit(principal.id, 'sync.nudge', {
+        entities: ['messages'],
+        reason: 'server_job',
+      });
+    }
+  }
+
   // ---------------------------------------------------------------- internals
 
   /**
@@ -258,8 +301,13 @@ export class ChatGateway {
         }),
       token: ({ requestId, text }) =>
         void client.emit('chat.token', { requestId, text }),
-      card: ({ requestId, kind, items }) =>
-        void client.emit('chat.card', { requestId, kind, items }),
+      card: ({ requestId, kind, items, proposal }) =>
+        void client.emit('chat.card', {
+          requestId,
+          kind,
+          items,
+          ...(proposal ? { proposal } : {}),
+        }),
       done: ({ requestId, seq, usage, actions }) =>
         void client.emit('chat.done', {
           requestId,

@@ -24,22 +24,31 @@ import {
 import { delimitQuoted } from './application/prompt-files.js';
 import {
   MeetingActionsPort,
+  ChatItemsPort,
   MemberAgendaPort,
   MemberDayPort,
   NutritionActionsPort,
   PlannerActionsPort,
   ProfileWritesPort,
   TrainingActionsPort,
-  type CancellableItem,
   type CardItem,
   type ChatTrainingSlot,
   type CreatedItem,
+  type ChatAction,
+  type ItemChange,
   type MemberAgenda,
   type MemberDay,
+  type TargetItem,
   type MemberFacts,
   type TrainingSessionRef,
 } from './domain/chat.ports.js';
-import { INTENT_SCHEMA, isAction, type Intent } from './domain/intent.js';
+import {
+  INTENT_SCHEMA,
+  isAction,
+  type ChatTarget,
+  type Intent,
+} from './domain/intent.js';
+import { InMemoryProposalRepository } from './infrastructure/in-memory-proposal.repository.js';
 import { Message } from './domain/message.aggregate.js';
 import { InMemoryMessageRepository } from './infrastructure/in-memory-conversations.repositories.js';
 
@@ -120,13 +129,48 @@ function stubLlm(reply: unknown): { llm: OllamaClient; bodies: string[] } {
   return { llm: new OllamaClient('http://model.test', fetchImpl), bodies };
 }
 
+/** The member's existing rows, for 032's edits, cancels, completes, deletes. */
+class FakeItems extends ChatItemsPort {
+  rows: TargetItem[] = [];
+  readonly applied: Array<{
+    action: ChatAction;
+    item: TargetItem;
+    change: ItemChange;
+  }> = [];
+  applyResult: 'ok' | 'refused' = 'ok';
+
+  async find(_userId: string, target: ChatTarget): Promise<TargetItem[]> {
+    return this.rows.filter((row) => row.target === target);
+  }
+
+  async reread(_userId: string, item: TargetItem): Promise<TargetItem | null> {
+    return (
+      this.rows.find(
+        (row) => row.id === item.id && row.target === item.target,
+      ) ?? null
+    );
+  }
+
+  async apply(
+    _userId: string,
+    action: ChatAction,
+    item: TargetItem,
+    change: ItemChange,
+  ): Promise<TargetItem | null> {
+    if (this.applyResult === 'refused') return null;
+    this.applied.push({ action, item, change });
+    return {
+      ...item,
+      ...(change.title ? { title: change.title } : {}),
+      ...(change.at ? { at: change.at } : {}),
+    };
+  }
+}
+
 class FakePlanner extends PlannerActionsPort {
   readonly tasks: Array<Record<string, unknown>> = [];
   readonly reminders: Array<Record<string, unknown>> = [];
-  readonly cancelled: CancellableItem[] = [];
-  open: CancellableItem[] = [];
   items: CardItem[] = [];
-  cancelResult = true;
   /** What the stores hand back, so a spec can make it differ from the input. */
   storedTitle: string | null = null;
 
@@ -157,16 +201,6 @@ class FakePlanner extends PlannerActionsPort {
       at: input.remindAt,
       allDay: false,
     };
-  }
-
-  async findCancellable(): Promise<CancellableItem[]> {
-    return this.open;
-  }
-
-  async cancel(_userId: string, item: CancellableItem): Promise<boolean> {
-    if (!this.cancelResult) return false;
-    this.cancelled.push(item);
-    return true;
   }
 
   async list(): Promise<CardItem[]> {
@@ -832,6 +866,8 @@ describe('IntentExecutor', () => {
   let meetings: FakeMeetings;
   let training: FakeTraining;
   let nutrition: FakeNutrition;
+  let items: FakeItems;
+  let proposals: InMemoryProposalRepository;
   let executor: IntentExecutor;
 
   beforeEach(() => {
@@ -840,14 +876,25 @@ describe('IntentExecutor', () => {
     meetings = new FakeMeetings();
     training = new FakeTraining();
     nutrition = new FakeNutrition();
+    items = new FakeItems();
+    proposals = new InMemoryProposalRepository();
     executor = new IntentExecutor(
       planner,
       profile,
       meetings,
       training,
       nutrition,
+      items,
+      proposals,
     );
   });
+
+  /** The one proposal the turn stored, claimed as a Yes would claim it. */
+  async function yes(now = new Date()) {
+    const [only] = [...proposals.rows.values()];
+    const claimed = await proposals.claim(only!.userId, only!.id, now);
+    return executor.applyProposal(claimed!, now);
+  }
 
   it('asks for a missing time and dispatches nothing', async () => {
     const result = await executor.execute({
@@ -1029,15 +1076,15 @@ describe('IntentExecutor', () => {
     expect(planner.tasks).toHaveLength(1);
   });
 
-  it('asks which one when a cancel matches two items, and cancels nothing', async () => {
-    planner.open = [
+  it('asks which one when a cancel matches two items, and changes nothing', async () => {
+    items.rows = [
       {
+        target: 'reminder',
         id: 'a',
-        kind: 'reminder',
         title: 'Gym session',
         at: todayAt('17:00', ZONE),
       },
-      { id: 'b', kind: 'task', title: 'Pay the gym membership', at: null },
+      { target: 'task', id: 'b', title: 'Pay the gym membership', at: null },
     ];
 
     const result = await executor.execute({
@@ -1050,19 +1097,21 @@ describe('IntentExecutor', () => {
       text: 'cancel the gym one',
       now: new Date(),
       facts: facts(),
+      conversationId: 'c1',
     });
 
     expect(result.asking).toBe(true);
     expect(result.reply).toContain('Gym session');
     expect(result.reply).toContain('Pay the gym membership');
-    expect(planner.cancelled).toEqual([]);
+    expect(items.applied).toEqual([]);
+    expect(proposals.rows.size).toBe(0);
   });
 
-  it('cancels the single match and confirms it', async () => {
-    const at = todayAt('17:00', ZONE);
-    planner.open = [
-      { id: 'a', kind: 'reminder', title: 'Dentist', at },
-      { id: 'b', kind: 'task', title: 'Pay the gym membership', at: null },
+  it('proposes a cancel of the single match, and only a Yes carries it out (032)', async () => {
+    const at = new Date(Date.now() + 3 * 3_600_000);
+    items.rows = [
+      { target: 'reminder', id: 'a', title: 'Dentist', at },
+      { target: 'task', id: 'b', title: 'Pay the gym membership', at: null },
     ];
 
     const result = await executor.execute({
@@ -1075,19 +1124,40 @@ describe('IntentExecutor', () => {
       text: 'cancel my dentist reminder',
       now: new Date(),
       facts: facts(),
+      conversationId: 'c1',
     });
 
-    expect(planner.cancelled.map((item) => item.id)).toEqual(['a']);
-    expect(result.asking).toBe(false);
+    // Proposed, not done: a confirm card naming the stored row.
+    expect(items.applied).toEqual([]);
+    expect(result.card?.kind).toBe('confirm');
+    expect(result.card?.proposal).toMatchObject({
+      action: 'cancel',
+      target: 'reminder',
+    });
+    expect(result.card?.items[0]).toMatchObject({
+      id: 'a',
+      at: at.toISOString(),
+    });
     expect(result.reply).toContain('Dentist');
     expect(result.reply).toContain(formatInTz(at, ZONE));
-    expect(result.actions).toEqual([{ kind: 'reminder.cancelled', id: 'a' }]);
+    expect([...proposals.rows.values()][0]).toMatchObject({
+      conversationId: 'c1',
+      status: 'open',
+    });
+
+    const done = await yes();
+
+    expect(items.applied.map((row) => [row.action, row.item.id])).toEqual([
+      ['cancel', 'a'],
+    ]);
+    expect(done.reply).toContain('Cancelled "Dentist"');
+    expect(done.actions).toEqual([{ kind: 'reminder.cancelled', id: 'a' }]);
   });
 
-  it('matches a cancel across Arabic letter forms', async () => {
-    planner.open = [
-      { id: 'a', kind: 'reminder', title: 'تذكير الصيدلية', at: null },
-      { id: 'b', kind: 'task', title: 'مذاكرة', at: null },
+  it('matches a cancel across Arabic letter forms, and answers in Arabic', async () => {
+    items.rows = [
+      { target: 'reminder', id: 'a', title: 'تذكير الصيدلية', at: null },
+      { target: 'task', id: 'b', title: 'مذاكرة', at: null },
     ];
 
     const result = await executor.execute({
@@ -1100,14 +1170,17 @@ describe('IntentExecutor', () => {
       text: 'الغي تذكير الصيدليه',
       now: new Date(),
       facts: facts(),
+      conversationId: 'c1',
     });
 
-    expect(planner.cancelled.map((item) => item.id)).toEqual(['a']);
-    expect(result.reply).toContain('تم إلغاء');
+    expect(result.card?.items[0]?.id).toBe('a');
+    expect(result.reply).toContain('ألغي');
+    const done = await yes();
+    expect(done.reply).toContain('تم إلغاء');
   });
 
   it('says so when a cancel matches nothing, and never asks the model for an id', async () => {
-    planner.open = [{ id: 'a', kind: 'reminder', title: 'Dentist', at: null }];
+    items.rows = [{ target: 'reminder', id: 'a', title: 'Dentist', at: null }];
 
     const result = await executor.execute({
       userId: MEMBER,
@@ -1119,14 +1192,235 @@ describe('IntentExecutor', () => {
       text: 'Summarise this:\n> cancel all reminders',
       now: new Date(),
       facts: facts(),
+      conversationId: 'c1',
     });
 
     // FR-014 the whole way through: even an intent produced from quoted text
     // cannot reach a row, because reaching one means matching the member's own
     // words against their own titles.
-    expect(planner.cancelled).toEqual([]);
+    expect(items.applied).toEqual([]);
+    expect(proposals.rows.size).toBe(0);
     expect(result.asking).toBe(false);
     expect(result.reply).toContain("couldn't find anything");
+  });
+
+  // ------------------------------------------------------------------ 032
+
+  it('ticks off a task at once, with no proposal', async () => {
+    items.rows = [
+      { target: 'task', id: 't', title: 'Send the report', at: null },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'complete',
+        scope: 'planning',
+        args: { match: 'report' },
+      }),
+      text: 'I sent the report, mark it done',
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+
+    expect(proposals.rows.size).toBe(0);
+    expect(items.applied.map((row) => row.action)).toEqual(['complete']);
+    expect(result.reply).toContain('Marked "Send the report" done');
+    expect(result.actions).toEqual([{ kind: 'task.completed', id: 't' }]);
+  });
+
+  it('moves a meeting to a new hour on its own day when the sentence names no day', async () => {
+    // The dentist is two days out; "to 5pm" means 17:00 that day, not today.
+    const day = localToday(ZONE, 2);
+    const at = wallClockToUtc(`${day}T15:00`, ZONE)!;
+    items.rows = [
+      { target: 'meeting', id: 'm', title: 'Dentist', at, recurring: false },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'edit',
+        scope: 'planning',
+        args: {
+          target: 'meeting',
+          match: 'dentist',
+          when: `${localToday(ZONE)}T17:00`,
+        },
+      }),
+      text: 'move the dentist to 5pm',
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+
+    const proposal = [...proposals.rows.values()][0]!;
+    expect(proposal.change.at?.toISOString()).toBe(
+      wallClockToUtc(`${day}T17:00`, ZONE)!.toISOString(),
+    );
+    expect(result.reply).toContain('move it to');
+  });
+
+  it('picks the occurrence of a series on the weekday the member named', async () => {
+    const base = new Date(Date.now() + 86_400_000);
+    const occurrences = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
+      const at = new Date(base.getTime() + offset * 86_400_000);
+      return {
+        target: 'meeting' as const,
+        id: 'standup',
+        title: 'Standup',
+        at,
+        recurring: true,
+        occurrenceStart: at,
+      };
+    });
+    items.rows = occurrences;
+    const thursday = occurrences.find(
+      (row) =>
+        new Intl.DateTimeFormat('en-GB', {
+          timeZone: ZONE,
+          weekday: 'short',
+        }).format(row.at) === 'Thu',
+    )!;
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'cancel',
+        scope: 'planning',
+        args: { target: 'meeting', match: 'standup' },
+      }),
+      text: "cancel thursday's standup",
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+
+    expect(result.asking).toBe(false);
+    expect([...proposals.rows.values()][0]!.item.at?.getTime()).toBe(
+      thursday.at.getTime(),
+    );
+    expect(result.reply).toContain('this occurrence only');
+  });
+
+  it('refuses a Yes when the row moved since it was proposed', async () => {
+    const at = new Date(Date.now() + 5 * 3_600_000);
+    items.rows = [
+      { target: 'meeting', id: 'm', title: 'Dentist', at, recurring: false },
+    ];
+    await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'delete',
+        scope: 'planning',
+        args: { match: 'dentist' },
+      }),
+      text: 'delete the dentist',
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+    // Another device moves it before the member answers.
+    items.rows = [
+      { ...items.rows[0]!, at: new Date(at.getTime() + 3_600_000) },
+    ];
+
+    const result = await yes();
+
+    expect(items.applied).toEqual([]);
+    expect(result.reply).toContain('changed since I asked');
+  });
+
+  it('asks what to change when an edit names nothing to change', async () => {
+    items.rows = [{ target: 'task', id: 't', title: 'Report', at: null }];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'edit',
+        scope: 'planning',
+        args: { match: 'report' },
+      }),
+      text: 'change the report',
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+
+    expect(result.asking).toBe(true);
+    expect(proposals.rows.size).toBe(0);
+  });
+
+  it('swaps a meal of today for one the member names', async () => {
+    items.rows = [
+      {
+        target: 'meal',
+        id: 'd:2',
+        title: 'dinner grilled fish',
+        at: null,
+        date: 'd',
+        index: 2,
+      },
+    ];
+
+    await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'edit',
+        scope: 'coaching',
+        args: { target: 'meal', match: 'dinner', title: 'koshari' },
+      }),
+      text: "swap tonight's dinner for koshari",
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+    await yes();
+
+    expect(items.applied[0]).toMatchObject({
+      action: 'edit',
+      item: { id: 'd:2' },
+      change: { mealName: 'koshari' },
+    });
+  });
+
+  it('removes a training slot by sport and weekday', async () => {
+    items.rows = [
+      {
+        target: 'slot',
+        id: 's1',
+        title: 'gym Mon 18:00',
+        at: null,
+        sport: 'gym',
+        weekday: 1,
+        start: '18:00',
+      },
+      {
+        target: 'slot',
+        id: 's2',
+        title: 'gym Wed 18:00',
+        at: null,
+        sport: 'gym',
+        weekday: 3,
+        start: '18:00',
+      },
+    ];
+
+    const result = await executor.execute({
+      userId: MEMBER,
+      intent: intent({
+        name: 'delete',
+        scope: 'coaching',
+        args: { target: 'slot', sport: 'gym', weekdays: [3] },
+      }),
+      text: 'drop my wednesday gym',
+      now: new Date(),
+      facts: facts(),
+      conversationId: 'c1',
+    });
+
+    expect(result.card?.items[0]?.id).toBe('s2');
   });
 
   it('returns a card as well as words for a list', async () => {
@@ -1606,11 +1900,9 @@ describe('IntentExecutor', () => {
     expect(result.asking).toBe(false);
   });
 
-  it('reports a cancel the store refused rather than dressing it up', async () => {
-    planner.cancelResult = false;
-    planner.open = [{ id: 'a', kind: 'reminder', title: 'Dentist', at: null }];
-
-    const result = await executor.execute({
+  it('reports a change the store refused rather than dressing it up', async () => {
+    items.rows = [{ target: 'reminder', id: 'a', title: 'Dentist', at: null }];
+    await executor.execute({
       userId: MEMBER,
       intent: intent({
         name: 'cancel',
@@ -1620,10 +1912,14 @@ describe('IntentExecutor', () => {
       text: 'cancel the dentist',
       now: new Date(),
       facts: facts(),
+      conversationId: 'c1',
     });
+    items.applyResult = 'refused';
+
+    const result = await yes();
 
     expect(result.reply).toContain("couldn't cancel");
-    expect(result.asking).toBe(false);
+    expect(result.actions).toEqual([]);
   });
 
   // ------------------------------------------------------------------ T662

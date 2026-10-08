@@ -36,7 +36,10 @@ import {
   MongoSeq,
   type CounterDoc,
 } from './infrastructure/mongo-seq.adapter.js';
-import { QuickQuestionSchema } from '../../shared/persistence/mongo/schemas.js';
+import {
+  ChatProposalSchema,
+  QuickQuestionSchema,
+} from '../../shared/persistence/mongo/schemas.js';
 import { LlmModule } from '../../shared/llm/llm.module.js';
 import { MemberContextPort } from '../../shared/member/member-context.port.js';
 import { OllamaClient } from '../../shared/llm/ollama.client.js';
@@ -77,6 +80,7 @@ import {
   IntentExecutorPort,
   IntentExtractorPort,
   LatestCheckinPort,
+  ChatItemsPort,
   MemberAgendaPort,
   MemberDayPort,
   MeetingActionsPort,
@@ -124,7 +128,31 @@ import {
   RhythmLatestCheckin,
   RhythmMemberDay,
   PlatformAgenda,
+  PlatformItems,
 } from './infrastructure/chat.adapters.js';
+import {
+  MongoProposalRepository,
+  type ProposalDoc,
+} from './infrastructure/mongo-proposal.repository.js';
+import { ProposalRepository } from './domain/proposal.repository.js';
+import { CompleteTaskHandler } from '../planning/features/complete-task/complete-task.handler.js';
+import { DeleteTaskHandler } from '../planning/features/delete-task/delete-task.handler.js';
+import { UpdateTaskHandler } from '../planning/features/update-task/update-task.handler.js';
+import { CancelMeetingHandler } from '../meetings/features/cancel-meeting/cancel-meeting.handler.js';
+import { CompleteMeetingHandler } from '../meetings/features/complete-meeting/complete-meeting.handler.js';
+import { DeleteMeetingHandler } from '../meetings/features/delete-meeting/delete-meeting.handler.js';
+import { MoveMeetingOccurrenceHandler } from '../meetings/features/move-occurrence/move-occurrence.handler.js';
+import { SkipMeetingOccurrenceHandler } from '../meetings/features/skip-occurrence/skip-occurrence.handler.js';
+import { UpdateMeetingHandler } from '../meetings/features/update-meeting/update-meeting.handler.js';
+import { CancelSessionHandler } from '../training/features/cancel-session/cancel-session.handler.js';
+import { DeleteSessionHandler } from '../training/features/delete-session/delete-session.handler.js';
+import { UpdateSessionHandler } from '../training/features/update-session/update-session.handler.js';
+import { MealsQueryHandler } from '../nutrition/features/meals/meals.query.js';
+import {
+  AddMealHandler,
+  DeleteMealHandler,
+} from '../nutrition/features/add-meal/add-meal.handler.js';
+import { ReplaceTodayMealHandler } from '../nutrition/features/replace-today-meal/replace-today-meal.handler.js';
 import {
   MongoQuickQuestionRepository,
   type QuickQuestionDoc,
@@ -217,6 +245,7 @@ import {
       { name: MODEL_NAMES.message, schema: MessageSchema },
       { name: MODEL_NAMES.counter, schema: CounterSchema },
       { name: MODEL_NAMES.quickQuestion, schema: QuickQuestionSchema },
+      { name: MODEL_NAMES.chatProposal, schema: ChatProposalSchema },
     ]),
   ],
   providers: [
@@ -296,6 +325,12 @@ import {
       inject: [getModelToken(MODEL_NAMES.quickQuestion)],
       useFactory: (model: Model<QuickQuestionDoc>) =>
         new MongoQuickQuestionRepository(model),
+    },
+    {
+      provide: ProposalRepository,
+      inject: [getModelToken(MODEL_NAMES.chatProposal)],
+      useFactory: (model: Model<ProposalDoc>) =>
+        new MongoProposalRepository(model),
     },
 
     // ---- the ports, bound to the contexts that own the answers ----------
@@ -441,26 +476,20 @@ import {
       inject: [
         CreateTaskHandler,
         TasksQueryHandler,
-        CancelTaskHandler,
         ManageReminderHandler,
         RemindersQueryHandler,
-        ReminderLifecycleHandler,
       ],
       useFactory: (
         tasks: CreateTaskHandler,
         taskQueries: TasksQueryHandler,
-        cancelTask: CancelTaskHandler,
         reminders: ManageReminderHandler,
         reminderQueries: RemindersQueryHandler,
-        lifecycle: ReminderLifecycleHandler,
       ) =>
         new PlanningReminderActions(
           tasks,
           taskQueries,
-          cancelTask,
           reminders,
           reminderQueries,
-          lifecycle,
         ),
     },
     {
@@ -521,6 +550,8 @@ import {
         MeetingActionsPort,
         TrainingActionsPort,
         NutritionActionsPort,
+        ChatItemsPort,
+        ProposalRepository,
       ],
       useFactory: (
         planner: PlannerActionsPort,
@@ -528,7 +559,120 @@ import {
         meetings: MeetingActionsPort,
         training: TrainingActionsPort,
         nutrition: NutritionActionsPort,
-      ) => new IntentExecutor(planner, profile, meetings, training, nutrition),
+        items: ChatItemsPort,
+        proposals: ProposalRepository,
+      ) =>
+        new IntentExecutor(
+          planner,
+          profile,
+          meetings,
+          training,
+          nutrition,
+          items,
+          proposals,
+        ),
+    },
+    /*
+     * Changing what already exists, from a sentence (032): every target's
+     * published query and command handler, bound once. They are the handlers
+     * the app's own screens call, so a chat edit raises the same events and
+     * obeys the same rules.
+     */
+    {
+      provide: ChatItemsPort,
+      inject: [
+        TasksQueryHandler,
+        UpdateTaskHandler,
+        CompleteTaskHandler,
+        CancelTaskHandler,
+        DeleteTaskHandler,
+        RemindersQueryHandler,
+        ManageReminderHandler,
+        ReminderLifecycleHandler,
+        MeetingQueryHandler,
+        MeetingOccurrencesQueryHandler,
+        UpdateMeetingHandler,
+        CancelMeetingHandler,
+        CompleteMeetingHandler,
+        DeleteMeetingHandler,
+        MoveMeetingOccurrenceHandler,
+        SkipMeetingOccurrenceHandler,
+        SessionsQueryHandler,
+        SessionQueryHandler,
+        UpdateSessionHandler,
+        CompleteSessionHandler,
+        CancelSessionHandler,
+        DeleteSessionHandler,
+        AthleteProfileQueryHandler,
+        SetSlotsHandler,
+        MealsQueryHandler,
+        AddMealHandler,
+        ReplaceTodayMealHandler,
+        DeleteMealHandler,
+        MemberContextPort,
+      ],
+      useFactory: (
+        tasks: TasksQueryHandler,
+        updateTask: UpdateTaskHandler,
+        completeTask: CompleteTaskHandler,
+        cancelTask: CancelTaskHandler,
+        deleteTask: DeleteTaskHandler,
+        reminders: RemindersQueryHandler,
+        manageReminder: ManageReminderHandler,
+        reminderLifecycle: ReminderLifecycleHandler,
+        meetings: MeetingQueryHandler,
+        occurrences: MeetingOccurrencesQueryHandler,
+        updateMeeting: UpdateMeetingHandler,
+        cancelMeeting: CancelMeetingHandler,
+        completeMeeting: CompleteMeetingHandler,
+        deleteMeeting: DeleteMeetingHandler,
+        moveOccurrence: MoveMeetingOccurrenceHandler,
+        skipOccurrence: SkipMeetingOccurrenceHandler,
+        sessions: SessionsQueryHandler,
+        session: SessionQueryHandler,
+        updateSession: UpdateSessionHandler,
+        completeSession: CompleteSessionHandler,
+        cancelSession: CancelSessionHandler,
+        deleteSession: DeleteSessionHandler,
+        athletes: AthleteProfileQueryHandler,
+        setSlots: SetSlotsHandler,
+        meals: MealsQueryHandler,
+        addMeal: AddMealHandler,
+        replaceMeal: ReplaceTodayMealHandler,
+        deleteMeal: DeleteMealHandler,
+        member: MemberContextPort,
+      ) =>
+        new PlatformItems({
+          tasks,
+          updateTask,
+          completeTask,
+          cancelTask,
+          deleteTask,
+          reminders,
+          manageReminder,
+          reminderLifecycle,
+          meetings,
+          occurrences,
+          updateMeeting,
+          cancelMeeting,
+          completeMeeting,
+          deleteMeeting,
+          moveOccurrence,
+          skipOccurrence,
+          sessions,
+          session,
+          updateSession,
+          completeSession,
+          cancelSession,
+          deleteSession,
+          athletes,
+          setSlots,
+          meals,
+          addMeal,
+          replaceMeal,
+          deleteMeal,
+          member,
+        }),
     },
     {
       provide: PromptAssemblerPort,

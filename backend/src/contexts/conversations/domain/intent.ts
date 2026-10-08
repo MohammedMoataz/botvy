@@ -76,7 +76,32 @@ export type IntentName =
    * with nothing to show for it, and the errors are not the same size: a wrongly
    * added meal sits in a list the member can see, a wrongly deleted one is gone.
    */
-  | 'add_meal';
+  | 'add_meal'
+  /**
+   * 032's three, plus `cancel` widened by a `target`: the chat changes what
+   * already exists. Generic verbs over a target rather than a name per pair
+   * (`move_meeting`, `complete_task`, …) because the enum is what a 3B model
+   * chooses from, and six targets times four verbs would be twenty-four names
+   * it confuses. The member's words still never pick a row: the executor
+   * searches their own rows, two matches is a question, and an edit, a cancel
+   * or a delete is only *proposed* until they say yes.
+   */
+  | 'edit'
+  | 'complete'
+  | 'delete';
+
+/** What an `edit`, `complete`, `cancel` or `delete` is about (032). */
+export type ChatTarget =
+  'task' | 'reminder' | 'meeting' | 'session' | 'meal' | 'slot';
+
+export const CHAT_TARGETS: readonly ChatTarget[] = [
+  'task',
+  'reminder',
+  'meeting',
+  'session',
+  'meal',
+  'slot',
+];
 
 /** What a `list` intent is a list of. Matches `chat.card`'s kinds. */
 export type ListKind = 'tasks' | 'reminders' | 'meetings' | 'plan' | 'sessions';
@@ -103,8 +128,14 @@ export interface IntentArgs {
   label?: string;
   leadTimes?: string[];
   notes?: string;
-  /** For `cancel`: what the member said, to match against their own items. */
+  /**
+   * For `cancel`, `edit`, `complete` and `delete`: what the member said, to
+   * match against their own items. For an `edit`, `title` is the *new* title
+   * and this is the old one.
+   */
   match?: string;
+  /** For `edit`, `complete`, `cancel` and `delete` (032). */
+  target?: ChatTarget;
   /** For `list`. */
   listKind?: ListKind;
   /**
@@ -232,6 +263,9 @@ const ACTIONS = new Set<IntentName>([
    * `chat` is in this set.
    */
   'add_meal',
+  'edit',
+  'complete',
+  'delete',
 ]);
 
 export function isAction(intent: Intent): boolean {
@@ -269,6 +303,9 @@ export const INTENT_SCHEMA = {
         'set_slots',
         'log_session',
         'add_meal',
+        'edit',
+        'complete',
+        'delete',
       ],
     },
     scope: { type: 'string', enum: ['coaching', 'planning', 'other'] },
@@ -283,6 +320,10 @@ export const INTENT_SCHEMA = {
         leadTimes: { type: 'array', items: { type: 'string' } },
         notes: { type: 'string' },
         match: { type: 'string' },
+        target: {
+          type: 'string',
+          enum: ['task', 'reminder', 'meeting', 'session', 'meal', 'slot'],
+        },
         listKind: {
           type: 'string',
           enum: ['tasks', 'reminders', 'meetings', 'plan', 'sessions'],

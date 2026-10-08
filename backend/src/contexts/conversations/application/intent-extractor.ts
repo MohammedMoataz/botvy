@@ -6,6 +6,7 @@ import { IntentExtractorPort } from '../domain/chat.ports.js';
 import {
   INTENT_SCHEMA,
   PLAIN_CHAT,
+  type ChatTarget,
   type Intent,
   type IntentArgs,
   type IntentName,
@@ -34,6 +35,9 @@ const NAMES = new Set<string>(INTENT_SCHEMA.properties.name.enum);
 const SCOPES = new Set<string>(INTENT_SCHEMA.properties.scope.enum);
 const LIST_KINDS = new Set<string>(
   INTENT_SCHEMA.properties.args.properties.listKind.enum,
+);
+const TARGETS = new Set<string>(
+  INTENT_SCHEMA.properties.args.properties.target.enum,
 );
 
 /**
@@ -316,6 +320,12 @@ export class IntentExtractor extends IntentExtractorPort {
     if (weekdays.length > 0) args.weekdays = weekdays;
 
     if (source.allDay === true) args.allDay = true;
+    // 032: which kind of row an edit, complete, cancel or delete is about.
+    // Narrowed like `listKind`; an unknown value is dropped and the executor
+    // searches the usual kinds instead.
+    if (TARGETS.has(source.target as string)) {
+      args.target = source.target as ChatTarget;
+    }
     if (LIST_KINDS.has(source.listKind as string)) {
       args.listKind = source.listKind as ListKind;
     }

@@ -5,20 +5,33 @@ import {
   wallClockToUtc,
 } from '../../../shared/time/time.js';
 import {
+  ChatItemsPort,
   IntentExecutorPort,
   MeetingActionsPort,
   PlannerActionsPort,
   ProfileWritesPort,
   NutritionActionsPort,
   TrainingActionsPort,
-  type CancellableItem,
+  type ChatAction,
   type ChatTrainingSlot,
   type CreatedItem,
   type ExecutionResult,
+  type ItemChange,
   type MemberFacts,
+  type TargetItem,
 } from '../domain/chat.ports.js';
-import type { Intent, ListKind } from '../domain/intent.js';
-import { mentionsAClock } from '../domain/relative-time.js';
+import type {
+  ChatTarget,
+  Intent,
+  IntentArgs,
+  ListKind,
+} from '../domain/intent.js';
+import {
+  ProposalRepository,
+  type Proposal,
+} from '../domain/proposal.repository.js';
+import { mentionsAClock, mentionsADay } from '../domain/relative-time.js';
+import { newId } from '../../../shared/cqrs/ids.js';
 import { fold } from './allergen-guard.js';
 
 /**
@@ -70,6 +83,8 @@ export class IntentExecutor extends IntentExecutorPort {
     private readonly meetings: MeetingActionsPort,
     private readonly training: TrainingActionsPort,
     private readonly nutrition: NutritionActionsPort,
+    private readonly items: ChatItemsPort,
+    private readonly proposals: ProposalRepository,
   ) {
     super();
   }
@@ -80,6 +95,8 @@ export class IntentExecutor extends IntentExecutorPort {
     text: string;
     now: Date;
     facts: MemberFacts;
+    /** Where a proposal is answered; absent only for callers that never propose. */
+    conversationId?: string;
   }): Promise<ExecutionResult> {
     const { userId, intent, text, now, facts } = input;
     const say = phrasebook(text, facts.locale);
@@ -297,76 +314,18 @@ export class IntentExecutor extends IntentExecutorPort {
         };
       }
 
-      case 'cancel': {
-        const match = intent.args.match ?? intent.args.title;
-        if (!match) {
-          return ask(
-            say('What would you like me to cancel?', 'تحب ألغي إيه بالظبط؟'),
-          );
-        }
-
-        const open = await this.planner.findCancellable(userId, now);
-        const hits = matching(open, match);
-
-        if (hits.length === 0) {
-          return {
-            reply: say(
-              `I couldn't find anything open that matches "${match}".`,
-              `مالقيتش حاجة مفتوحة بتطابق "${match}".`,
-            ),
-            actions: [],
-            asking: false,
-          };
-        }
-
-        if (hits.length > 1) {
-          /*
-           * Two matches is a question, never a guess, and the model is never
-           * asked to pick.
-           *
-           * The wrong choice here deletes something the member wanted and
-           * leaves the thing they meant to cancel in place — two failures from
-           * one turn, and the second one is invisible until it fires. The
-           * candidates are listed in their own words with their own times so
-           * the answer is one word long.
-           */
-          const listed = hits
-            .map((item) => `- ${item.title}${describeAt(item, zone)}`)
-            .join('\n');
-          return ask(
-            say(
-              `I found ${hits.length} that could be it — which one?\n${listed}`,
-              `لقيت ${hits.length} حاجة ممكن تكون هي — أنهي واحدة؟\n${listed}`,
-            ),
-          );
-        }
-
-        const item = hits[0]!;
-        const cancelled = await this.planner.cancel(userId, item);
-        if (!cancelled) {
-          // The row went while this turn was running — another device, or the
-          // reminder fired. Reported rather than dressed up as success: the
-          // member would go looking for a cancellation that never happened.
-          this.logger.debug(`cancel of ${item.kind} ${item.id} was refused`);
-          return {
-            reply: say(
-              `I couldn't cancel "${item.title}" — it may already be gone.`,
-              `مقدرتش ألغي "${item.title}" — يمكن تكون اتلغت خلاص.`,
-            ),
-            actions: [],
-            asking: false,
-          };
-        }
-
-        return {
-          reply: say(
-            `Cancelled "${item.title}"${describeAt(item, zone)}.`,
-            `تم إلغاء "${item.title}"${describeAt(item, zone)}.`,
-          ),
-          actions: [{ kind: `${item.kind}.cancelled`, id: item.id }],
-          asking: false,
-        };
-      }
+      case 'cancel':
+      case 'edit':
+      case 'complete':
+      case 'delete':
+        /*
+         * 032: one flow for every change to something that exists. The rows
+         * are the member's own, searched by their words (never an id from the
+         * model); two matches is a question; and an edit, a cancel, a delete
+         * or completing a meeting or a session is only *proposed* — the
+         * member's Yes applies it. See `change`.
+         */
+        return this.change(intent.name, input, say);
 
       case 'list': {
         /*
@@ -878,6 +837,361 @@ export class IntentExecutor extends IntentExecutorPort {
     );
   }
 
+  // ------------------------------------------------------- changing (032)
+
+  /**
+   * Find the member's row by their words, work out the change, and propose it
+   * — or, for completing a task or a reminder, just do it.
+   *
+   * ## Why most changes wait for a Yes
+   *
+   * The Owner's decision for 032: a create is cheap to get slightly wrong (it
+   * sits in a list), and an edit or a delete is not — the wrong meeting moved
+   * is two wrong facts, one of which somebody else is relying on. So the turn
+   * stores a proposal naming the row **as stored** and the change, and the
+   * member answers it. Ticking off a task or a reminder is applied at once,
+   * because it is the same tap the card already offers and the status keeps
+   * the record either way.
+   */
+  private async change(
+    action: ChatAction,
+    input: {
+      userId: string;
+      intent: Intent;
+      text: string;
+      now: Date;
+      facts: MemberFacts;
+      conversationId?: string;
+    },
+    say: Phrasebook,
+  ): Promise<ExecutionResult> {
+    const { userId, intent, text, now, facts } = input;
+    const zone = facts.timezone;
+    const args = intent.args;
+    const verb = VERBS[action];
+
+    /*
+     * For an edit, `title` is the *new* title and `match` the old one — "rename
+     * the report to quarterly report". Everywhere else the model puts the
+     * member's words for the row in either field, so both are read.
+     */
+    const match = action === 'edit' ? args.match : (args.match ?? args.title);
+    const bySlot =
+      args.target === 'slot' && (Boolean(args.sport) || Boolean(args.weekdays));
+    if (!match && !bySlot) {
+      return ask(say(`What should I ${verb.en}?`, `أ${verb.ar} إيه بالظبط؟`));
+    }
+
+    const targets = args.target ? [args.target] : DEFAULT_TARGETS[action];
+    const rows = (
+      await Promise.all(
+        targets.map((target) => this.items.find(userId, target, action, now)),
+      )
+    ).flat();
+    const hits = narrow(
+      matchItems(rows, match ?? '', args),
+      action,
+      args,
+      text,
+      zone,
+      now,
+    );
+
+    if (hits.length === 0) {
+      return {
+        reply: say(
+          `I couldn't find anything that matches "${match ?? args.sport}".`,
+          `مالقيتش حاجة بتطابق "${match ?? args.sport}".`,
+        ),
+        actions: [],
+        asking: false,
+      };
+    }
+    if (hits.length > 1) {
+      // Two matches is a question, never a guess — the cancel branch's rule
+      // since P4, now for every change. Listed with their own times so the
+      // answer can name one.
+      const listed = hits
+        .slice(0, 6)
+        .map((item) => `- ${item.title}${describeItem(item, zone)}`)
+        .join('\n');
+      return ask(
+        say(
+          `I found ${hits.length} that could be it — which one?\n${listed}`,
+          `لقيت ${hits.length} حاجة ممكن تكون هي — أنهي واحدة؟\n${listed}`,
+        ),
+      );
+    }
+
+    const item = hits[0]!;
+
+    if (action === 'complete' && item.target === 'meeting' && item.recurring) {
+      return {
+        reply: say(
+          `"${item.title}" repeats, so there's nothing to mark done — I can cancel this one occurrence if you like.`,
+          `"${item.title}" بيتكرر، فمفيش حاجة أعلّمها إنها خلصت — أقدر ألغي المرة دي بس لو تحب.`,
+        ),
+        actions: [],
+        asking: false,
+      };
+    }
+    if (action === 'cancel' && item.target === 'meal') {
+      // A meal has no "cancelled"; the two things that can be done are named.
+      return {
+        reply: say(
+          `I can swap "${item.title}" for another meal, or take it off your list — which would you like?`,
+          `أقدر أبدّل "${item.title}" بأكلة تانية، أو أشيلها من قائمتك — تحب إيه؟`,
+        ),
+        actions: [],
+        asking: true,
+      };
+    }
+
+    let change: ItemChange = {};
+    if (action === 'edit') {
+      const built = this.editOf(item, args, text, zone, now, say);
+      if ('ask' in built) return ask(built.ask);
+      change = built.change;
+    }
+
+    const proposed = !(
+      action === 'complete' &&
+      (item.target === 'task' || item.target === 'reminder')
+    );
+
+    if (!proposed) {
+      return this.applied(userId, action, item, change, now, say, zone);
+    }
+
+    const proposal: Proposal = {
+      id: newId(),
+      userId,
+      conversationId: input.conversationId ?? '',
+      action,
+      item,
+      change,
+      arabic: say('en', 'ar') === 'ar',
+      timezone: zone,
+      status: 'open',
+      expiresAt: new Date(now.getTime() + PROPOSAL_TTL_MS),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await this.proposals.create(proposal);
+
+    const sentence = describeProposal(action, item, change, zone, say);
+    return {
+      reply: say(
+        `${sentence.en}? Tap Yes to confirm, or tell me "yes".`,
+        `${sentence.ar}؟ اضغط نعم للتأكيد، أو قوللي "أيوه".`,
+      ),
+      card: {
+        kind: 'confirm',
+        items: [
+          {
+            id: item.id,
+            title: say(sentence.en, sentence.ar),
+            at: (change.at ?? item.at)?.toISOString() ?? null,
+          },
+        ],
+        proposal: {
+          id: proposal.id,
+          action,
+          target: item.target,
+          expiresAt: proposal.expiresAt.toISOString(),
+        },
+      },
+      actions: [],
+      asking: false,
+    };
+  }
+
+  /**
+   * The member said Yes: apply a proposal that has already been **claimed**.
+   *
+   * The claim (open → applied, atomically) is the caller's, so two Yeses can
+   * never apply one change twice. Here the row is read again and compared with
+   * the one the member was shown; if it moved since, nothing is written and
+   * they are told — a Yes to "move Dentist from 17:00" is not a Yes to moving a
+   * meeting somebody has since put at 15:00.
+   */
+  override async applyProposal(
+    proposal: Proposal,
+    now: Date,
+  ): Promise<ExecutionResult> {
+    const say: Phrasebook = (english, arabic) =>
+      proposal.arabic ? arabic : english;
+    const zone = proposal.timezone;
+    const current = await this.items.reread(proposal.userId, proposal.item);
+
+    if (!current) {
+      return {
+        reply: say(
+          `"${proposal.item.title}" isn't there any more, so I've left everything as it is.`,
+          `"${proposal.item.title}" مبقتش موجودة، فسيبت كل حاجة زي ما هي.`,
+        ),
+        actions: [],
+        asking: false,
+      };
+    }
+    if (fingerprint(current) !== fingerprint(proposal.item)) {
+      return {
+        reply: say(
+          `"${current.title}" changed since I asked, so I haven't touched it — tell me again if you still want that.`,
+          `"${current.title}" اتغيّرت من ساعة ما سألتك، فمالمستهاش — قوللي تاني لو لسه عايز كده.`,
+        ),
+        actions: [],
+        asking: false,
+      };
+    }
+
+    return this.applied(
+      proposal.userId,
+      proposal.action,
+      current,
+      proposal.change,
+      now,
+      say,
+      zone,
+    );
+  }
+
+  /** The member said No. */
+  override declined(proposal: Proposal): ExecutionResult {
+    return {
+      reply: proposal.arabic
+        ? `تمام، سيبت "${proposal.item.title}" زي ما هي.`
+        : `OK, I've left "${proposal.item.title}" as it is.`,
+      actions: [],
+      asking: false,
+    };
+  }
+
+  private async applied(
+    userId: string,
+    action: ChatAction,
+    item: TargetItem,
+    change: ItemChange,
+    now: Date,
+    say: Phrasebook,
+    zone: string,
+  ): Promise<ExecutionResult> {
+    const stored = await this.items.apply(userId, action, item, change, now);
+    if (!stored) {
+      return {
+        reply: say(
+          `I couldn't ${VERBS[action].en} "${item.title}" — it may already have changed on another device.`,
+          `مقدرتش أ${VERBS[action].ar} "${item.title}" — يمكن اتغيّرت من جهاز تاني.`,
+        ),
+        actions: [],
+        asking: false,
+      };
+    }
+
+    // FR-004: named from what the store holds now.
+    const when = stored.at ? describeItem(stored, zone) : '';
+    const done: Record<ChatAction, [string, string]> = {
+      edit: [
+        `Done — "${stored.title}"${when}.`,
+        `تم — "${stored.title}"${when}.`,
+      ],
+      complete: [
+        `Marked "${stored.title}" done.`,
+        `علّمت "${stored.title}" إنها خلصت.`,
+      ],
+      cancel: [
+        `Cancelled "${stored.title}"${when}.`,
+        `تم إلغاء "${stored.title}"${when}.`,
+      ],
+      delete: [`Deleted "${stored.title}".`, `اتمسحت "${stored.title}".`],
+    };
+    const [en, ar] = done[action];
+    return {
+      reply: say(en, ar),
+      actions: [{ kind: `${item.target}.${PAST[action]}`, id: item.id }],
+      asking: false,
+    };
+  }
+
+  /**
+   * What an `edit` changes, from the fields the member named — or the question
+   * to ask when they named nothing usable.
+   */
+  private editOf(
+    item: TargetItem,
+    args: IntentArgs,
+    text: string,
+    zone: string,
+    now: Date,
+    say: Phrasebook,
+  ): { change: ItemChange } | { ask: string } {
+    const change: ItemChange = {};
+    if (args.title && args.match && fold(args.title) !== fold(args.match)) {
+      change.title = args.title;
+    }
+    if (args.durationMin !== undefined) change.durationMin = args.durationMin;
+    if (args.priority !== undefined && item.target === 'task') {
+      change.priority = args.priority;
+    }
+
+    if (item.target === 'meal') {
+      // "swap tonight's dinner for koshari": the new meal arrives as `title`
+      // when `match` named the row, or as `notes` from a model that put it
+      // there. Either is the member's own word for a dish.
+      const meal = (change.title ?? args.notes)?.trim();
+      if (!meal) {
+        return {
+          ask: say(
+            `What should I swap "${item.title}" for?`,
+            `أبدّل "${item.title}" بإيه؟`,
+          ),
+        };
+      }
+      return { change: { mealName: meal } };
+    }
+
+    if (item.target === 'slot') {
+      const start = slotStart(args.when, args.allDay, text);
+      if (start) change.start = start;
+      delete change.title;
+    } else if (args.when) {
+      let at = wallClockToUtc(args.when, zone);
+      /*
+       * "Move the dentist to 5pm" names an hour and no day. The extractor
+       * resolves that to the soonest 17:00, which is today — but the member
+       * meant 17:00 on the dentist's own day. So when the sentence names no day,
+       * the row's own date is kept and only the clock moves.
+       */
+      if (at && item.at && !mentionsADay(text) && mentionsAClock(text)) {
+        const hhmm = /T(\d{2}:\d{2})$/.exec(args.when)?.[1];
+        if (hhmm)
+          at = wallClockToUtc(`${localDate(item.at, zone)}T${hhmm}`, zone);
+      }
+      if (!at) return { ask: say('When should it be?', 'تبقى امتى؟') };
+      const allDay = args.allDay === true && item.target === 'task';
+      if (!allDay && at.getTime() <= now.getTime()) {
+        return { ask: this.pastQuestion(say, at, zone) };
+      }
+      change.at = at;
+      if (allDay) change.allDay = true;
+    }
+
+    if (item.target === 'meeting') {
+      const location = normaliseLocation(args.onlineLink, args.address);
+      if (location) Object.assign(change, location);
+    }
+
+    if (Object.keys(change).length === 0) {
+      return {
+        ask: say(
+          `What should I change about "${item.title}"?`,
+          `أغيّر إيه في "${item.title}"؟`,
+        ),
+      };
+    }
+    return { change };
+  }
+
   /** What a stored task's confirmation says, by what it actually has. */
   private taskConfirmation(
     say: Phrasebook,
@@ -946,11 +1260,6 @@ function cardAt(at: string | null, zone: string): string {
     : ` (${formatInTz(instant, zone)})`;
 }
 
-/** ", at Tue 2 Sep, 17:00" — or nothing, for an item with no time. */
-function describeAt(item: CancellableItem, zone: string): string {
-  return item.at ? ` (${formatInTz(item.at, zone)})` : '';
-}
-
 /**
  * The words in a `cancel` that are worth searching with, once the framing is
  * gone.
@@ -994,33 +1303,6 @@ const STOPWORDS = new Set(
     'امسح',
   ].map((word) => fold(word)),
 );
-
-/**
- * Which of the member's own open items their words could mean.
- *
- * A search over rows the member owns, case-folded and Arabic-folded through the
- * same `fold` the allergen guard uses — "الجيم" has to find a title stored as
- * "الجيم" however either was typed. **The model is never asked for an id**: it
- * would produce one that looks right and does not exist, and the failure would
- * be a cancellation of somebody's other row or a silent no-op.
- *
- * ponytail: token containment, no scoring and no fuzziness. "my 5pm reminder"
- * finds nothing unless the title carries the hour, because the times are not
- * compared — and the branch for that is already correct: nothing matched, so
- * the member is told so rather than something being deleted on a guess. Compare
- * `item.at` against a time in the match when members report the miss.
- */
-function matching(items: CancellableItem[], match: string): CancellableItem[] {
-  const tokens = fold(match)
-    .split(' ')
-    .filter((token) => token.length > 0 && !STOPWORDS.has(token));
-  if (tokens.length === 0) return [];
-
-  return items.filter((item) => {
-    const title = ` ${fold(item.title)} `;
-    return tokens.some((token) => title.includes(` ${token} `));
-  });
-}
 
 /**
  * Which half of a location the model actually filled, whatever it called it.
@@ -1215,6 +1497,285 @@ function fieldName(field: string, arabic: boolean): string {
 function listWords(words: string[], connector: string): string {
   if (words.length <= 1) return words[0] ?? '';
   return `${words.slice(0, -1).join(', ')} ${connector} ${words[words.length - 1]}`;
+}
+
+// ----------------------------------------------------- changing helpers (032)
+
+/** How long a proposal can be answered. */
+const PROPOSAL_TTL_MS = 15 * 60_000;
+
+/** The verb for a question ("What should I move?") in both languages. */
+const VERBS: Record<ChatAction, { en: string; ar: string }> = {
+  edit: { en: 'change', ar: 'غيّر' },
+  complete: { en: 'mark done', ar: 'علّم إنها خلصت' },
+  cancel: { en: 'cancel', ar: 'لغي' },
+  delete: { en: 'delete', ar: 'مسح' },
+};
+
+/** The `chat.done` action kind's verb: `meeting.edited`, `task.completed`. */
+const PAST: Record<ChatAction, string> = {
+  edit: 'edited',
+  complete: 'completed',
+  cancel: 'cancelled',
+  delete: 'deleted',
+};
+
+/**
+ * Which kinds a change searches when the member did not say. Meals and slots
+ * only when named: "delete lunch" searching the meal list as well as the diary
+ * would turn a task called "lunch with Sara" into a two-match question.
+ */
+const DEFAULT_TARGETS: Record<ChatAction, ChatTarget[]> = {
+  edit: ['task', 'reminder', 'meeting', 'session'],
+  complete: ['task', 'reminder', 'meeting', 'session'],
+  cancel: ['task', 'reminder', 'meeting', 'session'],
+  delete: ['task', 'reminder', 'meeting', 'session'],
+};
+
+/** Words that name the kind of row rather than the row itself. */
+const ITEM_STOPWORDS = new Set(
+  [
+    ...STOPWORDS,
+    'meeting',
+    'meetings',
+    'session',
+    'sessions',
+    'training',
+    'meal',
+    'meals',
+    'slot',
+    'move',
+    'change',
+    'rename',
+    'reschedule',
+    'push',
+    'mark',
+    'done',
+    'complete',
+    'finish',
+    'swap',
+    'replace',
+    'today',
+    'tomorrow',
+    'tonight',
+    'اجتماع',
+    'الاجتماع',
+    'تمرين',
+    'التمرين',
+    'اكلة',
+    'الأكلة',
+  ].map((word) => fold(word)),
+);
+
+/**
+ * The member's rows their words could mean — the P4 `matching` rule over every
+ * target: folded token containment, never a model-chosen id. A slot is also
+ * matched by the sport and the weekdays the member named.
+ */
+function matchItems(
+  items: TargetItem[],
+  match: string,
+  args: IntentArgs,
+): TargetItem[] {
+  const tokens = fold(match)
+    .split(' ')
+    .filter((token) => token.length > 0 && !ITEM_STOPWORDS.has(token));
+
+  return items.filter((item) => {
+    if (item.target === 'slot') {
+      const sport = fold(item.sport ?? '');
+      const sportOk = args.sport
+        ? sport === fold(args.sport)
+        : tokens.length === 0 || tokens.includes(sport);
+      const dayOk = args.weekdays?.length
+        ? args.weekdays.includes(item.weekday ?? 0)
+        : true;
+      const named =
+        Boolean(args.sport) ||
+        Boolean(args.weekdays?.length) ||
+        tokens.length > 0;
+      return sportOk && dayOk && named;
+    }
+    if (tokens.length === 0) return false;
+    const title = ` ${fold(item.title)} `;
+    return tokens.some((token) => title.includes(` ${token} `));
+  });
+}
+
+/**
+ * From several matches to the one the member meant, where the sentence says.
+ *
+ * - A meeting series appears once per occurrence. The member said a day
+ *   ("Thursday's standup") or did not; the occurrences on that day are kept, and
+ *   otherwise the next one — "move the standup" means the coming one.
+ * - For everything but an edit, `when` names the row's own day ("cancel
+ *   tomorrow's meeting"), so it narrows. For an edit it is the *new* time.
+ *
+ * A narrowing that would leave nothing is not applied: the member is shown the
+ * candidates instead of being told nothing matched.
+ */
+function narrow(
+  hits: TargetItem[],
+  action: ChatAction,
+  args: IntentArgs,
+  text: string,
+  zone: string,
+  now: Date,
+): TargetItem[] {
+  let kept = hits;
+
+  const keepIf = (test: (item: TargetItem) => boolean): void => {
+    const next = kept.filter(test);
+    if (next.length > 0) kept = next;
+  };
+
+  if (action !== 'edit' && args.when) {
+    const day = args.when.slice(0, 10);
+    keepIf((item) => item.at !== null && localDate(item.at, zone) === day);
+  }
+
+  const named = weekdaysIn(text);
+  if (named.size > 0) {
+    keepIf((item) => item.at !== null && named.has(isoWeekday(item.at, zone)));
+  }
+
+  // One row per meeting: the earliest occurrence still kept that has not
+  // ended (an hour's grace for "this morning's").
+  const seen = new Map<string, TargetItem>();
+  for (const item of [...kept].sort(
+    (a, b) => (a.at?.getTime() ?? 0) - (b.at?.getTime() ?? 0),
+  )) {
+    const key = `${item.target}:${item.id}`;
+    const upcoming =
+      item.at === null || item.at.getTime() >= now.getTime() - 3_600_000;
+    if (!seen.has(key) && upcoming) seen.set(key, item);
+  }
+  for (const item of kept) {
+    const key = `${item.target}:${item.id}`;
+    if (!seen.has(key)) seen.set(key, item);
+  }
+  return [...seen.values()];
+}
+
+/** ISO weekdays (1 = Monday) the sentence names, in either language. */
+function weekdaysIn(text: string): Set<number> {
+  const folded = ` ${fold(text)} `;
+  const names: Array<[number, string[]]> = [
+    [1, ['monday', 'mon', 'الاثنين', 'الاتنين', 'اثنين', 'اتنين']],
+    [2, ['tuesday', 'tue', 'الثلاثاء', 'التلات', 'ثلاثاء']],
+    [3, ['wednesday', 'wed', 'الأربعاء', 'الاربع', 'اربعاء']],
+    [4, ['thursday', 'thu', 'الخميس', 'خميس']],
+    [5, ['friday', 'fri', 'الجمعة', 'جمعة']],
+    [6, ['saturday', 'sat', 'السبت', 'سبت']],
+    [7, ['sunday', 'sun', 'الأحد', 'الحد', 'احد']],
+  ];
+  const found = new Set<number>();
+  for (const [day, words] of names) {
+    if (words.some((word) => folded.includes(` ${fold(word)} `)))
+      found.add(day);
+  }
+  return found;
+}
+
+/** 1 (Monday) to 7, in the member's zone. */
+function isoWeekday(at: Date, zone: string): number {
+  const short = new Intl.DateTimeFormat('en-GB', {
+    timeZone: zone,
+    weekday: 'short',
+  }).format(at);
+  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(short) + 1;
+}
+
+/** " (Thu 15 Oct, 17:00)" for a row with a time; a slot's day and hour. */
+function describeItem(item: TargetItem, zone: string): string {
+  if (item.at) return ` (${formatInTz(item.at, zone)})`;
+  return '';
+}
+
+/** The proposal in one sentence, in both languages, from the stored row. */
+function describeProposal(
+  action: ChatAction,
+  item: TargetItem,
+  change: ItemChange,
+  zone: string,
+  say: Phrasebook,
+): { en: string; ar: string } {
+  const was = describeItem(item, zone);
+  const series =
+    item.target === 'meeting' && item.recurring
+      ? say(' (this occurrence only)', ' (المرة دي بس)')
+      : '';
+  if (action === 'cancel') {
+    return {
+      en: `Cancel "${item.title}"${was}${series}`,
+      ar: `ألغي "${item.title}"${was}${series}`,
+    };
+  }
+  if (action === 'delete') {
+    const whole =
+      item.target === 'meeting' && item.recurring
+        ? say(' — every occurrence', ' — كل المرات')
+        : '';
+    return {
+      en: `Delete "${item.title}"${was}${whole}`,
+      ar: `أمسح "${item.title}"${was}${whole}`,
+    };
+  }
+  if (action === 'complete') {
+    return {
+      en: `Mark "${item.title}"${was} as done`,
+      ar: `أعلّم "${item.title}"${was} إنها خلصت`,
+    };
+  }
+
+  const en: string[] = [];
+  const ar: string[] = [];
+  if (change.at) {
+    en.push(`move it to ${formatInTz(change.at, zone)}${series}`);
+    ar.push(`أنقلها لـ ${formatInTz(change.at, zone)}${series}`);
+  }
+  if (change.start) {
+    en.push(`start it at ${change.start}`);
+    ar.push(`أخليها تبدأ ${change.start}`);
+  }
+  if (change.title) {
+    en.push(`rename it "${change.title}"`);
+    ar.push(`أغيّر اسمها لـ "${change.title}"`);
+  }
+  if (change.durationMin) {
+    en.push(`make it ${change.durationMin} minutes`);
+    ar.push(`أخليها ${change.durationMin} دقيقة`);
+  }
+  if (change.priority) {
+    en.push(`set its priority to P${change.priority}`);
+    ar.push(`أخلي أولويتها P${change.priority}`);
+  }
+  if (change.onlineLink || change.address) {
+    const where = change.address ?? change.onlineLink;
+    en.push(`set its place to ${where}`);
+    ar.push(`أخلي مكانها ${where}`);
+  }
+  if (change.mealName) {
+    en.push(`swap it for ${change.mealName}`);
+    ar.push(`أبدّلها بـ ${change.mealName}`);
+  }
+  return {
+    en: `For "${item.title}"${was}: ${en.join(', ')}`,
+    ar: `بالنسبة لـ "${item.title}"${was}: ${ar.join('، ')}`,
+  };
+}
+
+/** What a Yes was given to: the fields that, changed, make it a different Yes. */
+function fingerprint(item: TargetItem): string {
+  return [
+    item.target,
+    item.id,
+    item.title,
+    item.at ? new Date(item.at).toISOString() : '',
+    item.durationMin ?? '',
+    item.start ?? '',
+    item.weekday ?? '',
+  ].join('|');
 }
 
 /** The compile-time exhaustiveness guard. Never runs. */

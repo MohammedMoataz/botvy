@@ -7,6 +7,7 @@ import {
   SeqPort,
 } from '../../domain/conversations.repositories.js';
 import { QuickQuestionRepository } from '../../domain/quick-question.repository.js';
+import { ProposalRepository } from '../../domain/proposal.repository.js';
 
 /**
  * Removes every chat, every message and the counter a deleted member had.
@@ -47,6 +48,7 @@ export class ConversationsPurgeOnDeletedHandler {
     private readonly messages: MessageRepository,
     private readonly seq: SeqPort,
     private readonly questions: QuickQuestionRepository,
+    private readonly proposals: ProposalRepository,
   ) {}
 
   async handle(event: DomainEvent): Promise<'purged' | 'nothing-to-do'> {
@@ -86,7 +88,14 @@ export class ConversationsPurgeOnDeletedHandler {
          * them — by the shape of the query rather than by a guard.
          */
         const removedQuestions = await this.questions.removeAllFor(userId);
-        return [removedMessages, removedConversations, removedQuestions];
+        // 032's proposals name the member's rows by title; they go too, and
+        // are counted with the questions because neither is a conversation.
+        const removedProposals = await this.proposals.removeAllFor(userId);
+        return [
+          removedMessages,
+          removedConversations,
+          removedQuestions + removedProposals,
+        ];
       },
     );
 
