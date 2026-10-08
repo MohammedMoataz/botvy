@@ -382,6 +382,8 @@ class AppLocalizations {
   String get chatCardComplete => _t('chatCardComplete');
   String get chatCardEmpty => _t('chatCardEmpty');
   String get chatConfirmTitle => _t('chatConfirmTitle');
+  String get mediaViewerClose => _t('mediaViewerClose');
+  String get knowledgeOpenMedia => _t('knowledgeOpenMedia');
   String get chatConfirmYes => _t('chatConfirmYes');
   String get chatConfirmNo => _t('chatConfirmNo');
   String get chatConfirmOffline => _t('chatConfirmOffline');
@@ -1084,6 +1086,8 @@ class AppLocalizations {
       'chatCardComplete': 'Mark as done',
       'chatCardEmpty': 'Nothing to show.',
       'chatConfirmTitle': 'Confirm this change',
+      'mediaViewerClose': 'Close',
+      'knowledgeOpenMedia': 'Open picture',
       'chatConfirmYes': 'Yes',
       'chatConfirmNo': 'No',
       'chatConfirmOffline': 'Connect to the internet to answer.',
@@ -1646,6 +1650,8 @@ class AppLocalizations {
     'chatCardComplete': 'تحديدها كمنجزة',
     'chatCardEmpty': 'لا يوجد ما يُعرض.',
     'chatConfirmTitle': 'تأكيد التغيير',
+    'mediaViewerClose': 'إغلاق',
+    'knowledgeOpenMedia': 'فتح الصورة',
     'chatConfirmYes': 'نعم',
     'chatConfirmNo': 'لا',
     'chatConfirmOffline': 'اتصل بالإنترنت علشان ترد.',

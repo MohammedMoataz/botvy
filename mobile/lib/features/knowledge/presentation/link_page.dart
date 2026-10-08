@@ -7,6 +7,8 @@ import '../../../app/l10n/app_localizations.dart';
 import '../../../core/db/database.dart';
 import '../application/knowledge_cubit.dart';
 import '../../../app/tokens.dart';
+import '../../../ui/linkified_text.dart';
+import '../../../ui/media_viewer.dart';
 import '../../../ui/states.dart';
 
 /// The link's images, as one horizontal strip of thumbnails.
@@ -97,7 +99,8 @@ class _LinkPageState extends State<LinkPage> {
     final phase = phaseOf(row.status);
 
     return [
-      Text(row.url, style: Theme.of(context).textTheme.bodySmall),
+      // The address itself is a link now (032), not only text to copy.
+      LinkifiedText(row.url, style: Theme.of(context).textTheme.bodySmall),
       const SizedBox(height: BotvySpace.md),
 
       if (phase == LinkPhase.failed && row.failReason != null)
@@ -116,7 +119,7 @@ class _LinkPageState extends State<LinkPage> {
       if (doc != null) ...[
         Text(t.knowledgeSummary, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: BotvySpace.xs),
-        Text(doc['summary'] as String? ?? ''),
+        LinkifiedText(doc['summary'] as String? ?? ''),
 
         // The spec's own edge case, said plainly rather than left as a gap the
         // member has to notice.
@@ -135,32 +138,28 @@ class _LinkPageState extends State<LinkPage> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: BotvySpace.xs),
-          for (final point in doc['keyPoints'] as List) Text('• $point'),
+          for (final point in doc['keyPoints'] as List)
+            LinkifiedText('• $point'),
         ],
 
-        if ((doc['media'] as List? ?? const []).isNotEmpty) ...[
+        if (_media(context, doc).isNotEmpty) ...[
           const SizedBox(height: BotvySpace.lg),
           SizedBox(
             height: _mediaStripHeight,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                for (final raw in doc['media'] as List)
-                  if (context
-                          .read<KnowledgeCubit>()
-                          .mediaUrl((raw as Map)['url'] as String?) !=
-                      null)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: BotvySpace.sm),
-                      child: Image.network(
-                        context
-                            .read<KnowledgeCubit>()
-                            .mediaUrl(raw['url'] as String?)!,
-                        // A picture that will not load is a picture; it is not
-                        // an error worth interrupting the summary for.
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
+                for (final (index, item) in _media(context, doc).indexed)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                      end: BotvySpace.sm,
                     ),
+                    child: _Thumbnail(
+                      key: ValueKey('link-media-$index'),
+                      item: item,
+                      onTap: () => _openMedia(context, doc, item),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -175,6 +174,9 @@ class _LinkPageState extends State<LinkPage> {
         for (final raw in _detail!['children'] as List)
           ListTile(
             dense: true,
+            // Each video opens where it lives (032).
+            onTap: () => openExternalLink(raw['url'] as String? ?? ''),
+            trailing: const Icon(Icons.open_in_new),
             title: Text((raw as Map)['title'] as String? ?? raw['url'] as String),
             subtitle: Text(
               _phaseLabel(t, phaseOf(raw['status'] as String? ?? 'queued')),
@@ -184,7 +186,7 @@ class _LinkPageState extends State<LinkPage> {
 
       const SizedBox(height: BotvySpace.xl),
       OutlinedButton.icon(
-        onPressed: () => _open(context, row.url),
+        onPressed: () => unawaited(_open(context, row.url)),
         icon: const Icon(Icons.open_in_new),
         label: Text(t.knowledgeOpenOriginal),
       ),
@@ -192,13 +194,101 @@ class _LinkPageState extends State<LinkPage> {
   }
 }
 
-void _open(BuildContext context, String url) {
-  // Deliberately not `url_launcher`: this app has no such dependency today, and
-  // adding one for a single button is a dependency for a sentence. The address
-  // is shown at the top of this screen and is selectable, which is the honest
-  // interim — and the day a second screen wants to open a link outside the app
-  // is the day it earns the package.
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(url)));
+/// Opens the original. `url_launcher` arrived with meetings in 032, which was
+/// the "second screen" this button had been waiting for; until it could open,
+/// it only showed the address in a snackbar.
+Future<void> _open(BuildContext context, String url) async {
+  final opened = await openExternalLink(url);
+  if (!opened && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(url)));
+  }
+}
+
+/// One picture or video of the link, with the address it loads from.
+class _Media {
+  const _Media({required this.url, required this.isVideo, this.caption});
+
+  final String url;
+  final bool isVideo;
+  final String? caption;
+}
+
+/// The link's media that this installation can show, in the server's order.
+///
+/// Only what comes through Botvy's own signed path (see the class comment): an
+/// item whose url the cubit cannot resolve is left out rather than loaded from
+/// the source.
+List<_Media> _media(BuildContext context, Map<String, dynamic> doc) {
+  final cubit = context.read<KnowledgeCubit>();
+  return [
+    for (final raw in doc['media'] as List? ?? const [])
+      if (raw is Map && cubit.mediaUrl(raw['url'] as String?) != null)
+        _Media(
+          url: cubit.mediaUrl(raw['url'] as String?)!,
+          isVideo: raw['type'] == 'video',
+          caption: raw['caption'] as String?,
+        ),
+  ];
+}
+
+/// Pictures open full screen at the one tapped, with the others a swipe away;
+/// a video opens where it lives.
+void _openMedia(BuildContext context, Map<String, dynamic> doc, _Media tapped) {
+  if (tapped.isVideo) {
+    unawaited(openExternalLink(tapped.url));
+    return;
+  }
+  final pictures = _media(context, doc).where((m) => !m.isVideo).toList();
+  unawaited(
+    showMediaViewer(
+      context,
+      items: [
+        for (final picture in pictures)
+          MediaViewerItem(url: picture.url, caption: picture.caption),
+      ],
+      initialIndex: pictures.indexWhere((m) => m.url == tapped.url),
+    ),
+  );
+}
+
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({required this.item, required this.onTap, super.key});
+
+  final _Media item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    return Semantics(
+      button: true,
+      label: item.caption ?? t.knowledgeOpenMedia,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(BotvyRadius.md),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(BotvyRadius.md),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.network(
+                item.url,
+                // A picture that will not load is a picture; it is not an
+                // error worth interrupting the summary for.
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+              if (item.isVideo)
+                Icon(
+                  Icons.play_circle_fill,
+                  size: BotvySpace.xxl,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 String _phaseLabel(AppLocalizations t, LinkPhase phase) => switch (phase) {
