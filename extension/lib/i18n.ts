@@ -51,6 +51,7 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'meetings.where': 'Give a link or an address — at least one.',
     'meetings.join': 'Join',
     'meetings.moved': 'Moved',
+    'meetings.viewOnMap': 'View on map',
     // E-014. Not an error the member caused and not one they can fix here, so
     // it says where it *can* be seen rather than apologising.
     'meetings.unreadable':
@@ -126,6 +127,7 @@ const catalogues: Record<Locale, Record<string, string>> = {
     'meetings.where': 'أدخل رابطًا أو عنوانًا — واحدًا على الأقل.',
     'meetings.join': 'انضم',
     'meetings.moved': 'مُنقول',
+    'meetings.viewOnMap': 'عرض على الخريطة',
     'meetings.unreadable':
       'لا يستطيع هذا اللوح قراءة طريقة تكرار هذا الاجتماع، لذا لا تُعرض مواعيده. افتحه في تطبيق بوتفي.',
     'meetings.addSubmit': 'إضافة اجتماع',

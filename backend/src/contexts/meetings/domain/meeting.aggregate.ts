@@ -1,4 +1,5 @@
 import { AggregateRoot } from '../../../shared/persistence/ports/aggregate-root.js';
+import { refusedScheme } from './location-link.js';
 import {
   expandOccurrences,
   isReadableRule,
@@ -103,6 +104,7 @@ export class MeetingRuleError extends Error {
     readonly code:
       | 'title_required'
       | 'location_required'
+      | 'location_link_scheme'
       | 'bad_duration'
       | 'bad_prep'
       | 'bad_offsets'
@@ -634,7 +636,26 @@ function requireLocation(location: MeetingLocation): MeetingLocation {
       'A meeting needs a link or an address.',
     );
   }
-  return { onlineLink, address };
+  return requireLinkSchemes({ onlineLink, address });
+}
+
+/**
+ * 032, FR-001: the extension renders a location as an `href` and the phone
+ * launches it, so a `javascript:` or `file:` link is refused at the write
+ * rather than trusted to every client's escaping. A scheme-less link passes;
+ * clients prefix `https://`.
+ */
+function requireLinkSchemes<T extends MeetingLocation>(location: T): T {
+  for (const value of [location.onlineLink, location.address]) {
+    const scheme = value ? refusedScheme(value) : null;
+    if (scheme !== null) {
+      throw new MeetingRuleError(
+        'location_link_scheme',
+        `A meeting link must start with http:// or https://, not ${scheme}:.`,
+      );
+    }
+  }
+  return location;
 }
 
 function requireDuration(durationMin: number): number {
@@ -711,6 +732,10 @@ function validatedRecurrence(
     exdates: [...(recurrence.exdates ?? [])],
     overrides: (recurrence.overrides ?? []).map((override) => ({
       ...override,
+      // A moved occurrence's room is a location like any other (032).
+      location: override.location
+        ? requireLinkSchemes(override.location)
+        : override.location,
     })),
   };
   if (!isReadableRule(copy, zone)) {

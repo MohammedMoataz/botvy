@@ -78,6 +78,10 @@ dependencies:
   # transform. Google's own package; hand-rolling a container transform is
   # hundreds of lines.
   animations: ^2.2.0
+  # A meeting's place as a small map with a pin (032). BSD-3; OSM tiles carry
+  # the app's package id as their user agent, per the tile usage policy.
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
 
 dev_dependencies:
   flutter_test:

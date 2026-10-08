@@ -1,5 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { observer } from 'mobx-react-lite';
+import {
+  fetchLinkPreview,
+  isLinkShaped,
+  osmLink,
+  safeHref,
+  type LinkPreview,
+} from '../../lib/meeting-links';
 import type { AgendaEntry, PanelStore } from '../../lib/store';
 
 /**
@@ -97,6 +104,7 @@ const MeetingRowView = observer(function MeetingRowView({
 }) {
   const { occurrence } = entry;
   const { onlineLink, address } = occurrence.location;
+  const joinHref = onlineLink ? safeHref(onlineLink) : null;
 
   return (
     <li className="d-flex align-items-start gap-2 py-1 border-bottom">
@@ -112,15 +120,21 @@ const MeetingRowView = observer(function MeetingRowView({
         {/* No link means an address, and the address is shown as written. Both
             may be present — a room that is also dialled into is one meeting —
             in which case the Join button and the address stand together. */}
-        {address && <div className="text-muted small">{address}</div>}
+        {address && <AddressLine address={address} />}
+        <PreviewCard
+          store={store}
+          url={joinHref ?? (address ? safeHref(address) : null)}
+          address={address && !isLinkShaped(address) ? address : null}
+        />
       </div>
-      {onlineLink && (
+      {joinHref && (
         // A plain link rather than `chrome.tabs.create`: `target="_blank"` opens
         // the new tab with no `tabs` permission to ask for, and `rel` keeps the
         // meeting host from reaching back into the panel through `window.opener`.
+        // `safeHref`, because an `href` is exactly where `javascript:` runs.
         <a
           className="btn btn-primary btn-sm flex-shrink-0"
-          href={onlineLink}
+          href={joinHref}
           target="_blank"
           rel="noreferrer noopener"
         >
@@ -130,6 +144,95 @@ const MeetingRowView = observer(function MeetingRowView({
     </li>
   );
 });
+
+/**
+ * An address, as a link when it is one (032, FR-002) — a pasted
+ * `maps.app.goo.gl/…` opens the place. Only `http(s)` becomes an `href`;
+ * anything else link-shaped stays text.
+ */
+export function AddressLine({ address }: { address: string }) {
+  const href = safeHref(address);
+  return (
+    <div className="text-muted small text-truncate">
+      {href ? (
+        <a href={href} target="_blank" rel="noreferrer noopener">
+          {address}
+        </a>
+      ) : (
+        address
+      )}
+    </div>
+  );
+}
+
+/**
+ * The server's preview of a link or a place: site, title, picture, and a
+ * "View on map" link for a place. No map — the panel is too narrow. Nothing is
+ * drawn while it loads or when there is none, because the plain link is
+ * already on screen.
+ */
+function PreviewCard({
+  store,
+  url,
+  address,
+}: {
+  store: PanelStore;
+  url: string | null;
+  address: string | null;
+}) {
+  const [preview, setPreview] = useState<LinkPreview | null>(null);
+  useEffect(() => {
+    if (!url && !address) return;
+    let live = true;
+    void fetchLinkPreview(store.client, { url, address }).then((answer) => {
+      if (live) setPreview(answer);
+    });
+    return () => {
+      live = false;
+    };
+  }, [store, url, address]);
+  return preview ? (
+    <PreviewBody preview={preview} viewOnMap={store.t('meetings.viewOnMap')} />
+  ) : null;
+}
+
+export function PreviewBody({
+  preview,
+  viewOnMap,
+}: {
+  preview: LinkPreview;
+  viewOnMap: string;
+}) {
+  const { title, siteName, image, place } = preview;
+  if (!title && !siteName && !image && !place) return null;
+  return (
+    <div className="d-flex gap-2 mt-1 small">
+      {image && (
+        <img
+          src={image}
+          alt=""
+          width={48}
+          height={48}
+          style={{ objectFit: 'cover' }}
+          referrerPolicy="no-referrer"
+        />
+      )}
+      <div style={{ minWidth: 0 }}>
+        {siteName && <div className="text-muted text-truncate">{siteName}</div>}
+        {title && <div className="text-truncate">{title}</div>}
+        {place && (
+          <a
+            href={osmLink(place.lat, place.lng)}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            {viewOnMap}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const QuickAdd = observer(function QuickAdd({ store }: { store: PanelStore }) {
   const [title, setTitle] = useState('');

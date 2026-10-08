@@ -6,9 +6,23 @@ import type { OutboxInsert } from '../../shared/persistence/mongo/mongo-reposito
 import { MongoUnitOfWork } from '../../shared/persistence/mongo/mongo-unit-of-work.js';
 import {
   CalendarEventSchema,
+  LinkPreviewSchema,
   MeetingSchema,
   MODEL_NAMES,
 } from '../../shared/persistence/mongo/schemas.js';
+import { SettingsService } from '../../shared/settings/settings.service.js';
+import {
+  Geocoder,
+  LinkPreviewCache,
+  PageFetcher,
+} from './domain/link-preview.ports.js';
+import { LinkPreviewQueryHandler } from './features/link-preview/link-preview.query.js';
+import { HttpPageFetcher } from './infrastructure/http-page-fetcher.js';
+import {
+  MongoLinkPreviewCache,
+  type LinkPreviewDoc,
+} from './infrastructure/link-preview.cache.js';
+import { NominatimGeocoder } from './infrastructure/nominatim-geocoder.js';
 import { UnitOfWork } from '../../shared/persistence/ports/unit-of-work.js';
 import { OperationsModule } from '../operations/operations.module.js';
 import { PlanningModule } from '../planning/planning.module.js';
@@ -101,6 +115,7 @@ import {
     MongooseModule.forFeature([
       { name: MODEL_NAMES.meeting, schema: MeetingSchema },
       { name: MODEL_NAMES.calendarEvent, schema: CalendarEventSchema },
+      { name: MODEL_NAMES.linkPreview, schema: LinkPreviewSchema },
     ]),
   ],
   providers: [
@@ -173,6 +188,24 @@ import {
     AgendaQueryHandler,
     MonthOverviewQueryHandler,
 
+    // ---- 032: link previews -------------------------------------------
+    // Factories, because a `typeof fetch` constructor parameter is
+    // `Function` to Nest (CLAUDE.md).
+    { provide: PageFetcher, useFactory: () => new HttpPageFetcher() },
+    {
+      provide: Geocoder,
+      inject: [SettingsService],
+      useFactory: (settings: SettingsService) =>
+        new NominatimGeocoder(settings),
+    },
+    {
+      provide: LinkPreviewCache,
+      inject: [getModelToken(MODEL_NAMES.linkPreview)],
+      useFactory: (model: Model<LinkPreviewDoc>) =>
+        new MongoLinkPreviewCache(model),
+    },
+    LinkPreviewQueryHandler,
+
     MongoUnitOfWork,
     { provide: UnitOfWork, useExisting: MongoUnitOfWork },
   ],
@@ -196,6 +229,8 @@ import {
     MeetingsQueryHandler,
     AgendaQueryHandler,
     MonthOverviewQueryHandler,
+    // For `LinkPreviewResolver`, which `GraphQLModule` provides.
+    LinkPreviewQueryHandler,
     /*
      * Every command handler, because the two controllers are declared by
      * `AppModule` and Nest resolves a controller's dependencies from the module

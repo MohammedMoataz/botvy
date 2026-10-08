@@ -67,6 +67,9 @@ const NOT_THROUGH_THE_BASE: Record<string, string> = {
    */
   usage_log:
     'append-only inserts by Operations; unique on eventId, never modified',
+  // 032. It still declares `updatedAt`, which the cache's upsert writes.
+  link_previews:
+    'a server cache: one bare upsert per fetch, no aggregate and no optimistic check',
 };
 
 interface SchemaLike {
@@ -214,6 +217,14 @@ describe('the schemas and the repository base agree', () => {
        * about who owns the row.
        */
       'athlete_profiles',
+      /*
+       * 032: previews of meeting links and addresses, shared across members
+       * and keyed by a hash of the string. No member data beyond a link or an
+       * address some member supplied, and a member only reads back the preview
+       * of a string they sent — so there is no owner to filter on, and a
+       * `userId` would split one URL's cache per member for nothing.
+       */
+      'link_previews',
     ]);
 
     const missing = all

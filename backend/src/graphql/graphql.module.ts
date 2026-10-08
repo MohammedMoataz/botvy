@@ -28,6 +28,7 @@ import { NutritionResolver } from '../contexts/nutrition/features/meals/nutritio
 import { OperationsAdminResolver } from '../contexts/operations/features/audit/operations-admin.resolver.js';
 import { NutritionModule } from '../contexts/nutrition/nutrition.module.js';
 import { KnowledgeResolver } from '../contexts/knowledge/features/links/knowledge.resolver.js';
+import { LinkPreviewResolver } from '../contexts/meetings/features/link-preview/link-preview.resolver.js';
 
 /**
  * The read edge.
@@ -190,6 +191,8 @@ export const RESOLVERS = [
   KnowledgeResolver,
   NutritionResolver,
   OperationsAdminResolver,
+  // 032: a meeting link's or address's preview.
+  LinkPreviewResolver,
 ] as const;
 
 @Module({
